@@ -54,17 +54,17 @@ export const getViewRelatedTableJoinCondition = async ({
       if (joinColumns.length) {
         try {
           const { count } = await db.one<{ count: number }>(`
-                    WITH ${tableName} AS (
-                      SELECT * 
-                      FROM ${tableName}
-                      LIMIT 0
-                    )
-        
-                    SELECT COUNT(*) as count
-                    FROM (
-                      ${viewDefinition}
-                    ) prostgles_view_ref_table_test
-                  `);
+            WITH ${tableName} AS (
+              SELECT * 
+              FROM ${tableName}
+              LIMIT 0
+            )
+
+            SELECT COUNT(*) as count
+            FROM (
+              ${viewDefinition}
+            ) prostgles_view_ref_table_test
+          `);
 
           const fullCondition = `
             EXISTS (
@@ -75,7 +75,6 @@ export const getViewRelatedTableJoinCondition = async ({
             )`;
 
           if (count.toString() === "0") {
-            // return relatedTableSubscription;
             condition = fullCondition;
           }
         } catch (e) {

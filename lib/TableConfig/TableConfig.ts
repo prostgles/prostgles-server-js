@@ -4,10 +4,9 @@ import type {
   AnyObject,
   ColumnInfo,
   JSONB,
-  TableInfo} from "prostgles-types";
-import {
-  isObject
+  TableInfo,
 } from "prostgles-types";
+import { isObject } from "prostgles-types";
 import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";

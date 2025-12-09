@@ -42,13 +42,13 @@ export async function getTablesForSchemaPostgresSQL(
       duration: fkeysResponseDuration,
     } = await getFkeys(t, { sql, schemaNames });
 
-    const uniqueColsReq = await tryCatchV2(async () => {
-      const res: {
+    const uniqueColsReq = await tryCatchV2(() => {
+      return t.any<{
         table_name: string;
         table_schema: string;
         index_name: string;
         column_names: string[];
-      }[] = await t.any(`
+      }>(`
         select
             t.relname as table_name,
             (SELECT pnm.nspname FROM pg_catalog.pg_namespace pnm WHERE pnm.oid =  i.relnamespace) as table_schema,
@@ -71,8 +71,6 @@ export async function getTablesForSchemaPostgresSQL(
             t.relname,
             i.relname;
       `);
-
-      return res;
     });
 
     if (uniqueColsReq.error) {
@@ -224,6 +222,7 @@ export async function getTablesForSchemaPostgresSQL(
         table.columns = clone(getTVColumns.data!.columns)
           .filter((c) => c.table_oid === table.oid)
           .map((c) => omitKeys(c, ["table_oid"]));
+
         table.parent_tables =
           getViewParentTables.data?.parent_tables.find((vr) => vr.oid === table.oid)?.table_names ??
           [];

@@ -12,7 +12,7 @@ export const getViewRelatedTables = async (
   newQuery: NewQuery
 ) => {
   /** TODO: this needs to be memoized on schema fetch */
-  const { name: viewName, escapedName: viewNameEscaped, dboBuilder } = viewHandler;
+  const { name: viewName, dboBuilder } = viewHandler;
 
   /** Get list of used columns and their parent tables */
   const { view_definition = "" } = viewHandler.tableOrViewInfo;
@@ -60,7 +60,7 @@ export const getViewRelatedTables = async (
     dboBuilder,
     viewDefinition: definition,
     viewTables,
-    viewNameEscaped,
+    viewNameEscaped: viewName,
     newQuery,
   });
 
