@@ -10,7 +10,7 @@ function prostgles<S = void, SUser extends SessionUser = SessionUser>(
   params: ProstglesInitOptions<S, SUser>
 ) {
   const prgl = new Prostgles(params as ProstglesInitOptions);
-  return prgl.init(params.onReady as unknown as OnReadyCallbackBasic, {
+  return prgl.init(params.onReady as OnReadyCallbackBasic, {
     type: "init",
   }) as unknown as Promise<InitResult<S, SUser>>;
 }

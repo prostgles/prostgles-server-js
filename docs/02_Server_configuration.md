@@ -42,6 +42,12 @@
    }
   );
   ```
+  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express</span>
+
+    Express server instance
+  - **path** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+    Defaults to "/api"
 - **disableRealtime** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then schema watch, subscriptions and syncs will be disabled.
@@ -97,7 +103,7 @@
 
     Name of the cookie or socket hadnshake query param that represents the session id.
     Defaults to "session_id"
-  - **onUseOrSocketConnected** <span style="color: grey">optional</span> <span style="color: green;">(sid: string | undefined, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;void | { error: string; httpCode: 400 | 401 | 403; } | { ...; }&gt;</span>
+  - **onUseOrSocketConnected** <span style="color: grey">optional</span> <span style="color: green;">((sid: string | undefined, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;void | { error: string; httpCode: 400 | 401 | 403; } | { ...; }&gt;) | undefined</span>
 
     Awaited before any auth actions.
     If session is returned then will set cookie and redirect
@@ -110,55 +116,18 @@
     - auth.expressConfig.use - express middleware to get user data and
        undefined sid is allowed to enable public users
     - websocket authguard - when session expires tells the client to reload to be redirected to login
-  - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig</span>
+  - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig&lt;S, SUser&gt; | undefined</span>
 
     Will setup auth routes
      /login
      /logout
      /magic-link/:id
-    - **app** <span style="color: red">required</span> <span style="color: green;">Express</span>
-
-      Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
-    - **cookieOptions** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | undefined</span>
-
-      Options used in setting the cookie after a successful login
-    - **disableSocketAuthGuard** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
-
-      False by default. If false and userRoutes are provided then the socket will request window.location.reload if the current url is on a user route.
-    - **publicRoutes** <span style="color: grey">optional</span> <span style="color: green;">string[] | undefined</span>
-
-      If provided, any client requests to NOT these routes (or their subroutes) will be redirected to loginRoute (if logged in) and then redirected back to the initial route after logging in
-      If logged in the user is allowed to access these routes
-    - **onGetRequestOK** <span style="color: grey">optional</span> <span style="color: green;">((req: ExpressReq, res: ExpressRes, params: AuthRequestParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;void&gt;) | undefined</span>
-
-      Will be called after a GET request is authorised
-      This means that
-    - **onMagicLinkOrOTP** <span style="color: grey">optional</span> <span style="color: green;">((data: MagicLinkOrOTPData, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;{ session: BasicSession | undefined; response?: AuthSuccess | ... 1 more ... | undefined; } | { ...; }&gt;) | undefined</span>
-
-      If defined, will enable:
-      - GET /magic-link/:id route.
-      - POST /magic-link { email, code } route.
-      Successfull requests that return a session will be logged in
-      and redirected to the returnUrl if set.
-      Otherwise just the response will be sent
-    - **signupWithEmail** <span style="color: grey">optional</span> <span style="color: green;">SignupWithEmail | undefined</span>
-    - **loginWithOAuth** <span style="color: grey">optional</span> <span style="color: green;">LoginWithOAuthConfig&lt;S&gt; | undefined</span>
-    - **localLoginMode** <span style="color: grey">optional</span> <span style="color: green;">LocalLoginMode | undefined</span>
-
-      Used to hint to the client which login mode is available
-      Defaults to username and password
-    - **login** <span style="color: red">required</span> <span style="color: green;">(params: LoginParams, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo) =&gt; Awaitable&lt;LoginResponse&gt;</span>
-
-      If provided then the user will be able to login with a username and/or password
-      through the POST /login route.
-    - **logout** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;void&gt;</span>
   - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
     Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; }</span>
+  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; } | undefined</span>
 
     If provided then session info will be saved on socket.__prglCache and reused from there
-    - **getSession** <span style="color: red">required</span> <span style="color: green;">(sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;</span>
 - **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   Used internally for debugging
@@ -201,6 +170,33 @@
   
   const fileUrl = file.url;
   ```
+  - **tableName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+    Name of the table that will contain the file metadata.
+    Defaults to "files"
+  - **fileServePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+    GET path used in serving media. defaults to /${tableName}
+  - **delayedDelete** <span style="color: grey">optional</span> <span style="color: green;">{ deleteAfterNDays: number; checkIntervalHours?: number | undefined; } | undefined</span>
+
+    If defined the the files will not be deleted immediately
+    Instead, the "deleted" field will be updated to the current timestamp and after the day interval provided in "deleteAfterNDays" the files will be deleted
+    "checkIntervalMinutes" is the frequency in hours at which the files ready for deletion are deleted
+  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express | ExpressApp</span>
+
+    Express server instance
+  - **referencedTables** <span style="color: grey">optional</span> <span style="color: green;">{ [tableName: string]: { type: "column"; referenceColumns: Record&lt;string, FileColumnConfig&gt;; }; } | undefined</span>
+
+    Specifying referencedTables with referenceColumns allows restricting the
+    allowed file types that can be inserted and referenced in the specified tables.
+  - **imageOptions** <span style="color: grey">optional</span> <span style="color: green;">ImageOptions | undefined</span>
+  - **cloudClient** <span style="color: grey">optional</span> <span style="color: green;">CloudClient | undefined</span>
+
+    Callbacks for file upload and download.
+    Used for custom file handling.
+  - **localConfig** <span style="color: grey">optional</span> <span style="color: green;">LocalConfig | undefined</span>
+
+    Local file storage configuration.
 - **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
 
   Define tables through a JSON-schema like object.

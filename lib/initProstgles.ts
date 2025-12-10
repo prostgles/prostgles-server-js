@@ -68,11 +68,11 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
 
 export type OnReadyCallback<S, SUser extends SessionUser> = (
   params: OnReadyParams<S>,
-  update: UpdateableOptions<S, SUser>
+  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>
 ) => any;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
-  update: InitResult["update"]
+  update: (newOpts: UpdateableOptions<void, SessionUser>, force?: true) => Promise<void>
 ) => any;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
