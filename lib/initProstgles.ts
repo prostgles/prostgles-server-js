@@ -1,6 +1,5 @@
-import * as pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
-import { getKeys, isEmpty, isEqual } from "prostgles-types";
+import { getKeys, getObjectEntries, isDefined, isEmpty, isEqual } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
@@ -14,6 +13,8 @@ import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
 import { sleep } from "./utils/utils";
 import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
+import { getDbConnection } from "./getDbConnection";
+import type pgPromise from "pg-promise";
 
 /**
  * Database connection details
@@ -30,7 +31,14 @@ export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
 export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
   ProstglesInitOptions<S, SUser>,
-  "fileTable" | "restApi" | "tableConfig" | "schemaFilter" | "auth"
+  | "fileTable"
+  | "restApi"
+  | "tableConfig"
+  | "schemaFilter"
+  | "auth"
+  | "publish"
+  | "publishMethods"
+  | "publishRawSQL"
 >;
 export type OnInitReason =
   | {
@@ -201,15 +209,18 @@ export const initProstgles = async function (
       getTSSchema: this.getTSFileContent,
       options: this.opts,
       update: async (newOpts) => {
-        let optsHaveChanged = false as boolean;
-        getKeys(newOpts).forEach((k) => {
-          if (!isEqual(this.opts[k], newOpts[k])) {
-            optsHaveChanged = true;
-            //@ts-ignore
-            this.opts[k] = newOpts[k];
-          }
-        });
-        if (!optsHaveChanged) {
+        const optionsThatChanged = getObjectEntries(newOpts)
+          .map((entry) => {
+            const [k, v] = entry;
+            if (!isEqual(this.opts[k], newOpts[k])) {
+              //@ts-ignore
+              this.opts[k] = v;
+              return entry;
+            }
+            return;
+          })
+          .filter(isDefined);
+        if (!optionsThatChanged.length) {
           console.warn("No options changed");
           return;
         }
@@ -284,91 +295,4 @@ export const initProstgles = async function (
     console.trace(e);
     throw "init issues: " + (e as Error).toString();
   }
-};
-
-type GetDbConnectionArgs = Pick<
-  ProstglesInitOptions,
-  "DEBUG_MODE" | "onQuery" | "dbConnection" | "onNotice" | "onConnectionError"
->;
-const getDbConnection = function ({
-  dbConnection,
-  onQuery,
-  onConnectionError,
-  DEBUG_MODE,
-  onNotice,
-}: GetDbConnectionArgs): { db: DB; pgp: PGP } {
-  const onQueryOrError:
-    | undefined
-    | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
-    !onQuery && !DEBUG_MODE ?
-      undefined
-    : (error, ctx) => {
-        if (onQuery) {
-          onQuery(error, ctx);
-        } else if (DEBUG_MODE) {
-          if (error) {
-            console.error(error, ctx);
-          } else {
-            console.log(ctx);
-          }
-        }
-      };
-
-  const pgp: PGP = pgPromise({
-    ...(onQueryOrError && {
-      query: (ctx) => onQueryOrError(undefined, ctx),
-    }),
-    error: (err: Error, ctx) => {
-      if (ctx.cn) {
-        onConnectionError?.(err, ctx);
-      }
-      onQueryOrError?.(err, ctx);
-    },
-    ...((onNotice || DEBUG_MODE) && {
-      connect: function ({ client, useCount }) {
-        const isFresh = !useCount;
-        if (isFresh && !client.listeners("notice").length) {
-          client.on("notice", function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else {
-              console.log("notice: %j", msg?.message);
-            }
-          });
-        }
-        if (isFresh && !client.listeners("error").length) {
-          client.on("error", function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else {
-              console.log("error: %j", msg?.message);
-            }
-          });
-        }
-      },
-    }),
-  });
-  // pgp.pg.defaults.max = 70;
-
-  // /* Casts count/sum/max to bigint. Needs rework to remove casting "+count" and other issues; */
-  // pgp.pg.types.setTypeParser(20, BigInt);
-
-  /**
-   * Prevent timestamp casting to ensure we don't lose the microseconds.
-   * This is needed to ensure the filters work as expected for a given row
-   * 
-  register(1114, parseTimestamp) // timestamp without time zone
-  register(1184, parseTimestampTz) // timestamp with time zone
-   */
-  // pgp.pg.types.setTypeParser(1114, v => v); // timestamp without time zone
-  // pgp.pg.types.setTypeParser(1184, v => v); // timestamp with time zone
-  // pgp.pg.types.setTypeParser(1182, v => v); // date
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMP, (v) => v); // timestamp without time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, (v) => v); // timestamp with time zone
-  pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, (v) => v); // date
-
-  return {
-    db: pgp(dbConnection),
-    pgp,
-  };
 };
