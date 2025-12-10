@@ -88,6 +88,9 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   ) => ReturnType<typeof getClientHandlers<S>>;
 };
 
+/**
+ * Changes that do not affect the server so onReady does not need to be called again
+ */
 const clientOnlyUpdateKeys = [
   "auth",
   "publish",
