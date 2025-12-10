@@ -109,34 +109,37 @@ export class DboBuilder {
       .filter(isDefined);
   }
 
+  getPubSubManagerPromise?: Promise<PubSubManager>;
   getPubSubManager = async (): Promise<PubSubManager> => {
-    if (!this._pubSubManager) {
-      const canExecute = await getCanExecute(this.db);
-      if (!canExecute)
-        throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
+    this.getPubSubManagerPromise ??= (async () => {
+      if (!this._pubSubManager) {
+        const canExecute = await getCanExecute(this.db);
+        if (!canExecute)
+          throw "PubSubManager based subscriptions not possible: Cannot run EXECUTE statements on this connection";
 
-      const {
-        data: pubSubManager,
-        error,
-        hasError,
-      } = await tryCatchV2(async () => {
-        const pubSubManager = await PubSubManager.create(this);
-        return pubSubManager;
-      });
-      this._pubSubManager = pubSubManager;
-      if (hasError || !this._pubSubManager) {
-        await this.prostgles.opts.onLog?.({
-          type: "debug",
-          command: "PubSubManager.create",
-          duration: 0,
-          error: getSerialisableError(error),
+        const {
+          data: pubSubManager,
+          error,
+          hasError,
+        } = await tryCatchV2(async () => {
+          const pubSubManager = await PubSubManager.create(this);
+          return pubSubManager;
         });
-        console.error("Could not create PubSubManager", getQueryErrorPositionInfo(error));
-        throw "Could not create this._pubSubManager check logs";
+        this._pubSubManager = pubSubManager;
+        if (hasError || !this._pubSubManager) {
+          await this.prostgles.opts.onLog?.({
+            type: "debug",
+            command: "PubSubManager.create",
+            duration: 0,
+            error: getSerialisableError(error),
+          });
+          console.error("Could not create PubSubManager", getQueryErrorPositionInfo(error));
+          throw "Could not create this._pubSubManager check logs";
+        }
       }
-    }
-
-    return this._pubSubManager;
+      return this._pubSubManager;
+    })();
+    return this.getPubSubManagerPromise;
   };
 
   tsTypesDefinition?: string;

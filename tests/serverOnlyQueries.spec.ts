@@ -1,9 +1,26 @@
 //@ts-ignore
 import { describe, test } from "node:test";
 import type { DBHandlerServer } from "../dist/Prostgles";
+import { assert } from "console";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
   await describe("Server Only Queries", async () => {
+    await test('Parallel subscription at init causing crash in getPubSubManager: duplicate key value violates unique constraint "apps_pkey"', async () => {
+      let results: any[] = [];
+      const sub1 = db.rec.subscribe!({}, {}, (res) => {
+        results.push(res);
+      });
+      const sub2 = db.items.subscribe!({}, {}, (res) => {
+        results.push(res);
+      });
+      const timeout = 5_000;
+      while (results.length < 2 && timeout > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      assert(results.length === 2, "Did not receive both subscription initial results");
+      (await sub1).unsubscribe();
+      (await sub2).unsubscribe();
+    });
     await test("Self reference recursion bug", async () => {
       await db.rec.findOne!({ id: 1 }, { select: { "*": 1, rec_ref: "*" } });
     });
