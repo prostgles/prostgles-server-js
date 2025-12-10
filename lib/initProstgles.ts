@@ -1,9 +1,10 @@
+import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
-import { getKeys, getObjectEntries, isDefined, isEmpty, isEqual } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
 import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+import { getDbConnection } from "./getDbConnection";
 import type { DBHandlerServer, Prostgles } from "./Prostgles";
 import { getIsSuperUser } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
@@ -11,10 +12,9 @@ import type { DbTableInfo } from "./PublishParser/PublishParser";
 import { PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
+import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
 import { sleep } from "./utils/utils";
 import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
-import { getDbConnection } from "./getDbConnection";
-import type pgPromise from "pg-promise";
 
 /**
  * Database connection details
@@ -66,8 +66,14 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>;
 };
 
-export type OnReadyCallback<S = void> = (params: OnReadyParams<S>) => any;
-export type OnReadyCallbackBasic = (params: OnReadyParamsBasic) => any;
+export type OnReadyCallback<S = void> = (
+  params: OnReadyParams<S>,
+  update: InitResult["update"]
+) => any;
+export type OnReadyCallbackBasic = (
+  params: OnReadyParamsBasic,
+  update: InitResult["update"]
+) => any;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   db: DBOFullyTyped<S>;
@@ -87,16 +93,6 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
     scope: PermissionScope | undefined
   ) => ReturnType<typeof getClientHandlers<S>>;
 };
-
-/**
- * Changes that do not affect the server so onReady does not need to be called again
- */
-const clientOnlyUpdateKeys = [
-  "auth",
-  "publish",
-  "publishMethods",
-  "publishRawSQL",
-] as const satisfies (keyof UpdateableOptions)[];
 
 export const initProstgles = async function (
   this: Prostgles,
@@ -197,12 +193,15 @@ export const initProstgles = async function (
       if (this.destroyed) {
         console.trace("Prostgles: Instance is destroyed");
       }
-      onReady({
-        dbo: this.dbo!,
-        db: this.db,
-        tables: this.dboBuilder.tables,
-        reason,
-      });
+      onReady(
+        {
+          dbo: this.dbo!,
+          db: this.db,
+          tables: this.dboBuilder.tables,
+          reason,
+        },
+        (...args) => updateConfiguration(this, onReady, ...args)
+      );
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err);
     }
@@ -216,54 +215,8 @@ export const initProstgles = async function (
       io: this.opts.io,
       getTSSchema: this.getTSFileContent,
       options: this.opts,
-      update: async (newOpts, force) => {
-        const optionsThatChanged = getObjectEntries(newOpts)
-          .map((entry) => {
-            const [k, v] = entry;
-            if (force || !isEqual(this.opts[k], newOpts[k])) {
-              //@ts-ignore
-              this.opts[k] = v;
-              return entry;
-            }
-            return;
-          })
-          .filter(isDefined);
-        if (!optionsThatChanged.length) {
-          console.warn("No options changed");
-          return;
-        }
-
-        if ("fileTable" in newOpts) {
-          await this.initFileTable();
-        }
-        if ("restApi" in newOpts) {
-          this.initRestApi();
-        }
-        if ("tableConfig" in newOpts) {
-          await this.initTableConfig({ type: "prgl.update", newOpts });
-        }
-        if ("schema" in newOpts) {
-          await this.refreshDBO();
-        }
-        if ("auth" in newOpts) {
-          this.initAuthHandler();
-        }
-
-        if (isEmpty(newOpts)) return;
-
-        /**
-         * Some of these changes require clients to reconnect
-         * While others also affect the server and onReady should be called
-         */
-        if (
-          getKeys(newOpts).every((updatedKey) =>
-            clientOnlyUpdateKeys.some((key) => key === updatedKey)
-          )
-        ) {
-          this.setupSocketIO();
-        } else {
-          await this.init(onReady, { type: "prgl.update", newOpts });
-        }
+      update: async (...args) => {
+        return updateConfiguration(this, onReady, ...args);
       },
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {

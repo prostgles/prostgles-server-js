@@ -9,6 +9,7 @@ import { FileManager } from "./FileManager/FileManager";
 import type { OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
+import { updateConfiguration } from "./updateConfiguration";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
 import { onSocketConnected } from "./WebsocketAPI/onSocketConnected";
 import pg = require("pg-promise/typescript/pg-subset");

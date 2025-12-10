@@ -164,7 +164,7 @@ export const clientOnlyQueries = async (
       });
     });
 
-    await test("SQL Stream stop with terminate kills the query", async () => {
+    await test("SQL Stream stop with terminate kills the query", { timeout: 10_000 }, async () => {
       await tryRunP("", async (resolve, reject) => {
         const totalRows = 5e6;
         const query = `SELECT * FROM generate_series(1, ${totalRows})`;
