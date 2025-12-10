@@ -205,6 +205,7 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
+    //@ts-ignore
     const initResult: InitResult = {
       db: this.dbo as DBOFullyTyped,
       _db: db,
