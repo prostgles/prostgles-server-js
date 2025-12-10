@@ -79,7 +79,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
-  update: (newOpts: UpdateableOptions<S, SUser>) => Promise<void>;
+  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
   getClientDBHandlers: (
@@ -88,7 +88,12 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   ) => ReturnType<typeof getClientHandlers<S>>;
 };
 
-const clientOnlyUpdateKeys = ["auth"] as const satisfies (keyof UpdateableOptions)[];
+const clientOnlyUpdateKeys = [
+  "auth",
+  "publish",
+  "publishMethods",
+  "publishRawSQL",
+] as const satisfies (keyof UpdateableOptions)[];
 
 export const initProstgles = async function (
   this: Prostgles,
@@ -200,7 +205,6 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
-    //@ts-ignore
     const initResult: InitResult = {
       db: this.dbo as DBOFullyTyped,
       _db: db,
@@ -208,11 +212,11 @@ export const initProstgles = async function (
       io: this.opts.io,
       getTSSchema: this.getTSFileContent,
       options: this.opts,
-      update: async (newOpts) => {
+      update: async (newOpts, force) => {
         const optionsThatChanged = getObjectEntries(newOpts)
           .map((entry) => {
             const [k, v] = entry;
-            if (!isEqual(this.opts[k], newOpts[k])) {
+            if (force || !isEqual(this.opts[k], newOpts[k])) {
               //@ts-ignore
               this.opts[k] = v;
               return entry;
