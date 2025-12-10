@@ -42,12 +42,6 @@
    }
   );
   ```
-  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express</span>
-
-    Express server instance
-  - **path** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    Defaults to "/api"
 - **disableRealtime** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then schema watch, subscriptions and syncs will be disabled.
@@ -99,35 +93,6 @@
 
   Auth configuration.
   Supports email and OAuth strategies
-  - **sidKeyName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    Name of the cookie or socket hadnshake query param that represents the session id.
-    Defaults to "session_id"
-  - **onUseOrSocketConnected** <span style="color: grey">optional</span> <span style="color: green;">((sid: string | undefined, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;void | { error: string; httpCode: 400 | 401 | 403; } | { ...; }&gt;) | undefined</span>
-
-    Awaited before any auth actions.
-    If session is returned then will set cookie and redirect
-    Failure will stop the auth process
-  - **getUser** <span style="color: red">required</span> <span style="color: green;">(sid: string | undefined, dbo: DBOFullyTyped&lt;S&gt;, db: DB, client: LoginClientInfo, reqInfo: AuthClientRequest) =&gt; Awaitable&lt;...&gt;</span>
-
-    Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.
-    Used in:
-    - publish - userData and/or sid (in testing) are passed to the publish function
-    - auth.expressConfig.use - express middleware to get user data and
-       undefined sid is allowed to enable public users
-    - websocket authguard - when session expires tells the client to reload to be redirected to login
-  - **loginSignupConfig** <span style="color: grey">optional</span> <span style="color: green;">LoginSignupConfig&lt;S, SUser&gt; | undefined</span>
-
-    Will setup auth routes
-     /login
-     /logout
-     /magic-link/:id
-  - **responseThrottle** <span style="color: grey">optional</span> <span style="color: green;">number</span>
-
-    Response time rounding in milliseconds to prevent timing attacks on login. Login response time should always be a multiple of this value. Defaults to 500 milliseconds
-  - **cacheSession** <span style="color: grey">optional</span> <span style="color: green;">{ getSession: (sid: string, dbo: DBOFullyTyped&lt;S&gt;, db: DB) =&gt; Awaitable&lt;BasicSession | undefined&gt;; } | undefined</span>
-
-    If provided then session info will be saved on socket.__prglCache and reused from there
 - **DEBUG_MODE** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   Used internally for debugging
@@ -170,33 +135,6 @@
   
   const fileUrl = file.url;
   ```
-  - **tableName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    Name of the table that will contain the file metadata.
-    Defaults to "files"
-  - **fileServePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    GET path used in serving media. defaults to /${tableName}
-  - **delayedDelete** <span style="color: grey">optional</span> <span style="color: green;">{ deleteAfterNDays: number; checkIntervalHours?: number | undefined; } | undefined</span>
-
-    If defined the the files will not be deleted immediately
-    Instead, the "deleted" field will be updated to the current timestamp and after the day interval provided in "deleteAfterNDays" the files will be deleted
-    "checkIntervalMinutes" is the frequency in hours at which the files ready for deletion are deleted
-  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express | ExpressApp</span>
-
-    Express server instance
-  - **referencedTables** <span style="color: grey">optional</span> <span style="color: green;">{ [tableName: string]: { type: "column"; referenceColumns: Record&lt;string, FileColumnConfig&gt;; }; } | undefined</span>
-
-    Specifying referencedTables with referenceColumns allows restricting the
-    allowed file types that can be inserted and referenced in the specified tables.
-  - **imageOptions** <span style="color: grey">optional</span> <span style="color: green;">ImageOptions | undefined</span>
-  - **cloudClient** <span style="color: grey">optional</span> <span style="color: green;">CloudClient | undefined</span>
-
-    Callbacks for file upload and download.
-    Used for custom file handling.
-  - **localConfig** <span style="color: grey">optional</span> <span style="color: green;">LocalConfig | undefined</span>
-
-    Local file storage configuration.
 - **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
 
   Define tables through a JSON-schema like object.
