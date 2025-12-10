@@ -1,4 +1,4 @@
-import { tryCatchV2 } from "prostgles-types";
+import { getSerialisableError, tryCatchV2 } from "prostgles-types";
 import { getFileText, type Prostgles } from "../Prostgles";
 
 export const runSQLFile = async (prostgles: Prostgles) => {
@@ -59,4 +59,8 @@ export const getQueryErrorPositionInfo = (err: any, _fileContent?: string): stri
       length: internalQuery.length,
     });
   }
+
+  try {
+    return JSON.stringify(getSerialisableError(err));
+  } catch {}
 };
