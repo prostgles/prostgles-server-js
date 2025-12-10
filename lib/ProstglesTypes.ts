@@ -115,7 +115,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Called when the prostgles server is ready to accept connections.
    * It waits for auth, tableConfig and other async configurations to complete before executing
    */
-  onReady: OnReadyCallback<S>;
+  onReady: OnReadyCallback<S, SUser>;
 
   /**
    * Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved.

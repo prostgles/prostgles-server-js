@@ -66,9 +66,9 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>;
 };
 
-export type OnReadyCallback<S = void> = (
+export type OnReadyCallback<S, SUser extends SessionUser> = (
   params: OnReadyParams<S>,
-  update: InitResult["update"]
+  update: UpdateableOptions<S, SUser>
 ) => any;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
