@@ -1,21 +1,20 @@
-import { getKeys, getObjectEntries, isDefined, isEmpty, isEqual } from "prostgles-types";
+import { getKeys, isDefined, isEmpty, isEqual } from "prostgles-types";
 import type { SessionUser } from "./Auth/AuthTypes";
 import type { OnReadyCallbackBasic, UpdateableOptions } from "./initProstgles";
 import type { Prostgles } from "./Prostgles";
 
-export const updateConfiguration = async (
+export const updateConfiguration = async <DBSchema, UserSchema extends SessionUser>(
   prgl: Prostgles,
   onReady: OnReadyCallbackBasic,
-  newOpts: UpdateableOptions<void, SessionUser>,
+  newOpts: UpdateableOptions<DBSchema, UserSchema>,
   force?: true
 ) => {
-  const optionsThatChanged = getObjectEntries(newOpts)
-    .map((entry) => {
-      const [k, v] = entry;
+  const optionsThatChanged = getKeys(newOpts)
+    .map((k) => {
       if (force || !isEqual(prgl.opts[k], newOpts[k])) {
         //@ts-ignore
-        prgl.opts[k] = v;
-        return entry;
+        prgl.opts[k] = newOpts[k];
+        return k;
       }
       return;
     })

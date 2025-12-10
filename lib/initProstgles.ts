@@ -200,7 +200,9 @@ export const initProstgles = async function (
           tables: this.dboBuilder.tables,
           reason,
         },
-        (...args) => updateConfiguration(this, onReady, ...args)
+        async (...args) => {
+          await updateConfiguration(this, onReady, ...args);
+        }
       );
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err);
@@ -216,7 +218,7 @@ export const initProstgles = async function (
       getTSSchema: this.getTSFileContent,
       options: this.opts,
       update: async (...args) => {
-        return updateConfiguration(this, onReady, ...args);
+        await updateConfiguration(this, onReady, ...args);
       },
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {

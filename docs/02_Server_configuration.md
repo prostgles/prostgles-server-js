@@ -42,12 +42,6 @@
    }
   );
   ```
-  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express</span>
-
-    Express server instance
-  - **path** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    Defaults to "/api"
 - **disableRealtime** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then schema watch, subscriptions and syncs will be disabled.
@@ -207,53 +201,6 @@
   
   const fileUrl = file.url;
   ```
-  - **tableName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    Name of the table that will contain the file metadata.
-    Defaults to "files"
-  - **fileServePath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-
-    GET path used in serving media. defaults to /${tableName}
-  - **delayedDelete** <span style="color: grey">optional</span> <span style="color: green;">{ deleteAfterNDays: number; checkIntervalHours?: number | undefined; }</span>
-
-    If defined the the files will not be deleted immediately
-    Instead, the "deleted" field will be updated to the current timestamp and after the day interval provided in "deleteAfterNDays" the files will be deleted
-    "checkIntervalMinutes" is the frequency in hours at which the files ready for deletion are deleted
-    - **deleteAfterNDays** <span style="color: red">required</span> <span style="color: green;">number</span>
-
-      Minimum amount of time measured in days for which the files will not be deleted after requesting delete
-    - **checkIntervalHours** <span style="color: grey">optional</span> <span style="color: green;">number</span>
-
-      How freuquently the files will be checked for deletion delay
-  - **expressApp** <span style="color: red">required</span> <span style="color: green;">Express | ExpressApp</span>
-
-    Express server instance
-  - **referencedTables** <span style="color: grey">optional</span> <span style="color: green;">{ [tableName: string]: { type: "column"; referenceColumns: Record&lt;string, FileColumnConfig&gt;; }; }</span>
-
-    Specifying referencedTables with referenceColumns allows restricting the
-    allowed file types that can be inserted and referenced in the specified tables.
-  - **imageOptions** <span style="color: grey">optional</span> <span style="color: green;">ImageOptions</span>
-    - **keepMetadata** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
-    - **compression** <span style="color: grey">optional</span> <span style="color: green;">ImageCompressionOptions | undefined</span>
-  - **cloudClient** <span style="color: grey">optional</span> <span style="color: green;">CloudClient</span>
-
-    Callbacks for file upload and download.
-    Used for custom file handling.
-    - **upload** <span style="color: red">required</span> <span style="color: green;">(file: FileUploadArgs) =&gt; Promise&lt;void&gt;</span>
-    - **downloadAsStream** <span style="color: red">required</span> <span style="color: green;">(name: string) =&gt; Promise&lt;Readable&gt;</span>
-    - **delete** <span style="color: red">required</span> <span style="color: green;">(fileName: string) =&gt; Promise&lt;void&gt;</span>
-    - **getSignedUrlForDownload** <span style="color: red">required</span> <span style="color: green;">(fileName: string, expiresInSeconds: number) =&gt; Promise&lt;string&gt;</span>
-  - **localConfig** <span style="color: grey">optional</span> <span style="color: green;">LocalConfig</span>
-
-    Local file storage configuration.
-    - **localFolderPath** <span style="color: red">required</span> <span style="color: green;">string</span>
-
-      example: path.join(__dirname+'/media')
-      note that this location will be relative to the compiled file location
-    - **minFreeBytes** <span style="color: grey">optional</span> <span style="color: green;">number</span>
-
-      Minimum amount of free bytes available to allow saving files
-      Defaults to 100MB
 - **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
 
   Define tables through a JSON-schema like object.
