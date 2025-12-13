@@ -1,5 +1,10 @@
 import type { AnyObject, InsertParams } from "prostgles-types";
-import { asName, getSerialisableError, isObject } from "prostgles-types";
+import {
+  asName,
+  getJSONBSchemaValidationError,
+  getSerialisableError,
+  isObject,
+} from "prostgles-types";
 import type { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
 import type { LocalParams } from "../../DboBuilder";
 import { getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
@@ -128,7 +133,6 @@ export async function insert(
       return insertResult;
     }
 
-    const pkeyNames = this.columns.filter((c) => c.is_pkey).map((c) => c.name);
     const getInsertQuery = async (_rows: AnyObject[]) => {
       const validatedData = _rows.map((_row) => {
         const row = { ..._row };
@@ -171,17 +175,42 @@ export async function insert(
       ).getQuery();
       const { onConflict } = insertParams ?? {};
       let conflict_query = "";
-      if (onConflict === "DoNothing") {
-        conflict_query = " ON CONFLICT DO NOTHING ";
-      } else if (onConflict === "DoUpdate") {
-        if (!pkeyNames.length) {
-          throw "Cannot do DoUpdate on a table without a primary key";
+      if (onConflict) {
+        const onConflictAction = typeof onConflict === "string" ? onConflict : onConflict.action;
+        const onConflictColumns =
+          typeof onConflict === "string" ? undefined : onConflict.conflictColumns;
+        if (onConflictAction === "DoNothing") {
+          conflict_query = " ON CONFLICT DO NOTHING ";
+        } else {
+          const firstRowKeys = Object.keys(validatedData[0] ?? {});
+          const pkeyNames = this.columns.filter((c) => c.is_pkey).map((c) => c.name);
+          const conflictColumns =
+            onConflictColumns ??
+            this.tableOrViewInfo.uniqueColumnGroups?.find((colGroup) => {
+              if (!firstRowKeys.length)
+                throw "Cannot determine conflict columns for onConflict DoUpdate";
+              return colGroup.some((col) => {
+                return firstRowKeys.includes(col);
+              });
+            }) ??
+            pkeyNames;
+
+          /**
+           * Table might have multiple constraint types in which case it is mandatory to specify the conflict columns.
+           * */
+          if (!conflictColumns.length) {
+            throw "Cannot on conflict DoUpdate. No conflict columns could be determined. Please specify conflictColumns in onConflict param.";
+          }
+
+          const nonConflictColumns = allowedCols
+            .filter((c) => !conflictColumns.includes(c))
+            .map((v) => asName(v));
+
+          if (nonConflictColumns.length === 0) {
+            throw "No non conflict columns to update for onConflict=DoUpdate";
+          }
+          conflict_query = ` ON CONFLICT (${conflictColumns.join(", ")}) DO UPDATE SET ${nonConflictColumns.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`;
         }
-        const nonPkeyCols = allowedCols.filter((c) => !pkeyNames.includes(c)).map((v) => asName(v));
-        if (!nonPkeyCols.length) {
-          throw "Cannot on conflict DoUpdate on a table with only primary key columns";
-        }
-        conflict_query = ` ON CONFLICT (${pkeyNames.join(", ")}) DO UPDATE SET ${nonPkeyCols.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`;
       }
       return query + conflict_query;
     };
@@ -242,8 +271,23 @@ export async function insert(
 
 const validateInsertParams = (params: InsertParams | undefined) => {
   const { onConflict, returnType, returning } = params ?? {};
-  if (![undefined, "DoNothing", "DoUpdate"].includes(onConflict)) {
-    throw `Invalid onConflict: ${onConflict}. Expecting one of: DoNothing, DoUpdate`;
+  const onConflictValidation = getJSONBSchemaValidationError(
+    {
+      oneOf: [
+        { enum: ["DoNothing", "DoUpdate"] },
+        {
+          type: {
+            action: { enum: ["DoNothing", "DoUpdate"] },
+            conflictColumns: { arrayOf: "string" },
+          },
+        },
+      ],
+      optional: true,
+    },
+    onConflict
+  );
+  if (onConflictValidation.error !== undefined) {
+    throw `Invalid onConflict: ${onConflictValidation.error}`;
   }
 
   const allowedReturnTypes: InsertParams["returnType"][] = [

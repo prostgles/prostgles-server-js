@@ -151,7 +151,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 
 export function makeSocketError(cb: (err: AnyObject) => void, err: any) {
   const serializedError = getSerialisableError(err);
-  cb(isObject(serializedError) ? serializedError : { serializedError });
+  cb(isObject(serializedError) ? serializedError : { error: serializedError });
 }
 
 type SocketRequestParams = {
