@@ -182,7 +182,7 @@ export async function insert(
         if (onConflictAction === "DoNothing") {
           conflict_query = " ON CONFLICT DO NOTHING ";
         } else {
-          const firstRowKeys = Object.keys(validatedData[0] ?? {});
+          const firstRowKeys = Object.keys(validatedData[0]?.validatedRow ?? {});
           const pkeyNames = this.columns.filter((c) => c.is_pkey).map((c) => c.name);
           const conflictColumns =
             onConflictColumns ??
