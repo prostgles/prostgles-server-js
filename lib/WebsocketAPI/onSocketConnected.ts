@@ -1,12 +1,11 @@
 import type { AnyObject } from "prostgles-types";
 import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
-import type { Prostgles, TABLE_METHODS } from "../Prostgles";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
-import { runClientMethod, runClientRequest } from "../runClientRequest";
-import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { Prostgles, TABLE_METHODS } from "../Prostgles";
+import { runClientMethod, runClientRequest } from "../runClientRequest";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
   if (!this.db || !this.dbo) throw new Error("db/dbo missing");
