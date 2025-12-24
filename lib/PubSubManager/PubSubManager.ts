@@ -289,7 +289,7 @@ export class PubSubManager {
 
   getSubData = async (
     sub: Subscription
-  ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: any }> => {
+  ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: unknown }> => {
     const { table_info, filter, selectParams: params, table_rules } = sub; //, subOne = false
     const { name: table_name } = table_info;
 

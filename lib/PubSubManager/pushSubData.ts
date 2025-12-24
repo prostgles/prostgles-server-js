@@ -1,3 +1,4 @@
+import { getSerialisableError } from "prostgles-types";
 import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import type { EventTypes } from "../Logging";
 import type { Subscription } from "./PubSubManager";
@@ -62,7 +63,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       }
     } else {
       onLog("fetch data error");
-      const errObj = { _err_msg: err.toString(), err };
+      const errObj = getSerialisableError(err) || "Unknown error fetching subscription data";
       if (socket_id && this.sockets[socket_id]) {
         this.sockets[socket_id]?.emit(channel_name, { err: errObj });
       } else if (localFuncs) {
