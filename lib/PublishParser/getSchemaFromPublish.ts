@@ -2,15 +2,9 @@ import type {
   DBSchemaTable,
   TableInfo,
   TableSchemaErrors,
-  TableSchemaForClient} from "prostgles-types";
-import {
-  getKeys,
-  includes,
-  isEmpty,
-  isObject,
-  pickKeys,
-  type AnyObject,
+  TableSchemaForClient,
 } from "prostgles-types";
+import { getKeys, includes, isEmpty, isObject, pickKeys, type AnyObject } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
@@ -184,9 +178,9 @@ export async function getSchemaFromPublish(
         })
       );
     }
-  } catch (e) {
-    console.error("Prostgles \nERRORS IN PUBLISH: ", JSON.stringify(e));
-    throw e;
+  } catch (error) {
+    console.error("Publish error", error);
+    throw error;
   }
 
   tables = tables.sort((a, b) => a.name.localeCompare(b.name));

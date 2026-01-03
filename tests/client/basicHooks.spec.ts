@@ -1,7 +1,7 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
-import { useAsyncEffectQueue } from "prostgles-client/dist/react-hooks";
-import { renderReactHook, renderReactHookManual } from "./renderReactHook";
+import { useAsyncEffectQueue } from "prostgles-client";
+import { renderReactHookManual } from "./renderReactHook";
 
 describe("React hooks", async (t) => {
   await test("useAsyncEffectQueue executes the first and debounces the rest", async (t) => {
