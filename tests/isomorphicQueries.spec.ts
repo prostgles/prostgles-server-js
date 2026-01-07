@@ -1870,6 +1870,12 @@ export const isomorphicQueries = async (
             i0: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
               path: [{ table: "items", on: [{ items0_id: "id" }] }],
             }),
+            i1: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
+              path: [{ table: "items", on: [{ items0_id: "id" }] }],
+            }),
+            i2: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
+              path: [{ table: "items", on: [{ items0_id: "id" }] }],
+            }),
           },
           orderBy: {
             "i0.name": -1,
@@ -1880,6 +1886,8 @@ export const isomorphicQueries = async (
       assert.equal(res[0].i0[0].name, "multi0");
       assert.equal(res[0].items2_id, null);
       assert.equal(res[0].items2_id, null);
+      assert.deepStrictEqual(res[0].i0, res[0].i1);
+      assert.deepStrictEqual(res[0].i1, res[0].i2);
     });
 
     await test("Self join", async () => {

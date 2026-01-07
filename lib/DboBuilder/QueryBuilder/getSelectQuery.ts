@@ -66,6 +66,7 @@ export function getSelectQuery(
       `  SELECT *, ${pkey ? asName(pkey.name) : "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
       `  FROM ${q.table}`,
       `)`,
+      joinCtes.length ? "," : "",
       ...joinCtes,
     ];
   }
