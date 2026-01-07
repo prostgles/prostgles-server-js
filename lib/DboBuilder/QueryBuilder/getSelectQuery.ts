@@ -11,7 +11,7 @@ export const ROOT_TABLE_ROW_NUM_ID = "prostgles_root_table_row_id";
 export const ROOT_TABLE_ALIAS = "prostgles_root_table_alias";
 
 /**
- * Creating the text query from the NewQuery spec
+ * Create the query from NewQuery
  * No validation/authorisation at this point
  * */
 export function getSelectQuery(
@@ -51,9 +51,11 @@ export function getSelectQuery(
     !parsedJoins.length ?
       []
     : [
-        ...parsedJoins.flatMap((j, i) => {
-          const needsComma = parsedJoins.length > 1 && i < parsedJoins.length - 1;
-          return j.cteLines.concat(needsComma ? [","] : []);
+        ...parsedJoins.flatMap((j, joinIndex) => {
+          if (joinIndex > 0 && j.cteLines.length) {
+            return [",", ...j.cteLines];
+          }
+          return j.cteLines;
         }),
       ];
 
@@ -63,7 +65,7 @@ export function getSelectQuery(
       `${q.table} AS (`,
       `  SELECT *, ${pkey ? asName(pkey.name) : "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
       `  FROM ${q.table}`,
-      `),`,
+      `)`,
       ...joinCtes,
     ];
   }

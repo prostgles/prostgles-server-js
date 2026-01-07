@@ -48,7 +48,6 @@ const getJoinTable = (
 
 type GetJoinQueryResult = {
   resultAlias: string;
-  // queryLines: string[];
   firstJoinTableJoinFields: string[];
   isOrJoin: boolean;
   type: "cte";
@@ -98,7 +97,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
 
   const joinType = q2.isLeftJoin ? "LEFT" : "INNER";
 
-  const isOrJoin = firstJoinTablePath.on.length > 1;
   const joinCondition = getJoinOnCondition({
     on: firstJoinTablePath.on,
     leftAlias: asName(q1.tableAlias || q1.table),
@@ -127,6 +125,38 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
    * Used to prevent duplicates in case of OR filters
    */
   const rootTableIdField = `${ROOT_TABLE_ALIAS}.${ROOT_TABLE_ROW_NUM_ID}`;
+  /**
+   * If multiple join conditions exist it's an OR join
+   * Must use LATERAL JOIN to prevent cartesian product
+   */
+  const isOrJoin = firstJoinTablePath.on.length > 1;
+  if (isOrJoin.toString() === "true") {
+    const wrappingQuery = [
+      `SELECT `,
+      ...indentLines(
+        [rootTableIdField, jsonAgg, ...rootNestedSort.map((d) => d.nested!.wrapperQuerySortItem)],
+        { appendCommas: true }
+      ),
+      `FROM (`,
+      ...indentLines(innerQuery),
+      `) ${targetTableAlias}`,
+      `WHERE ${joinCondition}`,
+      `GROUP BY ${rootTableIdField}`,
+    ];
+    const joinLines = [
+      `${joinType} JOIN LATERAL (`,
+      ...wrappingQuery,
+      `) as ${targetTableAlias} ON TRUE`,
+    ];
+    return {
+      type: "cte",
+      resultAlias: JSON_AGG_FIELD_NAME,
+      joinLines,
+      cteLines: [],
+      isOrJoin,
+      firstJoinTableJoinFields,
+    };
+  }
   const wrappingQuery = [
     `SELECT `,
     ...indentLines(
@@ -160,7 +190,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   return {
     type: "cte",
     resultAlias: JSON_AGG_FIELD_NAME,
-    // queryLines,
     joinLines,
     cteLines,
     isOrJoin,

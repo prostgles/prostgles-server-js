@@ -83,20 +83,22 @@ type GetJoinOnConditionArgs = {
   getLeftColName?: (col: string) => string;
   getRightColName?: (col: string) => string;
 };
-export const getJoinOnCondition = ({
+export const getJoinOnConditions = ({
   on,
   leftAlias,
   rightAlias,
   getLeftColName = asName,
   getRightColName = asName,
 }: GetJoinOnConditionArgs) => {
-  return on
-    .map((constraint) =>
-      Object.entries(constraint)
-        .map(([leftCol, rightCol]) => {
-          return `${leftAlias}.${getLeftColName(leftCol)} = ${rightAlias}.${getRightColName(rightCol)}`;
-        })
-        .join(" AND ")
-    )
-    .join(" OR ");
+  return on.map((constraint) =>
+    Object.entries(constraint)
+      .map(([leftCol, rightCol]) => {
+        return `${leftAlias}.${getLeftColName(leftCol)} = ${rightAlias}.${getRightColName(rightCol)}`;
+      })
+      .join(" AND ")
+  );
+};
+
+export const getJoinOnCondition = (args: GetJoinOnConditionArgs) => {
+  return getJoinOnConditions(args).join(" OR ");
 };

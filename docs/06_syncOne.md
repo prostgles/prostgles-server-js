@@ -16,7 +16,7 @@
 
       If true then the first onChange trigger is skipped
     - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
-    - **storageType** <span style="color: grey">optional</span> <span style="color: green;">"object" | "array" | "localStorage" | undefined</span>
+    - **storageType** <span style="color: grey">optional</span> <span style="color: green;">"map" | "localStorage" | undefined</span>
 
       Default is "object".
       "localStorage" will persist the data
