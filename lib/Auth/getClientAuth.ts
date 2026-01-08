@@ -1,22 +1,12 @@
 import type {
   AuthGuardLocation,
   AuthGuardLocationResponse,
-  AuthSocketSchema} from "prostgles-types";
-import {
-  CHANNELS,
-  getObjectEntries,
-  isEmpty,
-  isObject,
+  AuthSocketSchema,
 } from "prostgles-types";
-import type {
-  AuthClientRequest,
-  LoginWithOAuthConfig,
-  AuthResultWithSID} from "./AuthTypes";
-import {
-  type AuthResult,
-} from "./AuthTypes";
+import { CHANNELS, getObjectEntries, isEmpty, isObject } from "prostgles-types";
 import type { AuthHandler } from "./AuthHandler";
-import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
+import type { AuthClientRequest, AuthConfig, AuthResultWithSID } from "./AuthTypes";
+import { type AuthResult } from "./AuthTypes";
 
 export async function getClientAuth(
   this: AuthHandler,
@@ -89,11 +79,10 @@ export async function getClientAuth(
     return userData;
   }
   const auth: AuthSocketSchema = {
-    //@ts-ignore
-    providers: getOAuthProviders(loginWithOAuth),
+    providers: getOAuthProviders(this, loginWithOAuth),
     signupWithEmailAndPassword: signupWithEmail && {
       minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
-      url: AUTH_ROUTES_AND_PARAMS.emailRegistration,
+      url: this.authRoutes.emailRegistration,
     },
     preferredLogin: userData.preferredLogin,
     user: userData.clientUser,
@@ -104,7 +93,8 @@ export async function getClientAuth(
 }
 
 const getOAuthProviders = (
-  loginWithOAuth: LoginWithOAuthConfig<any> | undefined
+  authHandler: AuthHandler,
+  loginWithOAuth: NonNullable<AuthConfig["loginSignupConfig"]>["loginWithOAuth"]
 ): AuthSocketSchema["providers"] | undefined => {
   if (!loginWithOAuth) return undefined;
   const { OAuthProviders } = loginWithOAuth;
@@ -114,7 +104,7 @@ const getOAuthProviders = (
   getObjectEntries(OAuthProviders).forEach(([providerName, config]) => {
     if (config?.clientID) {
       result[providerName] = {
-        url: `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`,
+        url: `${authHandler.authRoutes.loginWithProvider}/${providerName}`,
         ...(providerName === "customOAuth" && {
           displayName: OAuthProviders.customOAuth?.displayName,
           displayIconPath: OAuthProviders.customOAuth?.displayIconPath,

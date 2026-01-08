@@ -1,4 +1,4 @@
-import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES, type AuthHandler } from "../AuthHandler";
+import { AUTH_RETURN_URL_PARAM_NAME, HTTP_FAIL_CODES, type AuthHandler } from "../AuthHandler";
 import type { ExpressReq } from "../AuthTypes";
 import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
 import { getBasicSessionErrorCode } from "../login";
@@ -63,16 +63,8 @@ export function setCookieAndGoToReturnURLIFSet(
   if (safeReturnUrl) {
     return res.redirect(safeReturnUrl);
   }
-  const safeOriginalUrl = getSafeReturnURL(
-    req.originalUrl,
-    AUTH_ROUTES_AND_PARAMS.returnUrlParamName
-  );
-  if (
-    safeOriginalUrl &&
-    ![AUTH_ROUTES_AND_PARAMS.magicLinks].some((authRoute) =>
-      matchesRoute(authRoute, safeOriginalUrl)
-    )
-  ) {
+  const safeOriginalUrl = getSafeReturnURL(req.originalUrl, AUTH_RETURN_URL_PARAM_NAME);
+  if (safeOriginalUrl && !matchesRoute(this.authRoutes.magicLinks, safeOriginalUrl)) {
     return res.redirect(safeOriginalUrl);
   }
   return res.redirect("/");

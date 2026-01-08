@@ -3,7 +3,7 @@ import type { RequestHandler } from "express";
 import { isDefined } from "prostgles-types";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
-import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import { EXPRESS_CATCH_ALL_ROUTE, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthClientRequest } from "../AuthTypes";
 import { getReturnUrl } from "../utils/getReturnUrl";
 import { matchesRoute } from "../utils/matchesRoute";
@@ -15,7 +15,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     const pathsHandledByProstgles = [
       restApi?.path,
       fileManager?.path,
-      authHandler && AUTH_ROUTES_AND_PARAMS.loginWithProvider,
+      authHandler && this.authRoutes.loginWithProvider,
     ].filter(isDefined);
     if (pathsHandledByProstgles.some((path) => matchesRoute(path, req.path))) {
       next();
@@ -41,13 +41,12 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
       /**
        * Requesting a User route (must be logged in)
        */
+      const loginRoute = this.authRoutes.login;
       if (this.isUserRoute(req.path)) {
         /* Check auth. Redirect to login if unauthorized */
         const isLoggedIn = await isLoggedInUser();
         if (!isLoggedIn) {
-          res.redirect(
-            `${AUTH_ROUTES_AND_PARAMS.login}?returnURL=${encodeURIComponent(req.originalUrl)}`
-          );
+          res.redirect(`${loginRoute}?returnURL=${encodeURIComponent(req.originalUrl)}`);
           return;
         }
 
@@ -63,7 +62,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
          * 1) If logged in and not anonymous then redirect to main page
          * 2) If logged in and anonymous then allow visiting /login (it will be caught earlier by new-session-redirect)
          * */
-      } else if (matchesRoute(AUTH_ROUTES_AND_PARAMS.login, req.path)) {
+      } else if (matchesRoute(loginRoute, req.path)) {
         const { user, isAnonymous, error } = await getUser();
         if (error) {
           res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(error);
@@ -95,5 +94,5 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     }
   };
 
-  app.get(AUTH_ROUTES_AND_PARAMS.catchAll, requestHandlerCatchAll);
+  app.get(EXPRESS_CATCH_ALL_ROUTE, requestHandlerCatchAll);
 }

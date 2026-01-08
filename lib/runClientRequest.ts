@@ -11,7 +11,11 @@ import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandl
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSQL";
 import type { Prostgles } from "./Prostgles";
-import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
+import type {
+  Awaitable,
+  ParsedTableRule,
+  PublishParams,
+} from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
@@ -162,7 +166,11 @@ export const clientCanRunSqlRequest = async function (
       throw "authHandler missing";
     }
     const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
-    const allowedToRunSQL = publishParams && (await this.opts.publishRawSQL?.(publishParams));
+    const allowedToRunSQL =
+      publishParams &&
+      (await (
+        this.opts.publishRawSQL as undefined | ((params: PublishParams) => Awaitable<boolean | "*">)
+      )?.(publishParams));
     return allowedToRunSQL === true || allowedToRunSQL === "*";
   };
 

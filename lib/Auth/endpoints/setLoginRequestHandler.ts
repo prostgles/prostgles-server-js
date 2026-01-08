@@ -1,9 +1,9 @@
-import type { Response } from "express";
 import type e from "express";
-import type { AuthRequest, AuthResponse} from "prostgles-types";
+import type { Response } from "express";
+import type { AuthRequest, AuthResponse } from "prostgles-types";
 import { isDefined, isObject } from "prostgles-types";
-import type { AuthHandler} from "../AuthHandler";
-import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import type { AuthHandler } from "../AuthHandler";
+import { HTTP_FAIL_CODES } from "../AuthHandler";
 import type { LoginParams } from "../AuthTypes";
 
 export type LoginResponse =
@@ -16,7 +16,7 @@ export type LoginResponse =
 export type LoginResponseHandler = Response<LoginResponse>;
 
 export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
-  app.post(AUTH_ROUTES_AND_PARAMS.login, async (req, res: LoginResponseHandler) => {
+  app.post(this.authRoutes.login, async (req, res: LoginResponseHandler) => {
     const [error, loginData] = parseLoginData(req.body);
     if (error || !loginData) {
       return res

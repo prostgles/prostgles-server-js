@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { AuthHandler} from "./AuthHandler";
+import type { AuthHandler } from "./AuthHandler";
 import { getClientRequestIPsInfo } from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
@@ -31,7 +31,7 @@ export function setupAuthRoutes(this: AuthHandler) {
   }
 
   if (signupWithEmail) {
-    setRegisterRequestHandler(signupWithEmail, app);
+    setRegisterRequestHandler.bind(this)(signupWithEmail, app);
   }
 
   if (loginWithOAuth) {

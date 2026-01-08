@@ -1,8 +1,7 @@
-import type { Request, Response } from "express";
 import type e from "express";
+import type { Request, Response } from "express";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
-import { AUTH_ROUTES_AND_PARAMS } from "../AuthHandler";
 import { throttledReject } from "../utils/throttledReject";
 
 export function setLogoutRequestHandler(this: AuthHandler, app: e.Express) {
@@ -23,5 +22,5 @@ export function setLogoutRequestHandler(this: AuthHandler, app: e.Express) {
     }
     res.redirect("/");
   };
-  app.post(AUTH_ROUTES_AND_PARAMS.logout, logoutRequestHandler);
+  app.post(this.authRoutes.logout, logoutRequestHandler);
 }

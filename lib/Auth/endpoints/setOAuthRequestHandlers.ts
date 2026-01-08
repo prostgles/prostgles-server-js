@@ -8,7 +8,7 @@ import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
-import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import { HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { upsertNamedExpressMiddleware } from "../utils/upsertNamedExpressMiddleware";
@@ -40,7 +40,7 @@ export function setOAuthRequestHandlers(
       : providerName === "facebook" ? FacebookStrategy
       : providerName === "customOAuth" ? OAuth2Strategy
       : MicrosoftStrategy;
-    const callbackPath = `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}/callback`;
+    const callbackPath = `${this.authRoutes.loginWithProvider}/${providerName}/callback`;
     passport.use(
       new (strategy as typeof GoogleStrategy)(
         {
@@ -54,7 +54,7 @@ export function setOAuthRequestHandlers(
       )
     );
 
-    const authPath = `${AUTH_ROUTES_AND_PARAMS.loginWithProvider}/${providerName}`;
+    const authPath = `${this.authRoutes.loginWithProvider}/${providerName}`;
     app.get(authPath, passport.authenticate(providerName, authOpts ?? {}));
 
     app.get(callbackPath, async (req, res: LoginResponseHandler) => {

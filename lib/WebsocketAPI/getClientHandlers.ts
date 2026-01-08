@@ -14,14 +14,15 @@ import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runCl
 import { getClientSchema } from "./getClientSchema";
 import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 
+export type ClientHandlers<S = void> = {
+  clientDb: DBOFullyTyped<S, false>;
+  clientMethods: Record<string, Method>;
+};
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined
-): Promise<{
-  clientDb: DBOFullyTyped<S, false>;
-  clientMethods: Record<string, Method>;
-}> => {
+): Promise<ClientHandlers> => {
   const clientSchema =
     clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq, scope));
   const sql: SQLHandler | undefined = ((query: string, params?: unknown, options?: SQLOptions) =>
@@ -82,7 +83,6 @@ export const getClientHandlers = async <S = void>(
 
   return { clientDb, clientMethods };
 };
-export type ClientHandlers<S = void> = Awaited<ReturnType<typeof getClientHandlers<S>>>;
 
 const viewMethods = getKeys({
   count: 1,

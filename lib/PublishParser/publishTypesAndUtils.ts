@@ -1,9 +1,11 @@
-import {
-  RULE_METHODS,
-  type MethodFullDef,
-} from "prostgles-types";
+import { RULE_METHODS, type MethodFullDef } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { CommonTableRules, Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
+import type {
+  CommonTableRules,
+  Filter,
+  LocalParams,
+  TableOrViewInfo,
+} from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
 
 export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
@@ -143,12 +145,15 @@ export const RULE_TO_METHODS = [
   },
 ] as const;
 
-import type { FieldFilter, SelectParams ,
+import type {
+  FieldFilter,
+  SelectParams,
   AnyObject,
   DBSchema,
   FullFilter,
   Method,
-  TableInfo} from "prostgles-types";
+  TableInfo,
+} from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";

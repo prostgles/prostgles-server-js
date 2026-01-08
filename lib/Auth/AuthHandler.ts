@@ -31,17 +31,34 @@ export const HTTP_SUCCESS_CODES = {
   CREATED: 201,
 } as const;
 
-export const AUTH_ROUTES_AND_PARAMS = {
+const SID_KEY_NAME = "session_id" as const;
+export const EXPRESS_CATCH_ALL_ROUTE = "*splat"; //v5 "*splat" //v4 "*"
+export const AUTH_RETURN_URL_PARAM_NAME = "returnURL";
+const AUTH_ROUTES = {
   login: "/login",
   loginWithProvider: "/oauth",
   emailRegistration: "/register",
-  returnUrlParamName: "returnURL",
-  sidKeyName: "session_id",
   logout: "/logout",
   magicLinks: "/magic-link",
   magicLinkWithId: "/magic-link/:id",
-  catchAll: "*splat", //v5 "*splat" //v4 "*"
 } as const;
+export const GET_AUTH_ROUTE = (
+  conf: AuthConfig["loginSignupConfig"],
+  route: keyof typeof AUTH_ROUTES
+) => {
+  const basePath = conf?.authRoutesBasePath || "";
+  return `${basePath}/auth${AUTH_ROUTES[route]}`;
+};
+export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
+  return Object.fromEntries(
+    Object.entries(AUTH_ROUTES).map(([key]) => [
+      key,
+      GET_AUTH_ROUTE(conf, key as keyof typeof AUTH_ROUTES),
+    ])
+  ) as {
+    [K in keyof typeof AUTH_ROUTES]: string;
+  };
+};
 
 export class AuthHandler {
   protected readonly prostgles: Prostgles;
@@ -59,7 +76,11 @@ export class AuthHandler {
   }
 
   get sidKeyName() {
-    return this.opts.sidKeyName ?? AUTH_ROUTES_AND_PARAMS.sidKeyName;
+    return this.opts.sidKeyName ?? SID_KEY_NAME;
+  }
+
+  get authRoutes() {
+    return GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
   }
 
   validateSid = (sid: string | undefined) => {
@@ -74,7 +95,7 @@ export class AuthHandler {
       logout: logoutRoute,
       magicLinks: magicLinksRoute,
       loginWithProvider,
-    } = AUTH_ROUTES_AND_PARAMS;
+    } = GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
     const pubRoutes = [
       ...(this.opts.loginSignupConfig?.publicRoutes || []),
       login,
@@ -116,17 +137,16 @@ export class AuthHandler {
       login,
       logout,
       magicLinkWithId: magicLinksIdParam,
-      catchAll,
       loginWithProvider,
       emailRegistration,
       magicLinks,
-    } = AUTH_ROUTES_AND_PARAMS;
+    } = GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
 
     removeExpressRoute(app, [
       login,
       logout,
       magicLinksIdParam,
-      catchAll,
+      EXPRESS_CATCH_ALL_ROUTE,
       loginWithProvider,
       emailRegistration,
       magicLinks,

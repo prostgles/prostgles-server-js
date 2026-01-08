@@ -1,7 +1,7 @@
-import type { Request, Response } from "express";
 import type e from "express";
+import type { Request, Response } from "express";
 import type { AuthResponse } from "prostgles-types";
-import { AUTH_ROUTES_AND_PARAMS, HTTP_FAIL_CODES } from "../AuthHandler";
+import { HTTP_FAIL_CODES, type AuthHandler } from "../AuthHandler";
 import { getMagicLinkUrl, type SignupWithEmail } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { parseLoginData } from "./setLoginRequestHandler";
@@ -14,10 +14,11 @@ type ReturnType =
 
 type RegisterResponseHandler = Response<ReturnType>;
 
-export const setRegisterRequestHandler = (
+export function setRegisterRequestHandler(
+  this: AuthHandler,
   { onRegister, minPasswordLength = 8, requirePassword }: SignupWithEmail,
   app: e.Express
-) => {
+) {
   const registerRequestHandler = async (req: Request, res: RegisterResponseHandler) => {
     const [error, data] = parseLoginData(req.body);
     if (error || !data) {
@@ -51,7 +52,11 @@ export const setRegisterRequestHandler = (
         email: username,
         password,
         getConfirmationUrl: ({ code, websiteUrl }) =>
-          getMagicLinkUrl(websiteUrl, { type: "otp", code, email: username, returnToken: false }),
+          getMagicLinkUrl({
+            loginSignupConfig: this.opts.loginSignupConfig,
+            websiteUrl,
+            data: { type: "otp", code, email: username, returnToken: false },
+          }),
         clientInfo,
         req,
       });
@@ -66,5 +71,5 @@ export const setRegisterRequestHandler = (
     }
   };
 
-  app.post(AUTH_ROUTES_AND_PARAMS.emailRegistration, registerRequestHandler);
-};
+  app.post(this.authRoutes.emailRegistration, registerRequestHandler);
+}

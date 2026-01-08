@@ -23,10 +23,10 @@ import type {
   UserLike,
 } from "prostgles-types";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { PRGLIOSocket} from "../DboBuilder/DboBuilderTypes";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
 import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
-import { AUTH_ROUTES_AND_PARAMS } from "./AuthHandler";
+import { GET_AUTH_ROUTE } from "./AuthHandler";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -363,12 +363,22 @@ export type MagicLinkOrOTPData =
   | { type: "magic-link"; id: string; returnToken: boolean }
   | { type: "otp"; code: string; email: string; returnToken: boolean };
 
-export const getMagicLinkUrl = (websiteUrl: string, data: MagicLinkOrOTPData) => {
+export const getMagicLinkUrl = ({
+  websiteUrl,
+  data,
+  loginSignupConfig,
+}: {
+  websiteUrl: string;
+  data: MagicLinkOrOTPData;
+  loginSignupConfig: AuthConfig["loginSignupConfig"];
+}) => {
   if (data.type === "magic-link") {
-    return `${AUTH_ROUTES_AND_PARAMS.magicLinkWithId}/${data.id}`;
+    return `${GET_AUTH_ROUTE(loginSignupConfig, "magicLinkWithId")}/${data.id}`;
   }
   const { code, email } = data;
-  const confirmationUrl = new URL(`${websiteUrl}${AUTH_ROUTES_AND_PARAMS.magicLinks}`);
+  const confirmationUrl = new URL(
+    `${websiteUrl}${GET_AUTH_ROUTE(loginSignupConfig, "magicLinks")}`
+  );
   confirmationUrl.searchParams.set("email", email);
   confirmationUrl.searchParams.set("code", code);
   return confirmationUrl.toString();
@@ -384,6 +394,8 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    * Express app instance. If provided Prostgles will attempt to set sidKeyName to user cookie
    */
   app: Express;
+
+  authRoutesBasePath?: string;
 
   /**
    * Options used in setting the cookie after a successful login

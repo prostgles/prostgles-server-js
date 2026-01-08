@@ -1,18 +1,12 @@
 import type e from "express";
 import { type Response } from "express";
+import type { AuthResponse } from "prostgles-types";
 import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
-import type {
-  AuthHandler} from "../AuthHandler";
-import {
-  AUTH_ROUTES_AND_PARAMS,
-  getClientRequestIPsInfo,
-  HTTP_FAIL_CODES,
-  HTTP_SUCCESS_CODES,
-} from "../AuthHandler";
+import type { AuthHandler } from "../AuthHandler";
+import { getClientRequestIPsInfo, HTTP_FAIL_CODES, HTTP_SUCCESS_CODES } from "../AuthHandler";
 import type { ExpressReq, LoginSignupConfig, MagicLinkOrOTPData, SessionUser } from "../AuthTypes";
 import { throttledAuthCall } from "../utils/throttledReject";
 import type { LoginResponse } from "./setLoginRequestHandler";
-import type { AuthResponse } from "prostgles-types";
 
 type MagicLinkResponseHandler = Response<
   | LoginResponse
@@ -56,24 +50,24 @@ export function setMagicLinkOrOTPRequestHandler(
     }
   };
 
-  app.get(AUTH_ROUTES_AND_PARAMS.magicLinkWithId, (req, res: MagicLinkResponseHandler) => {
+  app.get(this.authRoutes.magicLinkWithId, (req, res: MagicLinkResponseHandler) => {
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
-      res
+      return res
         .status(HTTP_FAIL_CODES.BAD_REQUEST)
         .json({ success: false, code: "invalid-magic-link", message: "Invalid magic link" });
     }
     return handler(req, res, { type: "magic-link", id, returnToken: false });
   });
 
-  app.get(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
+  app.get(this.authRoutes.magicLinks, (req, res: MagicLinkResponseHandler) => {
     const data = parseMagicLinkOrOTPData(res, req.query);
     if (!data) return;
     return handler(req, res, data);
   });
 
-  app.post(AUTH_ROUTES_AND_PARAMS.magicLinks, (req, res: MagicLinkResponseHandler) => {
+  app.post(this.authRoutes.magicLinks, (req, res: MagicLinkResponseHandler) => {
     const data = parseMagicLinkOrOTPData(res, req.body);
     if (!data) return;
     return handler(req, res, data);

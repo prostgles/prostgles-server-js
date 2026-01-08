@@ -1,13 +1,12 @@
-import { AUTH_ROUTES_AND_PARAMS } from "../AuthHandler";
+import { AUTH_RETURN_URL_PARAM_NAME } from "../AuthHandler";
 import type { ExpressReq } from "../AuthTypes";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 
 export const getReturnUrl = (req: ExpressReq) => {
-  const { returnUrlParamName } = AUTH_ROUTES_AND_PARAMS;
-  if (req.query[returnUrlParamName]) {
-    const returnURL = decodeURIComponent(req.query[returnUrlParamName] as string);
+  if (req.query[AUTH_RETURN_URL_PARAM_NAME]) {
+    const returnURL = decodeURIComponent(req.query[AUTH_RETURN_URL_PARAM_NAME] as string);
 
-    return getSafeReturnURL(returnURL, returnUrlParamName);
+    return getSafeReturnURL(returnURL, AUTH_RETURN_URL_PARAM_NAME);
   }
   return null;
 };
