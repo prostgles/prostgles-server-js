@@ -465,7 +465,8 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
     params: LoginParams,
     dbo: DBOFullyTyped<S>,
     db: DB,
-    client: LoginClientInfo
+    client: LoginClientInfo,
+    getMagicLinkUrl: (data: MagicLinkOrOTPData, websiteUrl: string) => string
   ) => Awaitable<LoginResponse>;
 
   logout: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<void>;

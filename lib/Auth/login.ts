@@ -1,8 +1,8 @@
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { AuthHandler} from "./AuthHandler";
+import type { AuthHandler } from "./AuthHandler";
 import { getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
-import type { ExpressReq, LoginParams} from "./AuthTypes";
-import { type BasicSession } from "./AuthTypes";
+import type { ExpressReq, LoginParams } from "./AuthTypes";
+import { getMagicLinkUrl, type BasicSession } from "./AuthTypes";
 import type { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { throttledAuthCall } from "./utils/throttledReject";
 
@@ -25,7 +25,13 @@ export async function login(
       loginParams,
       this.dbo as DBOFullyTyped,
       this.db,
-      getClientRequestIPsInfo({ httpReq: req })
+      getClientRequestIPsInfo({ httpReq: req }),
+      (data, websiteUrl) =>
+        getMagicLinkUrl({
+          loginSignupConfig: this.opts.loginSignupConfig,
+          websiteUrl,
+          data,
+        })
     );
 
     if (typeof result === "string" || !result.session) {
