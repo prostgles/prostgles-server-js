@@ -47,7 +47,7 @@ export const GET_AUTH_ROUTE = (
   route: keyof typeof AUTH_ROUTES
 ) => {
   const basePath = conf?.authRoutesBasePath || "";
-  return `${basePath}/auth${AUTH_ROUTES[route]}`;
+  return `${basePath}${AUTH_ROUTES[route]}`;
 };
 export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
   return Object.fromEntries(
