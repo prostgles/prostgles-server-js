@@ -1,24 +1,23 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
-import { useProstglesClient } from "prostgles-client/dist/prostgles";
-import { AnyObject } from "prostgles-types";
+import { useProstglesClient, type UseProstglesClientProps } from "prostgles-client";
 import type { DBHandlerClient } from "./index";
 import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 
 export const newly_created_table = "newly_created_table";
 export const useProstglesTest = async (
   db: DBHandlerClient,
-  getSocketOptions: (watchSchema?: boolean) => AnyObject,
+  getSocketOptions: (watchSchema?: boolean) => UseProstglesClientProps
 ) => {
   await db.sql(`DROP TABLE IF EXISTS ${newly_created_table};`);
   await describe("useProstgles hook", async (t) => {
-    const socketOptions = getSocketOptions();
+    const clientOptions = getSocketOptions();
     await test("useProstglesClient", async (t) => {
       const {
         results: [res1, res2],
       } = await renderReactHook({
         hook: useProstglesClient,
-        props: [{ socketOptions }],
+        props: [clientOptions],
         expectedRerenders: 2,
       });
       assert.deepStrictEqual(res1, { isLoading: true });
@@ -30,7 +29,7 @@ export const useProstglesTest = async (
       await db.sql(`select pg_sleep(1)`);
       await renderReactHookManual({
         hook: useProstglesClient,
-        initialProps: [{ socketOptions: getSocketOptions(true) }],
+        initialProps: [getSocketOptions(true)],
         renderDuration: 1000,
         onRender: async (results) => {
           if (results.length !== 1) return;
@@ -40,14 +39,8 @@ export const useProstglesTest = async (
           const [res1, res2, res3] = results;
           assert.deepStrictEqual(res1, { isLoading: true });
           assert.equal(res2.isLoading, false);
-          assert.equal(
-            typeof (res2 as any)?.dbo[newly_created_table]?.useFind,
-            "undefined",
-          );
-          assert.equal(
-            typeof (res3 as any)?.dbo[newly_created_table].useFind,
-            "function",
-          );
+          assert.equal(typeof (res2 as any)?.dbo[newly_created_table]?.useFind, "undefined");
+          assert.equal(typeof (res3 as any)?.dbo[newly_created_table].useFind, "function");
           assert.equal(results.length, 3);
 
           const count = await (res3 as any)?.dbo[newly_created_table].count();
@@ -59,32 +52,26 @@ export const useProstglesTest = async (
     await test("useProstglesClient with initial skip", async (t) => {
       const { setProps } = await renderReactHookManual({
         hook: useProstglesClient,
-        initialProps: [{ socketOptions, skip: true }],
+        initialProps: [{ ...clientOptions, skip: true }],
         onEnd: async (results) => {
           assert.deepStrictEqual(results, [{ isLoading: true }]);
         },
       });
-      await setProps([{ socketOptions }], {
+      await setProps([clientOptions], {
         onEnd: async (results) => {
           assert.equal(results.length, 3);
           const [res1, res2, res3] = results;
-          assert.deepStrictEqual(
-            [res1, res2],
-            [{ isLoading: true }, { isLoading: true }],
-          );
+          assert.deepStrictEqual([res1, res2], [{ isLoading: true }, { isLoading: true }]);
           const count = await (res3 as any)?.dbo.items4.count();
           assert.equal(count, 0);
 
           assert.equal(res3.isLoading, false);
           if ("error" in res3) throw res3.error;
-          assert.equal(
-            typeof res3.dbo[newly_created_table]?.useFind,
-            "undefined",
-          );
+          assert.equal(typeof res3.dbo[newly_created_table]?.useFind, "undefined");
         },
       });
 
-      await setProps([{ socketOptions: getSocketOptions(true) }], {
+      await setProps([getSocketOptions(true)], {
         onEnd: async (results) => {
           assert.equal(results.length, 5);
           const [res1, res2, res3, res4, res5] = results;
@@ -95,10 +82,7 @@ export const useProstglesTest = async (
           const count = await res5.dbo.items4.count();
           assert.equal(count, 0);
 
-          assert.equal(
-            typeof res5.dbo[newly_created_table].useFind,
-            "function",
-          );
+          assert.equal(typeof res5.dbo[newly_created_table].useFind, "function");
           const count0 = await res5.dbo[newly_created_table].count();
           assert.equal(count0, 0);
         },

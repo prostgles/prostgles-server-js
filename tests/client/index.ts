@@ -3,7 +3,11 @@ import io from "socket.io-client";
 
 import { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 export { AuthHandler } from "prostgles-client/dist/getAuthHandler";
-import type { DBHandlerClient, MethodHandler } from "prostgles-client/dist/prostgles";
+import type {
+  DBHandlerClient,
+  MethodHandler,
+  UseProstglesClientProps,
+} from "prostgles-client/dist/prostgles";
 import { DBSchemaTable } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
@@ -24,15 +28,20 @@ log("Started client...");
 
 const { TEST_NAME } = process.env;
 const url = "http://127.0.0.1:3001";
-const path = "/teztz/s";
+const defaultPath = "/teztz/s";
 const pathWatchSchema = "/teztz/sWatchSchema";
-const getSocketOptions = (watchSchema = false) => ({
-  uri: url,
-  path: watchSchema ? pathWatchSchema : path,
-  query: { token: TEST_NAME },
-});
-const { uri, ...socketOpts } = getSocketOptions();
-const socket = io(uri, socketOpts);
+const getClientOptions = (watchSchema = false) => {
+  const path = watchSchema ? pathWatchSchema : defaultPath;
+  return {
+    endpoint: url,
+    socketOptions: {
+      query: { token: TEST_NAME },
+      path,
+    },
+  } satisfies UseProstglesClientProps;
+};
+const { endpoint, socketOptions } = getClientOptions();
+const socket = io(endpoint, { ...socketOptions });
 
 type ClientTestSpecV2 = (args: {
   db: DBHandlerClient<void>;
@@ -54,7 +63,7 @@ const tests: Record<string, ClientTestSpecV2> = {
     await clientHooks(db);
   },
   useProstgles: async ({ db }) => {
-    await useProstglesTest(db, getSocketOptions);
+    await useProstglesTest(db, getClientOptions);
   },
   files: async ({ db }) => {
     await clientFileTests(db);
