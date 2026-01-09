@@ -20,6 +20,7 @@ import type {
   ClientSchema,
   FieldFilter,
   IdentityProvider,
+  LocalLoginMode,
   UserLike,
 } from "prostgles-types";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -455,7 +456,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    * Used to hint to the client which login mode is available
    * Defaults to username and password
    */
-  localLoginMode?: AuthSocketSchema["loginType"];
+  localLoginMode?: LocalLoginMode;
 
   /**
    * If provided then the user will be able to login with a username and/or password

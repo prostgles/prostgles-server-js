@@ -78,15 +78,22 @@ export async function getClientAuth(
   if (userData === "new-session-redirect") {
     return userData;
   }
+
+  const loginMode = localLoginMode ?? (login ? "email+password" : undefined);
   const auth: AuthSocketSchema = {
     providers: getOAuthProviders(this, loginWithOAuth),
     signupWithEmailAndPassword: signupWithEmail && {
       minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
       url: this.authRoutes.emailRegistration,
+      emailConfirmationRoute: this.authRoutes.magicLinks,
     },
     preferredLogin: userData.preferredLogin,
     user: userData.clientUser,
-    loginType: localLoginMode ?? (login ? "email+password" : undefined),
+    login: loginMode && {
+      mode: loginMode,
+      loginRoute: this.authRoutes.login,
+      logoutRoute: this.authRoutes.logout,
+    },
     pathGuard,
   };
   return { auth, userData };
