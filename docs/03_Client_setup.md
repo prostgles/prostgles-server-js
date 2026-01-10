@@ -39,6 +39,12 @@ const prostglesClient = prostgles<DBGeneratedSchema>
 
 ### Configuration options
 <span style="color: green;">InitOptions</span>
+  - **endpoint** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+    Prostgles UI host url
+  - **project** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+    Project path from the API section
   - **socket** <span style="color: red">required</span> <span style="color: green;">Socket&lt;DefaultEventsMap, DefaultEventsMap&gt;</span>
 
     Socket.io client instance

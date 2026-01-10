@@ -34,7 +34,7 @@ export const HTTP_SUCCESS_CODES = {
 const SID_KEY_NAME = "session_id" as const;
 export const EXPRESS_CATCH_ALL_ROUTE = "*splat"; //v5 "*splat" //v4 "*"
 export const AUTH_RETURN_URL_PARAM_NAME = "returnURL";
-const AUTH_ROUTES = {
+export const AUTH_ROUTES = {
   login: "/login",
   loginWithProvider: "/oauth",
   emailRegistration: "/register",

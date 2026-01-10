@@ -4,7 +4,7 @@ import type {
   AuthSocketSchema,
 } from "prostgles-types";
 import { CHANNELS, getObjectEntries, isEmpty, isObject } from "prostgles-types";
-import type { AuthHandler } from "./AuthHandler";
+import { AUTH_ROUTES, type AuthHandler } from "./AuthHandler";
 import type { AuthClientRequest, AuthConfig, AuthResultWithSID } from "./AuthTypes";
 import { type AuthResult } from "./AuthTypes";
 
@@ -84,15 +84,15 @@ export async function getClientAuth(
     providers: getOAuthProviders(this, loginWithOAuth),
     signupWithEmailAndPassword: signupWithEmail && {
       minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
-      url: this.authRoutes.emailRegistration,
-      emailConfirmationRoute: this.authRoutes.magicLinks,
+      url: AUTH_ROUTES.emailRegistration,
+      emailConfirmationRoute: AUTH_ROUTES.magicLinks,
     },
     preferredLogin: userData.preferredLogin,
     user: userData.clientUser,
     login: loginMode && {
       mode: loginMode,
-      loginRoute: this.authRoutes.login,
-      logoutRoute: this.authRoutes.logout,
+      loginRoute: AUTH_ROUTES.login,
+      logoutRoute: AUTH_ROUTES.logout,
     },
     pathGuard,
   };
