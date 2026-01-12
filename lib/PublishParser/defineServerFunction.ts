@@ -55,3 +55,27 @@ export const createDefineServerFunction = <S = void, SUser extends SessionUser =
     ) => MaybePromise<unknown>;
   }) => ({ ...args, isAllowed }) as unknown as ServerFunctionDefinition;
 };
+
+type TypeGuardResult<T, Fallback> = T extends (arg: any) => arg is infer R ? R : Fallback;
+
+export const createDefineServerFunctionWithContextGuard = <
+  S,
+  SUser extends SessionUser,
+  TGuard extends (params: PublishParams<S, SUser>) => boolean,
+>(
+  isAllowed?: TGuard
+) => {
+  type BaseContext = PublishParams<S, SUser>;
+  type GuardedContext = TypeGuardResult<TGuard, BaseContext>;
+
+  return <TInput extends Record<string, JSONB.FieldType> | undefined = undefined>(args: {
+    input?: TInput;
+    output?: JSONB.FieldType;
+    description?: string;
+    run: (args: JSONBObjectTypeIfDefined<TInput>, context: GuardedContext) => MaybePromise<unknown>;
+  }) =>
+    ({
+      ...args,
+      isAllowed,
+    }) as unknown as ServerFunctionDefinition;
+};
