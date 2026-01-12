@@ -38,9 +38,9 @@ export type ServerFunction<
 export type ServerFunctionDefinitions<
   S = void,
   SUser extends SessionUser = SessionUser,
-> = (params: { dbo: DBOFullyTyped<S>; db: DB }) => {
+> = (params: { dbo: DBOFullyTyped<S>; db: DB }) => MaybePromise<{
   [key: string]: ServerFunction<S, SUser>;
-};
+}>;
 
 export const createDefineServerFunction = <S = void, SUser extends SessionUser = SessionUser>(
   isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>

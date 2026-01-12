@@ -304,7 +304,7 @@ export class DboBuilder {
     let resolvedFunctions = {} as { [key: string]: ServerFunction };
     if (functions) {
       try {
-        resolvedFunctions = functions({
+        resolvedFunctions = await functions({
           dbo: this.dbo as DBOFullyTyped,
           db: this.db,
         });

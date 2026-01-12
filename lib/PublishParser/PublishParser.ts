@@ -24,7 +24,6 @@ import type { ServerFunction } from "./defineServerFunction";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
-  functionHandler: { [key: string]: ServerFunction } | undefined;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB;
@@ -33,15 +32,7 @@ export class PublishParser {
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
     this.publish = prostgles.opts.publish;
-    try {
-      this.functionHandler = prostgles.opts.functions?.({
-        dbo: prostgles.dbo as DBOFullyTyped,
-        db: prostgles.db as DB,
-      });
-    } catch (e) {
-      console.error("Invalid functions:", e);
-      throw e;
-    }
+
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
     const { dbo, db } = prostgles;
@@ -72,14 +63,27 @@ export class PublishParser {
     };
   }
 
+  getFunctionHandler = async (): Promise<{ [key: string]: ServerFunction } | undefined> => {
+    try {
+      const prostgles = this.prostgles;
+      return prostgles.opts.functions?.({
+        dbo: prostgles.dbo as DBOFullyTyped,
+        db: prostgles.db as DB,
+      });
+    } catch (e) {
+      console.error("Invalid functions:", e);
+      throw e;
+    }
+  };
   async getAllowedFunctions(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
-    if (!this.functionHandler) {
+    const functionHandler = await this.getFunctionHandler();
+    if (!functionHandler) {
       return;
     }
     const methods: Map<string, ServerFunction> = new Map();
 
     const publishParams = await this.getPublishParams(clientReq, userData);
-    for (const [name, method] of Object.entries(this.functionHandler)) {
+    for (const [name, method] of Object.entries(functionHandler)) {
       if (await method.isAllowed(publishParams)) {
         methods.set(name, method);
       }

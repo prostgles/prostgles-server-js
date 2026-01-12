@@ -27,7 +27,7 @@ import type { DBOFullyTyped } from "prostgles-server";
 import type { PublishParams } from "prostgles-server";
 import type { SessionUser } from "prostgles-server";
 import { defineServerFunction } from "prostgles-server";
-export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
+export type { DBHandlerServer } from "prostgles-server";
 
 let logs = [];
 
