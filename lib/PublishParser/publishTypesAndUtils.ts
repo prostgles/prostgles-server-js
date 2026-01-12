@@ -154,7 +154,7 @@ import type {
   Method,
   TableInfo,
 } from "prostgles-types";
-import type { AuthClientRequest, SessionUser } from "../Auth/AuthTypes";
+import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
@@ -522,6 +522,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   db: DB;
   user?: SUser["user"];
   clientReq: AuthClientRequest;
+  clientInfo: LoginClientInfo;
   tables: DbTableInfo[];
   getClientDBHandlers: (
     /**

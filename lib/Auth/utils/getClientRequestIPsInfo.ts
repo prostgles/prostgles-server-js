@@ -15,8 +15,10 @@ export const getClientRequestIPsInfo = <T extends ClientReq>(req: T): LoginClien
       user_agent,
     };
   } else {
+    const ip_address = req.socket.handshake.address;
+    if (!ip_address) throw new Error("ip_address missing from req.socket.handshake");
     return {
-      ip_address: req.socket.handshake.address,
+      ip_address,
       ip_address_remote: req.socket.request.connection.remoteAddress,
       x_real_ip: req.socket.handshake.headers?.["x-real-ip"] as string | undefined,
       user_agent: req.socket.handshake.headers?.["user-agent"] as string | undefined,

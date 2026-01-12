@@ -16,7 +16,6 @@ import type {
   AnyObject,
   AuthRequest,
   AuthResponse,
-  AuthSocketSchema,
   ClientSchema,
   FieldFilter,
   IdentityProvider,
@@ -53,7 +52,11 @@ export type BasicSession = {
 };
 
 type SocketClientRequest = { socket: PRGLIOSocket; httpReq?: undefined };
-type HttpClientRequest = { httpReq: ExpressReq; res: ExpressRes; socket?: undefined };
+type HttpClientRequest = {
+  httpReq: ExpressReq;
+  res: ExpressRes;
+  socket?: undefined;
+};
 export type AuthClientRequest = SocketClientRequest | HttpClientRequest;
 
 export type ThirdPartyProviders = {

@@ -23,6 +23,7 @@ import {
   type PublishObject,
   type PermissionScope,
 } from "./publishTypesAndUtils";
+import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
@@ -51,17 +52,18 @@ export class PublishParser {
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined
   ): Promise<PublishParams> {
-    const _clientInfo =
+    const sessionUser =
       clientInfo ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
-    if (_clientInfo === "new-session-redirect") {
+    if (sessionUser === "new-session-redirect") {
       throw "new-session-redirect";
     }
     return {
       sid: undefined,
-      ..._clientInfo,
+      ...sessionUser,
       dbo: this.dbo as DBOFullyTyped,
       db: this.db,
       clientReq,
+      clientInfo: getClientRequestIPsInfo(clientReq),
       tables: this.prostgles.dboBuilder.tables,
       getClientDBHandlers: (scope: PermissionScope | undefined) =>
         getClientHandlers(this.prostgles, clientReq, scope),
