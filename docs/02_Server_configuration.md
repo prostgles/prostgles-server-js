@@ -54,7 +54,7 @@
 - **publishRawSQL** <span style="color: grey">optional</span> <span style="color: green;">(params: PublishParams&lt;S, SUser&gt;) =&gt; Awaitable&lt;boolean | "*"&gt;</span>
 
   If defined and resolves to true then the connected client can run SQL queries
-- **functions** <span style="color: grey">optional</span> <span style="color: green;">ServerActionHandlers</span>
+- **functions** <span style="color: grey">optional</span> <span style="color: green;">ServerFunctionDefinitions</span>
 
   Server-side functions that can be invoked by the client
 - **testRulesOnConnect** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>

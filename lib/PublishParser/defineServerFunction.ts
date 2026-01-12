@@ -41,3 +41,17 @@ export type ServerFunctionDefinitions<
 > = (params: { dbo: DBOFullyTyped<S>; db: DB }) => {
   [key: string]: ServerFunction<S, SUser>;
 };
+
+export const createDefineServerFunction = <S = void, SUser extends SessionUser = SessionUser>(
+  isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>
+) => {
+  return <TInput extends Record<string, JSONB.FieldType> | undefined = undefined>(args: {
+    input?: TInput;
+    output?: JSONB.FieldType;
+    description?: string;
+    run: (
+      args: JSONBObjectTypeIfDefined<TInput>,
+      context: PublishParams<S, SUser>
+    ) => MaybePromise<unknown>;
+  }) => ({ ...args, isAllowed }) as unknown as ServerFunctionDefinition;
+};
