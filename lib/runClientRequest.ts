@@ -228,7 +228,7 @@ export const runClientMethod = async function (
   }
   const reqArgs = validation.data;
   const { name, input } = reqArgs;
-  const allowedFunctions = await this.publishParser?.getAllowedMethods(clientReq, undefined);
+  const allowedFunctions = await this.publishParser?.getAllowedFunctions(clientReq, undefined);
 
   const functionDefinition = allowedFunctions?.get(name);
   if (!functionDefinition) {

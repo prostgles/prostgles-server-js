@@ -3,9 +3,6 @@ import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 
-import { testDboTypes } from "./typeTests/dboTypeCheck";
-testDboTypes();
-
 function prostgles<S = void, SUser extends SessionUser = SessionUser>(
   params: ProstglesInitOptions<S, SUser>
 ) {
@@ -14,4 +11,11 @@ function prostgles<S = void, SUser extends SessionUser = SessionUser>(
     type: "init",
   }) as unknown as Promise<InitResult<S, SUser>>;
 }
-export = prostgles;
+export * from "./PublishParser/defineServerFunction";
+export * from "./Auth/AuthTypes";
+export type { PublishParams } from "./PublishParser/publishTypesAndUtils";
+export type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+export type { DBHandlerServer } from "./Prostgles";
+export type { CloudClient, LocalConfig } from "./FileManager/FileManager";
+
+export default prostgles;

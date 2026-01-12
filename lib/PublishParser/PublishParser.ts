@@ -13,7 +13,6 @@ import type {
   DboTableCommand,
   ParsedTableRule,
   PublishParams,
-  ServerFunction,
 } from "./publishTypesAndUtils";
 import {
   RULE_TO_METHODS,
@@ -21,6 +20,7 @@ import {
   type PermissionScope,
   type PublishObject,
 } from "./publishTypesAndUtils";
+import type { ServerFunction } from "./defineServerFunction";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
@@ -72,7 +72,7 @@ export class PublishParser {
     };
   }
 
-  async getAllowedMethods(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
+  async getAllowedFunctions(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
     if (!this.functionHandler) {
       return;
     }

@@ -23,9 +23,10 @@ import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
-import type { DBOFullyTyped } from "../../dist/DBSchemaBuilder/DBSchemaBuilder";
-import type { PublishParams } from "../../dist/PublishParser/publishTypesAndUtils";
-import type { SessionUser } from "../../dist/Auth/AuthTypes";
+import type { DBOFullyTyped } from "prostgles-server";
+import type { PublishParams } from "prostgles-server";
+import type { SessionUser } from "prostgles-server";
+import { defineServerFunction } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 let logs = [];
@@ -228,12 +229,12 @@ function dd() {
         return params.user?.type === "admin";
       };
       return {
-        myfunc: {
+        myfunc: defineServerFunction({
           input: { arg1: { type: "number" } },
           output: "number",
           run: () => 222,
           isAllowed: isAllowedForAllUsers,
-        },
+        }),
         myAdminFunc: {
           input: { arg1: { type: "number" } },
           output: "number",

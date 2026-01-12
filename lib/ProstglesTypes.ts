@@ -17,7 +17,7 @@ import type pg from "pg-promise/typescript/pg-subset";
 import type { AnyObject } from "prostgles-types";
 import type { Server } from "socket.io";
 import type { Awaitable, Publish, PublishParams } from "./PublishParser/PublishParser";
-import { type ServerActionHandlers } from "./PublishParser/PublishParser";
+import type { ServerFunctionDefinitions } from "./PublishParser/defineServerFunction";
 
 /**
  * Allows uploading and downloading files.
@@ -174,7 +174,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Server-side functions that can be invoked by the client
    */
-  functions?: ServerActionHandlers<S, SUser>;
+  functions?: ServerFunctionDefinitions<S, SUser>;
 
   /**
    * If true then will test all table methods on each socket connect.

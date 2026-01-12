@@ -1,7 +1,6 @@
 import {
   getKeys,
   type AnyObject,
-  type ServerFunctionDefinition,
   type SQLHandler,
   type SQLOptions,
   type TableHandler,
@@ -13,6 +12,7 @@ import type { Prostgles } from "../Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
 import { getClientSchema } from "./getClientSchema";
 import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
+import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export type ClientHandlers<S = void> = {
   clientDb: DBOFullyTyped<S, false>;

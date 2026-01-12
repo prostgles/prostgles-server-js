@@ -11,7 +11,7 @@ import type { DB, Prostgles } from "../Prostgles";
 import type { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
-import type { DbTableInfo, PublishParser, ServerFunction } from "../PublishParser/PublishParser";
+import type { DbTableInfo, PublishParser } from "../PublishParser/PublishParser";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "../shortestPath";
 import { clone } from "../utils/utils";
@@ -36,6 +36,7 @@ import {
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
+import type { ServerFunction } from "../PublishParser/defineServerFunction";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";

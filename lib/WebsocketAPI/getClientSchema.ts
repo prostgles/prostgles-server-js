@@ -57,7 +57,7 @@ export async function getClientSchema(
       });
     }
 
-    const methods = await publishParser?.getAllowedMethods(clientInfo, userData);
+    const methods = await publishParser?.getAllowedFunctions(clientInfo, userData);
 
     const methodSchema: ClientSchema["methods"] =
       !methods ?
