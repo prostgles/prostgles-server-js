@@ -37,7 +37,7 @@ export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser>
   | "schemaFilter"
   | "auth"
   | "publish"
-  | "publishMethods"
+  | "functions"
   | "publishRawSQL"
 >;
 export type OnInitReason =

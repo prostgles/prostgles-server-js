@@ -1,7 +1,7 @@
 import {
   getKeys,
   type AnyObject,
-  type Method,
+  type ServerFunctionDefinition,
   type SQLHandler,
   type SQLOptions,
   type TableHandler,
@@ -16,7 +16,7 @@ import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 
 export type ClientHandlers<S = void> = {
   clientDb: DBOFullyTyped<S, false>;
-  clientMethods: Record<string, Method>;
+  clientMethods: Record<string, ServerFunctionDefinition>;
 };
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
@@ -67,17 +67,16 @@ export const getClientHandlers = async <S = void>(
     sql: sqlHandler,
   } as DBOFullyTyped<S, false>;
 
-  const clientMethods: Record<string, Method> = Object.fromEntries(
-    clientSchema.methods.map((method) => {
-      const methodName = typeof method === "string" ? method : method.name;
-      const methodHandler =
-        scope && !scope.methods?.[methodName] ?
-          () => {
-            throw new Error(`Method ${methodName} is not allowed by PermissionScope`);
-          }
-        : (...params: any[]) =>
-            runClientMethod.bind(prostgles)({ method: methodName, params }, clientReq);
-      return [methodName, methodHandler];
+  //@ts-ignore
+  const clientMethods: Record<string, ServerFunctionDefinition> = Object.fromEntries(
+    clientSchema.methods.map(({ name, input, description, output }) => {
+      const methodHandler = (input?: unknown) => {
+        if (scope && !scope.methods?.[name]) {
+          throw new Error(`Method ${name} is not allowed by PermissionScope`);
+        }
+        return runClientMethod.bind(prostgles)({ name, input }, clientReq);
+      };
+      return [name, { name, input, description, output, run: methodHandler }];
     })
   );
 

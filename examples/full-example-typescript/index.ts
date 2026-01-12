@@ -27,7 +27,7 @@ prostgles({
       planes: "*",
     };
   },
-  publishMethods: ({ dbo }) => {
+  functions: ({ dbo }) => {
     return {
       insertPlanes: async (data) => {
         let res = await dbo.planes.insert(data);

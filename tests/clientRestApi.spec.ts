@@ -19,8 +19,8 @@ export const clientRestApi = async (
       rest({ tableName, command, noAuth: true }, ...(params ?? []));
     const sqlRest = (query: string, ...params: any[]) =>
       post({ path: `db/sql`, token }, query, ...(params ?? []));
-    const dbMethod = (methodName: string, ...params: any[]) =>
-      post({ path: `methods/${methodName}`, token }, ...(params ?? []));
+    const dbMethod = (methodName: string, input?: unknown) =>
+      post({ path: `methods/${methodName}`, token, onlyFirstParam: true }, input);
 
     await test("Rest api test", async () => {
       const dataFilter = { id: 123123123, last_updated: Date.now() };
@@ -68,7 +68,9 @@ export const clientRestApi = async (
         })
       );
 
-      const two22 = await dbMethod("myfunc", {});
+      const err = await dbMethod("myfunc", {}).catch((error) => error);
+      assert.deepStrictEqual(err, { error: { message: "arg1 is missing but required" } });
+      const two22 = await dbMethod("myfunc", { arg1: 1 }).catch((error) => error);
       assert.equal(two22, 222);
     });
 
@@ -95,7 +97,7 @@ export const clientRestApi = async (
 
         const methodRes = await dbMethod(key, {}).catch((error) => error);
         assert.deepStrictEqual(methodRes, {
-          error: { message: `Disallowed/missing method "${key}"` },
+          error: { message: `Disallowed/missing function "${key}"` },
         });
       }
     });
@@ -103,7 +105,12 @@ export const clientRestApi = async (
 };
 
 const post = async (
-  { path, noAuth, token }: { path: string; token: string; noAuth?: boolean },
+  {
+    path,
+    noAuth,
+    token,
+    onlyFirstParam,
+  }: { path: string; token: string; noAuth?: boolean; onlyFirstParam?: boolean },
   ...params: any[]
 ) => {
   const headers = new Headers({
@@ -111,10 +118,15 @@ const post = async (
     Accept: "application/json",
     "Content-Type": "application/json",
   });
+
+  const body =
+    !params?.length ? undefined
+    : onlyFirstParam ? JSON.stringify(params[0])
+    : JSON.stringify(params);
   const res = await fetch(`http://127.0.0.1:3001/api/${path}`, {
     method: "POST",
     headers,
-    body: !params?.length ? undefined : JSON.stringify(params),
+    body,
   });
   const resBodyJson = await res.text().then((text) => {
     try {

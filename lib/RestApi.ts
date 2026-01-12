@@ -61,7 +61,7 @@ export class RestApi {
     this.routes = {
       db: `${path}/db/:tableName/:command`,
       sql: `${path}/db/sql`,
-      methods: `${path}/methods/:method`,
+      methods: `${path}/methods/:name`,
       schema: `${path}/schema`,
     };
     this.expressApp = expressApp as ExpressApp;
@@ -80,14 +80,14 @@ export class RestApi {
     removeExpressRoute(this.expressApp, [this.path]);
   };
   onPostMethod = async (req: ExpressReq, res: ExpressRes) => {
-    const { method = "" } = req.params;
-    const params = req.body || [];
+    const { name = "" } = req.params;
+    const input = req.body;
 
     try {
       const data = await runClientMethod.bind(this.prostgles)(
         {
-          method,
-          params,
+          name,
+          input,
         },
         {
           res,

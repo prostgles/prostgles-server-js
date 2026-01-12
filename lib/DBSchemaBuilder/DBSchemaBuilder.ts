@@ -18,7 +18,7 @@ import type { TableConfig } from "../TableConfig/TableConfig";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
 
-export const getDBSchema = ({
+export const getDBTypescriptSchema = ({
   tablesOrViews,
   config,
 }: {

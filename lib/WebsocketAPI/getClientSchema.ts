@@ -62,15 +62,13 @@ export async function getClientSchema(
     const methodSchema: ClientSchema["methods"] =
       !methods ?
         []
+        //@ts-ignore
       : Array.from(methods.entries())
-          .map(([methodName, method]) => {
-            if (isObject(method) && "run" in method) {
-              return {
-                name: methodName,
-                ...omitKeys(method, ["run"]),
-              };
-            }
-            return methodName;
+          .map(([name, method]) => {
+            return {
+              name,
+              ...omitKeys(method, ["run"]),
+            };
           })
           .sort((a, b) => {
             const aName = isObject(a) ? a.name : a;

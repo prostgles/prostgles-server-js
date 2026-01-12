@@ -61,6 +61,6 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
 export const clientOnlyUpdateKeys = [
   "auth",
   "publish",
-  "publishMethods",
+  "functions",
   "publishRawSQL",
 ] as const satisfies (keyof UpdateableOptions)[];

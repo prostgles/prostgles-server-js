@@ -1,4 +1,4 @@
-import { RULE_METHODS, type MethodFullDef } from "prostgles-types";
+import { RULE_METHODS, type ServerFunctionDefinition } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type {
   CommonTableRules,
@@ -8,14 +8,17 @@ import type {
 } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
 
-export type PublishMethods<S = void, SUser extends SessionUser = SessionUser> = (
-  params: PublishParams<S, SUser>
-) => { [key: string]: Method } | Promise<{ [key: string]: Method } | null>;
-
-export type PublishMethodsV2<S = void, SUser extends SessionUser = SessionUser> = {
-  [key: string]: MethodFullDef & {
-    isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>;
-  };
+export type ServerFunction<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+> = ServerFunctionDefinition<Omit<PublishParams<S, SUser>, "db" | "dbo">> & {
+  isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>;
+};
+export type ServerActionHandlers<S = void, SUser extends SessionUser = SessionUser> = (params: {
+  dbo: DBOFullyTyped<S>;
+  db: DB;
+}) => {
+  [key: string]: ServerFunction<S, SUser>;
 };
 
 export type Awaitable<T> = T | Promise<T>;
@@ -151,7 +154,6 @@ import type {
   AnyObject,
   DBSchema,
   FullFilter,
-  Method,
   TableInfo,
 } from "prostgles-types";
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";

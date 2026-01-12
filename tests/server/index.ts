@@ -24,6 +24,8 @@ import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
 import type { DBOFullyTyped } from "../../dist/DBSchemaBuilder/DBSchemaBuilder";
+import type { PublishParams } from "../../dist/PublishParser/publishTypesAndUtils";
+import type { SessionUser } from "../../dist/Auth/AuthTypes";
 export type { DBHandlerServer } from "prostgles-server/dist/Prostgles";
 
 let logs = [];
@@ -220,18 +222,31 @@ function dd() {
         },
       },
     },
-    publishMethods: {
-      myfunc: {
-        input: { arg1: { type: "number" } },
-        run: () => 222,
-        isAllowed: () => true,
-      },
-      myfuncWithReturn: {
-        input: { arg1: { type: "number" } },
-        output: { out: { type: "number" } },
-        run: () => 222,
-        isAllowed: () => true,
-      },
+    functions: () => {
+      const isAllowedForAllUsers = () => true;
+      const isAllowedForAdmins = (params: PublishParams<DBGeneratedSchema, SessionUser>) => {
+        return params.user?.type === "admin";
+      };
+      return {
+        myfunc: {
+          input: { arg1: { type: "number" } },
+          output: "number",
+          run: () => 222,
+          isAllowed: isAllowedForAllUsers,
+        },
+        myAdminFunc: {
+          input: { arg1: { type: "number" } },
+          output: "number",
+          run: () => 222,
+          isAllowed: isAllowedForAdmins,
+        },
+        myfuncWithBadReturn: {
+          input: { arg1: { type: "number" } },
+          output: "number",
+          run: () => "222",
+          isAllowed: isAllowedForAllUsers,
+        },
+      };
     },
     publish: testPublish,
     publishRawSQL: async (params) => {

@@ -3,12 +3,8 @@ import io from "socket.io-client";
 
 import { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 export { AuthHandler } from "prostgles-client/dist/getAuthHandler";
-import type {
-  DBHandlerClient,
-  MethodHandler,
-  UseProstglesClientProps,
-} from "prostgles-client/dist/prostgles";
-import { DBSchemaTable } from "prostgles-types";
+import type { DBHandlerClient, UseProstglesClientProps } from "prostgles-client";
+import { DBSchemaTable, type ServerFunctionHandler } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
@@ -17,7 +13,9 @@ import { isomorphicQueriesTyped } from "../isomorphicQueriesTyped.spec";
 import { clientHooks } from "./hooks.spec";
 import * as _ from "./basicHooks.spec";
 import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
-export { DBHandlerClient } from "prostgles-client/dist/prostgles";
+import type { ClientFunctionHandler } from "prostgles-client/dist/getMethods";
+export type { ClientFunctionHandler } from "prostgles-client/dist/getMethods";
+export { DBHandlerClient } from "prostgles-client";
 
 const start = Date.now();
 const log = (msgOrObj: any, extra?: any) => {
@@ -45,7 +43,7 @@ const socket = io(endpoint, { ...socketOptions });
 
 type ClientTestSpecV2 = (args: {
   db: DBHandlerClient<void>;
-  methods: MethodHandler;
+  methods: ClientFunctionHandler;
   tableSchema: DBSchemaTable[];
   isReconnect?: boolean;
   auth: AuthHandler;
@@ -118,7 +116,7 @@ try {
       onReconnect: (socket) => {
         log("Reconnected");
       },
-      onReady: async (db, methods, tableSchema, auth, isReconnect) => {
+      onReady: async (db, methods, methodSchema, tableSchema, auth, isReconnect) => {
         log(`TEST_NAME: ${TEST_NAME} Started`);
         try {
           //@ts-ignore

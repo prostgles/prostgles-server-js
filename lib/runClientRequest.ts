@@ -1,6 +1,7 @@
-import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
+import type { JSONB, SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
   getJSONBObjectSchemaValidationError,
+  getJSONBSchemaValidationError,
   getKeys,
   pickKeys,
   type AnyObject,
@@ -206,8 +207,8 @@ export const runClientSqlRequest = async function (
 };
 
 type ArgsMethod = {
-  method: unknown;
-  params?: any[];
+  name: unknown;
+  input?: unknown;
 };
 export const runClientMethod = async function (
   this: Prostgles,
@@ -216,8 +217,8 @@ export const runClientMethod = async function (
 ) {
   const validation = getJSONBObjectSchemaValidationError(
     {
-      method: { type: "string" },
-      params: { type: "any[]", optional: true },
+      name: "string",
+      input: { type: "any", optional: true },
     },
     unvalidatedArgs,
     "method"
@@ -226,21 +227,43 @@ export const runClientMethod = async function (
     throw validation.error;
   }
   const reqArgs = validation.data;
-  const { method, params = [] } = reqArgs;
-  const methods = await this.publishParser?.getAllowedMethods(clientReq, undefined);
+  const { name, input } = reqArgs;
+  const allowedFunctions = await this.publishParser?.getAllowedMethods(clientReq, undefined);
 
-  const methodDef = methods?.get(method);
-  if (!methods || !methodDef) {
-    throw "Disallowed/missing method " + JSON.stringify(method);
+  const functionDefinition = allowedFunctions?.get(name);
+  if (!functionDefinition) {
+    throw "Disallowed/missing function " + JSON.stringify(name);
   }
 
-  const onRun =
-    (
-      typeof methodDef === "function" ||
-      typeof (methodDef as unknown as Promise<void>).then === "function"
-    ) ?
-      (methodDef as (...args: any) => Promise<void>)
-    : methodDef.run;
-  const res = await onRun(...params);
+  const inputSchema = functionDefinition.input;
+  if (!inputSchema && input !== undefined) {
+    throw "Function " + JSON.stringify(name) + " does not accept any arguments";
+  }
+
+  const expectedArgsError =
+    !inputSchema ? undefined : getJSONBSchemaValidationError({ type: inputSchema }, input);
+
+  if (expectedArgsError?.error !== undefined) {
+    const { error } = expectedArgsError;
+    const message = error.startsWith(" ") ? "input" + error : error;
+    throw message;
+  }
+  const context = (await this.publishParser?.getPublishParams(
+    clientReq,
+    undefined
+  )) as PublishParams<never, any>;
+  const res = await functionDefinition.run(input as never, context);
+  const outputSchema = functionDefinition.output;
+  if (!outputSchema) {
+    if (res !== undefined) {
+      throw "Function " + JSON.stringify(name) + " returned unexpected output";
+    }
+  } else {
+    const expectedOutputError = getJSONBSchemaValidationError(outputSchema, res);
+    if (expectedOutputError.error !== undefined) {
+      throw "output" + expectedOutputError.error;
+    }
+  }
+
   return res;
 };

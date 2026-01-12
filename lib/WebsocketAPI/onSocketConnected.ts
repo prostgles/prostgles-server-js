@@ -1,4 +1,4 @@
-import type { AnyObject } from "prostgles-types";
+import type { AnyObject, SocketFunctionCall } from "prostgles-types";
 import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
@@ -119,7 +119,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     socket.on(
       CHANNELS.METHOD,
       (
-        { method, params }: SocketMethodRequest,
+        { name, input }: SocketFunctionCall,
         cb = (..._callback: any) => {
           /* Empty */
         }
@@ -127,8 +127,8 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         runClientMethod
           .bind(this)(
             {
-              method,
-              params,
+              name,
+              input,
             },
             {
               socket,
@@ -160,8 +160,4 @@ type SocketRequestParams = {
   param1: any;
   param2: any;
   param3: any;
-};
-type SocketMethodRequest = {
-  method: string;
-  params: any;
 };

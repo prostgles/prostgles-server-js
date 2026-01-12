@@ -1,14 +1,15 @@
 import { strict as assert } from "assert";
-import type { DBHandlerClient, AuthHandler } from "./client";
-import { AnyObject, DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
-import { tryRun, tryRunP } from "./isomorphicQueries.spec";
 import { describe, test } from "node:test";
+import { AnyObject, DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
+import type { AuthHandler, ClientFunctionHandler, DBHandlerClient } from "./client";
+import type { GeneratedFunctionSchema } from "./DBGeneratedSchema";
+import { tryRun, tryRunP } from "./isomorphicQueries.spec";
 
 export const clientOnlyQueries = async (
   db: DBHandlerClient,
   auth: AuthHandler,
   log: (...args: any[]) => any,
-  methods,
+  serverFunctions: ClientFunctionHandler,
   tableSchema: DBSchemaTable[],
   token: string
 ) => {
@@ -381,10 +382,6 @@ export const clientOnlyQueries = async (
     const testRealtime = () => {
       return new Promise(async (resolveTest, rejectTest) => {
         try {
-          /* DB_HANDLER */
-          const t222 = await methods.myfunc.run();
-          assert.equal(t222, 222, "methods.myfunc() failed");
-
           /* RAWSQL */
           await tryRun("SQL Full result", async () => {
             if (!db.sql) throw "db.sql missing";
@@ -657,6 +654,36 @@ export const clientOnlyQueries = async (
         +(await db.insert_rules.count!({ name: "notfail" })),
         "postValidation failed"
       );
+
+      const funcError = await serverFunctions.myfunc().catch((err) => err);
+      assert.deepStrictEqual(funcError, {
+        error: "input is of invalid type. Expecting { arg1: number }",
+      });
+      const funcResult = await serverFunctions.myfunc({ arg1: 1 }).catch((err) => err);
+      assert.equal(funcResult, 222, "methods.myfunc() failed");
+
+      const badFunc = await serverFunctions.myfuncWithBadReturn({ arg1: 1 }).catch((err) => err);
+      assert.deepStrictEqual(badFunc, {
+        error: "output is of invalid type. Expecting number",
+      });
+
+      assert.equal(serverFunctions.myAdminFunc, undefined, "myAdminFunc should not be defined");
+
+      const typedServerFunctions = serverFunctions as unknown as GeneratedFunctionSchema;
+      const res = await typedServerFunctions.myfunc({ arg1: 1 });
+      () =>
+        typedServerFunctions.myfuncWithBadReturn({
+          //@ts-expect-error
+          arg2: 1,
+        });
+      if (
+        //@ts-expect-error
+        res === "2"
+      ) {
+        throw "methods.myfuncWithReturn() failed";
+      }
+      if (res === 2) {
+      }
     });
 
     // await tryRun("Duplicate subscription", async () => {

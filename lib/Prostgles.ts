@@ -119,7 +119,7 @@ export class Prostgles {
       disableRealtime: 1,
       onReady: 1,
       dbConnection: 1,
-      publishMethods: 1,
+      functions: 1,
       io: 1,
       publish: 1,
       schemaFilter: 1,
