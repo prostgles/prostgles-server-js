@@ -43,7 +43,8 @@ export type ServerFunctionDefinitions<
 }>;
 
 export const createDefineServerFunction = <S = void, SUser extends SessionUser = SessionUser>(
-  isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>
+  isAllowed: (params: PublishParams<S, SUser>) => boolean | Promise<boolean>,
+  defaultOutput?: JSONB.FieldType
 ) => {
   return <TInput extends Record<string, JSONB.FieldType> | undefined = undefined>(args: {
     input?: TInput;
@@ -53,7 +54,12 @@ export const createDefineServerFunction = <S = void, SUser extends SessionUser =
       args: JSONBObjectTypeIfDefined<TInput>,
       context: PublishParams<S, SUser>
     ) => MaybePromise<unknown>;
-  }) => ({ ...args, isAllowed }) as unknown as ServerFunctionDefinition;
+  }) =>
+    ({
+      ...args,
+      output: args.output ?? defaultOutput,
+      isAllowed,
+    }) as unknown as ServerFunctionDefinition;
 };
 
 type TypeGuardResult<T, Fallback> = T extends (arg: any) => arg is infer R ? R : Fallback;
@@ -63,7 +69,8 @@ export const createDefineServerFunctionWithContextGuard = <
   SUser extends SessionUser,
   TGuard extends (params: PublishParams<S, SUser>) => boolean,
 >(
-  isAllowed?: TGuard
+  isAllowed?: TGuard,
+  defaultOutput?: JSONB.FieldType
 ) => {
   type BaseContext = PublishParams<S, SUser>;
   type GuardedContext = TypeGuardResult<TGuard, BaseContext>;
@@ -76,6 +83,7 @@ export const createDefineServerFunctionWithContextGuard = <
   }) =>
     ({
       ...args,
+      output: args.output ?? defaultOutput,
       isAllowed,
     }) as unknown as ServerFunctionDefinition;
 };
