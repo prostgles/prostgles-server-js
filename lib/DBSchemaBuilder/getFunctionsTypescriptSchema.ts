@@ -16,12 +16,13 @@ export const getFunctionsTypescriptSchema = (
     ([name, functionDefinition]) => {
       const { output } = functionDefinition;
       const input = functionDefinition.input;
-      const argumentTypes = !input ? "never" : getJSONBTSTypes(tablesOrViews, { type: input });
+      const argumentTypes =
+        !input ? "" : `args: ${getJSONBTSTypes(tablesOrViews, { type: input })}`;
 
       const removeSemicolon = (v: string) =>
         v.trim().endsWith(";") ? v.trim().slice(0, -1) : v.trim();
       const returnType = !output ? "void" : getJSONBTSTypes(tablesOrViews, output);
-      return `  ${JSON.stringify(name)}: (args: ${removeSemicolon(argumentTypes)}) => Promise<${removeSemicolon(returnType)}>`;
+      return `  ${JSON.stringify(name)}: (${removeSemicolon(argumentTypes)}) => Promise<${removeSemicolon(returnType)}>`;
     }
   );
   if (methodDefinitions.length) {
