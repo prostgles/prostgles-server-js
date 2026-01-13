@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.384",
+  "version": "4.2.385",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,7 +17,7 @@
     "test-quick": "cd tests/ && ./test.sh -quick",
     "test": "npm run test:lib && npm run test-only",
     "generate-docs": "rm -f ./docs/*.md && cd docs/utils && npm start",
-    "pushpublish": "npm run generate-docs && npm version patch --git-tag-version false && git push && npm publish",
+    "pushpublish": "npm run generate-docs && npm version patch --git-tag-version false && git push && npm publish --no-audit",
     "circular-deps": "tsc && npx madge --circular  ."
   },
   "repository": {
