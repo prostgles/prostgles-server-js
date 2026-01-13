@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import prostgles from "prostgles-server";
+import prostgles, { createServerFunctionWithContext } from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig } from "./testTableConfig";
@@ -223,30 +223,40 @@ function dd() {
         },
       },
     },
-    functions: () => {
-      const isAllowedForAllUsers = () => true;
-      const isAllowedForAdmins = (params: PublishParams<DBGeneratedSchema, SessionUser>) => {
-        return params.user?.type === "admin";
-      };
+    functions: (params) => {
+      const forAllUsers = createServerFunctionWithContext(!params ? {} : params);
+      const forAdmins = createServerFunctionWithContext(
+        params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined
+      );
       return {
-        myfunc: defineServerFunction({
+        myfunc: forAllUsers({
           input: { arg1: { type: "number" } },
           output: "number",
-          run: () => 222,
-          isAllowed: isAllowedForAllUsers,
+          run: (
+            {
+              arg1,
+              //@ts-expect-error
+              dwadwa,
+            },
+            { dbo }
+          ) => {
+            return 222;
+          },
         }),
-        myAdminFunc: {
+        myAdminFunc: forAdmins({
           input: { arg1: { type: "number" } },
           output: "number",
-          run: () => 222,
-          isAllowed: isAllowedForAdmins,
-        },
-        myfuncWithBadReturn: {
+          run: ({ arg1 }, { user, type }) => {
+            type === "admin";
+            user.type === "dwadaw";
+            return 222;
+          },
+        }),
+        myfuncWithBadReturn: forAllUsers({
           input: { arg1: { type: "number" } },
           output: "number",
           run: () => "222",
-          isAllowed: isAllowedForAllUsers,
-        },
+        }),
       };
     },
     publish: testPublish,

@@ -20,7 +20,7 @@ import {
   type PermissionScope,
   type PublishObject,
 } from "./publishTypesAndUtils";
-import type { ServerFunction } from "./defineServerFunction";
+import type { ServerFunctionDefinition } from "./defineServerFunction";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
@@ -63,28 +63,27 @@ export class PublishParser {
     };
   }
 
-  getFunctionHandler = async (): Promise<{ [key: string]: ServerFunction } | undefined> => {
+  getFunctionHandler = async (
+    params: PublishParams
+  ): Promise<{ [key: string]: ServerFunctionDefinition } | undefined> => {
     try {
       const prostgles = this.prostgles;
-      return prostgles.opts.functions?.({
-        dbo: prostgles.dbo as DBOFullyTyped,
-        db: prostgles.db as DB,
-      });
+      return await prostgles.opts.functions?.(params);
     } catch (e) {
       console.error("Invalid functions:", e);
       throw e;
     }
   };
   async getAllowedFunctions(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
-    const functionHandler = await this.getFunctionHandler();
+    const publishParams = await this.getPublishParams(clientReq, userData);
+    const functionHandler = await this.getFunctionHandler(publishParams);
     if (!functionHandler) {
       return;
     }
-    const methods: Map<string, ServerFunction> = new Map();
+    const methods: Map<string, ServerFunctionDefinition> = new Map();
 
-    const publishParams = await this.getPublishParams(clientReq, userData);
     for (const [name, method] of Object.entries(functionHandler)) {
-      if (await method.isAllowed(publishParams)) {
+      if (method.run !== undefined) {
         methods.set(name, method);
       }
     }

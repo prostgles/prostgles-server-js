@@ -36,7 +36,7 @@ import {
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
-import type { ServerFunction } from "../PublishParser/defineServerFunction";
+import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -301,13 +301,10 @@ export class DboBuilder {
     }
 
     const { functions } = this.prostgles.opts;
-    let resolvedFunctions = {} as { [key: string]: ServerFunction };
+    let resolvedFunctions = {} as { [key: string]: ServerFunctionDefinition };
     if (functions) {
       try {
-        resolvedFunctions = await functions({
-          dbo: this.dbo as DBOFullyTyped,
-          db: this.db,
-        });
+        resolvedFunctions = await functions(undefined);
       } catch (e) {
         console.error("Invalid functions:", e);
         throw e;

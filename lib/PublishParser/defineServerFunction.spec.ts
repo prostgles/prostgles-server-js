@@ -12,7 +12,6 @@ void describe("defineServerFunction type test", async () => {
         if (args.zz) {
         }
       },
-      isAllowed: () => true,
     });
   });
 });

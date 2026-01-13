@@ -1,4 +1,4 @@
-import type { JSONB, SQLRequest, TableHandler, UserLike } from "prostgles-types";
+import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationError,
@@ -231,7 +231,7 @@ export const runClientMethod = async function (
   const allowedFunctions = await this.publishParser?.getAllowedFunctions(clientReq, undefined);
 
   const functionDefinition = allowedFunctions?.get(name);
-  if (!functionDefinition) {
+  if (!functionDefinition?.run) {
     throw "Disallowed/missing function " + JSON.stringify(name);
   }
 
@@ -248,11 +248,8 @@ export const runClientMethod = async function (
     const message = error.startsWith(" ") ? "input" + error : error;
     throw message;
   }
-  const context = (await this.publishParser?.getPublishParams(
-    clientReq,
-    undefined
-  )) as PublishParams<never, any>;
-  const res = await functionDefinition.run(input as never, context);
+
+  const res = await functionDefinition.run(input as never);
   const outputSchema = functionDefinition.output;
   if (!outputSchema) {
     if (res !== undefined) {
