@@ -33,7 +33,7 @@ export async function getSchemaFromPublish(
   try {
     /* Publish tables and views based on socket */
     const clientInfo =
-      userData ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
+      userData ?? (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }

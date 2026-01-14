@@ -16,7 +16,7 @@ export async function getClientSchema(
         { type: "socket" as const, ...clientReq }
       : { type: "http" as const, ...clientReq };
 
-    const userData = await this.authHandler?.getSidAndUserFromRequest(clientInfo);
+    const userData = await this.authHandler.getSidAndUserFromRequest(clientInfo);
     if (userData === "new-session-redirect") {
       throw "new-session-redirect";
     }
@@ -76,7 +76,7 @@ export async function getClientSchema(
             return aName.localeCompare(bName);
           });
 
-    const authInfo = await this.authHandler?.getClientAuth(clientReq);
+    const authInfo = await this.authHandler.getClientAuth(clientReq);
     if (authInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
@@ -88,7 +88,7 @@ export async function getClientSchema(
       rawSQL,
       joinTables: joinTables2,
       tableSchemaErrors,
-      auth: authInfo?.auth,
+      auth: authInfo.auth,
       version,
       err: publishValidationError ? "Server Error: User publish validation failed." : undefined,
     };
@@ -99,7 +99,7 @@ export async function getClientSchema(
       userData,
     };
   });
-  const sid = this.authHandler?.getSIDNoError(clientReq);
+  const sid = this.authHandler.getSIDNoError(clientReq);
   await this.opts.onLog?.({
     type: "connect.getClientSchema",
     duration: result.duration,

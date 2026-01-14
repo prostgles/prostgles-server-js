@@ -10,7 +10,7 @@ export async function addSync(
   this: PubSubManager,
   syncParams: AddSyncParams
 ): Promise<{ channelName: string }> {
-  const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket: syncParams.socket });
+  const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatchV2(async () => {
     const {
       socket = null,

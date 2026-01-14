@@ -1,7 +1,8 @@
 import type { AnyObject } from "prostgles-types";
 import { CHANNELS } from "prostgles-types";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilder";
-import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { Prostgles } from "../Prostgles";
 import type { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
 import { getClientAuth } from "./getClientAuth";
 import { login } from "./login";
@@ -9,12 +10,12 @@ import { setupAuthRoutes } from "./setupAuthRoutes";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 import { handleGetUserThrottled, type GetUserOrRedirected } from "./utils/handleGetUser";
+import { matchesRoute } from "./utils/matchesRoute";
 import { removeExpressRoute, removeExpressRoutesTest } from "./utils/removeExpressRoute";
 import {
   setCookieAndGoToReturnURLIFSet,
   validateSessionAndSetCookie,
 } from "./utils/setCookieAndGoToReturnURLIFSet";
-import { matchesRoute } from "./utils/matchesRoute";
 
 export { getClientRequestIPsInfo, removeExpressRoute, removeExpressRoutesTest };
 export const HTTP_FAIL_CODES = {
@@ -62,18 +63,25 @@ export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
 
 export class AuthHandler {
   protected readonly prostgles: Prostgles;
-  protected readonly opts: AuthConfig;
-  dbo: DBHandlerServer;
-  db: DB;
+  protected readonly opts: Omit<AuthConfig, "getUser"> & {
+    getUser?: undefined | AuthConfig["getUser"];
+  };
+
+  get dbHandles() {
+    const { dbo, db } = this.prostgles;
+    if (!db || !dbo) {
+      throw new Error("dbo or db missing");
+    }
+    return { dbo: dbo as DBOFullyTyped, db };
+  }
 
   // TODO: tidy
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
-    if (!prostgles.opts.auth) throw new Error("prostgles.opts.auth missing");
-    this.opts = prostgles.opts.auth;
-    if (!prostgles.dbo || !prostgles.db) throw new Error("dbo or db missing");
-    this.dbo = prostgles.dbo;
-    this.db = prostgles.db;
+    this.opts = prostgles.opts.auth ?? {};
+    if (prostgles.opts.auth) {
+      this.init();
+    }
   }
 
   get sidKeyName() {
@@ -83,6 +91,8 @@ export class AuthHandler {
   get authRoutes() {
     return GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
   }
+
+  init = setupAuthRoutes.bind(this);
 
   validateSid = (sid: string | undefined) => {
     if (!sid) return undefined;
@@ -129,8 +139,6 @@ export class AuthHandler {
       };
     }
   };
-
-  init = setupAuthRoutes.bind(this);
 
   destroy = () => {
     const app = this.opts.loginSignupConfig?.app;

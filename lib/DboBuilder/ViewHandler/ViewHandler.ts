@@ -105,7 +105,7 @@ export class ViewHandler {
       }
       return;
     }
-    const sid = this.dboBuilder.prostgles.authHandler?.getSIDNoError(localParams?.clientReq);
+    const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError(localParams?.clientReq);
     return this.dboBuilder.prostgles.opts.onLog?.({
       type: "table",
       command,

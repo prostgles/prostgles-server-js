@@ -60,8 +60,8 @@ export function setOAuthRequestHandlers(
     app.get(callbackPath, async (req, res: LoginResponseHandler) => {
       try {
         const clientInfo = getClientRequestIPsInfo({ httpReq: req });
-        const db = this.db;
-        const dbo = this.dbo as DBOFullyTyped;
+
+        const { db, dbo } = this.dbHandles;
         const args = { provider: providerName, req, res, clientInfo, db, dbo };
         const startCheck = await onProviderLoginStart?.(args);
         if (onProviderLoginStart && !startCheck?.success) {

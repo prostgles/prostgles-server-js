@@ -26,10 +26,11 @@ export function setMagicLinkOrOTPRequestHandler(
   ) => {
     try {
       const response = await throttledAuthCall(async () => {
+        const { db, dbo } = this.dbHandles;
         return onMagicLink(
           data,
-          this.dbo as DBOFullyTyped,
-          this.db,
+          dbo,
+          db,
           getClientRequestIPsInfo({ httpReq: req })
         );
       });

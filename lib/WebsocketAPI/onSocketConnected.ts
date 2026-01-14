@@ -20,7 +20,6 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 
   try {
     const getUser = async (): Promise<AuthResultWithSID<SessionUser>> => {
-      if (!this.authHandler) return { sid: undefined, user: undefined };
       const res = await this.authHandler.getSidAndUserFromRequest({ socket });
       if (res === "new-session-redirect") {
         socket.emit(CHANNELS.AUTHGUARD, {
@@ -39,7 +38,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       this.dboBuilder.queryStreamer.onDisconnect(socket.id);
       void this.opts.onLog?.({
         type: "disconnect",
-        sid: this.authHandler?.getValidatedSid({ socket }),
+        sid: this.authHandler.getValidatedSid({ socket }),
         socketId: socket.id,
         connectedSocketIds: this.connectedSockets.map((s) => s.id),
       });
@@ -51,7 +50,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
 
     await this.opts.onLog?.({
       type: "connect",
-      sid: this.authHandler?.getValidatedSid({ socket }),
+      sid: this.authHandler.getValidatedSid({ socket }),
       socketId: socket.id,
       connectedSocketIds: this.connectedSockets.map((s) => s.id),
     });
@@ -59,9 +58,6 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     const { onUseOrSocketConnected } = this.opts.auth ?? {};
     const { authHandler } = this;
     if (onUseOrSocketConnected) {
-      if (!authHandler) {
-        throw "authHandler missing";
-      }
       const errorInfo = await onUseOrSocketConnected(
         authHandler.getValidatedSid({ socket }),
         getClientRequestIPsInfo({ socket }),

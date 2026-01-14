@@ -106,7 +106,7 @@ export async function addTrigger(
     socketId: socket?.id,
     state: !addedTrigger.data?.tbl ? "fail" : "ok",
     error: addedTrigger.error,
-    sid: socket && this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
+    sid: socket && this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket }),
     tableName: addedTrigger.data?.tbl ?? params.table_name,
     connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
     localParams: socket && { clientReq: { socket } },

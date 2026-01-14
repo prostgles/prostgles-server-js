@@ -1,7 +1,6 @@
 import type e from "express";
 import type { RequestHandler } from "express";
 import { isDefined } from "prostgles-types";
-import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
 import { EXPRESS_CATCH_ALL_ROUTE, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthClientRequest } from "../AuthTypes";
@@ -15,7 +14,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
     const pathsHandledByProstgles = [
       restApi?.path,
       fileManager?.path,
-      authHandler && this.authRoutes.loginWithProvider,
+      authHandler.opts.loginSignupConfig?.loginWithOAuth && this.authRoutes.loginWithProvider,
     ].filter(isDefined);
     if (pathsHandledByProstgles.some((path) => matchesRoute(path, req.path))) {
       next();
@@ -76,8 +75,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
 
       await onGetRequestOK?.(req, res, {
         getUser,
-        dbo: this.dbo as DBOFullyTyped,
-        db: this.db,
+        ...this.dbHandles,
       });
     } catch (error) {
       console.error(error);

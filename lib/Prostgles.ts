@@ -92,7 +92,7 @@ export class Prostgles {
   }
   publishParser?: PublishParser;
 
-  authHandler?: AuthHandler;
+  authHandler = new AuthHandler(this);
 
   schemaWatch?: SchemaWatch;
 
@@ -239,12 +239,8 @@ export class Prostgles {
   };
 
   initAuthHandler = () => {
-    this.authHandler?.destroy();
-    if (!this.opts.auth) {
-      return;
-    }
+    this.authHandler.destroy();
     this.authHandler = new AuthHandler(this);
-    this.authHandler.init();
   };
 
   initTableConfig = async (reason: OnInitReason) => {

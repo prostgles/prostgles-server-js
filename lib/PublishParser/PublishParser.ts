@@ -46,12 +46,11 @@ export class PublishParser {
     clientInfo: AuthResultWithSID | undefined
   ): Promise<PublishParams> {
     const sessionUser =
-      clientInfo ?? (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
+      clientInfo ?? (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (sessionUser === "new-session-redirect") {
       throw "new-session-redirect";
     }
     return {
-      sid: undefined,
       ...sessionUser,
       dbo: this.dbo as DBOFullyTyped,
       db: this.db,
@@ -117,7 +116,7 @@ export class PublishParser {
     clientReq,
   }: DboTableCommand): Promise<ParsedTableRule> {
     const clientInfo =
-      clientReq && (await this.prostgles.authHandler?.getSidAndUserFromRequest(clientReq));
+      clientReq && (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }

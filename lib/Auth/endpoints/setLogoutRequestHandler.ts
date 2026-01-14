@@ -10,10 +10,11 @@ export function setLogoutRequestHandler(this: AuthHandler, app: e.Express) {
     if (sid) {
       try {
         await throttledReject(async () => {
+          const { db, dbo } = this.dbHandles;
           return this.opts.loginSignupConfig?.logout(
             req.cookies?.[this.sidKeyName],
-            this.dbo as DBOFullyTyped,
-            this.db
+            dbo,
+            db
           );
         });
       } catch (err) {

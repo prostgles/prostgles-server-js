@@ -1,10 +1,9 @@
-import type { AuthResponse} from "prostgles-types";
+import type { AuthResponse } from "prostgles-types";
 import { isObject } from "prostgles-types";
-import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import { getClientRequestIPsInfo, type AuthHandler } from "../AuthHandler";
 import type { AuthClientRequest, AuthResultOrError, AuthResultWithSID } from "../AuthTypes";
-import { throttledAuthCall } from "./throttledReject";
 import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
+import { throttledAuthCall } from "./throttledReject";
 
 export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
@@ -37,10 +36,16 @@ export async function handleGetUserThrottled(
   }
 
   const result = await throttledAuthCall(async () => {
+    if (!this.opts.getUser) {
+      return {
+        sid: undefined,
+      };
+    }
+    const { db, dbo } = this.dbHandles;
     const clientInfoOrErr = await this.opts.getUser(
       this.getValidatedSid(clientReq),
-      this.dbo as DBOFullyTyped,
-      this.db,
+      dbo,
+      db,
       getClientRequestIPsInfo(clientReq),
       clientReq
     );
@@ -68,7 +73,8 @@ export async function handleGetUserThrottled(
     /** Set cached session data */
     const sid = this.getValidatedSid(clientReq);
     if (getSessionForCaching && sid) {
-      const session = await getSessionForCaching(sid, this.dbo as DBOFullyTyped, this.db);
+      const { db, dbo } = this.dbHandles;
+      const session = await getSessionForCaching(sid, dbo, db);
       if (session && session.expires && clientInfo?.user) {
         const __prglCache = {
           userData: clientInfo,

@@ -326,7 +326,7 @@ export class PubSubManager {
           command: "upsertSocket.disconnect",
           tableName: "",
           duration: 0,
-          sid: this.dboBuilder.prostgles.authHandler?.getSIDNoError({ socket }),
+          sid: this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket }),
           socketId: socket.id,
           connectedSocketIds: this.connectedSocketIds,
           remainingSubs: JSON.stringify(

@@ -1,4 +1,3 @@
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "./AuthHandler";
 import { getClientRequestIPsInfo, HTTP_FAIL_CODES } from "./AuthHandler";
 import type { ExpressReq, LoginParams } from "./AuthTypes";
@@ -21,10 +20,12 @@ export async function login(
       console.error("Auth login config missing");
       return "server-error";
     }
+
+    const { db, dbo } = this.dbHandles;
     const result = await login(
       loginParams,
-      this.dbo as DBOFullyTyped,
-      this.db,
+      dbo,
+      db,
       getClientRequestIPsInfo({ httpReq: req }),
       (data, websiteUrl) =>
         getMagicLinkUrl({

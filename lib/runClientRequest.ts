@@ -1,4 +1,4 @@
-import type { JSONB, SQLRequest, TableHandler, UserLike } from "prostgles-types";
+import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationError,
@@ -97,7 +97,7 @@ export const runClientRequest = async function (
     throw `tableName ${tableName} is invalid or not allowed`;
   }
 
-  const clientInfo = await this.authHandler?.getSidAndUserFromRequest(clientReq);
+  const clientInfo = await this.authHandler.getSidAndUserFromRequest(clientReq);
   if (clientInfo === "new-session-redirect") {
     throw clientInfo;
   }
@@ -113,9 +113,8 @@ export const runClientRequest = async function (
   }
 
   const sessionUser: UserLike | undefined =
-    !clientInfo?.user ?
-      undefined
-    : {
+    !clientInfo.user ? undefined : (
+      {
         ...parseFieldFilter(
           //@ts-ignore
           clientInfo.sessionFields ?? [],
@@ -123,7 +122,8 @@ export const runClientRequest = async function (
           getKeys(clientInfo.user)
         ),
         ...(pickKeys(clientInfo.user, ["id", "type"]) as UserLike),
-      };
+      }
+    );
   const localParams: LocalParams = {
     clientReq,
     isRemoteRequest: { user: sessionUser },
@@ -163,9 +163,6 @@ export const clientCanRunSqlRequest = async function (
     return { allowed: false, clientReq };
   }
   const canRunSQL = async () => {
-    if (!this.authHandler) {
-      throw "authHandler missing";
-    }
     const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
     const allowedToRunSQL =
       publishParams &&
