@@ -224,7 +224,7 @@ function dd() {
       },
     },
     functions: (params) => {
-      const forAllUsers = createServerFunctionWithContext(!params ? {} : params);
+      const forAllUsers = createServerFunctionWithContext(params);
       const forAdmins = createServerFunctionWithContext(
         params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined
       );
@@ -238,8 +238,9 @@ function dd() {
               //@ts-expect-error
               dwadwa,
             },
-            { dbo }
+            params
           ) => {
+            params.user;
             return 222;
           },
         }),
