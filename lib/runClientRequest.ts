@@ -1,4 +1,4 @@
-import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
+import type { JSONB, SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationError,

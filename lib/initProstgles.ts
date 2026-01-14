@@ -168,8 +168,8 @@ export const initProstgles = async function (
     this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
 
     if (this.opts.publish) {
-      if (!this.opts.io) {
-        console.warn("IO missing. Publish has no effect without io");
+      if (!this.opts.io && !this.opts.restApi) {
+        console.warn("IO missing. Publish has no effect without io or restApi");
       }
 
       /* 3.9 Check auth config */

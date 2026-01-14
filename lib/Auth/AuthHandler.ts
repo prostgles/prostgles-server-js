@@ -66,6 +66,7 @@ export class AuthHandler {
   dbo: DBHandlerServer;
   db: DB;
 
+  // TODO: tidy
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
     if (!prostgles.opts.auth) throw new Error("prostgles.opts.auth missing");
