@@ -7,7 +7,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
   prgl: Prostgles,
   onReady: OnReadyCallbackBasic,
   newOpts: UpdateableOptions<DBSchema, UserSchema>,
-  force?: true
+  force?: true,
 ) => {
   const optionsThatChanged = getKeys(newOpts)
     .map((k) => {
@@ -39,6 +39,11 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
   if ("auth" in newOpts) {
     prgl.initAuthHandler();
   }
+  if ("io" in newOpts) {
+    prgl.connectedSockets.forEach((socket) => {
+      socket.disconnect();
+    });
+  }
 
   if (isEmpty(newOpts)) return;
 
@@ -59,6 +64,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
  * Changes that do not affect the server so onReady does not need to be called again
  */
 export const clientOnlyUpdateKeys = [
+  "io",
   "auth",
   "publish",
   "functions",

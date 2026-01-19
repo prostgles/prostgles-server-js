@@ -4,6 +4,7 @@ import type {
   AnyObject,
   ColumnInfo,
   JSONB,
+  StrictUnion,
   TableInfo,
 } from "prostgles-types";
 import { isObject } from "prostgles-types";
@@ -223,12 +224,7 @@ export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
   enum: BaseColumn<LANG_IDS> & Enum;
 };
 
-type UnionKeys<T> = T extends T ? keyof T : never;
-type StrictUnionHelper<T, TAll> =
-  T extends any ? T & Partial<Record<Exclude<UnionKeys<TAll>, keyof T>, never>> : never;
-export type StrictUnion<T> = StrictUnionHelper<T, T>;
-
-export const CONSTRAINT_TYPES = ["PRIMARY KEY", "UNIQUE", "CHECK", "FOREIGN KEY"] as const;
+type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
 
 /**
  * Each column definition cannot reference to tables that appear later in the table definition.
@@ -248,7 +244,7 @@ export type TableDefinition<LANG_IDS> = {
         [constraint_name: string]:
           | string
           | {
-              type: (typeof CONSTRAINT_TYPES)[number];
+              type: ConstraintType;
               dropIfExists?: boolean;
               /**
                * E.g.:

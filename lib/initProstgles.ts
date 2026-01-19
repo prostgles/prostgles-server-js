@@ -31,6 +31,7 @@ export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
 export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
   ProstglesInitOptions<S, SUser>,
+  | "io"
   | "fileTable"
   | "restApi"
   | "tableConfig"
@@ -68,11 +69,11 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
 
 export type OnReadyCallback<S, SUser extends SessionUser> = (
   params: OnReadyParams<S>,
-  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>
+  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>,
 ) => any;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
-  update: (newOpts: UpdateableOptions<void, SessionUser>, force?: true) => Promise<void>
+  update: (newOpts: UpdateableOptions<void, SessionUser>, force?: true) => Promise<void>,
 ) => any;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
@@ -90,14 +91,14 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   options: ProstglesInitOptions<S, SUser>;
   getClientDBHandlers: (
     clientReq: AuthClientRequest,
-    scope: PermissionScope | undefined
+    scope: PermissionScope | undefined,
   ) => ReturnType<typeof getClientHandlers<S>>;
 };
 
 export const initProstgles = async function (
   this: Prostgles,
   onReady: OnReadyCallbackBasic,
-  reason: OnInitReason
+  reason: OnInitReason,
 ): Promise<InitResult> {
   this.loaded = false;
   const expressApp =
@@ -202,7 +203,7 @@ export const initProstgles = async function (
         },
         async (...args) => {
           await updateConfiguration(this, onReady, ...args);
-        }
+        },
       );
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err);
