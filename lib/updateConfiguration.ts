@@ -1,4 +1,4 @@
-import { getKeys, isDefined, isEmpty, isEqual } from "prostgles-types";
+import { getKeys, includes, isDefined, isEmpty, isEqual } from "prostgles-types";
 import type { SessionUser } from "./Auth/AuthTypes";
 import type { OnReadyCallbackBasic, UpdateableOptions } from "./initProstgles";
 import type { Prostgles } from "./Prostgles";
@@ -24,22 +24,22 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
     return;
   }
 
-  if ("fileTable" in newOpts) {
+  if (includes(optionsThatChanged, "fileTable")) {
     await prgl.initFileTable();
   }
-  if ("restApi" in newOpts) {
+  if (includes(optionsThatChanged, "restApi")) {
     prgl.initRestApi();
   }
-  if ("tableConfig" in newOpts) {
+  if (includes(optionsThatChanged, "tableConfig")) {
     await prgl.initTableConfig({ type: "prgl.update", newOpts });
   }
-  if ("schema" in newOpts) {
+  if (includes(optionsThatChanged, "schema")) {
     await prgl.refreshDBO();
   }
-  if ("auth" in newOpts) {
+  if (includes(optionsThatChanged, "auth")) {
     prgl.initAuthHandler();
   }
-  if ("io" in newOpts) {
+  if (includes(optionsThatChanged, "io")) {
     prgl.connectedSockets.forEach((socket) => {
       socket.disconnect();
     });
@@ -52,7 +52,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
    * While others also affect the server and onReady should be called
    */
   if (
-    getKeys(newOpts).every((updatedKey) => clientOnlyUpdateKeys.some((key) => key === updatedKey))
+    optionsThatChanged.every((updatedKey) => clientOnlyUpdateKeys.some((key) => key === updatedKey))
   ) {
     prgl.setupSocketIO();
   } else {
