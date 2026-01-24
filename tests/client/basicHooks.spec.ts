@@ -62,4 +62,4 @@ describe("React hooks", async (t) => {
   });
 });
 
-const tout = (ms) => new Promise((res) => setTimeout(res, ms));
+const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));

@@ -24,9 +24,6 @@ import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
 import type { DBOFullyTyped } from "prostgles-server";
-import type { PublishParams } from "prostgles-server";
-import type { SessionUser } from "prostgles-server";
-import { defineServerFunction } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs = [];
@@ -226,7 +223,7 @@ function dd() {
     functions: (params) => {
       const forAllUsers = createServerFunctionWithContext(params);
       const forAdmins = createServerFunctionWithContext(
-        params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined
+        params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined,
       );
       return {
         myfunc: forAllUsers({
@@ -238,7 +235,7 @@ function dd() {
               //@ts-expect-error
               dwadwa,
             },
-            params
+            params,
           ) => {
             params.user;
             return 222;
@@ -291,7 +288,7 @@ function dd() {
         type: "many-many",
       },
     ],
-    onReady: async ({ dbo, db }) => {
+    onReady: async ({ dbo, sql, db }) => {
       log("prostgles onReady");
 
       try {
@@ -309,14 +306,14 @@ function dd() {
             {
               cwd: execPath,
               stdio: "inherit",
-            }
+            },
           );
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
           await serverOnlyQueries(dbo as any);
           log("Server-only query tests successful");
-          await isomorphicQueries(dbo as any, log);
+          await isomorphicQueries(dbo as any, sql, log);
           log("Server isomorphic tests successful");
 
           stopTest();

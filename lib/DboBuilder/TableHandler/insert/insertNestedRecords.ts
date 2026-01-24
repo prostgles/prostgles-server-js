@@ -381,7 +381,7 @@ const referencedInsert = async (
 ): Promise<AnyObject[]> => {
   getJoinPath(tableHandler, targetTable);
 
-  if (!dbTX?.[targetTable] || !("insert" in dbTX[targetTable]!)) {
+  if (!dbTX?.[targetTable] || !("insert" in dbTX[targetTable])) {
     throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
   }
 

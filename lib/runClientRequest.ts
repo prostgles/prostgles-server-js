@@ -56,14 +56,14 @@ type TableMethodFunctionWithRulesAndLocalParams = (
   arg2: any,
   arg3: any,
   tableRule: ParsedTableRule,
-  localParams: LocalParams
+  localParams: LocalParams,
 ) => any;
 
 export const runClientRequest = async function (
   this: Prostgles,
   nonValidatedArgs: Args,
   clientReq: AuthClientRequest,
-  scope: PermissionScope | undefined
+  scope: PermissionScope | undefined,
 ) {
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if (!this.publishParser || !this.dbo) {
@@ -79,7 +79,7 @@ export const runClientRequest = async function (
       param3: { type: "any", optional: true },
     },
     nonValidatedArgs,
-    "tableName"
+    "tableName",
   );
   if (validation.error !== undefined) {
     throw validation.error;
@@ -104,7 +104,7 @@ export const runClientRequest = async function (
   const validRules = await this.publishParser.getValidatedRequestRule(
     { tableName, command, clientReq },
     clientInfo,
-    scope
+    scope,
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -119,7 +119,7 @@ export const runClientRequest = async function (
           //@ts-ignore
           clientInfo.sessionFields ?? [],
           false,
-          getKeys(clientInfo.user)
+          getKeys(clientInfo.user),
         ),
         ...(pickKeys(clientInfo.user, ["id", "type"]) as UserLike),
       }
@@ -151,13 +151,13 @@ export const runClientRequest = async function (
     param2,
     param3,
     validRules,
-    localParams
+    localParams,
   ) as AnyObject | undefined;
 };
 
 export const clientCanRunSqlRequest = async function (
   this: Prostgles,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
 ) {
   if (!this.opts.publishRawSQL || typeof this.opts.publishRawSQL !== "function") {
     return { allowed: false, clientReq };
@@ -179,13 +179,12 @@ export const clientCanRunSqlRequest = async function (
 export const runClientSqlRequest = async function (
   this: Prostgles,
   unvalidatedArgs: SQLRequest,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
 ) {
   const { allowed } = await clientCanRunSqlRequest.bind(this)(clientReq);
   if (!allowed) {
     throw "Not allowed to execute sql";
   }
-  if (!this.dbo?.sql) throw "Internal error: sql handler missing";
   const validation = getJSONBObjectSchemaValidationError(
     {
       query: { type: "string" },
@@ -193,14 +192,14 @@ export const runClientSqlRequest = async function (
       options: { type: "any", optional: true },
     },
     unvalidatedArgs,
-    "query"
+    "query",
   );
   if (validation.error !== undefined) {
     throw validation.error;
   }
   const reqData = validation.data;
   const { query, params, options } = reqData;
-  return this.dbo.sql(query, params, options, { clientReq });
+  return this.dboBuilder.runSQL(query, params, options, { clientReq });
 };
 
 type ArgsMethod = {
@@ -210,7 +209,7 @@ type ArgsMethod = {
 export const runClientMethod = async function (
   this: Prostgles,
   unvalidatedArgs: ArgsMethod,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
 ) {
   const validation = getJSONBObjectSchemaValidationError(
     {
@@ -218,7 +217,7 @@ export const runClientMethod = async function (
       input: { type: "any", optional: true },
     },
     unvalidatedArgs,
-    "method"
+    "method",
   );
   if (validation.error !== undefined) {
     throw validation.error;

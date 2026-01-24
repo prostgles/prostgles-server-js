@@ -20,7 +20,7 @@ export async function insert(
   insertParams?: InsertParams,
   param3_unused?: undefined,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<any> {
   const ACTION = "insert";
   const start = Date.now();
@@ -42,8 +42,8 @@ export async function insert(
             insertParams,
             param3_unused,
             tableRules,
-            localParams
-          )
+            localParams,
+          ),
         );
       }
     }
@@ -61,7 +61,7 @@ export async function insert(
         !nestedInsert ||
         !allowedNestedInserts.some(
           (ai) =>
-            ai.table === nestedInsert.previousTable && ai.column === nestedInsert.referencingColumn
+            ai.table === nestedInsert.previousTable && ai.column === nestedInsert.referencingColumn,
         )
       ) {
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `;
@@ -93,6 +93,7 @@ export async function insert(
 
     validateInsertParams(insertParams);
 
+    const tx = localParams?.tx?.t || this.tx?.t;
     const preValidatedRows = await Promise.all(
       rows.map(async (nonValidated) => {
         const { preValidate, validate } = rule ?? {};
@@ -103,18 +104,20 @@ export async function insert(
           validate,
           localParams,
           row: nonValidated,
+          tx: tx || this.db,
         });
         if (preValidate) {
           if (!localParams) throw "localParams missing for insert preValidate";
           row = await preValidate({
             row,
+            tx: tx || this.db,
             dbx: this.tx?.dbTX || this.dboBuilder.dbo,
             localParams,
           });
         }
 
         return row;
-      })
+      }),
     );
     const preValidatedrowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
 
@@ -171,6 +174,7 @@ export async function insert(
           allowedCols,
           dbTx,
           validationOptions,
+          tx: tx || this.db,
         })
       ).getQuery();
       const { onConflict } = insertParams ?? {};
@@ -284,7 +288,7 @@ const validateInsertParams = (params: InsertParams | undefined) => {
       ],
       optional: true,
     },
-    onConflict
+    onConflict,
   );
   if (onConflictValidation.error !== undefined) {
     throw `Invalid onConflict: ${onConflictValidation.error}`;

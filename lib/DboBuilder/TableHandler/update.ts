@@ -1,13 +1,7 @@
 import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type {
-  Filter,
-  LocalParams} from "../DboBuilder";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  withUserRLS,
-} from "../DboBuilder";
+import type { Filter, LocalParams } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
@@ -20,7 +14,7 @@ export async function update(
   _newData: AnyObject,
   params?: UpdateParams,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<AnyObject | void> {
   const ACTION = "update";
   const start = Date.now();
@@ -34,8 +28,8 @@ export async function update(
           _newData,
           params,
           tableRules,
-          localParams
-        )
+          localParams,
+        ),
       );
     const rule = tableRules?.[ACTION];
     if (rule?.postValidate && !finalDBtx) {
@@ -138,7 +132,7 @@ export async function update(
             { returning: "*" },
             undefined,
             refTableRules,
-            nestedLocalParams
+            nestedLocalParams,
           )) as AnyObject;
           nestedInsertsResultsObj[nestedInsert.insertedFieldName] = nestedInsertResult;
 
@@ -151,16 +145,18 @@ export async function update(
             ...nestedInsert,
             result: nestedInsertResult,
           };
-        })
+        }),
       );
     }
 
+    const tx = localParams?.tx?.t || this.tx?.t || this.db;
     let query = (
       await this.dataValidator.parse({
         command: "update",
         rows: [nData],
         allowedCols,
         dbTx: this.getFinalDbo(localParams),
+        tx,
         validationOptions: { validate: validateRow, localParams },
       })
     ).getQuery();

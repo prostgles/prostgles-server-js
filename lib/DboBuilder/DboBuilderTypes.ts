@@ -8,7 +8,6 @@ import type {
   AnyObject,
   ClientSchema,
   ColumnInfo,
-  DbJoinMaker,
   EXISTS_KEY,
   RawJoinPath,
   SQLHandler,
@@ -101,7 +100,7 @@ export type Media = {
 export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 
 export type TxCB<R = any, TH = DbTxTableHandlers> = {
-  (t: TH & Pick<DBHandlerServer, "sql">, _t: pgPromise.ITask<{}>): R;
+  (t: TH, _t: pgPromise.ITask<{}>): R;
 };
 export type TX<TH = TableHandlers> = {
   <R>(t: TxCB<R, TH>): Promise<R>;
@@ -114,22 +113,18 @@ export type DbTxTableHandlers = {
   [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
 };
 
-type SQLHandlerServer = SQLHandler<LocalParams>;
+export type SQLHandlerServer = SQLHandler<LocalParams>;
 
-export type DBHandlerServerExtra<TH = TableHandlers, WithTransactions = true> = {
-  sql: SQLHandlerServer;
-} & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
+export type DBHandlerServerExtra<
+  TH = TableHandlers,
+  WithTransactions = true,
+> = {} & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
 
-export type DBHandlerServer<TH = TableHandlers> = TH &
-  Partial<DbJoinMaker> & {
-    sql?: SQLHandlerServer;
-  } & {
-    tx?: TX<TH>;
-  };
+export type DBHandlerServer<TH = TableHandlers> = TH & {
+  tx?: TX<TH>;
+};
 
-export const pgp: PGP = pgPromise({
-  // ,query: function (e) { console.log({psql: e.query, params: e.params}); }
-});
+export const pgp: PGP = pgPromise({});
 
 export type TableInfo = TInfo & {
   schema: string;

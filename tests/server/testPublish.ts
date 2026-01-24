@@ -109,11 +109,9 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
         checkFilter: {
           $and: [{ "name.<>": "fail-check" }],
         },
-        postValidate: async ({ row, dbx: dboTx }) => {
+        postValidate: async ({ row, dbx: dboTx, tx }) => {
           /** Records must exist in this transaction */
-          const exists = await dboTx.sql("SELECT * FROM insert_rules WHERE id = ${id}", row, {
-            returnType: "row",
-          });
+          const exists = await tx.oneOrNone("SELECT * FROM insert_rules WHERE id = ${id}", row);
           const existsd = await dboTx.insert_rules.findOne({ id: row.id });
           if (row.id !== exists.id || row.id !== existsd.id) {
             console.error("postValidate failed");

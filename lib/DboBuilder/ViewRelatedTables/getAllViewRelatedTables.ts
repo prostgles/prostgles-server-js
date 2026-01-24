@@ -1,7 +1,11 @@
-import type { DBHandlerServer } from "../DboBuilder";
+import type { DB } from "../../initProstgles";
 
-export const getAllViewRelatedTables = async (dbo: DBHandlerServer, viewName: string) => {
-  const tables = await dbo.sql!(
+export const getAllViewRelatedTables = async (db: DB, viewName: string) => {
+  const tables = await db.any<{
+    table_name: string;
+    table_schema: string;
+    table_oid: number;
+  }>(
     `
     SELECT DISTINCT 
         vcu.table_name, 
@@ -13,12 +17,6 @@ export const getAllViewRelatedTables = async (dbo: DBHandlerServer, viewName: st
     WHERE vcu.view_name = \${viewName}
   `,
     { viewName },
-    { returnType: "rows" }
   );
-
-  return tables as {
-    table_name: string;
-    table_schema: string;
-    table_oid: number;
-  }[];
+  return tables;
 };

@@ -1,17 +1,24 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
-import { AnyObject, DBSchemaTable, SocketSQLStreamPacket, isDefined } from "prostgles-types";
+import {
+  AnyObject,
+  DBSchemaTable,
+  SocketSQLStreamPacket,
+  isDefined,
+  type SQLHandler,
+} from "prostgles-types";
 import type { AuthHandler, ClientFunctionHandler, DBHandlerClient } from "./client";
 import type { GeneratedFunctionSchema } from "./DBGeneratedSchema";
 import { tryRun, tryRunP } from "./isomorphicQueries.spec";
 
 export const clientOnlyQueries = async (
   db: DBHandlerClient,
+  sql: SQLHandler | undefined,
   auth: AuthHandler,
   log: (...args: any[]) => any,
   serverFunctions: ClientFunctionHandler,
   tableSchema: DBSchemaTable[],
-  token: string
+  token: string,
 ) => {
   await describe("Client only queries", async (t) => {
     // await test("Social auth redirect routes work", async ( ) => {
@@ -24,10 +31,10 @@ export const clientOnlyQueries = async (
       const expectedRowCount = 2e3;
       await tryRunP("", async (resolve, reject) => {
         let rows: any[] = [];
-        const res = await db.sql!(
+        const res = await sql!(
           `SELECT * FROM generate_series(1, ${expectedRowCount})`,
           {},
-          { returnType: "stream" }
+          { returnType: "stream" },
         );
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
@@ -52,10 +59,10 @@ export const clientOnlyQueries = async (
         const query = "SELECT * FROM generate_series(1, 100)";
         let results: any[] = [];
         const streamLimit = 10;
-        const res = await db.sql!(
+        const res = await sql!(
           query,
           {},
-          { returnType: "stream", persistStreamConnection: true, streamLimit }
+          { returnType: "stream", persistStreamConnection: true, streamLimit },
         );
         const listener = async (packet: SocketSQLStreamPacket) => {
           try {
@@ -87,11 +94,7 @@ export const clientOnlyQueries = async (
     await test("SQL Stream ensure the connection is never released (same pg_backend_pid is the same for subsequent) when using persistConnectionId", async () => {
       await tryRunP("", async (resolve, reject) => {
         const query = "SELECT pg_backend_pid()";
-        const res = await db.sql!(
-          query,
-          {},
-          { returnType: "stream", persistStreamConnection: true }
-        );
+        const res = await sql!(query, {}, { returnType: "stream", persistStreamConnection: true });
         const pids: number[] = [];
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
@@ -118,13 +121,13 @@ export const clientOnlyQueries = async (
     await test("SQL Stream stop kills the query", async () => {
       await tryRunP("", async (resolve, reject) => {
         const query = "SELECT * FROM pg_sleep(5)";
-        const res = await db.sql!(query, {}, { returnType: "stream" });
+        const res = await sql!(query, {}, { returnType: "stream" });
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
-            const queryState = await db.sql!(
+            const queryState = await sql!(
               "SELECT * FROM pg_stat_activity WHERE query = $1",
               [query],
-              { returnType: "rows" }
+              { returnType: "rows" },
             );
             assert.equal(queryState.length, 1);
             assert.equal(queryState[0].state, "idle");
@@ -146,10 +149,10 @@ export const clientOnlyQueries = async (
 
     await test("SQL Stream limit works", async () => {
       await tryRunP("", async (resolve, reject) => {
-        const res = await db.sql!(
+        const res = await sql!(
           "SELECT * FROM generate_series(1, 1e5)",
           {},
-          { returnType: "stream", streamLimit: 10 }
+          { returnType: "stream", streamLimit: 10 },
         );
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
@@ -169,14 +172,14 @@ export const clientOnlyQueries = async (
       await tryRunP("", async (resolve, reject) => {
         const totalRows = 5e6;
         const query = `SELECT * FROM generate_series(1, ${totalRows})`;
-        const res = await db.sql!(query, {}, { returnType: "stream" });
+        const res = await sql!(query, {}, { returnType: "stream" });
         const rowsReceived: any[] = [];
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
-            const queryState = await db.sql!(
+            const queryState = await sql!(
               "SELECT * FROM pg_stat_activity WHERE query = $1",
               [query],
-              { returnType: "rows" }
+              { returnType: "rows" },
             );
             assert.equal(queryState.length, 0);
             resolve("ok");
@@ -202,10 +205,10 @@ export const clientOnlyQueries = async (
       await Promise.all(
         [1e3, 1e2].map(async (numberOfRows) => {
           await tryRunP("", async (resolve, reject) => {
-            const res = await db.sql!(
+            const res = await sql!(
               `SELECT v.* FROM generate_series(1, ${numberOfRows}) v`,
               {},
-              { returnType: "stream" }
+              { returnType: "stream" },
             );
             let rows: any[] = [];
             const listener = async (packet: SocketSQLStreamPacket) => {
@@ -221,7 +224,7 @@ export const clientOnlyQueries = async (
             };
             await res.start(listener);
           });
-        })
+        }),
       );
     });
 
@@ -229,7 +232,7 @@ export const clientOnlyQueries = async (
       await tryRunP("", async (resolve, reject) => {
         const getExpected = (val: string) =>
           new Promise(async (resolve, reject) => {
-            const res = await db.sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
+            const res = await sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
             const listener = async (packet: SocketSQLStreamPacket) => {
               try {
                 assert.equal(packet.type, "data");
@@ -259,10 +262,10 @@ export const clientOnlyQueries = async (
     await test("SQL Stream query error structure matches default sql run error", async () => {
       await tryRunP("", async (resolve, reject) => {
         const badQuery = "SELECT * FROM not_existing_table";
-        const res = await db.sql!(badQuery, {}, { returnType: "stream" });
+        const res = await sql!(badQuery, {}, { returnType: "stream" });
         const listener = async (packet: SocketSQLStreamPacket) => {
           try {
-            const normalSqlError = await db.sql!(badQuery, {}).catch((err) => err);
+            const normalSqlError = await sql!(badQuery, {}).catch((err) => err);
             assert.equal(packet.type, "error");
             assert.equal(packet.error.message, 'relation "not_existing_table" does not exist');
             assert.deepEqual(packet.error, normalSqlError);
@@ -277,7 +280,7 @@ export const clientOnlyQueries = async (
     await test("SQL Stream streamLimit", async () => {
       await tryRunP("", async (resolve, reject) => {
         const generate_series = "SELECT * FROM generate_series(1, 100)";
-        const res = await db.sql!(generate_series, {}, { returnType: "stream", streamLimit: 10 });
+        const res = await sql!(generate_series, {}, { returnType: "stream", streamLimit: 10 });
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
@@ -286,7 +289,7 @@ export const clientOnlyQueries = async (
             assert.equal(packet.ended, true);
             assert.equal(packet.rows.length, 10);
 
-            const normalSql = await db.sql!(generate_series, {});
+            const normalSql = await sql!(generate_series, {});
 
             /** fields the same as on normal sql request */
             assert.deepStrictEqual(packet.fields, normalSql.fields);
@@ -297,7 +300,7 @@ export const clientOnlyQueries = async (
 
             assert.deepStrictEqual(
               packet.rows.flat(),
-              Array.from({ length: 10 }, (_, i) => i + 1).flat()
+              Array.from({ length: 10 }, (_, i) => i + 1).flat(),
             );
             resolve("ok");
           }
@@ -308,9 +311,9 @@ export const clientOnlyQueries = async (
 
     await test("SQL Stream table fields are the same as on default request", async () => {
       await tryRunP("", async (resolve, reject) => {
-        await db.sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
-        await db.sql!("INSERT INTO planes (last_updated) VALUES (56789);", {});
-        const res = await db.sql!("SELECT * FROM planes", {}, { returnType: "stream" });
+        await sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
+        await sql!("INSERT INTO planes (last_updated) VALUES (56789);", {});
+        const res = await sql!("SELECT * FROM planes", {}, { returnType: "stream" });
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
@@ -318,8 +321,8 @@ export const clientOnlyQueries = async (
             assert.equal(packet.type, "data");
             assert.equal(packet.ended, true);
             assert.equal(packet.rows.length, 1);
-            const normalSql = await db.sql!("SELECT * FROM planes LIMIT 1", {});
-            await db.sql!("DELETE FROM planes", {});
+            const normalSql = await sql!("SELECT * FROM planes LIMIT 1", {});
+            await sql!("DELETE FROM planes", {});
             assert.deepStrictEqual(packet.fields, normalSql.fields);
             assert.equal(packet.fields.length > 0, true);
             resolve("ok");
@@ -330,11 +333,7 @@ export const clientOnlyQueries = async (
     });
     await test("SQL Stream works for multiple statements", async () => {
       await tryRunP("", async (resolve, reject) => {
-        const res = await db.sql!(
-          "SELECT * FROM planes; SELECT 1 as a",
-          {},
-          { returnType: "stream" }
-        );
+        const res = await sql!("SELECT * FROM planes; SELECT 1 as a", {}, { returnType: "stream" });
         const listener = async (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
@@ -342,8 +341,8 @@ export const clientOnlyQueries = async (
             assert.equal(packet.type, "data");
             assert.equal(packet.ended, true);
             assert.equal(packet.rows.length, 1);
-            const normalSql = await db.sql!("SELECT 1 as a", {});
-            await db.sql!("DELETE FROM planes", {});
+            const normalSql = await sql!("SELECT 1 as a", {});
+            await sql!("DELETE FROM planes", {});
             assert.deepStrictEqual(packet.fields, normalSql.fields);
             assert.equal(packet.fields.length > 0, true);
             resolve("ok");
@@ -375,7 +374,7 @@ export const clientOnlyQueries = async (
           const info = await db[tbl.name]?.getInfo?.();
           assert.deepStrictEqual(tbl.columns, cols);
           assert.deepStrictEqual(tbl.info, info);
-        })
+        }),
       );
     });
 
@@ -384,32 +383,32 @@ export const clientOnlyQueries = async (
         try {
           /* RAWSQL */
           await tryRun("SQL Full result", async () => {
-            if (!db.sql) throw "db.sql missing";
-            const sqlStatement = await db.sql("SELECT $1", [1], {
+            if (!sql) throw "sql missing";
+            const sqlStatement = await sql("SELECT $1", [1], {
               returnType: "statement",
             });
-            assert.equal(sqlStatement, "SELECT 1", "db.sql statement query failed");
+            assert.equal(sqlStatement, "SELECT 1", "sql statement query failed");
 
-            await db.sql("SELECT 1 -- ${param}", {}, { hasParams: false });
+            await sql("SELECT 1 -- ${param}", {}, { hasParams: false });
 
-            const arrayMode = await db.sql("SELECT 1 as a, 2 as a", undefined, {
+            const arrayMode = await sql("SELECT 1 as a, 2 as a", undefined, {
               returnType: "arrayMode",
             });
-            assert.equal(arrayMode.rows?.[0].join("."), "1.2", "db.sql statement arrayMode failed");
+            assert.equal(arrayMode.rows?.[0].join("."), "1.2", "sql statement arrayMode failed");
             assert.equal(
               arrayMode.fields?.map((f) => f.name).join("."),
               "a.a",
-              "db.sql statement arrayMode failed"
+              "sql statement arrayMode failed",
             );
 
-            const select1 = await db.sql("SELECT $1 as col1", [1], {
+            const select1 = await sql("SELECT $1 as col1", [1], {
               returnType: "rows",
             });
-            assert.deepStrictEqual(select1[0], { col1: 1 }, "db.sql justRows query failed");
+            assert.deepStrictEqual(select1[0], { col1: 1 }, "sql justRows query failed");
 
-            const fullResult = await db.sql("SELECT $1 as col1", [1]);
+            const fullResult = await sql("SELECT $1 as col1", [1]);
             // console.log(fullResult)
-            assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "db.sql query failed");
+            assert.deepStrictEqual(fullResult.rows[0], { col1: 1 }, "sql query failed");
             assert.deepStrictEqual(
               fullResult.fields,
               [
@@ -426,18 +425,18 @@ export const clientOnlyQueries = async (
                   tsDataType: "number",
                 },
               ],
-              "db.sql query failed"
+              "sql query failed",
             );
           });
 
           await tryRunP("sql LISTEN NOTIFY events", async (resolve, reject) => {
-            if (!db.sql) throw "db.sql missing";
+            if (!sql) throw "sql missing";
 
             try {
-              const sub = await db.sql(
+              const sub = await sql(
                 "LISTEN chnl ",
                 {},
-                { allowListen: true, returnType: "arrayMode" }
+                { allowListen: true, returnType: "arrayMode" },
               );
               if (!("addListener" in sub)) {
                 reject("addListener missing");
@@ -449,10 +448,10 @@ export const clientOnlyQueries = async (
                 if (notif === expected) resolve(true);
                 else
                   reject(
-                    `Notif value is not what we expect: ${JSON.stringify(notif)} is not ${JSON.stringify(expected)} (expected) `
+                    `Notif value is not what we expect: ${JSON.stringify(notif)} is not ${JSON.stringify(expected)} (expected) `,
                   );
               });
-              db.sql("NOTIFY chnl , 'hello'; ");
+              sql("NOTIFY chnl , 'hello'; ");
             } catch (e) {
               reject(e);
             }
@@ -461,19 +460,19 @@ export const clientOnlyQueries = async (
           await tryRunP(
             "sql NOTICE events",
             async (resolve, reject) => {
-              if (!db.sql) throw "db.sql missing";
+              if (!sql) throw "sql missing";
 
-              const sub = await db.sql("", {}, { returnType: "noticeSubscription" });
+              const sub = await sql("", {}, { returnType: "noticeSubscription" });
 
               sub.addListener((notice) => {
                 const expected = "hello2";
                 if (notice.message === expected) resolve(true);
                 else
                   reject(
-                    `Notice value is not what we expect: ${JSON.stringify(notice)} is not ${JSON.stringify(expected)} (expected) `
+                    `Notice value is not what we expect: ${JSON.stringify(notice)} is not ${JSON.stringify(expected)} (expected) `,
                   );
               });
-              db.sql(`
+              sql(`
             DO $$ 
             BEGIN
 
@@ -482,7 +481,7 @@ export const clientOnlyQueries = async (
             END $$;
           `);
             },
-            { log }
+            { log },
           );
 
           /* REPLICATION */
@@ -490,7 +489,7 @@ export const clientOnlyQueries = async (
           const start = Date.now();
 
           await db.planes.delete!();
-          await db.sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
+          await sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
           let inserts = new Array(100).fill(null).map((d, i) => ({
             id: i,
             flight_number: `FN${i}`,
@@ -521,7 +520,7 @@ export const clientOnlyQueries = async (
                 ": sub stats: x10 -> " +
                 p10.length +
                 "    x20 ->" +
-                planes.filter((p) => p.x == 20).length
+                planes.filter((p) => p.x == 20).length,
             );
 
             if (p10.length === 100) {
@@ -572,11 +571,11 @@ export const clientOnlyQueries = async (
                   Date.now() +
                     ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " +
                     (Date.now() - start - CLOCK_DRIFT) +
-                    "ms"
+                    "ms",
                 );
                 resolveTest(true);
               }
-            }
+            },
           );
 
           const msLimit = 20000;
@@ -626,7 +625,7 @@ export const clientOnlyQueries = async (
         cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && s && !d)
           .length,
         2,
-        "Validated getColumns failed"
+        "Validated getColumns failed",
       );
 
       /* Validated insert */
@@ -647,22 +646,22 @@ export const clientOnlyQueries = async (
       assert.equal(
         0,
         +(await db.insert_rules.count!({ name: "fail-check" })),
-        "checkFilter failed"
+        "checkFilter failed",
       );
       assert.equal(
         1,
         +(await db.insert_rules.count!({ name: "notfail" })),
-        "postValidation failed"
+        "postValidation failed",
       );
 
-      const funcError = await serverFunctions.myfunc().catch((err) => err);
+      const funcError = await serverFunctions.myfunc?.().catch((err) => err);
       assert.deepStrictEqual(funcError, {
         error: "input is of invalid type. Expecting { arg1: number }",
       });
-      const funcResult = await serverFunctions.myfunc({ arg1: 1 }).catch((err) => err);
+      const funcResult = await serverFunctions.myfunc?.({ arg1: 1 }).catch((err) => err);
       assert.equal(funcResult, 222, "methods.myfunc() failed");
 
-      const badFunc = await serverFunctions.myfuncWithBadReturn({ arg1: 1 }).catch((err) => err);
+      const badFunc = await serverFunctions.myfuncWithBadReturn?.({ arg1: 1 }).catch((err) => err);
       assert.deepStrictEqual(badFunc, {
         error: "output is of invalid type. Expecting number",
       });

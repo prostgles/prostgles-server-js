@@ -37,7 +37,7 @@ export async function getValidatedFileType(
     const tableConfig = config.referencedTables?.[tableName];
 
     if (tableConfig && isObject(tableConfig) && tableConfig.referenceColumns[colName]) {
-      const colConfig = tableConfig.referenceColumns[colName]!;
+      const colConfig = tableConfig.referenceColumns[colName];
       if (colConfig.maxFileSizeMB) {
         const actualBufferSize = Buffer.byteLength(buffer);
         if (actualBufferSize / 1e6 > colConfig.maxFileSizeMB) {

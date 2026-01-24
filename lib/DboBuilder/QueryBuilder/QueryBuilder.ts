@@ -115,7 +115,7 @@ export class SelectItemBuilder {
     this.functions = params.functions;
     this.columns = params.columns;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(
-      this.computedFields.map((cf) => cf.name)
+      this.computedFields.map((cf) => cf.name),
     );
     if (!this.allowedFields.length) {
       if (!this.columns.length) {
@@ -126,7 +126,7 @@ export class SelectItemBuilder {
 
     /* Check for conflicting computed column names */
     const conflictingCol = this.allFields.find((fieldName) =>
-      this.computedFields.find((cf) => cf.name === fieldName)
+      this.computedFields.find((cf) => cf.name === fieldName),
     );
     if (conflictingCol) {
       throw (
@@ -227,12 +227,13 @@ export class SelectItemBuilder {
 
   parseUserSelect = async (
     userSelect: Select,
-    joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any
+    joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any,
   ) => {
     /* [col1, col2, col3] */
     if (Array.isArray(userSelect)) {
-      if (userSelect.find((key) => typeof key !== "string"))
+      if (userSelect.find((key) => typeof (key as unknown) !== "string")) {
         throw "Invalid array select. Expecting an array of strings";
+      }
 
       userSelect.map((key) => this.addColumn(key, true));
 
@@ -290,7 +291,7 @@ export class SelectItemBuilder {
                     this.checkField(key, true);
                   } catch {
                     throwErr(
-                      ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `
+                      ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `,
                     );
                   }
                   funcName = val;
@@ -311,7 +312,7 @@ export class SelectItemBuilder {
                 await joinParse(key, val as JoinSelect, throwErr);
               }
             } else throwErr();
-          })
+          }),
         );
       }
     } else {

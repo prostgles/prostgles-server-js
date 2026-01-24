@@ -2,13 +2,13 @@ import { strict as assert } from "assert";
 import fs from "fs";
 import { describe, test } from "node:test";
 import type { DBHandlerClient } from "./client";
+import type { AnyObject, SQLHandler } from "prostgles-types";
 
-export const clientFileTests = async (db: DBHandlerClient) => {
+export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
   await describe("clientFileTests", async () => {
     const fileFolder = `${__dirname}/../../server/dist/server/media/`;
-    const getFiles = () =>
-      db.sql?.("SELECT id, original_name FROM files", {}, { returnType: "rows" });
-    await db.sql?.(
+    const getFiles = () => sql?.("SELECT id, original_name FROM files", {}, { returnType: "rows" });
+    await sql?.(
       `
       ALTER TABLE users_public_info 
       DROP CONSTRAINT "users_public_info_avatar_fkey";
@@ -18,7 +18,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
       REFERENCES "files" ("id")
       ON DELETE SET NULL
     `,
-      {}
+      {},
     );
     const initialFiles = await getFiles();
 
@@ -36,11 +36,11 @@ export const clientFileTests = async (db: DBHandlerClient) => {
       data: Buffer.from("This is a string", "utf-8"),
       name: "sample_file.txt",
     };
-    let insertedFile;
+    let insertedFile: AnyObject;
     await test("Insert file from nested insert", async () => {
       const nestedInsert = await db.users_public_info.insert!(
         { name: "somename.txt", avatar: file },
-        { returning: "*" }
+        { returning: "*" },
       );
       const files = await db.files.find!();
       assert.equal(files.length, 1);
@@ -55,7 +55,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
       try {
         await db.files.insert!(file, { returning: "*" });
         throw "Should not be able to insert files directly";
-      } catch (err) {
+      } catch (err: any) {
         assert.equal(err.message.startsWith("Direct inserts not allowed"), true);
       }
     });
@@ -76,7 +76,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
           .readFileSync(fileFolder + newFile.name)
           .toString("utf8")
           .toString(),
-        newData.data.toString()
+        newData.data.toString(),
       );
     });
 
@@ -90,7 +90,7 @@ export const clientFileTests = async (db: DBHandlerClient) => {
       const d = await db.users_public_info.update!(
         { id: user?.id },
         { avatar: newData },
-        { returning: "*" }
+        { returning: "*" },
       );
       const avatarFile = await db.files.findOne?.({ id: d?.at(0)?.avatar.id });
       const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.name).toString("utf8");

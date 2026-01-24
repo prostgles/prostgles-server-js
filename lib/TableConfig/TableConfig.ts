@@ -53,7 +53,7 @@ type BaseTableDefinition = {
      * The returned row must satisfy the table schema
      */
     getPreInsertRow?: (
-      args: GetPreInsertRowArgs
+      args: GetPreInsertRowArgs,
     ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
   };
   triggers?: {
@@ -459,9 +459,9 @@ export default class TableConfigurator {
     if (
       sourceTable in this.config &&
       this.config[sourceTable] &&
-      "columns" in this.config[sourceTable]!
+      "columns" in this.config[sourceTable]
     ) {
-      const td = this.config[sourceTable]!;
+      const td = this.config[sourceTable];
       if ("columns" in td && td.columns?.[targetTable]) {
         const cd = td.columns[targetTable];
         if (isObject(cd) && "joinDef" in cd) {
@@ -486,7 +486,7 @@ export default class TableConfigurator {
 
   getPreInsertRow = async (
     tableHandler: TableHandler,
-    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx">
+    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx" | "tx">,
   ): Promise<AnyObject> => {
     const tableHook = this.config[tableHandler.name]?.hooks?.getPreInsertRow;
     if (tableHandler.is_media) {

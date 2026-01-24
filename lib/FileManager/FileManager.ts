@@ -139,7 +139,7 @@ export class FileManager {
             const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
             if (fileTable && this.dbo[fileTable]?.delete && daysDelay) {
               const filesToDelete =
-                (await this.dbo[fileTable]?.find?.({
+                (await this.dbo[fileTable].find?.({
                   deleted_from_storage: null,
                   deleted: { ">": Date.now() - daysDelay * HOUR * 24 },
                 })) ?? [];
@@ -148,12 +148,12 @@ export class FileManager {
               }
             } else {
               console.error(
-                "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()"
+                "FileManager checkInterval delayedDelete FAIL: Could not access file table tableHandler.delete()",
               );
             }
           })();
         },
-        Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR)
+        Math.max(10000, (fullConfig.delayedDelete.checkIntervalHours || 0) * HOUR),
       );
     }
   }
@@ -282,7 +282,7 @@ export class FileManager {
       (c) =>
         c.name === colName &&
         c.references &&
-        c.references.some(({ ftable }) => ftable === this.tableName)
+        c.references.some(({ ftable }) => ftable === this.tableName),
     );
     const allowAllFiles = { acceptedContent: "*" } as const;
     if (isReferencingFileTable) {
@@ -302,7 +302,7 @@ export class FileManager {
 }
 
 export const getFileTypeFromFilename = (
-  fileName: string
+  fileName: string,
 ): { mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION } | undefined => {
   const nameParts = fileName.split(".");
 
@@ -310,7 +310,7 @@ export const getFileTypeFromFilename = (
 
   const nameExt = nameParts.at(-1)!.toLowerCase(),
     mime = getKeys(CONTENT_TYPE_TO_EXT).find((k) =>
-      (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt)
+      (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt),
     );
 
   if (!mime) return undefined;
@@ -326,7 +326,7 @@ export const getFileTypeFromFilename = (
 
 export const getFileType = async (
   file: Buffer | string,
-  fileName: string
+  fileName: string,
 ): Promise<{ mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION }> => {
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<
     // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -348,7 +348,7 @@ export const getFileType = async (
   } else {
     if (fileNameMime.ext.toLowerCase() !== res.ext.toLowerCase()) {
       throw new Error(
-        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime.ext} vs ${res.ext}`
+        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime.ext} vs ${res.ext}`,
       );
     }
   }

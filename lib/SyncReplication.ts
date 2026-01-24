@@ -1,4 +1,4 @@
-import type { AnyObject, OrderBy, SyncBatchParams} from "prostgles-types";
+import type { AnyObject, OrderBy, SyncBatchParams } from "prostgles-types";
 import { WAL, omitKeys, pickKeys } from "prostgles-types";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import type { PubSubManager, SyncParams } from "./PubSubManager/PubSubManager";
@@ -52,7 +52,7 @@ export async function syncData(
   this: PubSubManager,
   sync: SyncParams,
   clientData: ClientExpressData | undefined,
-  source: "trigger" | "client"
+  source: "trigger" | "client",
 ) {
   await this._log({
     type: "sync",
@@ -86,6 +86,10 @@ export async function syncData(
   if (!socket) {
     return;
   }
+  const tableHandler = this.dbo[table_name];
+  if (!tableHandler?.find || !tableHandler.count) {
+    throw `dbo.${table_name}.find or .count are missing or not allowed`;
+  }
 
   const sync_fields = [synced_field, ...id_fields.sort()],
     orderByAsc: OrderBy = sync_fields.reduce((a, v) => ({ ...a, [v]: true }), {}),
@@ -105,23 +109,20 @@ export async function syncData(
           ...(to_synced ? { $lte: to_synced } : {}),
         };
       }
-      if (this.dbo[table_name]?.find === undefined || this.dbo[table_name]?.count === undefined) {
-        throw `dbo.${table_name}.find or .count are missing or not allowed`;
-      }
 
-      const first_rows = await this.dbo[table_name]?.find?.(
+      const first_rows = await tableHandler.find!(
         _filter,
         { orderBy: orderByAsc, select: sync_fields, limit, offset },
         undefined,
-        table_rules
+        table_rules,
       );
-      const last_rows = first_rows?.slice(-1); // Why not logic below?
+      const last_rows = first_rows.slice(-1); // Why not logic below?
       // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-      const count = await this.dbo[table_name]?.count?.(_filter, undefined, undefined, table_rules);
+      const count = await tableHandler.count!(_filter, undefined, undefined, table_rules);
 
       return {
-        s_fr: first_rows?.[0] || null,
-        s_lr: last_rows?.[0] || null,
+        s_fr: first_rows[0] || null,
+        s_lr: last_rows[0] || null,
         s_count: count,
       };
     },
@@ -172,7 +173,7 @@ export async function syncData(
               .map((idKey) =>
                 a[idKey] < b[idKey] ? -1
                 : a[idKey] > b[idKey] ? 1
-                : 0
+                : 0,
               )
               .find((v) => v) ||
             0
@@ -186,10 +187,8 @@ export async function syncData(
         [synced_field]: { $gte: from_synced || 0 },
       };
 
-      if (!this.dbo[table_name]?.find) throw "_this?.dbo?.[table_name]?.find is missing";
-
       try {
-        const res = this.dbo[table_name]?.find?.(
+        const res = tableHandler.find?.(
           _filter,
           {
             select: params.select,
@@ -198,7 +197,7 @@ export async function syncData(
             limit: batch_size,
           },
           undefined,
-          table_rules
+          table_rules,
         );
 
         if (!res) throw "_this?.dbo?.[table_name]?.find is missing";
@@ -249,11 +248,11 @@ export async function syncData(
               orderBy: orderByAsc as OrderBy,
             },
             undefined,
-            table_rules
+            table_rules,
           );
           let inserts = data.filter((d) => !existingData.find((ed) => rowsIdsMatch(ed, d)));
           let updates = data.filter((d) =>
-            existingData.find((ed) => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field])
+            existingData.find((ed) => rowsIdsMatch(ed, d) && +ed[synced_field] < +d[synced_field]),
           );
           try {
             if (!table_rules) throw "table_rules missing";
@@ -268,13 +267,13 @@ export async function syncData(
                   };
 
                   updateData.push([syncSafeFilter, omitKeys(upd, id_fields)]);
-                })
+                }),
               );
               await tbl.updateBatch(
                 updateData,
                 { removeDisallowedFields: true },
                 undefined,
-                table_rules
+                table_rules,
               );
             } else {
               updates = [];
@@ -294,7 +293,7 @@ export async function syncData(
         })
         .then(({ inserts, updates }) => {
           log(
-            `upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`
+            `upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`,
           );
           return {
             inserted: inserts.length,
@@ -306,7 +305,7 @@ export async function syncData(
           console.trace(
             "Something went wrong with syncing to server: " + err.message,
             data.length,
-            id_fields
+            id_fields,
           );
           return Promise.reject(new Error("Something went wrong with syncing to server: "));
         });
@@ -413,7 +412,7 @@ export async function syncData(
               _filter,
               { select: sync_fields, limit: 1 },
               undefined,
-              table_rules
+              table_rules,
             );
           }
 
@@ -443,7 +442,7 @@ export async function syncData(
             {
               syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]",
             },
-            sync.table_name
+            sync.table_name,
           );
         }
         sync.lr = lastRow;
@@ -508,12 +507,12 @@ export async function syncData(
 
         const forClient = serverData.filter((s) => {
           return !clientData.find(
-            (c) => rowsIdsMatch(c, s) && +c[synced_field] >= +s[synced_field]
+            (c) => rowsIdsMatch(c, s) && +c[synced_field] >= +s[synced_field],
           );
         });
         if (forClient.length) {
           const res: any = await pushData(
-            forClient.filter((d) => !sync.wal || !sync.wal.isInHistory(d))
+            forClient.filter((d) => !sync.wal || !sync.wal.isInHistory(d)),
           );
           pushed += res.pushed;
         }
@@ -530,7 +529,7 @@ export async function syncData(
       }
       log(
         `server.syncBatch ${table_name}: inserted( ${inserted} )    updated( ${updated} )   deleted( ${deleted} )    pushed to client( ${pushed} )     total( ${total} )`,
-        socket._user
+        socket._user,
       );
 
       return true;

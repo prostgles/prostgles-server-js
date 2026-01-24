@@ -1,17 +1,9 @@
-import type {
-  AnyObject,
-  FieldFilter} from "prostgles-types/dist";
-import {
-  asName,
-  getKeys,
-  isEmpty,
-  isObject,
-  pickKeys,
-} from "prostgles-types/dist";
+import type { AnyObject, FieldFilter } from "prostgles-types/dist";
+import { asName, getKeys, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
 import type { DBHandlerServer } from "../../Prostgles";
-import type { ValidateRowBasic } from "../../PublishParser/PublishParser";
+import type { ValidateRowArgs, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
-import type { LocalParams, TableSchemaColumn} from "../DboBuilder";
+import type { LocalParams, TableSchemaColumn } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { validateObj } from "../ViewHandler/ViewHandler";
@@ -40,6 +32,7 @@ type ParseDataArgs = {
   rows: AnyObject[];
   allowedCols: string[];
   dbTx: DBHandlerServer;
+  tx: ValidateRowArgs["tx"];
   command: "update" | "insert";
   validationOptions: {
     localParams: undefined | LocalParams;
@@ -75,16 +68,16 @@ export class DataValidator {
 const getQuery = (
   type: "insert" | "update",
   parsedRowFieldData: ParsedRowFieldData[][],
-  escapedTableName: string
+  escapedTableName: string,
 ): string => {
   if (type === "insert") {
     const uniqueColumns = Array.from(
-      new Set(parsedRowFieldData.flatMap((row) => row.map((r) => r.escapedCol)))
+      new Set(parsedRowFieldData.flatMap((row) => row.map((r) => r.escapedCol))),
     );
     const values = parsedRowFieldData
       .map(
         (row) =>
-          `(${uniqueColumns.map((colName) => row.find((r) => r.escapedCol === colName)?.escapedVal ?? "DEFAULT")})`
+          `(${uniqueColumns.map((colName) => row.find((r) => r.escapedCol === colName)?.escapedVal ?? "DEFAULT")})`,
       )
       .join(",\n");
     const whatToInsert =
@@ -213,8 +206,8 @@ export const prepareNewData = ({
  *  - no duplicate column names ( could update with $func and plain value for same column )
  */
 const getValidatedRowFieldData = async (
-  { allowedCols, rows, validationOptions, dbTx, command }: ParseDataArgs,
-  tableHandler: TableHandler
+  { allowedCols, rows, validationOptions, dbTx, tx, command }: ParseDataArgs,
+  tableHandler: TableHandler,
 ) => {
   if (!allowedCols.length && command === "update") {
     throw "allowedColumns cannot be empty";
@@ -230,11 +223,12 @@ const getValidatedRowFieldData = async (
         row = await validationOptions.validate({
           row,
           dbx: dbTx,
+          tx,
           localParams: validationOptions.localParams,
         });
       }
       const keysAddedDuringValidate = Object.keys(row).filter(
-        (newKey) => !initialRowKeys.includes(newKey)
+        (newKey) => !initialRowKeys.includes(newKey),
       );
 
       const getColumn = (fieldName: string) => {
@@ -283,7 +277,7 @@ const getValidatedRowFieldData = async (
       });
 
       return rowPartValues;
-    })
+    }),
   );
 
   return rowFieldData;
@@ -389,7 +383,7 @@ const convertionFuncs: ConvertionFunc[] = [
           const argList = args.map((arg) => asValue(arg)).join(", ");
           return `${name}(${argList})`;
         },
-      }) satisfies ConvertionFunc
+      }) satisfies ConvertionFunc,
   ),
   {
     name: "to_timestamp",

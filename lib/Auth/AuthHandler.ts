@@ -45,7 +45,7 @@ export const AUTH_ROUTES = {
 } as const;
 export const GET_AUTH_ROUTE = (
   conf: AuthConfig["loginSignupConfig"],
-  route: keyof typeof AUTH_ROUTES
+  route: keyof typeof AUTH_ROUTES,
 ) => {
   const basePath = conf?.authRoutesBasePath || "";
   return `${basePath}${AUTH_ROUTES[route]}`;
@@ -55,7 +55,7 @@ export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
     Object.entries(AUTH_ROUTES).map(([key]) => [
       key,
       GET_AUTH_ROUTE(conf, key as keyof typeof AUTH_ROUTES),
-    ])
+    ]),
   ) as {
     [K in keyof typeof AUTH_ROUTES]: string;
   };
@@ -176,9 +176,10 @@ export class AuthHandler {
     const { sidKeyName } = this;
     if (maybeClientReq.socket) {
       const { handshake } = maybeClientReq.socket;
-      const querySid = (handshake.auth?.[sidKeyName] || handshake.query?.[sidKeyName]) as
-        | string
-        | undefined;
+      const querySid = (handshake.auth?.[sidKeyName] ||
+        handshake.query?.[sidKeyName] ||
+        handshake.auth?.token ||
+        handshake.query?.token) as string | undefined;
       let rawSid = querySid;
       if (!rawSid) {
         const cookie_str = maybeClientReq.socket.handshake.headers?.cookie;
@@ -198,7 +199,7 @@ export class AuthHandler {
     }
     return this.validateSid(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      bearerSid ?? (maybeClientReq.httpReq.cookies?.[sidKeyName] as string | undefined)
+      bearerSid ?? (maybeClientReq.httpReq.cookies?.[sidKeyName] as string | undefined),
     );
   }
 
@@ -218,7 +219,7 @@ export class AuthHandler {
 
   isNonExpiredSocketSession = (
     socket: PRGLIOSocket,
-    session: BasicSession | undefined
+    session: BasicSession | undefined,
   ): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
     if (

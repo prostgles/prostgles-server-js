@@ -1,4 +1,4 @@
-import type { AnyObject} from "prostgles-types";
+import type { AnyObject } from "prostgles-types";
 import { getKeys, isObject } from "prostgles-types";
 import type { LocalParams, Media } from "./DboBuilder";
 import type { ValidateRowBasic } from "../PublishParser/PublishParser";
@@ -11,7 +11,7 @@ export const isFile = (row: any): row is { data: Buffer; name: string } => {
       getKeys(row).sort().join() === ["name", "data"].sort().join() &&
       row.data &&
       (typeof row.data === "string" || Buffer.isBuffer(row.data)) &&
-      typeof row.name === "string"
+      typeof row.name === "string",
   );
 };
 
@@ -27,7 +27,7 @@ type UploadFileArgs = {
 
 export async function uploadFile(
   this: TableHandler,
-  { row, localParams, validate, mediaId }: UploadFileArgs
+  { row, localParams, validate, mediaId }: UploadFileArgs,
 ): Promise<Media> {
   if (!this.dboBuilder.prostgles.fileManager) throw "fileManager not set up";
 
@@ -62,6 +62,7 @@ export async function uploadFile(
   if (validate) {
     if (!localParams) throw "localParams missing";
     const parsedMedia = await validate({
+      tx: localParams.tx?.t || this.tx?.t || this.db,
       row: media,
       dbx: this.getFinalDbo(localParams),
       localParams,

@@ -1,6 +1,5 @@
 import type {
   AnyObject,
-  DbJoinMaker,
   DBSchema,
   SQLHandler,
   TableHandler,
@@ -43,7 +42,7 @@ export const getDBTypescriptSchema = ({
     columns: {${cols
       .map(
         (column) => `
-      ${getColumnTypescriptDefinition({ tablesOrViews, config, tableOrView, column })}`
+      ${getColumnTypescriptDefinition({ tablesOrViews, config, tableOrView, column })}`,
       )
       .join("")}
     };
@@ -74,19 +73,16 @@ export type DBTableHandlersFromSchema<Schema = void> =
     }
   : Record<string, Partial<ServerTableHandler>>;
 
-export type DBHandlerServerExtra<
+export type DBHandlerServerWithTx<
   TH = Record<string, Partial<ServerTableHandler>>,
   WithTransactions = true,
-> = {
-  sql: SQLHandler;
-} & Partial<DbJoinMaker> &
-  (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
+> = WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>;
 
 export type DBOFullyTyped<
   Schema = void,
   WithTransactions = true,
 > = DBTableHandlersFromSchema<Schema> &
-  DBHandlerServerExtra<DBTableHandlersFromSchema<Schema>, WithTransactions>;
+  DBHandlerServerWithTx<DBTableHandlersFromSchema<Schema>, WithTransactions>;
 
 export type PublishFullyTyped<Schema = void> =
   Schema extends DBSchema ?

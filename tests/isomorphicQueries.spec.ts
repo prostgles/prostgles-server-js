@@ -5,30 +5,37 @@ import {
   describe,
   test,
 } from "node:test";
-import { SubscriptionHandler, pickKeys } from "prostgles-types";
+import {
+  SubscriptionHandler,
+  innerJoin,
+  leftJoin,
+  pickKeys,
+  type SQLHandler,
+} from "prostgles-types";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 
 export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
-  log: (msg: string, extra?: any) => void
+  sql: SQLHandler | undefined,
+  log: (msg: string, extra?: any) => void,
 ) => {
   log("Starting isomorphic queries");
 
   const expectNoTriggers = async () => {
     await tout(2500); // this should be higher than the 1k timeout in deleteOrphanedTriggers
-    const currentTriggers = await db.sql!(
+    const currentTriggers = await sql!(
       `
         SELECT table_name, condition, c_id, inserted, id, condition_hash, app_id 
         FROM prostgles.v_triggers
       `,
       {},
-      { returnType: "rows" }
+      { returnType: "rows" },
     );
     assert.equal(
       currentTriggers.length,
       0,
-      `No triggers should be active but found ${JSON.stringify(currentTriggers)}`
+      `No triggers should be active but found ${JSON.stringify(currentTriggers)}`,
     );
   };
 
@@ -47,7 +54,7 @@ export const isomorphicQueries = async (
         await db.items2.delete!({});
         await db.items.delete!({});
       }
-      await db.sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
+      await sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
     });
 
     await test("Error structure", async () => {
@@ -87,7 +94,7 @@ export const isomorphicQueries = async (
           code_info: "invalid_text_representation",
           severity: "ERROR",
         };
-        if (isServer || db.sql) {
+        if (isServer || sql) {
           const allKeys = [
             "message",
             "code",
@@ -114,7 +121,7 @@ export const isomorphicQueries = async (
           assert.equal(typeof err.code_info, "string");
         } else {
           // TODO: ensure this runs
-          assert.deepStrictEqual(!!db.sql, false);
+          assert.deepStrictEqual(!!sql, false);
           assert.deepStrictEqual(err, clientOnlyError);
         }
       }
@@ -143,7 +150,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Prepare data", async () => {
-      if (!db.sql) throw "db.sql missing";
+      if (!sql) throw "sql missing";
       const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], {
         returning: "*",
       });
@@ -163,10 +170,10 @@ export const isomorphicQueries = async (
         id_basic: { txt: "basic" },
         txt: "basic1",
       });
-      await db.sql(`REFRESH MATERIALIZED VIEW  prostgles_test.mv_basic1;`);
+      await sql(`REFRESH MATERIALIZED VIEW  prostgles_test.mv_basic1;`);
       assert.deepStrictEqual(
         await db["prostgles_test.mv_basic1"].find!(),
-        await db["prostgles_test.basic1"].find!()
+        await db["prostgles_test.basic1"].find!(),
       );
 
       /* Ensure */
@@ -179,7 +186,7 @@ export const isomorphicQueries = async (
         { name: "abc81 here", added: added3, jsn: { a: { b: 2 } } },
       ]);
 
-      await db.sql("TRUNCATE files CASCADE");
+      await sql("TRUNCATE files CASCADE");
     });
 
     const json = {
@@ -194,7 +201,7 @@ export const isomorphicQueries = async (
       const res = await db.tjson.update!(
         { colOneOf: "a" },
         { json: { $merge: [{ a: false }] } },
-        { returning: "*" }
+        { returning: "*" },
       );
       assert.deepStrictEqual(res?.[0].json, { ...json, a: false });
     });
@@ -207,11 +214,11 @@ export const isomorphicQueries = async (
     await test("onConflict do update", async () => {
       const initial = await db.items4.insert!(
         { id: -99, name: "onConflict", public: "onConflict" },
-        { returning: "*" }
+        { returning: "*" },
       );
       const updated = await db.items4.insert!(
         { id: -99, name: "onConflict", public: "onConflict2" },
-        { onConflict: "DoUpdate", returning: "*" }
+        { onConflict: "DoUpdate", returning: "*" },
       );
       assert.equal(initial.id, -99);
       assert.equal(initial.public, "onConflict");
@@ -234,7 +241,7 @@ export const isomorphicQueries = async (
       await tryRun("Nested insert", async () => {
         const nestedInsert = await db.users_public_info.insert!(
           { name: "somename.txt", avatar: mediaFile },
-          { returning: "*" }
+          { returning: "*" },
         );
         const { name, avatar } = nestedInsert;
         const { extension, content_type, original_name } = avatar;
@@ -244,7 +251,7 @@ export const isomorphicQueries = async (
             extension: "txt",
             content_type: "text/plain",
             original_name: "sample_file.txt",
-          }
+          },
         );
 
         assert.equal(name, "somename.txt");
@@ -445,7 +452,7 @@ export const isomorphicQueries = async (
     await test("$unnest_words", async () => {
       const res = await db.various.find!(
         {},
-        { returnType: "values", select: { name: "$unnest_words" } }
+        { returnType: "values", select: { name: "$unnest_words" } },
       );
 
       assert.deepStrictEqual(res, ["abc9", "abc1", "abc81", "here"]);
@@ -458,7 +465,7 @@ export const isomorphicQueries = async (
       const res = await db.items.find!({}, { select: { name: 1 }, groupBy: true });
       const resV = await db.items.find!(
         {},
-        { select: { name: 1 }, groupBy: true, returnType: "values" }
+        { select: { name: 1 }, groupBy: true, returnType: "values" },
       );
 
       assert.deepStrictEqual(res, [{ name: "a" }, { name: "b" }]);
@@ -467,10 +474,10 @@ export const isomorphicQueries = async (
 
     await test("sql returntype default-with-rollback", async () => {
       const item = { name: "a" };
-      const res = await db.sql!(
+      const res = await sql!(
         "delete from items2 returning name; ",
         {},
-        { returnType: "default-with-rollback" }
+        { returnType: "default-with-rollback" },
       );
       assert.deepEqual(res.rows, [item]);
       const count = await db.items2.count!();
@@ -483,7 +490,7 @@ export const isomorphicQueries = async (
     await test("returnType: value", async () => {
       const resVl = await db.items.find!(
         {},
-        { select: { name: { $array_agg: ["name"] } }, returnType: "value" }
+        { select: { name: { $array_agg: ["name"] } }, returnType: "value" },
       );
 
       assert.deepStrictEqual(resVl, ["a", "a", "b"]);
@@ -505,7 +512,7 @@ export const isomorphicQueries = async (
             added: "$year",
             addedY: { $date: ["added"] },
           },
-        }
+        },
       );
       // console.log(d);
       await db.various.findOne!(
@@ -517,7 +524,7 @@ export const isomorphicQueries = async (
             added: "$year",
             addedY: { $date: ["added"] },
           },
-        }
+        },
       );
 
       /*
@@ -553,7 +560,7 @@ export const isomorphicQueries = async (
             hObjAll: { $term_highlight: ["*", term, { returnType: "object" }] },
           },
           orderBy: { hIdx: -1 },
-        }
+        },
       );
 
       assert.deepStrictEqual(res[0], {
@@ -589,17 +596,17 @@ export const isomorphicQueries = async (
 
     const testToEnsureTriggersAreDisabled = async (
       sub: SubscriptionHandler,
-      table_name: string
+      table_name: string,
     ) => {
       const getTableTriggers = async (table_name: string) => {
-        return (await db.sql?.(
+        return (await sql?.(
           `
           SELECT tgname, tgenabled = 'O' as enabled 
           FROM pg_catalog.pg_trigger 
           WHERE tgname like format('prostgles_triggers_%s_', \${table_name}) || '%'
         `,
           { table_name },
-          { returnType: "rows" }
+          { returnType: "rows" },
         )) as { tgname: string; enabled: boolean }[];
       };
       let validTriggers = await getTableTriggers(table_name);
@@ -616,10 +623,10 @@ export const isomorphicQueries = async (
             validTriggers,
           },
           null,
-          2
-        )}`
+          2,
+        )}`,
       );
-      await db.sql?.(`DELETE FROM prostgles.app_triggers`, []);
+      await sql?.(`DELETE FROM prostgles.app_triggers`, []);
       validTriggers = await getTableTriggers(table_name);
       assert.equal(validTriggers.length, 3, "3 Triggers should exist but be disabled");
       assert.equal(validTriggers.filter((t) => t.enabled).length, 0);
@@ -660,7 +667,7 @@ export const isomorphicQueries = async (
         async (d) => {
           log(JSON.stringify(d));
           runs++;
-        }
+        },
       );
       await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
@@ -693,7 +700,7 @@ export const isomorphicQueries = async (
           await db.various.update!(variousId99, { name: "zz3zz2" });
           await db.various.update!(variousId99, { name: "zz3zz3" });
         },
-        { timeout: 4000 }
+        { timeout: 4000 },
       );
     });
 
@@ -736,12 +743,12 @@ export const isomorphicQueries = async (
             return {
               handler,
             };
-          })
+          }),
         ).catch(reject);
 
         await tout(2000);
         await Promise.all(
-          Object.values(subscriptions).map(async ({ handler }) => handler.unsubscribe())
+          Object.values(subscriptions).map(async ({ handler }) => handler.unsubscribe()),
         );
         assert.equal(Object.keys(callbacksFired).length, 5);
         resolve(true);
@@ -770,7 +777,7 @@ export const isomorphicQueries = async (
       }
       await expectNoTriggers();
       const checkLocks = async () => {
-        const locks = await db.sql!(
+        const locks = await sql!(
           `
           WITH locks AS (
             SELECT pid, pg_blocking_pids(pid) as blocking_pids, wait_event, wait_event_type, query, 
@@ -786,7 +793,7 @@ export const isomorphicQueries = async (
           FROM locks l 
         `,
           {},
-          { returnType: "rows" }
+          { returnType: "rows" },
         );
         if (locks.length) {
           log("Locks: " + JSON.stringify(locks));
@@ -796,7 +803,7 @@ export const isomorphicQueries = async (
       const updateInTx = async (id: number) => {
         await db.various.insert!({ id, name: `slowtx${id}` }, { returning: "*" });
         checkLocks();
-        await db.sql!(
+        await sql!(
           `
           BEGIN;
             UPDATE various
@@ -806,7 +813,7 @@ export const isomorphicQueries = async (
           COMMIT;
 
         `,
-          { id }
+          { id },
         );
       };
       const expectedDuration = 4000;
@@ -824,7 +831,7 @@ export const isomorphicQueries = async (
       assert.equal(
         duration1 < expectedDuration,
         true,
-        `Update should take less than ${expectedDuration} seconds but took ${duration1}`
+        `Update should take less than ${expectedDuration} seconds but took ${duration1}`,
       );
       const callOffsets: number[] = [];
       const start = Date.now();
@@ -836,7 +843,7 @@ export const isomorphicQueries = async (
       assert.equal(
         duration2 < expectedDuration,
         true,
-        `Update should take less than ${expectedDuration} seconds but took ${duration2}`
+        `Update should take less than ${expectedDuration} seconds but took ${duration2}`,
       );
       assert.equal(callOffsets.length, 2 + COUNT * 2);
       //TODO: throttle notify to reduce this
@@ -849,7 +856,7 @@ export const isomorphicQueries = async (
           " vs " +
           duration1 +
           " duration11: " +
-          duration11
+          duration11,
       );
       // const offetsHigherThanExpected = callOffsets.filter((offset) => offset > expectedDuration);
       // assert.equal(
@@ -882,12 +889,12 @@ export const isomorphicQueries = async (
                 sub.unsubscribe();
                 resolve(true);
               }
-            }
+            },
           );
           await db.various.update!(variousId99, { name: "zz3zz1" });
           await db.various.update!(variousId99, { name: "zz3zz2" });
         },
-        { timeout: 4000 }
+        { timeout: 4000 },
       );
     });
 
@@ -911,11 +918,11 @@ export const isomorphicQueries = async (
                   resolve(true);
                 }
               }
-            }
+            },
           );
           await db.various.insert!(variousId99);
         },
-        { timeout: 4000 }
+        { timeout: 4000 },
       );
     });
 
@@ -959,7 +966,7 @@ export const isomorphicQueries = async (
         { actions: { insert: true } },
         async () => {
           runs++;
-        }
+        },
       );
       await tout(500);
       assert.deepStrictEqual(runs, 1);
@@ -979,7 +986,7 @@ export const isomorphicQueries = async (
         { actions: { insert: false } },
         async () => {
           runs++;
-        }
+        },
       );
       await tout(500);
       assert.deepStrictEqual(runs, 1);
@@ -1015,11 +1022,11 @@ export const isomorphicQueries = async (
     await test("template_string function", async () => {
       const res = await db.various.findOne!(
         { name: "abc9" },
-        { select: { tstr: { $template_string: ["{name} is hehe"] } } }
+        { select: { tstr: { $template_string: ["{name} is hehe"] } } },
       );
       const res2 = await db.various.findOne!(
         { name: "abc9" },
-        { select: { tstr: { $template_string: ["is hehe"] } } }
+        { select: { tstr: { $template_string: ["is hehe"] } } },
       );
       assert.equal(res?.tstr, "abc9 is hehe");
       assert.equal(res2?.tstr, "is hehe");
@@ -1044,7 +1051,7 @@ export const isomorphicQueries = async (
         {
           select: { name: 1 },
           orderBy: [{ key: "name", asc: false, nulls: "first", nullEmpty: true }],
-        }
+        },
       );
       assert.deepStrictEqual(res, [{ name: "b" }, { name: "a" }, { name: "a" }]);
     });
@@ -1054,7 +1061,7 @@ export const isomorphicQueries = async (
         {
           select: { uname: { $upper: ["name"] }, count: { $countAll: [] } },
           orderBy: { uname: -1 },
-        }
+        },
       );
       assert.deepStrictEqual(res, [
         { uname: "B", count: "1" },
@@ -1064,21 +1071,21 @@ export const isomorphicQueries = async (
     await test("Filter by aliased func", async () => {
       const res = await db.items.find!(
         { uname: "B" },
-        { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } }
+        { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } },
       );
       assert.deepStrictEqual(res, [{ uname: "B", count: "1" }]);
     });
     await test("Count with Filter by aliased func ", async () => {
       const res = await db.items.count!(
         { uname: "A" },
-        { select: { uname: { $upper: ["name"] } } }
+        { select: { uname: { $upper: ["name"] } } },
       );
       assert.deepStrictEqual(res, 2);
     });
     await test("Count with Aggregate and Filter by aliased func ", async () => {
       const res = await db.items.count!(
         { uname: "A" },
-        { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } }
+        { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } },
       );
       assert.deepStrictEqual(res, 1);
     });
@@ -1094,7 +1101,7 @@ export const isomorphicQueries = async (
         {
           select: { name: 1, count: { $countAll: [] } },
           orderBy: { count: -1 },
-        }
+        },
       );
       assert.deepStrictEqual(res, [
         { name: "a", count: "2" },
@@ -1107,7 +1114,7 @@ export const isomorphicQueries = async (
         {
           select: { label: { $column: ["name"] }, count: { $countAll: [] } },
           orderBy: { count: -1 },
-        }
+        },
       );
       assert.deepStrictEqual(res, [
         { label: "a", count: "2" },
@@ -1120,7 +1127,7 @@ export const isomorphicQueries = async (
         {
           select: { name: { $countAll: [] }, n: { $left: ["name", 1] } },
           orderBy: { name: -1 },
-        }
+        },
       );
       assert.deepStrictEqual(res, [
         { name: "2", n: "a" },
@@ -1139,7 +1146,7 @@ export const isomorphicQueries = async (
     await test("Function example", async () => {
       const f = await db.items4.findOne!(
         {},
-        { select: { public: 1, p_5: { $left: ["public", 3] } } }
+        { select: { public: 1, p_5: { $left: ["public", 3] } } },
       );
       assert.equal(f?.p_5.length, 3);
       assert.equal(f?.p_5, f.public.substr(0, 3));
@@ -1147,7 +1154,7 @@ export const isomorphicQueries = async (
       // Nested function
       const fg = await db.items2.findOne!(
         {},
-        { select: { id: 1, name: 1, items3: { name: "$upper" } } }
+        { select: { id: 1, name: 1, items3: { name: "$upper" } } },
       ); // { $upper: ["public"] } } });
       assert.deepStrictEqual(fg, { id: 1, name: "a", items3: [{ name: "A" }] });
 
@@ -1158,7 +1165,7 @@ export const isomorphicQueries = async (
       // Date + agg
       const MonAgg = await db.items4.find!(
         { name: "abc" },
-        { select: { added: "$Mon", public: "$count" } }
+        { select: { added: "$Mon", public: "$count" } },
       );
       assert.deepStrictEqual(MonAgg, [{ added: "Dec", public: "2" }]);
 
@@ -1178,7 +1185,7 @@ export const isomorphicQueries = async (
           public: "public data",
           added: "04 Dec 1995 00:12:00",
         },
-        returningParam
+        returningParam,
       );
       assert.deepStrictEqual(i, {
         id: 1,
@@ -1191,7 +1198,7 @@ export const isomorphicQueries = async (
       let u = await db.items4_pub.update!(
         { name: "abc123" },
         { public: "public data2" },
-        returningParam
+        returningParam,
       );
       assert.deepStrictEqual(u, [
         {
@@ -1253,7 +1260,7 @@ export const isomorphicQueries = async (
             geomGeo: { $ST_AsGeoJSON: ["geom"] },
           },
           orderBy: "geom",
-        }
+        },
       );
       assert.deepStrictEqual(f, {
         geomGeo: {
@@ -1277,7 +1284,7 @@ export const isomorphicQueries = async (
             extent: { $ST_Extent: ["geom"] },
             //  extent3D: { "$ST_3DExtent": ["geom"] },
           },
-        }
+        },
       );
       assert.deepStrictEqual(aggs, {
         xMax: -1,
@@ -1400,9 +1407,9 @@ export const isomorphicQueries = async (
           select: {
             "*": 1,
             items3: "*",
-            items22: db.leftJoin?.items2({}, "*"),
+            items22: leftJoin("items2", {}, "*"),
           },
-        }
+        },
       );
 
       if (
@@ -1423,7 +1430,7 @@ export const isomorphicQueries = async (
             "*": 1,
             items2: "*",
           },
-        }
+        },
       );
       const items2j = await db.items.find!(
         {},
@@ -1431,21 +1438,21 @@ export const isomorphicQueries = async (
           select: {
             "*": 1,
             items2: "*",
-            items2j: db.leftJoin?.items2({}, "*"),
+            items2j: leftJoin("items2", {}, "*"),
           },
-        }
+        },
       );
 
       items2.forEach((d, i) => {
         assert.deepStrictEqual(
           d.items2,
           items2j[i].items2,
-          "Joins duplicate aliased table query failed"
+          "Joins duplicate aliased table query failed",
         );
         assert.deepStrictEqual(
           d.items2,
           items2j[i].items2j,
-          "Joins duplicate aliased table query failed"
+          "Joins duplicate aliased table query failed",
         );
       });
     });
@@ -1458,7 +1465,7 @@ export const isomorphicQueries = async (
 
       const shortHandAggJoined = await db.items.findOne!(
         { id: 4 },
-        { select: { id: 1, items2: { name: "$max" } } }
+        { select: { id: 1, items2: { name: "$max" } } },
       );
       assert.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
     });
@@ -1470,11 +1477,11 @@ export const isomorphicQueries = async (
       const rowhashView = await db.v_items.findOne!({}, { select: { $rowhash: 1 } });
       const rh1 = await db.items.findOne!(
         { $rowhash: rowhash?.$rowhash },
-        { select: { $rowhash: 1 } }
+        { select: { $rowhash: 1 } },
       );
       const rhView = await db.v_items.findOne!(
         { $rowhash: rowhashView?.$rowhash },
-        { select: { $rowhash: 1 } }
+        { select: { $rowhash: 1 } },
       );
       // console.log({ rowhash, f });
 
@@ -1531,7 +1538,7 @@ export const isomorphicQueries = async (
               [`id2 max`]: { $max: [`"id2"`] },
             },
           },
-        }
+        },
       );
 
       assert.deepStrictEqual(res[0], {
@@ -1563,7 +1570,7 @@ export const isomorphicQueries = async (
               },
             },
           },
-        }
+        },
       );
 
       assert.deepStrictEqual(aliasedQuotedJoin, [
@@ -1590,7 +1597,7 @@ export const isomorphicQueries = async (
             },
           },
         },
-        { select: "*" }
+        { select: "*" },
       );
       /** Duplicated tables */
       const exists2 = await db[`"""quoted0"""`].find!(
@@ -1602,7 +1609,7 @@ export const isomorphicQueries = async (
             },
           },
         },
-        { select: "*" }
+        { select: "*" },
       );
       assert.deepStrictEqual(exists1, exists2);
     });
@@ -1614,19 +1621,19 @@ export const isomorphicQueries = async (
         setTimeout(async () => {
           /** Used for debugging */
           if (runs < 2) {
-            const appName = await db.sql?.(
+            const appName = await sql?.(
               `
               SELECT application_name
               FROM pg_catalog.pg_stat_activity
               WHERE pid = pg_backend_pid()
             `,
               [],
-              { returnType: "rows" }
+              { returnType: "rows" },
             );
-            const apps = await db.sql?.(`SELECT * FROM prostgles.apps`, [], {
+            const apps = await sql?.(`SELECT * FROM prostgles.apps`, [], {
               returnType: "value",
             });
-            const app_triggers = await db.sql?.(`SELECT * FROM prostgles.app_triggers`, [], {
+            const app_triggers = await sql?.(`SELECT * FROM prostgles.app_triggers`, [], {
               returnType: "rows",
             });
             log("show-logs");
@@ -1642,8 +1649,8 @@ export const isomorphicQueries = async (
                 runs,
               },
               null,
-              2
-            )
+              2,
+            ),
           );
           if (item && item[`"text_col0"`] === "0") {
             runs++;
@@ -1675,7 +1682,7 @@ export const isomorphicQueries = async (
               await sub.unsubscribe();
               resolve(true);
             }, 10);
-          }
+          },
         );
       });
     });
@@ -1700,14 +1707,14 @@ export const isomorphicQueries = async (
               select: idAggSelect,
             },
           },
-        }
+        },
       );
       const reverseJoin = await db.tr2.find!(
         { t1: "a" },
         {
           orderBy: { id: true },
           select: { "*": 1, tr1: { $innerJoin: "tr1", select: idAggSelect } },
-        }
+        },
       );
       assert.deepStrictEqual(normalJoin[0], {
         id: 1,
@@ -1756,7 +1763,7 @@ export const isomorphicQueries = async (
               await sub.unsubscribe();
               resolve(true);
             }
-          }
+          },
         );
       });
     });
@@ -1775,7 +1782,7 @@ export const isomorphicQueries = async (
             orderBy: {
               "tr2.maxId": asc,
             },
-          }
+          },
         );
       const sortedAsc = await getSorted(true);
       const sortedDesc = await getSorted(false);
@@ -1784,7 +1791,7 @@ export const isomorphicQueries = async (
           .map((d) => d.tr2[0].maxId)
           .slice(0)
           .reverse(),
-        sortedDesc.map((d) => d.tr2[0].maxId)
+        sortedDesc.map((d) => d.tr2[0].maxId),
       );
     });
 
@@ -1801,14 +1808,14 @@ export const isomorphicQueries = async (
           orderBy: {
             id: true,
           },
-        }
+        },
       );
       assert.deepStrictEqual(
         res.map((row) => [row.id, row.tr2[0]!.sign]),
         [
           [1, 1],
           [2, 1],
-        ]
+        ],
       );
     });
 
@@ -1819,7 +1826,7 @@ export const isomorphicQueries = async (
           items2_id: { name: "it2", items_id: { name: "it" } },
           name: "it4a",
         },
-        { returning: "*" }
+        { returning: "*" },
       );
       const itemsCount = await db.items.count!({ name: "it" });
       const items2Count = await db.items2.count!({ name: "it2" });
@@ -1839,14 +1846,14 @@ export const isomorphicQueries = async (
           items3_id: { name: "multi" },
           name: "root_multi",
         },
-        { returning: "*" }
+        { returning: "*" },
       );
       const itemsCount = await db.items.count!({ name: "multi" });
       assert.equal(+itemsCount, 4);
 
       const multiItem = await db.items_multi.findOne!(
         { name: "root_multi" },
-        { select: { "*": 1, items: "*" } }
+        { select: { "*": 1, items: "*" } },
       );
       assert.equal(multiItem?.name, "root_multi");
       assert.equal(multiItem?.items.filter((d) => d.name === "multi").length, 4);
@@ -1859,7 +1866,7 @@ export const isomorphicQueries = async (
           items1_id: { name: "multi1" },
           name: "root_multi",
         },
-        { returning: "*" }
+        { returning: "*" },
       );
 
       const res = await db.items_multi.find!(
@@ -1867,20 +1874,20 @@ export const isomorphicQueries = async (
         {
           select: {
             "*": 1,
-            i0: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
+            i0: innerJoin("items_multi", { name: "multi0" }, "*", {
               path: [{ table: "items", on: [{ items0_id: "id" }] }],
             }),
-            i1: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
+            i1: innerJoin("items_multi", { name: "multi0" }, "*", {
               path: [{ table: "items", on: [{ items0_id: "id" }] }],
             }),
-            i2: db.innerJoin?.items_multi({ name: "multi0" }, "*", {
+            i2: innerJoin("items_multi", { name: "multi0" }, "*", {
               path: [{ table: "items", on: [{ items0_id: "id" }] }],
             }),
           },
           orderBy: {
             "i0.name": -1,
           },
-        }
+        },
       );
       assert.equal(res.length, 1);
       assert.equal(res[0].i0[0].name, "multi0");
@@ -1914,7 +1921,7 @@ export const isomorphicQueries = async (
               orderBy: "name",
             },
           },
-        }
+        },
       );
       assert.equal(one.length, 1);
       assert.equal(one[0].my.length, 1);
@@ -1947,7 +1954,7 @@ export const isomorphicQueries = async (
               select: "*",
             },
           },
-        }
+        },
       );
       assert.equal(res.length, 3);
       res.forEach((row) => {
@@ -1976,7 +1983,7 @@ export const isomorphicQueries = async (
               orderBy: { price: 1 },
             },
           },
-        }
+        },
       );
       assert.equal(resSortedInnerJoin.length, 2);
       resSortedInnerJoin.forEach((row) => {
@@ -1994,7 +2001,7 @@ export const isomorphicQueries = async (
         having: {
           c: 4,
         },
-      }
+      },
     );
     assert.deepStrictEqual(res, [
       {
@@ -2012,7 +2019,7 @@ export const isomorphicQueries = async (
         having: {
           $filter: [{ $countAll: [] }, "=", 4],
         },
-      }
+      },
     );
     assert.deepStrictEqual(res, [
       {
@@ -2036,7 +2043,7 @@ export const isomorphicQueries = async (
             having: { c: 1 },
           },
         },
-      }
+      },
     );
     assert.deepStrictEqual(res, [
       {
@@ -2065,7 +2072,7 @@ export async function tryRun(desc: string, func: () => any, log?: Function) {
 export function tryRunP(
   desc: string,
   func: (resolve: any, reject: any) => any,
-  opts?: { log?: Function; timeout?: number }
+  opts?: { log?: Function; timeout?: number },
 ) {
   const timeoutMs = opts?.timeout || 7000;
   return new Promise(async (rv, rj) => {

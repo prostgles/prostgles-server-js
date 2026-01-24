@@ -4,7 +4,7 @@ import { isDefined } from "prostgles-types";
 import type { AuthHandler } from "../AuthHandler";
 import { EXPRESS_CATCH_ALL_ROUTE, HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthClientRequest } from "../AuthTypes";
-import { getReturnUrl } from "../utils/getReturnUrl";
+import { getSafeReturnUrlFromQuery } from "../utils/getSafeReturnUrlFromQuery";
 import { matchesRoute } from "../utils/matchesRoute";
 
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
@@ -35,7 +35,7 @@ export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
         const userInfo = await getUser();
         return !!userInfo.user;
       };
-      const returnURL = getReturnUrl(req);
+      const returnURL = getSafeReturnUrlFromQuery(req);
 
       /**
        * Requesting a User route (must be logged in)

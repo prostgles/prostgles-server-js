@@ -9,7 +9,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   const { socket_id, channel_name } = sub;
 
   const onLog = (
-    state: Extract<EventTypes.SyncOrSub, { type: "syncOrSub"; command: "pushSubData" }>["state"]
+    state: Extract<EventTypes.SyncOrSub, { type: "syncOrSub"; command: "pushSubData" }>["state"],
   ) => {
     void this._log({
       type: "syncOrSub",
@@ -48,7 +48,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       if (socket_id && this.sockets[socket_id]) {
         log("Pushed " + data.length + " records to sub");
         onLog("Emiting to socket");
-        this.sockets[socket_id]?.emit(channel_name, { data }, () => {
+        this.sockets[socket_id].emit(channel_name, { data }, () => {
           resolve(data);
         });
         /* TO DO: confirm receiving data or server will unsubscribe
@@ -65,7 +65,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
       onLog("fetch data error");
       const errObj = getSerialisableError(err) || "Unknown error fetching subscription data";
       if (socket_id && this.sockets[socket_id]) {
-        this.sockets[socket_id]?.emit(channel_name, { err: errObj });
+        this.sockets[socket_id].emit(channel_name, { err: errObj });
       } else if (localFuncs) {
         if (!localFuncs.onError) {
           console.error("Uncaught subscription error", err);

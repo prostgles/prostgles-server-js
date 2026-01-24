@@ -26,7 +26,7 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 //  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
   { db, runSQL }: Pick<DboBuilder, "db" | "runSQL">,
-  schemaFilter: ProstglesInitOptions["schemaFilter"]
+  schemaFilter: ProstglesInitOptions["schemaFilter"],
 ): Promise<{
   result: TableSchema[];
   durations: Record<string, number>;
@@ -77,7 +77,7 @@ export async function getTablesForSchemaPostgresSQL(
       throw uniqueColsReq.error;
     }
 
-    const badFkey = fkeys.find((r) => r.fcols.find((fc) => typeof fc !== "string"));
+    const badFkey = fkeys.find((r) => r.fcols.find((fc) => typeof (fc as unknown) !== "string"));
     if (badFkey) {
       throw `Invalid table column schema. Null or empty fcols for ${JSON.stringify(fkeys)}`;
     }
@@ -152,7 +152,7 @@ export async function getTablesForSchemaPostgresSQL(
           WHERE table_schema ${sql}
           ORDER BY table_oid, ordinal_position
       `,
-        { schemaNames }
+        { schemaNames },
       );
 
       const columns = columnsWithNullProps.map((col) => {
@@ -161,7 +161,7 @@ export async function getTablesForSchemaPostgresSQL(
             if (col[key] === null || col[key] === undefined) {
               delete col[key];
             }
-          }
+          },
         );
         return col;
       });
@@ -252,7 +252,7 @@ export async function getTablesForSchemaPostgresSQL(
     }
 
     let tableSchemaList = getTablesAndViews.data!.tablesAndViews.concat(
-      getMaterialViewsReq.data!.materialViews
+      getMaterialViewsReq.data!.materialViews,
     );
     tableSchemaList = await Promise.all(
       tableSchemaList.map(async (table) => {
@@ -308,7 +308,7 @@ export async function getTablesForSchemaPostgresSQL(
           .map((r) => r.column_names);
 
         return table;
-      })
+      }),
     );
 
     const res = {
@@ -342,11 +342,11 @@ const getHyperTables = async (db: DBorTx): Promise<string[] | undefined> => {
           AND table_schema = ${schema} \
           AND table_name = 'hypertable' \
     );",
-    { schema }
+    { schema },
   );
   if (res?.exists) {
     const tables: { table_name: string }[] = await db.any(
-      "SELECT table_name FROM " + asName(schema) + ".hypertable;"
+      "SELECT table_name FROM " + asName(schema) + ".hypertable;",
     );
     return tables.map((t) => t.table_name);
   }

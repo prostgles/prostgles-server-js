@@ -123,7 +123,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
           `CREATE TABLE IF NOT EXISTS ${tableName} (
             id  TEXT PRIMARY KEY
             ${columnNames.length ? ", " + columnNames.map((k) => asName(k) + " TEXT ").join(", ") : ""}
-          );`
+          );`,
         );
       }
       if (rows.length) {
@@ -131,7 +131,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
           !lookupTableHandler ?
             []
           : await this.db.any(
-              `SELECT id FROM ${tableName} WHERE id IN (${rows.map((r) => asValue(r.id)).join(", ")});`
+              `SELECT id FROM ${tableName} WHERE id IN (${rows.map((r) => asValue(r.id)).join(", ")});`,
             );
         rows
           .filter((r) => !existingValues.some((ev) => ev.id === r.id))
@@ -142,8 +142,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
               this.prostgles.pgp!.as.format(
                 `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
                   " VALUES (${values:csv});",
-                { values }
-              )
+                { values },
+              ),
             );
           });
       }
@@ -206,7 +206,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       currCons.forEach((c) => {
         if (
           !futureCons.some(
-            (nc) => nc.definition === c.definition && (!nc.isNamed || nc.name === c.name)
+            (nc) => nc.definition === c.definition && (!nc.isNamed || nc.name === c.name),
           )
         ) {
           queries.push(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)};`);
@@ -259,10 +259,10 @@ export const initTableConfig = async function (this: TableConfigurator) {
                 where && `WHERE ${where}`,
               ]
                 .filter((v) => v)
-                .join(" ") + ";"
+                .join(" ") + ";",
             );
           }
-        }
+        },
       );
     }
 
@@ -270,7 +270,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     if (triggers) {
       const isDropped = dropIfExists || dropIfExistsCascade;
 
-      const existingTriggers = (await this.dbo.sql!(
+      const existingTriggers = await this.db.any<{ trigger_name: string }>(
         `
             SELECT event_object_table
               ,trigger_name
@@ -279,8 +279,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
             ORDER BY event_object_table
           `,
         { tableName },
-        { returnType: "rows" }
-      )) as { trigger_name: string }[];
+      );
 
       // const existingTriggerFuncs = await this.dbo.sql!(`
       //   SELECT p.oid,proname,prosrc,u.usename
@@ -359,7 +358,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
   if (migrations) {
     await this.db.any(
-      `INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`
+      `INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`,
     );
   }
   this.initialising = false;

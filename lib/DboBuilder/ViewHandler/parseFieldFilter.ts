@@ -9,7 +9,7 @@ import { getKeys, includes, isObject } from "prostgles-types";
 export const parseFieldFilter = <AllowedKeys extends string[]>(
   fieldParams: FieldFilter<Record<AllowedKeys[number] | string, 1>> = "*",
   allow_empty = true,
-  all_cols: AllowedKeys
+  all_cols: AllowedKeys,
 ): AllowedKeys | [""] => {
   let colNames: string[] = [];
   const initialParams = JSON.stringify(fieldParams);
@@ -24,7 +24,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
 
     /* string[] */
     if (Array.isArray(fieldParams)) {
-      if (fieldParams.find((f) => typeof f !== "string")) {
+      if (fieldParams.find((f) => typeof (f as unknown) !== "string")) {
         throw (
           " Invalid field filter array.\nExpecting array of strings. \n Received ->  " +
           initialParams
@@ -65,7 +65,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
       const keys = getKeys(
         fieldParams as {
           [key: string]: boolean | 0 | 1;
-        }
+        },
       ) as AllowedKeys;
       if (keys[0] === "") {
         if (allow_empty) {
@@ -83,7 +83,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
           !includes(
             allowedVals,
             //@ts-ignore
-            fieldParams[key]
+            fieldParams[key],
           )
         )
           throw `Invalid field selection value for: { ${key}: ${(fieldParams as any)[key]} }. \n Allowed values: ${allowedVals.join(" OR ")}`;

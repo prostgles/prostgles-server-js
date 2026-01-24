@@ -15,13 +15,14 @@ import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export type ClientHandlers<S = void> = {
+  clientSql: SQLHandler | undefined;
   clientDb: DBOFullyTyped<S, false>;
   clientMethods: Record<string, ServerFunctionDefinition>;
 };
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest,
-  scope: PermissionScope | undefined
+  scope: PermissionScope | undefined,
 ): Promise<ClientHandlers> => {
   const clientSchema =
     clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq, scope));
@@ -36,13 +37,13 @@ export const getClientHandlers = async <S = void>(
             runClientRequest.bind(prostgles)(
               { command, tableName: table.name, param1, param2, param3 },
               clientReq,
-              scope
+              scope,
             );
           return [command, method];
-        })
+        }),
       );
       return [table.name, handlers];
-    })
+    }),
   );
 
   const txNotAllowed: {} = {
@@ -51,9 +52,9 @@ export const getClientHandlers = async <S = void>(
     },
   };
   const sqlPermission = scope?.sql;
-  const sqlHandlerRolledBack = (query: string, params?: AnyObject, options?: SQLOptions) =>
-    sql(query, params, { ...options, returnType: "default-with-rollback" });
-  const sqlHandler =
+  const sqlHandlerRolledBack = ((query: string, params?: AnyObject, options?: SQLOptions) =>
+    sql(query, params, { ...options, returnType: "default-with-rollback" })) as SQLHandler;
+  const clientSql: SQLHandler | undefined =
     !sqlPermission ?
       () => {
         throw new Error("SQL is dissallowed by PermissionScope");
@@ -64,7 +65,6 @@ export const getClientHandlers = async <S = void>(
   const clientDb = {
     ...tableHandlers,
     ...txNotAllowed,
-    sql: sqlHandler,
   } as DBOFullyTyped<S, false>;
 
   //@ts-ignore
@@ -77,10 +77,10 @@ export const getClientHandlers = async <S = void>(
         return runClientMethod.bind(prostgles)({ name, input }, clientReq);
       };
       return [name, { name, input, description, output, run: methodHandler }];
-    })
+    }),
   );
 
-  return { clientDb, clientMethods };
+  return { clientDb, clientSql, clientMethods };
 };
 
 const viewMethods = getKeys({

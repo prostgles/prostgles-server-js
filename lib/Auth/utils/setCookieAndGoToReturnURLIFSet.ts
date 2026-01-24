@@ -2,23 +2,22 @@ import { AUTH_RETURN_URL_PARAM_NAME, HTTP_FAIL_CODES, type AuthHandler } from ".
 import type { ExpressReq } from "../AuthTypes";
 import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
 import { getBasicSessionErrorCode } from "../login";
-import { getReturnUrl } from "./getReturnUrl";
+import { getSafeReturnUrlFromQuery } from "./getSafeReturnUrlFromQuery";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 import { matchesRoute } from "./matchesRoute";
 
 export function validateSessionAndSetCookie(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
-  requestHandler: { req: ExpressReq; res: LoginResponseHandler }
+  requestHandler: { req: ExpressReq; res: LoginResponseHandler },
 ) {
   const sessionErrorCode = getBasicSessionErrorCode(cookie);
   if (sessionErrorCode) {
     const { res } = requestHandler;
-    res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json({
+    return res.status(HTTP_FAIL_CODES.UNAUTHORIZED).json({
       success: false,
       code: sessionErrorCode,
     });
-    return;
   }
   return this.setCookieAndGoToReturnURLIFSet(cookie, requestHandler);
 }
@@ -26,12 +25,12 @@ export function validateSessionAndSetCookie(
 export function setCookieAndGoToReturnURLIFSet(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
-  requestHandler: { req: ExpressReq; res: LoginResponseHandler }
+  requestHandler: { req: ExpressReq; res: LoginResponseHandler },
 ) {
   const { sid, expires } = cookie;
   const { res, req } = requestHandler;
   if (!sid) {
-    throw "no sid";
+    throw new Error("sid missing");
   }
 
   const maxAgeOneDay = 60 * 60 * 24; // 24 hours;
@@ -54,12 +53,13 @@ export function setCookieAndGoToReturnURLIFSet(
     httpOnly: true,
     //signed: true
     secure: true,
-    sameSite: "strict" as const,
+    sameSite: "strict",
     ...(this.opts.loginSignupConfig?.cookieOptions ?? {}),
-  };
+  } as const;
   const cookieData = sid;
+
   res.cookie(this.sidKeyName, cookieData, cookieOpts);
-  const safeReturnUrl = getReturnUrl(req);
+  const safeReturnUrl = getSafeReturnUrlFromQuery(req);
   if (safeReturnUrl) {
     return res.redirect(safeReturnUrl);
   }

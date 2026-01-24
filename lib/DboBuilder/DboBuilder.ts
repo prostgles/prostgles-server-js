@@ -4,14 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { PG_COLUMN_UDT_DATA_TYPE, SQLOptions } from "prostgles-types";
-import { getJoinHandlers, getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
-import { getDBTypescriptSchema, type DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
+import { getDBTypescriptSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
 import { getFunctionsTypescriptSchema } from "../DBSchemaBuilder/getFunctionsTypescriptSchema";
 import type { DB, Prostgles } from "../Prostgles";
 import type { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
 import type { DbTableInfo, PublishParser } from "../PublishParser/PublishParser";
+import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "../shortestPath";
 import { clone } from "../utils/utils";
@@ -19,6 +20,7 @@ import type {
   DBHandlerServer,
   DbTxTableHandlers,
   LocalParams,
+  SQLHandlerServer,
   TableSchema,
   TxCB,
 } from "./DboBuilderTypes";
@@ -36,7 +38,6 @@ import {
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSQL";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
-import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -192,11 +193,11 @@ export class DboBuilder {
     this.shortestJoinPaths = shortestJoinPaths;
   };
 
-  runSQL = async (
+  runSQL: SQLHandlerServer = async (
     query: string,
     params: any,
     options: SQLOptions | undefined,
-    localParams: LocalParams | undefined
+    localParams: LocalParams | undefined,
   ) => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return runSQL
@@ -207,8 +208,8 @@ export class DboBuilder {
           getSerializedClientErrorFromPGError(error, {
             type: "sql",
             localParams,
-          })
-        )
+          }),
+        ),
       );
   };
 
@@ -221,7 +222,7 @@ export class DboBuilder {
       if (subscribeError) {
         console.error(
           "Could not initiate PubSubManager. Realtime data/Subscriptions will not work. Error: ",
-          subscribeError
+          subscribeError,
         );
         this.canSubscribe = false;
       } else {
@@ -232,7 +233,7 @@ export class DboBuilder {
     const start = Date.now();
     const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(
       this,
-      this.prostgles.opts.schemaFilter
+      this.prostgles.opts.schemaFilter,
     );
     await this.prostgles.opts.onLog?.({
       type: "debug",
@@ -263,26 +264,10 @@ export class DboBuilder {
         tov,
         this,
         undefined,
-        this.shortestJoinPaths
+        this.shortestJoinPaths,
       );
       this.dbo[tov.name] = tableHandler;
       this.dboMap.set(tov.name, tableHandler);
-
-      if (this.shortestJoinPaths.find((jp) => [jp.t1, jp.t2].includes(tov.name))) {
-        const table = tov.name;
-
-        this.dbo.innerJoin ??= {};
-        this.dbo.leftJoin ??= {};
-        this.dbo.innerJoinOne ??= {};
-        this.dbo.leftJoinOne ??= {};
-
-        const joinHandlers = getJoinHandlers(table);
-        //@ts-ignore
-        this.dbo.leftJoin[table] = joinHandlers.leftJoin;
-        this.dbo.innerJoin[table] = joinHandlers.innerJoin;
-        this.dbo.leftJoinOne[table] = joinHandlers.leftJoinOne;
-        this.dbo.innerJoinOne[table] = joinHandlers.innerJoinOne;
-      }
     });
 
     if (this.prostgles.opts.transactions) {
@@ -290,14 +275,8 @@ export class DboBuilder {
 
       //@ts-ignore
       this.dbo[txKey] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
-        cb: TxCB<Promise<R>, TH>
+        cb: TxCB<Promise<R>, TH>,
       ) => this.getTX(cb);
-    }
-
-    if (!this.dbo.sql) {
-      this.dbo.sql = this.runSQL;
-    } else {
-      console.warn(`Could not create dbo.sql handler because there is already a table named "sql"`);
     }
 
     const { functions } = this.prostgles.opts;
@@ -324,7 +303,7 @@ export class DboBuilder {
 
   getShortestJoinPath = (
     viewHandler: ViewHandler,
-    target: string
+    target: string,
   ): JoinPaths[number] | undefined => {
     const source = viewHandler.name;
     if (source === target) {
@@ -345,21 +324,19 @@ export class DboBuilder {
     return jp;
   };
 
-  getTX = async <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
-    cb: TxCB<Promise<R> | R, TH>
-  ) => {
+  getTX = async <R, TH extends DbTxTableHandlers>(cb: TxCB<Promise<R> | R, TH>) => {
     return this.db.tx((t) => {
-      const dbTX: DbTxTableHandlers & Pick<DBHandlerServer, "sql"> = {};
+      const dbTX: DbTxTableHandlers = {};
       this.tablesOrViews?.map((tov) => {
         const handlerClass = tov.is_view ? ViewHandler : TableHandler;
         dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
       });
-      dbTX.sql = (q, args, opts, localParams) => {
-        if (localParams?.tx) {
-          throw "Cannot run transaction within transaction";
-        }
-        return this.runSQL(q, args, opts, { ...localParams, tx: { dbTX, t } });
-      };
+      // dbTX.sql = (q, args, opts, localParams) => {
+      //   if (localParams?.tx) {
+      //     throw "Cannot run transaction within transaction";
+      //   }
+      //   return this.runSQL(q, args, opts, { ...localParams, tx: { dbTX, t } });
+      // };
 
       return cb(dbTX as TH, t);
     });

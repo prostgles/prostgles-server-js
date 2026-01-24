@@ -97,10 +97,10 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
       if (t1 === t2) return;
 
       joinGraph[t1] ??= {};
-      joinGraph[t1]![t2] = 1;
+      joinGraph[t1][t2] = 1;
 
       joinGraph[t2] ??= {};
-      joinGraph[t2]![t1] = 1;
+      joinGraph[t2][t1] = 1;
     });
     const tables = Array.from(new Set(joins.flatMap((t) => t.tables)));
     const shortestJoinPaths: JoinPaths = [];

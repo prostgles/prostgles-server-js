@@ -298,7 +298,7 @@ export class PubSubManager {
     }
 
     try {
-      const data = await this.dbo[table_name]!.find!(filter, params, undefined, table_rules);
+      const data = await this.dbo[table_name].find(filter, params, undefined, table_rules);
       return { data };
     } catch (err) {
       return { err };

@@ -135,15 +135,14 @@ export const RULE_TO_METHODS = [
   },
 ] as const;
 
+import type pgPromise from "pg-promise";
 import type {
-  FieldFilter,
-  SelectParams,
   AnyObject,
   DBSchema,
+  FieldFilter,
   FullFilter,
+  SelectParams,
   TableInfo,
-  JSONB,
-  JSONBObjectTypeIfDefined,
 } from "prostgles-types";
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
@@ -180,6 +179,7 @@ export type UpdateRequestData<R extends AnyObject = AnyObject> =
 export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = {
   row: R;
   dbx: DBX;
+  tx: pgPromise.ITask<{}> | DB;
   localParams: LocalParams;
 };
 export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHandlerServer> = {
@@ -189,18 +189,18 @@ export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHa
   localParams: LocalParams;
 };
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
 ) => R | Promise<R>;
 export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
 ) => void | Promise<void>;
 export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
 export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
 export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (
-  args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>
+  args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>,
 ) => Partial<R> | Promise<Partial<R>>;
 export type ValidateUpdateRowBasic = (
-  args: ValidateUpdateRowArgs
+  args: ValidateUpdateRowArgs,
 ) => AnyObject | Promise<AnyObject>;
 
 export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
@@ -519,7 +519,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
     /**
      * Used to filter permissions
      */
-    scope: PermissionScope | undefined
+    scope: PermissionScope | undefined,
   ) => Promise<ClientHandlers<S>>;
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };

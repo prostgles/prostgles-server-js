@@ -159,8 +159,8 @@ export async function getTableRulesWithoutFileTable(
         if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
           const sr = MY_RULES.find((r) => r.rule === subKey);
           if (sr && canSubscribe) {
-            parsedTableRule[subKey] = { ...(sr.no_limits as SubscribeRule) };
-            parsedTableRule.subscribeOne = { ...(sr.no_limits as SubscribeRule) };
+            parsedTableRule[subKey] = { ...(sr.no_limits) };
+            parsedTableRule.subscribeOne = { ...(sr.no_limits) };
           }
         }
       });

@@ -10,7 +10,7 @@ import { type AuthResult } from "./AuthTypes";
 
 export async function getClientAuth(
   this: AuthHandler,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
 ): Promise<{ auth: AuthSocketSchema; userData: AuthResultWithSID } | "new-session-redirect"> {
   let pathGuard = false;
   const {
@@ -43,7 +43,7 @@ export async function getClientAuth(
           params: AuthGuardLocation,
           cb = (_err: any, _res?: AuthGuardLocationResponse) => {
             /** EMPTY */
-          }
+          },
         ) => {
           try {
             const { pathname, origin } =
@@ -52,7 +52,6 @@ export async function getClientAuth(
               console.warn("Invalid pathname provided for AuthGuardLocation: ", pathname);
             }
 
-            /** These origins  */
             const IGNORED_API_ORIGINS = ["file://"];
             if (
               !IGNORED_API_ORIGINS.includes(origin) &&
@@ -69,7 +68,7 @@ export async function getClientAuth(
             console.error("AUTHGUARD err: ", err);
             cb(err);
           }
-        }
+        },
       );
     }
   }
@@ -101,7 +100,7 @@ export async function getClientAuth(
 
 const getOAuthProviders = (
   authHandler: AuthHandler,
-  loginWithOAuth: NonNullable<AuthConfig["loginSignupConfig"]>["loginWithOAuth"]
+  loginWithOAuth: NonNullable<AuthConfig["loginSignupConfig"]>["loginWithOAuth"],
 ): AuthSocketSchema["providers"] | undefined => {
   if (!loginWithOAuth) return undefined;
   const { OAuthProviders } = loginWithOAuth;

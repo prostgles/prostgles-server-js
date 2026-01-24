@@ -58,7 +58,7 @@ export class QueryStreamer {
         console.log("Admin client error. Reconnecting...", error);
         void setAdminClient();
       },
-      { keepAlive: true }
+      { keepAlive: true },
     );
     void this.adminClient.connect();
   }
@@ -117,7 +117,7 @@ export class QueryStreamer {
       },
     };
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    this.socketQueries[socketId]![id] ??= socketQuery;
+    this.socketQueries[socketId][id] ??= socketQuery;
     let processID = -1;
     let streamState: "started" | "ended" | "errored" | undefined;
 
@@ -177,7 +177,7 @@ export class QueryStreamer {
         const batchSize =
           query.options?.streamLimit ? Math.min(1e3, query.options.streamLimit) : 1e3;
         const cursor = currentClient.query(
-          new Cursor(query.query, undefined, { rowMode: "array" })
+          new Cursor(query.query, undefined, { rowMode: "array" }),
         );
         this.socketQueries[socketId]![id]!.cursor = cursor;
         let streamLimitReached = false;
@@ -196,7 +196,7 @@ export class QueryStreamer {
               ]) as Info;
               rowsSent += rowChunk.length;
               streamLimitReached = Boolean(
-                query.options?.streamLimit && rowsSent >= query.options.streamLimit
+                query.options?.streamLimit && rowsSent >= query.options.streamLimit,
               );
               reachedEnd = rowChunk.length < batchSize;
               emit({
@@ -216,11 +216,15 @@ export class QueryStreamer {
           } catch (error: any) {
             streamState = "errored";
             if (error.message === "cannot insert multiple commands into a prepared statement") {
-              this.dboBuilder.dbo.sql!(
-                query.query,
-                {},
-                { returnType: "arrayMode", hasParams: false }
-              )
+              this.dboBuilder
+                .runSQL(
+                  query.query,
+                  {},
+                  { returnType: "arrayMode", hasParams: false },
+                  {
+                    clientReq: { socket: query.socket },
+                  },
+                )
                 .then((res) => {
                   emit({
                     info: omitKeys(res, ["rows"]),
@@ -259,7 +263,7 @@ export class QueryStreamer {
         const stopFunction = opts?.terminate ? "pg_terminate_backend" : "pg_cancel_backend";
         const rows = await this.adminClient.query(
           `SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`,
-          [processID]
+          [processID],
         );
         cleanup();
         cb({ processID, info: rows.rows[0] });
@@ -267,7 +271,7 @@ export class QueryStreamer {
         cb(null, error);
       }
     };
-    this.socketQueries[socketId]![id]!.stop = () =>
+    this.socketQueries[socketId][id].stop = () =>
       stop({ terminate: true }, () => {
         /* Empty */
       });
@@ -303,7 +307,7 @@ export class QueryStreamer {
           cb(processID, getErrorAsObject(err));
         }
         runCount++;
-      }
+      },
     );
 
     /** If not started within 5 seconds then assume it will never happen */

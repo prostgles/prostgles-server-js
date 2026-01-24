@@ -85,7 +85,7 @@ export async function getSchemaFromPublish(
           }
 
           schema[tableName] = {};
-          const tableSchema = schema[tableName]!;
+          const tableSchema = schema[tableName];
           const methods = getKeys(tableRules).filter(
             (m) => canSubscribe || !includes(SUBSCRIBE_METHODS, m)
           );
@@ -103,7 +103,7 @@ export async function getSchemaFromPublish(
                   //@ts-ignore
                   tableSchema[method] =
                     method === "insert" ?
-                      pickKeys(tableRules[method]!, ["allowedNestedInserts"])
+                      pickKeys(tableRules[method], ["allowedNestedInserts"])
                     : ({} as AnyObject);
 
                   /* Test for issues with the common table CRUD methods () */
@@ -134,7 +134,7 @@ export async function getSchemaFromPublish(
                     } catch (e) {
                       console.error(`${tableName}.${method}`, e);
                       tableSchemaErrors[tableName] ??= {};
-                      tableSchemaErrors[tableName]![method] = {
+                      tableSchemaErrors[tableName][method] = {
                         error: "Internal publish error. Check server logs",
                       };
 

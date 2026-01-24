@@ -10,7 +10,7 @@ const docsFolder = `${__dirname}/../../`;
 
 export const generateServerDocs = () => {
   const serverFilePath = path.resolve(
-    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts` // "ProstglesInitOptions",
+    `${testFolderPath}/server/node_modules/prostgles-server/dist/ProstglesTypes.d.ts`, // "ProstglesInitOptions",
   );
   const {
     resolvedTypes: [ProstglesInitOptions],
@@ -24,7 +24,6 @@ export const generateServerDocs = () => {
         "Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> | undefined",
         "IConnectionParameters<IClient>",
         "Express",
-        "Partial<DbJoinMaker>",
         "DB",
         "IEventContext<IClient>",
       ],
@@ -41,7 +40,7 @@ export const generateServerDocs = () => {
   const configurationPropsMarkdown = getObjectEntries(prostglesInitOpts.properties).map(
     ([propName, prop]) => {
       return renderTsType(prop, 0, { name: propName, optional: prop.optional });
-    }
+    },
   );
 
   const docs = [
@@ -128,6 +127,6 @@ export const generateServerDocs = () => {
   fs.writeFileSync(
     `${docsFolder}02_Server_configuration.md`,
     [`### Configuration options`, configurationPropsMarkdown.join("\n")].join("\n\n"),
-    { encoding: "utf-8" }
+    { encoding: "utf-8" },
   );
 };

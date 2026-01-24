@@ -22,7 +22,7 @@ type Args = {
  */
 export async function getSubscribeRelatedTables(
   this: ViewHandler | TableHandler,
-  { filter, localParams, newQuery }: Args
+  { filter, localParams, newQuery }: Args,
 ) {
   let viewOptions: ViewSubscriptionOptions | undefined = undefined;
   if (this.is_view) {
@@ -42,7 +42,7 @@ export async function getSubscribeRelatedTables(
       }
 
       const alreadyPushed = viewOptions?.relatedTables.find(
-        (rt) => rt.tableName === relatedTableName
+        (rt) => rt.tableName === relatedTableName,
       );
       if (alreadyPushed || relatedTableOrViewHandler.is_view) {
         return;
@@ -79,7 +79,6 @@ export async function getSubscribeRelatedTables(
       await pushRelatedTable(j.table, j.joinPath);
     }
     for (const e of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
-      if (!e.isJoined) throw `Not possible`;
       for (const [index, pathItem] of e.parsedPath.entries()) {
         await pushRelatedTable(pathItem.table, e.parsedPath.slice(0, index + 1));
       }

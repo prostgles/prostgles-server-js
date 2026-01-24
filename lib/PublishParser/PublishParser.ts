@@ -43,7 +43,7 @@ export class PublishParser {
 
   async getPublishParams(
     clientReq: AuthClientRequest,
-    clientInfo: AuthResultWithSID | undefined
+    clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishParams> {
     const sessionUser =
       clientInfo ?? (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
@@ -63,7 +63,7 @@ export class PublishParser {
   }
 
   getFunctionHandler = async (
-    params: PublishParams
+    params: PublishParams,
   ): Promise<{ [key: string]: ServerFunctionDefinition } | undefined> => {
     try {
       const prostgles = this.prostgles;
@@ -94,7 +94,7 @@ export class PublishParser {
    */
   async getPublishAsObject(
     clientReq: AuthClientRequest,
-    clientInfo: AuthResultWithSID | undefined
+    clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
     const _publish = await applyParamsIfFunc(this.publish, publishParams);
@@ -123,7 +123,7 @@ export class PublishParser {
     const rules = await this.getValidatedRequestRule(
       { tableName, command, clientReq },
       clientInfo,
-      undefined
+      undefined,
     );
     return rules;
   }
@@ -131,7 +131,7 @@ export class PublishParser {
   async getValidatedRequestRule(
     { tableName, command, clientReq }: DboTableCommand,
     clientInfo: AuthResultWithSID | undefined,
-    scope: PermissionScope | undefined
+    scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule> {
     if (!command || !tableName) throw "command OR tableName are missing";
 
@@ -142,7 +142,7 @@ export class PublishParser {
 
     if (scope) {
       const tableScope = scope.tables;
-      if (!tableScope?.[tableName] || !tableScope[tableName]?.[rule.sqlRule]) {
+      if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
         throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
       }
     }
@@ -154,7 +154,7 @@ export class PublishParser {
           ...a,
           [v.rule]: v.no_limits,
         }),
-        {}
+        {},
       );
     }
 
@@ -194,7 +194,7 @@ export class PublishParser {
 
   async getTableRules(
     args: DboTable,
-    clientInfo: AuthResultWithSID | undefined
+    clientInfo: AuthResultWithSID | undefined,
   ): Promise<ParsedTableRule | undefined> {
     const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
     if (this.dbo[args.tableName]?.is_media) {
@@ -202,7 +202,7 @@ export class PublishParser {
         args.tableName,
         fileTablePublishRules,
         args.clientReq,
-        clientInfo
+        clientInfo,
       );
       return parsePublishTableRule(fileTableRules);
     }

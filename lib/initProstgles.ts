@@ -1,5 +1,6 @@
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
+import type { SQLHandler } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
@@ -57,6 +58,7 @@ export type OnInitReason =
 
 type OnReadyParamsCommon = {
   db: DB;
+  sql: SQLHandler;
   tables: DbTableInfo[];
   reason: OnInitReason;
 };
@@ -196,6 +198,7 @@ export const initProstgles = async function (
       }
       onReady(
         {
+          sql: (q, a, o) => this.dboBuilder.runSQL(q, a, o, undefined),
           dbo: this.dbo!,
           db: this.db,
           tables: this.dboBuilder.tables,

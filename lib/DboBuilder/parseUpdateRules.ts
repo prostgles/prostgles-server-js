@@ -3,10 +3,9 @@ import { isDefined } from "prostgles-types";
 import type {
   UpdateRule,
   ValidateRowBasic,
-  ValidateUpdateRowBasic} from "../PublishParser/PublishParser";
-import {
-  type ParsedTableRule,
+  ValidateUpdateRowBasic,
 } from "../PublishParser/PublishParser";
+import { type ParsedTableRule } from "../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "./DboBuilder";
 import { prepareNewData } from "./TableHandler/DataValidator";
 import type { TableHandler } from "./TableHandler/TableHandler";
@@ -20,7 +19,7 @@ export async function parseUpdateRules(
   filter: Filter,
   params?: UpdateParams,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<{
   fields: string[];
   validateRow?: ValidateRowBasic;
@@ -172,6 +171,7 @@ export async function parseUpdateRules(
               rows: [data],
               allowedCols,
               dbTx: this.tx?.dbTX || this.dboBuilder.dbo,
+              tx: localParams?.tx?.t || this.tx?.t || this.db,
               validationOptions: {
                 validate: updateValidate,
                 localParams,
@@ -201,7 +201,7 @@ export async function parseUpdateRules(
   if (validate) {
     if (!localParams) throw "localParams missing";
     validateRow = ({ row }) =>
-      validate!({
+      validate({
         update: row,
         filter: finalUpdateFilter,
         localParams,

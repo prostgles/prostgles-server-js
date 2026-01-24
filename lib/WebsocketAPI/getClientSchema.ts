@@ -8,7 +8,7 @@ import { version } from "../../package.json";
 export async function getClientSchema(
   this: Prostgles,
   clientReq: AuthClientRequest,
-  scope: PermissionScope | undefined
+  scope: PermissionScope | undefined,
 ) {
   const result = await tryCatchV2(async () => {
     const clientInfo =
@@ -31,7 +31,7 @@ export async function getClientSchema(
           ...clientInfo,
           userData,
         },
-        scope
+        scope,
       );
     } catch (e) {
       publishValidationError = e;
@@ -48,7 +48,7 @@ export async function getClientSchema(
     if (this.opts.joins) {
       const _joinTables2 = this.dboBuilder
         .getAllJoinPaths()
-        .filter((jp) => ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t]?.findOne))
+        .filter((jp) => ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t].findOne))
         .map((jp) => [jp.t1, jp.t2].sort());
       _joinTables2.map((jt) => {
         if (!joinTables2.find((_jt) => _jt.join() === jt.join())) {

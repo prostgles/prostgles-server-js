@@ -1,7 +1,7 @@
 import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { asName } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
-import type { LocalParams} from "../DboBuilder";
+import type { LocalParams } from "../DboBuilder";
 import { getClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
@@ -45,7 +45,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   const returningSelectItems = await tableHandler.prepareReturning(
     params?.returning,
-    tableHandler.parseFieldFilter(returningFields)
+    tableHandler.parseFieldFilter(returningFields),
   );
   const { checkFilter, postValidate } = rule ?? {};
   let checkCondition = "WHERE FALSE";
@@ -115,7 +115,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
         localParams,
         view: tableHandler,
         allowedKeys: allowedFieldKeys,
-      })
+      }),
     );
   } else {
     result = await tableHandler.db
@@ -126,13 +126,13 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
           localParams,
           view: tableHandler,
           allowedKeys: allowedFieldKeys,
-        })
+        }),
       );
   }
 
   if (checkFilter && result.failed_check?.length) {
     throw new Error(
-      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`
+      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
     );
   }
 
@@ -145,6 +145,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     for (const row of rows) {
       await postValidate({
         row: row,
+        tx: tx || tableHandler.db,
         dbx: finalDBtx as any,
         localParams,
       });

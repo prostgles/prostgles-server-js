@@ -9,7 +9,7 @@ import { getViewRelatedTableJoinCondition } from "./getViewRelatedTableJoinCondi
 export const getViewRelatedTables = async (
   viewHandler: ViewHandler,
   localParams: LocalParams | undefined,
-  newQuery: NewQuery
+  newQuery: NewQuery,
 ) => {
   /** TODO: this needs to be memoized on schema fetch */
   const { name: viewName, dboBuilder } = viewHandler;
@@ -28,10 +28,10 @@ export const getViewRelatedTables = async (
       view: this,
     });
   }
-  const { fields } = await dboBuilder.dbo.sql!(
+  const { fields } = await dboBuilder.runSQL(
     `SELECT * FROM ( \n ${definition} \n ) prostgles_subscribe_view_definition LIMIT 0`,
     {},
-    { returnType: "default-with-rollback" }
+    { returnType: "default-with-rollback" },
   );
 
   const viewTables: Map<
@@ -72,7 +72,7 @@ export const getViewRelatedTables = async (
   };
 
   /** Get list of remaining used inner tables (tables whose columns do not appear in fields list but are still used by the view) */
-  const allUsedTables = await getAllViewRelatedTables(dboBuilder.dbo, viewName);
+  const allUsedTables = await getAllViewRelatedTables(dboBuilder.db, viewName);
 
   /** Remaining tables will have listeners on all records (condition = "TRUE") */
   allUsedTables.forEach((rt) => {
