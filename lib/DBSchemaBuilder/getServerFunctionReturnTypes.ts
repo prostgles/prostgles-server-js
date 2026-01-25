@@ -124,11 +124,7 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
       if (ts.isPropertyAssignment(prop)) {
         const propName = prop.name.getText();
 
-        if (isDefineFunctionCall(prop.initializer)) {
-          extractFromDefineCall(prop.initializer, propName);
-        }
-
-        if (ts.isCallExpression(prop.initializer)) {
+        if (isDefineFunctionCall(prop.initializer) || ts.isCallExpression(prop.initializer)) {
           extractFromDefineCall(prop.initializer, propName);
         }
       }
