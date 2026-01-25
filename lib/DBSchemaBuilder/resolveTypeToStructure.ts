@@ -90,7 +90,9 @@ export const resolveTypeToStructure = (
   // Handle function types
   const callSignatures = type.getCallSignatures();
   if (callSignatures.length > 0) {
-    throw new Error("Function types are not supported in return types");
+    console.error(
+      "Function types are not supported in return types. Failing function: " + functionName,
+    );
     const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
       const paramType = checker.getTypeOfSymbolAtLocation(param, param.valueDeclaration!);
