@@ -290,7 +290,7 @@ export class DboBuilder {
         config: this.prostgles.opts.tableConfig,
         tablesOrViews,
       }),
-      getFunctionsTypescriptSchema(tablesOrViews, resolvedFunctions),
+      getFunctionsTypescriptSchema(this.prostgles.opts, tablesOrViews, resolvedFunctions),
     ].join("\n");
 
     return this.dbo;

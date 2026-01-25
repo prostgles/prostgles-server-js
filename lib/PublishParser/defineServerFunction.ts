@@ -4,7 +4,6 @@ import type { PublishParams } from "./publishTypesAndUtils";
 
 export type ServerFunctionDefinition = {
   input?: Record<string, JSONB.FieldType> | undefined;
-  output?: JSONB.FieldType;
   description?: string;
   /**
    * undefined if not allowed
@@ -14,11 +13,8 @@ export type ServerFunctionDefinition = {
 
 export const defineServerFunction = <
   TInput extends Record<string, JSONB.FieldType> | undefined = undefined,
-  /** TODO: add output validation. It was removed due: Type instantiation is excessively deep and possibly infinite */
-  // TOutput extends JSONB.FieldType = never,
 >(args: {
   input?: TInput;
-  output?: JSONB.FieldType;
   description?: string;
   /**
    * undefined if not allowed
@@ -30,7 +26,7 @@ export type ServerFunctionDefinitions<S = void, SUser extends SessionUser = Sess
   /**
    * params will be undefined on first run to generate the definitions
    */
-  params: undefined | PublishParams<S, SUser>
+  params: undefined | PublishParams<S, SUser>,
 ) => MaybePromise<Record<string, ServerFunctionDefinition>>;
 
 export const createServerFunctionWithContext = <C>(
@@ -38,11 +34,9 @@ export const createServerFunctionWithContext = <C>(
    * undefined if not allowed
    */
   context: C | undefined,
-  defaultOutput?: JSONB.FieldType
 ) => {
   return <TInput extends Record<string, JSONB.FieldType> | undefined = undefined>(args: {
     input?: TInput;
-    output?: JSONB.FieldType;
     description?: string;
     run: (args: JSONBObjectTypeIfDefined<TInput>, context: C) => MaybePromise<unknown>;
   }) =>
@@ -55,6 +49,5 @@ export const createServerFunctionWithContext = <C>(
             return args.run(validatedArgs, context);
           }
         ),
-      output: args.output ?? defaultOutput,
     }) as ServerFunctionDefinition;
 };

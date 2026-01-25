@@ -118,6 +118,11 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * can be used as a generic type input for the prostgles instances to ensure type safety
    */
   tsGeneratedTypesDir?: string;
+  /**
+   * Path to the prostgles instance typescript file.
+   * Used to extract the server functions return types for generating the `GeneratedFunctionSchema` type in `DBGeneratedSchema.d.ts`
+   */
+  tsGeneratedTypesFunctionsPath?: string;
 
   /**
    * Socket.IO server instance object required to allow clients to connect through websockets
@@ -216,14 +221,14 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Use for connection verification. Will disconnect socket on any errors
    */
   onSocketConnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }
+    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
   ) => void | Promise<void>;
 
   /**
    * Called when a socket disconnects
    */
   onSocketDisconnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket }
+    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
   ) => void | Promise<void>;
 
   /**
@@ -339,6 +344,6 @@ type OnMigrate = (args: {
   getConstraints: (
     table: string,
     column?: string,
-    types?: PGConstraint["type"][]
+    types?: PGConstraint["type"][],
   ) => Promise<PGConstraint[]>;
 }) => void | Promise<void>;

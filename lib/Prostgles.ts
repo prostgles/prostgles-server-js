@@ -111,6 +111,7 @@ export class Prostgles {
       transactions: 1,
       joins: 1,
       tsGeneratedTypesDir: 1,
+      tsGeneratedTypesFunctionsPath: 1,
       disableRealtime: 1,
       onReady: 1,
       dbConnection: 1,

@@ -98,6 +98,7 @@ function dd() {
     sqlFilePath: path.join(__dirname + "/../../init.sql"),
     io,
     tsGeneratedTypesDir: path.join(__dirname + "/../../../"),
+    tsGeneratedTypesFunctionsPath: path.join(__dirname + "/../../index.ts"),
     transactions: true,
     schemaFilter: { public: 1, prostgles_test: 1 },
     onLog: async (ev) => {
@@ -228,7 +229,6 @@ function dd() {
       return {
         myfunc: forAllUsers({
           input: { arg1: { type: "number" } },
-          output: "number",
           run: (
             {
               arg1,
@@ -243,7 +243,6 @@ function dd() {
         }),
         myAdminFunc: forAdmins({
           input: { arg1: { type: "number" } },
-          output: "number",
           run: ({ arg1 }, { user, type }) => {
             type === "admin";
             user.type === "dwadaw";
@@ -252,8 +251,17 @@ function dd() {
         }),
         myfuncWithBadReturn: forAllUsers({
           input: { arg1: { type: "number" } },
-          output: "number",
           run: () => "222",
+        }),
+        myfuncWithComplexReturn: forAllUsers({
+          input: { arg1: { type: "number" } },
+          run: () => {
+            if (Math.random() > 0.5) {
+              return { a: 1, b: "str", c: { d: true } };
+            } else {
+              return [1, 2, 3];
+            }
+          },
         }),
       };
     },

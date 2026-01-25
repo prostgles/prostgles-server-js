@@ -246,17 +246,6 @@ export const runClientMethod = async function (
   }
 
   const res = await functionDefinition.run(input as never);
-  const outputSchema = functionDefinition.output;
-  if (!outputSchema) {
-    if (res !== undefined) {
-      throw "Function " + JSON.stringify(name) + " returned unexpected output";
-    }
-  } else {
-    const expectedOutputError = getJSONBSchemaValidationError(outputSchema, res);
-    if (expectedOutputError.error !== undefined) {
-      throw "output" + expectedOutputError.error;
-    }
-  }
 
   return res;
 };

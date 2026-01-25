@@ -661,11 +661,6 @@ export const clientOnlyQueries = async (
       const funcResult = await serverFunctions.myfunc?.({ arg1: 1 }).catch((err) => err);
       assert.equal(funcResult, 222, "methods.myfunc() failed");
 
-      const badFunc = await serverFunctions.myfuncWithBadReturn?.({ arg1: 1 }).catch((err) => err);
-      assert.deepStrictEqual(badFunc, {
-        error: "output is of invalid type. Expecting number",
-      });
-
       assert.equal(serverFunctions.myAdminFunc, undefined, "myAdminFunc should not be defined");
 
       const typedServerFunctions = serverFunctions as unknown as GeneratedFunctionSchema;
@@ -682,6 +677,18 @@ export const clientOnlyQueries = async (
         throw "methods.myfuncWithReturn() failed";
       }
       if (res === 2) {
+      }
+
+      const typedComplexFunc = await typedServerFunctions.myfuncWithComplexReturn({ arg1: 5 });
+      if (Array.isArray(typedComplexFunc)) {
+        const item = typedComplexFunc[0];
+        // @ts-expect-error
+        item satisfies string;
+        item satisfies number;
+      } else {
+        typedComplexFunc satisfies { a: number; b: string; c: { d: boolean } };
+        // @ts-expect-error
+        typedComplexFunc satisfies { a: string };
       }
     });
 
