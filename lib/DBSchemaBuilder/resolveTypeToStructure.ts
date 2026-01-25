@@ -46,7 +46,7 @@ export const resolveTypeToStructure = (
   // Handle union types
   if (type.isUnion()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
     );
     // Deduplicate
     const unique = [...new Set(parts)];
@@ -56,7 +56,7 @@ export const resolveTypeToStructure = (
   // Handle intersection types
   if (type.isIntersection()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
     );
     return parts.join(" & ");
   }
@@ -70,7 +70,7 @@ export const resolveTypeToStructure = (
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length > 0) {
       const resolvedArgs = typeArgs.map((t) =>
-        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
+        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
       );
       return `${typeName}<${resolvedArgs.join(", ")}>`;
     }
@@ -197,7 +197,7 @@ export const resolveTypeToStructure = (
         functionName,
         checker,
         propType,
-        nextParentTypes,
+        parentTypes,
       );
       const isOptional = prop.flags & ts.SymbolFlags.Optional;
       const propName = prop.getName();
