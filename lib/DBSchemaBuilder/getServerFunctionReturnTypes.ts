@@ -73,13 +73,14 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
     }
 
     const runProp = arg.properties.find(
-      (x): x is ts.PropertyAssignment => ts.isPropertyAssignment(x) && x.name.getText() === "run",
+      (x): x is ts.PropertyAssignment | ts.MethodDeclaration =>
+        (ts.isPropertyAssignment(x) || ts.isMethodDeclaration(x)) && x.name.getText() === "run",
     );
     if (!runProp) {
       return;
     }
 
-    const runExpr = runProp.initializer;
+    const runExpr = ts.isPropertyAssignment(runProp) ? runProp.initializer : runProp; // method declarations are already function-like
 
     if (!ts.isFunctionLike(runExpr)) {
       return;
