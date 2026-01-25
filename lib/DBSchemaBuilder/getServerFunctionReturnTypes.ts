@@ -1,11 +1,20 @@
+import { dirname } from "node:path";
 import * as ts from "typescript";
 
 export const getServerFunctionReturnTypes = (instancePath: string) => {
-  const program = ts.createProgram([instancePath], {
-    strict: true,
-    target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.ESNext,
-  });
+  const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
+  if (!configPath) throw new Error("tsconfig.json not found");
+
+  // const program = ts.createProgram([instancePath], {
+  //   strict: true,
+  //   target: ts.ScriptTarget.ESNext,
+  //   module: ts.ModuleKind.ESNext,
+  // });
+
+  const { config } = ts.readConfigFile(configPath, (f) => ts.sys.readFile(f));
+  const { fileNames, options } = ts.parseJsonConfigFileContent(config, ts.sys, dirname(configPath));
+
+  const program = ts.createProgram(fileNames, options);
 
   const checker = program.getTypeChecker();
   const sf = program.getSourceFile(instancePath);
