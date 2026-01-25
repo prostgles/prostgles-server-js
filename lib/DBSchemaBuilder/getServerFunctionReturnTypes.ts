@@ -116,6 +116,29 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
     return false;
   };
 
+  const extractFromAwaitExpression = (spreadExpr: ts.AwaitExpression, depth: number) => {
+    const awaitedExpr = spreadExpr.expression;
+
+    if (ts.isCallExpression(awaitedExpr)) {
+      // Resolve the function being called and extract from its return
+      const calleeExpr = awaitedExpr.expression;
+      if (ts.isIdentifier(calleeExpr)) {
+        const symbol = checker.getSymbolAtLocation(calleeExpr);
+        const decl = getDeclarationFromSymbol(symbol);
+
+        if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
+          const body = resolveFunctionBody(decl.initializer);
+          if (body) {
+            extractFromFunctionBody(body, depth + 2);
+          }
+        }
+        if (decl && ts.isFunctionDeclaration(decl) && decl.body) {
+          extractFromFunctionBody(decl.body, depth + 2);
+        }
+      }
+    }
+  };
+
   /**
    * Extract methods from an object literal that contains method definitions
    */
@@ -134,12 +157,16 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
 
         if (ts.isIdentifier(spreadExpr)) {
           const symbol = checker.getSymbolAtLocation(spreadExpr);
-
           const decl = getDeclarationFromSymbol(symbol);
 
           if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
             if (ts.isObjectLiteralExpression(decl.initializer)) {
               extractMethodsFromObjectLiteral(decl.initializer, depth + 2);
+            } else {
+              const init = unwrapExpression(decl.initializer);
+              if (ts.isAwaitExpression(init)) {
+                extractFromAwaitExpression(init, depth);
+              }
             }
           }
         }
@@ -150,26 +177,7 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
 
         // Handle await expressions: ...await someAsyncFunction()
         if (ts.isAwaitExpression(spreadExpr)) {
-          const awaitedExpr = spreadExpr.expression;
-
-          if (ts.isCallExpression(awaitedExpr)) {
-            // Resolve the function being called and extract from its return
-            const calleeExpr = awaitedExpr.expression;
-            if (ts.isIdentifier(calleeExpr)) {
-              const symbol = checker.getSymbolAtLocation(calleeExpr);
-              const decl = getDeclarationFromSymbol(symbol);
-
-              if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
-                const body = resolveFunctionBody(decl.initializer);
-                if (body) {
-                  extractFromFunctionBody(body, depth + 2);
-                }
-              }
-              if (decl && ts.isFunctionDeclaration(decl) && decl.body) {
-                extractFromFunctionBody(decl.body, depth + 2);
-              }
-            }
-          }
+          extractFromAwaitExpression(spreadExpr, depth);
         }
       }
 
