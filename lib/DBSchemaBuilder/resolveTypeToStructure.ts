@@ -63,49 +63,6 @@ export const resolveTypeToStructure = (
   const symbol = type.getSymbol();
   const typeName = symbol?.getName();
 
-  if (typeName && globalBuiltIns.has(typeName)) {
-    // Check for type arguments (e.g., ReadableStream<Uint8Array>)
-    const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
-    if (typeArgs.length > 0) {
-      const resolvedArgs = typeArgs.map((t) =>
-        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
-      );
-      return `${typeName}<${resolvedArgs.join(", ")}>`;
-    }
-    return typeName;
-  }
-
-  if (typeName === "Promise") {
-    const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
-    if (typeArg) {
-      const innerType = resolveTypeToStructure(
-        globalBuiltIns,
-        functionName,
-        checker,
-        typeArg,
-        nextParentTypes,
-      );
-      return `Promise<${innerType}>`;
-    }
-    return "Promise<unknown>";
-  }
-
-  // Handle Array<T> or T[]
-  if (checker.isArrayType(type)) {
-    const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
-    if (typeArg) {
-      const elementType = resolveTypeToStructure(
-        globalBuiltIns,
-        functionName,
-        checker,
-        typeArg,
-        nextParentTypes,
-      );
-      return `${elementType}[]`;
-    }
-    return "unknown[]";
-  }
-
   // Handle tuple types
   if (checker.isTupleType(type)) {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
@@ -115,48 +72,25 @@ export const resolveTypeToStructure = (
     return `[${elements.join(", ")}]`;
   }
 
-  // Handle Map<K, V>
-  if (typeName === "Map") {
-    const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
-    if (typeArgs.length === 2) {
-      const keyType = resolveTypeToStructure(
-        globalBuiltIns,
-        functionName,
-        checker,
-        typeArgs[0]!,
-        nextParentTypes,
-      );
-      const valueType = resolveTypeToStructure(
-        globalBuiltIns,
-        functionName,
-        checker,
-        typeArgs[1]!,
-        nextParentTypes,
-      );
-      return `Map<${keyType}, ${valueType}>`;
-    }
-    return "Map<unknown, unknown>";
-  }
-
-  // Handle Set<T>
-  if (typeName === "Set") {
+  if (typeName && globalBuiltIns.has(typeName)) {
+    // Check for type arguments (e.g., ReadableStream<Uint8Array>)
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length > 0) {
-      const elementType = resolveTypeToStructure(
-        globalBuiltIns,
-        functionName,
-        checker,
-        typeArgs[0]!,
-        nextParentTypes,
+      const resolvedArgs = typeArgs.map((t) =>
+        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
       );
-      return `Set<${elementType}>`;
+      if (typeName === "Array") {
+        return `${resolvedArgs[0]}[]`;
+      }
+      return `${typeName}<${resolvedArgs.join(", ")}>`;
     }
-    return "Set<unknown>";
+    return typeName;
   }
 
   // Handle function types
   const callSignatures = type.getCallSignatures();
   if (callSignatures.length > 0) {
+    throw new Error("Function types are not supported in return types");
     const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
       const paramType = checker.getTypeOfSymbolAtLocation(param, param.valueDeclaration!);
@@ -177,7 +111,7 @@ export const resolveTypeToStructure = (
       checker.getReturnTypeOfSignature(sig),
       nextParentTypes,
     );
-    return `(${params.join(", ")}) => ${returnType}`;
+    return `((${params.join(", ")}) => ${returnType})`;
   }
 
   // Handle object types - expand to structural form

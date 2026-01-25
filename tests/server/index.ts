@@ -241,6 +241,11 @@ function dd() {
             return 222;
           },
         }),
+        myfuncVoid: forAllUsers({
+          run: async () => {
+            await new Promise((res) => setTimeout(res, 100));
+          },
+        }),
         myAdminFunc: forAdmins({
           input: { arg1: { type: "number" } },
           run: ({ arg1 }, { user, type }) => {
