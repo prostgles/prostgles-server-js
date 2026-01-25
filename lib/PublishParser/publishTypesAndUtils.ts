@@ -142,6 +142,7 @@ import type {
   FieldFilter,
   FullFilter,
   SelectParams,
+  SQLHandler,
   TableInfo,
 } from "prostgles-types";
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
@@ -511,6 +512,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid: string | undefined;
   dbo: DBOFullyTyped<S>;
   db: DB;
+  sql: SQLHandler;
   user?: SUser["user"];
   clientReq: AuthClientRequest;
   clientInfo: LoginClientInfo;

@@ -54,6 +54,7 @@ export class PublishParser {
       ...sessionUser,
       dbo: this.dbo as DBOFullyTyped,
       db: this.db,
+      sql: this.prostgles.dboBuilder.sql,
       clientReq,
       clientInfo: getClientRequestIPsInfo(clientReq),
       tables: this.prostgles.dboBuilder.tables,

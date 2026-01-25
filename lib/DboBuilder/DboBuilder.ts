@@ -1,4 +1,4 @@
-import type { PG_COLUMN_UDT_DATA_TYPE, SQLOptions } from "prostgles-types";
+import type { PG_COLUMN_UDT_DATA_TYPE, SQLHandler, SQLOptions } from "prostgles-types";
 import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
 import { getDBTypescriptSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
 import { getFunctionsTypescriptSchema } from "../DBSchemaBuilder/getFunctionsTypescriptSchema";
@@ -188,6 +188,9 @@ export class DboBuilder {
     this.shortestJoinPaths = shortestJoinPaths;
   };
 
+  sql: SQLHandler = (q, args, options) => {
+    return this.runSQL(q, args, options, undefined);
+  };
   runSQL: SQLHandlerServer = async (
     query: string,
     params: unknown,
@@ -323,8 +326,14 @@ export class DboBuilder {
     return this.db.tx((t) => {
       const dbTX: DbTxTableHandlers = {};
       this.tablesOrViews?.map((tov) => {
-        const handlerClass = tov.is_view ? ViewHandler : TableHandler;
-        dbTX[tov.name] = new handlerClass(this.db, tov, this, { t, dbTX }, this.shortestJoinPaths);
+        const TableOrViewHandler = tov.is_view ? ViewHandler : TableHandler;
+        dbTX[tov.name] = new TableOrViewHandler(
+          this.db,
+          tov,
+          this,
+          { t, dbTX },
+          this.shortestJoinPaths,
+        );
       });
       // dbTX.sql = (q, args, opts, localParams) => {
       //   if (localParams?.tx) {

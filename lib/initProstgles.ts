@@ -199,7 +199,7 @@ export const initProstgles = async function (
       }
       onReady(
         {
-          sql: (q, a, o) => this.dboBuilder.runSQL(q, a, o, undefined),
+          sql: this.dboBuilder.sql,
           dbo: this.dbo!,
           db: this.db,
           tables: this.dboBuilder.tables,
@@ -216,7 +216,7 @@ export const initProstgles = async function (
     this.loaded = true;
     const initResult: InitResult = {
       db: this.dbo as DBOFullyTyped,
-      sql: (q, a, o) => this.dboBuilder.runSQL(q, a, o, undefined),
+      sql: this.dboBuilder.sql,
       _db: db,
       pgp,
       io: this.opts.io,

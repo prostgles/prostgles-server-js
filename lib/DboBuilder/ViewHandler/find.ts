@@ -1,9 +1,7 @@
-import type { SelectParams} from "prostgles-types";
+import type { SelectParams } from "prostgles-types";
 import { isObject } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type {
-  Filter,
-  LocalParams} from "../DboBuilder";
+import type { Filter, LocalParams } from "../DboBuilder";
 import {
   getClientErrorFromPGError,
   getErrorAsObject,
@@ -23,7 +21,7 @@ export const find = async function (
   selectParams?: SelectParams,
   _?: undefined,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<any[]> {
   const start = Date.now();
   const command =
@@ -102,14 +100,14 @@ export const find = async function (
       selectParamsLimitCheck,
       _,
       tableRules,
-      localParams
+      localParams,
     );
 
     const queryWithoutRLS = getSelectQuery(
       this,
       newQuery,
       undefined,
-      !!selectParamsLimitCheck.groupBy
+      !!selectParamsLimitCheck.groupBy,
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
@@ -200,20 +198,20 @@ export const runQueryReturnType = async ({
           type: "tableMethod",
           localParams,
           view: handler,
-        })
+        }),
       );
   } else if (sqlTypes.some((v) => v === returnType)) {
     if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams?.clientReq))) {
       throw `Not allowed:  { returnType: ${JSON.stringify(returnType)} } requires execute sql privileges `;
     }
     if (returnType === "statement-no-rls") {
-      return queryWithoutRLS as any;
+      return queryWithoutRLS as unknown;
     }
     if (returnType === "statement-where") {
       if (!newQuery) throw `returnType ${returnType} not possible for this command type`;
-      return newQuery.whereOpts.condition as any;
+      return newQuery.whereOpts.condition as unknown;
     }
-    return query as unknown as any[];
+    return query as unknown as unknown[];
   } else if (["row", "value"].includes(returnType)) {
     return handler.dbHandler
       .oneOrNone(query)
@@ -225,7 +223,7 @@ export const runQueryReturnType = async ({
           type: "tableMethod",
           localParams,
           view: handler,
-        })
+        }),
       );
   }
 };
