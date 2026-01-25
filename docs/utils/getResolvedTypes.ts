@@ -25,10 +25,6 @@ export const getResolvedTypes = ({ filePath, outputFilename, filter }: Args) => 
   const visitedMaps: VisitedTypesMap[] = [];
 
   const visit = (node: ts.Node) => {
-    console.log(node.pos, ts.SyntaxKind[node.kind], node.getText());
-    if (node.getText().startsWith("functions: ")) {
-      debugger;
-    }
     if (ts.isTypeAliasDeclaration(node)) {
       if (!filter || filter?.nodeNames.includes(node.name.text)) {
         const type1 = checker.getTypeAtLocation(node.type);

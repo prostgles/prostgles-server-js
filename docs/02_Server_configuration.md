@@ -12,6 +12,10 @@
   Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved.
   This file exports a `DBGeneratedSchema` type which contains types for the database tables and
   can be used as a generic type input for the prostgles instances to ensure type safety
+- **tsGeneratedTypesFunctionsPath** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+
+  Path to the prostgles instance typescript file.
+  Used to extract the server functions return types for generating the `GeneratedFunctionSchema` type in `DBGeneratedSchema.d.ts`
 - **io** <span style="color: grey">optional</span> <span style="color: green;">Server&lt;DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any&gt; | undefined</span>
 
   Socket.IO server instance object required to allow clients to connect through websockets
