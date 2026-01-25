@@ -1,8 +1,3 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Stefan L. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import type { PG_COLUMN_UDT_DATA_TYPE, SQLOptions } from "prostgles-types";
 import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
 import { getDBTypescriptSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -195,7 +190,7 @@ export class DboBuilder {
 
   runSQL: SQLHandlerServer = async (
     query: string,
-    params: any,
+    params: unknown,
     options: SQLOptions | undefined,
     localParams: LocalParams | undefined,
   ) => {

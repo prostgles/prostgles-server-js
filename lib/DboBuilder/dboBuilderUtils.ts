@@ -1,12 +1,7 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Stefan L. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
-import type { AnyObject, ProstglesError } from "prostgles-types";
-import { asNameAlias } from "../utils/asNameAlias";
+import type { AnyObject } from "prostgles-types";
 import { getSerialisableError, isObject, omitKeys, pickKeys } from "prostgles-types";
 import type { DB } from "../Prostgles";
+import { asNameAlias } from "../utils/asNameAlias";
 import type { LocalParams, SortItem } from "./DboBuilderTypes";
 import { pgp } from "./DboBuilderTypes";
 import { getSchemaFilter } from "./schema/getTablesForSchemaPostgresSQL";
@@ -61,7 +56,7 @@ const otherKeys = [
 
 export function getSerializedClientErrorFromPGError(
   rawError: any,
-  args: GetSerializedClientErrorFromPGErrorArgs
+  args: GetSerializedClientErrorFromPGErrorArgs,
 ): AnyObject {
   const err = getErrorAsObject(rawError);
   if (err.code) {
@@ -87,13 +82,13 @@ export function getSerializedClientErrorFromPGError(
   const errObject = pickKeys(err, finalKeys);
   if (view?.dboBuilder?.constraints && errObject.constraint && !errObject.column) {
     const constraint = view.dboBuilder.constraints.find(
-      (c) => c.conname === errObject.constraint && c.relname === view.name
+      (c) => c.conname === errObject.constraint && c.relname === view.name,
     );
     if (constraint) {
       const cols = view.columns?.filter(
         (c) =>
           (!allowedKeys || allowedKeys.includes(c.name)) &&
-          constraint.conkey.includes(c.ordinal_position)
+          constraint.conkey.includes(c.ordinal_position),
       );
       const [firstCol] = cols ?? [];
       if (firstCol) {
@@ -106,29 +101,10 @@ export function getSerializedClientErrorFromPGError(
 }
 export function getClientErrorFromPGError(
   rawError: any,
-  args: GetSerializedClientErrorFromPGErrorArgs
+  args: GetSerializedClientErrorFromPGErrorArgs,
 ) {
   const errorObj = getSerializedClientErrorFromPGError(rawError, args);
   return Promise.reject(errorObj);
-}
-
-/**
- * @deprecated
- */
-export function parseError(e: any, _caller: string): ProstglesError {
-  const errorObject = isObject(e) ? e : undefined;
-  const message =
-    typeof e === "string" ? e
-    : e instanceof Error ? e.message
-    : isObject(errorObject) ?
-      (errorObject.message ?? errorObject.txt ?? JSON.stringify(errorObject) ?? "")
-    : "";
-
-  const result: ProstglesError = {
-    ...errorObject,
-    message,
-  };
-  return result;
 }
 
 export type PGConstraint = {
@@ -158,7 +134,7 @@ export type PGConstraint = {
 
 export const getConstraints = async (
   db: DB,
-  schema: ProstglesInitOptions["schemaFilter"]
+  schema: ProstglesInitOptions["schemaFilter"],
 ): Promise<PGConstraint[]> => {
   const { sql, schemaNames } = getSchemaFilter(schema);
   return db.any(
@@ -171,7 +147,7 @@ export const getConstraints = async (
             ON nsp.oid = connamespace
     WHERE nsp.nspname ${sql}
   `,
-    { schemaNames }
+    { schemaNames },
   );
 };
 

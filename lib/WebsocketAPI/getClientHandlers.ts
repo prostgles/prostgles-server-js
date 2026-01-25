@@ -15,7 +15,7 @@ import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export type ClientHandlers<S = void> = {
-  clientSql: SQLHandler | undefined;
+  clientSql: SQLHandler;
   clientDb: DBOFullyTyped<S, false>;
   clientMethods: Record<string, ServerFunctionDefinition>;
 };
@@ -26,8 +26,11 @@ export const getClientHandlers = async <S = void>(
 ): Promise<ClientHandlers> => {
   const clientSchema =
     clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq, scope));
-  const sql: SQLHandler | undefined = ((query: string, params?: unknown, options?: SQLOptions) =>
-    runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
+  const sqlHandler: SQLHandler | undefined = ((
+    query: string,
+    params?: unknown,
+    options?: SQLOptions,
+  ) => runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
   const tableHandlers = Object.fromEntries(
     prostgles.dboBuilder.tablesOrViews!.map((table) => {
       const methods = table.is_view ? viewMethods : [...viewMethods, ...tableMethods];
@@ -52,22 +55,22 @@ export const getClientHandlers = async <S = void>(
     },
   };
   const sqlPermission = scope?.sql;
-  const sqlHandlerRolledBack = ((query: string, params?: AnyObject, options?: SQLOptions) =>
-    sql(query, params, { ...options, returnType: "default-with-rollback" })) as SQLHandler;
-  const clientSql: SQLHandler | undefined =
-    !sqlPermission ?
-      () => {
-        throw new Error("SQL is dissallowed by PermissionScope");
-      }
-    : sqlPermission === "commited" ? sql
-    : sqlHandlerRolledBack;
+  const clientSql = ((query: string, params?: AnyObject, options?: SQLOptions) => {
+    if (!sqlPermission) {
+      throw new Error("SQL is dissallowed by PermissionScope");
+    }
 
+    if (sqlPermission === "commited") {
+      return sqlHandler(query, params, options);
+    }
+
+    return sqlHandler(query, params, { ...options, returnType: "default-with-rollback" });
+  }) as SQLHandler;
   const clientDb = {
     ...tableHandlers,
     ...txNotAllowed,
   } as DBOFullyTyped<S, false>;
 
-  //@ts-ignore
   const clientMethods: Record<string, ServerFunctionDefinition> = Object.fromEntries(
     clientSchema.methods.map(({ name, input, description, output }) => {
       const methodHandler = (input?: unknown) => {

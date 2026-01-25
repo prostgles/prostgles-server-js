@@ -1,8 +1,3 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Stefan L. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import type * as pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
@@ -59,7 +54,7 @@ import * as fs from "fs";
 
 export class Prostgles {
   /**
-   * Used facilitate concurrent prostgles connections to the same database
+   * Used to manage concurrent prostgles connections to the same database
    */
   readonly appId = randomUUID();
   opts: ProstglesInitOptions = {
@@ -142,7 +137,7 @@ export class Prostgles {
       testRulesOnConnect: 1,
     };
     const unknownParams = Object.keys(params).filter(
-      (key: string) => !Object.keys(config).includes(key)
+      (key: string) => !Object.keys(config).includes(key),
     );
     if (unknownParams.length) {
       console.error(`Unrecognised ProstglesInitOptions params: ${unknownParams.join()}`);

@@ -1,8 +1,3 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Stefan L. All rights reserved.
- *  Licensed under the MIT License. See LICENSE in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import type { DB } from "./Prostgles";
 import type pg from "pg-promise/typescript/pg-subset";
 import type pgPromise from "pg-promise";
@@ -26,7 +21,7 @@ export class PostgresNotifListenManager {
   static create = (
     db_pg: DB,
     notifListener: PrglNotifListener,
-    db_channel_name: string
+    db_channel_name: string,
   ): Promise<PostgresNotifListenManager> => {
     const res = new PostgresNotifListenManager(db_pg, notifListener, db_channel_name, true);
     return res.init();
@@ -36,7 +31,7 @@ export class PostgresNotifListenManager {
     db_pg: DB,
     notifListener: PrglNotifListener,
     db_channel_name: string,
-    noInit = false
+    noInit = false,
   ) {
     if (!db_channel_name)
       throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
@@ -92,7 +87,7 @@ export class PostgresNotifListenManager {
     const setListeners = (
         client: pg.IClient,
         notifListener: PrglNotifListener,
-        db_channel_name: string
+        db_channel_name: string,
       ) => {
         client.on("notification", notifListener);
         this.client = client;
@@ -100,7 +95,7 @@ export class PostgresNotifListenManager {
         return this.connection
           .none(
             `/* prostgles-server internal query used for subscriptions and schema hot reload */ \nLISTEN $1~`,
-            db_channel_name
+            db_channel_name,
           )
           .catch((error) => {
             console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
@@ -121,7 +116,7 @@ export class PostgresNotifListenManager {
           .catch(() => {
             // failed after 10 attempts
             console.log(
-              "PostgresNotifListenManager: Connection Lost Permanently. No more retryies"
+              "PostgresNotifListenManager: Connection Lost Permanently. No more retryies",
             );
             // process.exit(); // exiting the process
           });

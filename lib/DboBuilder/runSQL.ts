@@ -2,19 +2,19 @@ import type { ParameterizedQuery } from "pg-promise";
 import type pgPromise from "pg-promise";
 import { ParameterizedQuery as PQ } from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
-import type { AnyObject, SQLOptions, SQLResult, SQLResultInfo} from "prostgles-types";
+import type { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
 import { postgresToTsType } from "prostgles-types";
 import type { DB, Prostgles } from "../Prostgles";
-import type { DboBuilder, LocalParams} from "./DboBuilder";
+import type { DboBuilder, LocalParams } from "./DboBuilder";
 import { pgp } from "./DboBuilder";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 
 export async function runSQL(
   this: DboBuilder,
   queryWithoutRLS: string,
-  args: undefined | AnyObject | any[],
+  args: unknown,
   options: SQLOptions | undefined,
-  localParams: LocalParams | undefined
+  localParams: LocalParams | undefined,
 ) {
   const queryWithRLS = queryWithoutRLS;
   if (
@@ -93,7 +93,7 @@ export async function runSQL(
     queryWithoutRLS,
     queryResult,
     allowListen,
-    localParams?.clientReq
+    localParams?.clientReq,
   );
   if (listenHandlers) {
     return listenHandlers;
@@ -124,7 +124,7 @@ const onSQLResult = async function (
   queryWithoutRLS: string,
   { command }: Omit<SQLResultInfo, "duration">,
   allowListen: boolean | undefined,
-  clientReq: AuthClientRequest | undefined
+  clientReq: AuthClientRequest | undefined,
 ) {
   this.prostgles.schemaWatch?.onSchemaChangeFallback?.({
     command,
@@ -135,7 +135,7 @@ const onSQLResult = async function (
     const { socket } = clientReq || {};
     if (!allowListen)
       throw new Error(
-        `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`
+        `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`,
       );
     if (!socket) throw "LISTEN allowed only with client socket";
     return await this.prostgles.dbEventsManager?.addNotify(queryWithoutRLS, socket);
@@ -179,7 +179,7 @@ export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
     const dataType = this.DATA_TYPES!.find((dt) => +dt.oid === +f.dataTypeID)?.typname ?? "text",
       table = this.USER_TABLES!.find((t) => +t.relid === +f.tableID),
       column = this.USER_TABLE_COLUMNS!.find(
-        (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID
+        (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID,
       ),
       tsDataType = postgresToTsType(dataType);
 
@@ -197,7 +197,7 @@ export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
 
 export const canRunSQL = async (
   prostgles: Prostgles,
-  clientReq: AuthClientRequest | undefined
+  clientReq: AuthClientRequest | undefined,
 ): Promise<boolean> => {
   if (!clientReq) return true;
   const publishParams = await prostgles.publishParser?.getPublishParams(clientReq, undefined);

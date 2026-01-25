@@ -80,6 +80,7 @@ export type OnReadyCallbackBasic = (
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   db: DBOFullyTyped<S>;
+  sql: SQLHandler;
   _db: DB;
   pgp: PGP;
   io: ProstglesInitOptions<S, SUser>["io"];
@@ -213,9 +214,9 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
-    //@ts-ignore
     const initResult: InitResult = {
       db: this.dbo as DBOFullyTyped,
+      sql: (q, a, o) => this.dboBuilder.runSQL(q, a, o, undefined),
       _db: db,
       pgp,
       io: this.opts.io,
