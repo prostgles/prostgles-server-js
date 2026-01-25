@@ -117,7 +117,9 @@ export const resolveTypeToStructure = (
   }
 
   // Handle object types - expand to structural form
-  const properties = type.getProperties();
+  const props = type.getProperties();
+  const oProps = checker.getPropertiesOfType(type);
+  const properties = props.length ? props : oProps;
   if (properties.length > 0 || type.flags & ts.TypeFlags.Object) {
     const members: string[] = [];
 
