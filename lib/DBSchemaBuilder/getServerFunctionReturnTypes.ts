@@ -1,13 +1,7 @@
 import * as ts from "typescript";
 import { dirname } from "path";
 import { resolveTypeToStructure } from "./resolveTypeToStructure";
-
-let globalBuiltinsCache:
-  | {
-      instancePath: string;
-      names: Set<string>;
-    }
-  | undefined = undefined;
+import { getGlobalBuiltinTypes } from "./getGlobalBuiltinTypes";
 
 export const getServerFunctionReturnTypes = (instancePath: string) => {
   const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
@@ -25,18 +19,7 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
     throw new Error(`Source file not found: ${instancePath}`);
   }
 
-  if (!globalBuiltinsCache || globalBuiltinsCache.instancePath !== instancePath) {
-    // get all global type symbols
-    const globals = checker
-      .getSymbolsInScope(program.getSourceFiles()[0]!, ts.SymbolFlags.Type)
-      .filter((sym) => sym.declarations?.some((d) => d.getSourceFile().hasNoDefaultLib))
-      .map((sym) => sym.getName());
-    globalBuiltinsCache = {
-      instancePath,
-      names: new Set(globals),
-    };
-  }
-  const globalBuiltins = globalBuiltinsCache.names;
+  const globalBuiltins = getGlobalBuiltinTypes(instancePath, checker, program);
 
   const getActualSymbol = (symbol: ts.Symbol | undefined) => {
     if (!symbol) return undefined;
