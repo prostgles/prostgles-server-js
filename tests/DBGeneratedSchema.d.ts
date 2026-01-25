@@ -557,8 +557,8 @@ export type DBGeneratedSchema = {
 
 
 export type GeneratedFunctionSchema = { 
-  "myfunc": (args: {    arg1: number;  }) => Promise<number>
-  "myAdminFunc": (args: {    arg1: number;  }) => Promise<number>
-  "myfuncWithBadReturn": (args: {    arg1: number;  }) => Promise<string>
-  "myfuncWithComplexReturn": (args: {    arg1: number;  }) => Promise<number[] | { a: number; b: string; c: { d: boolean; }; }>
+  "myfunc": (args: {    arg1: number;  }) => Promise<unknown>
+  "myAdminFunc": (args: {    arg1: number;  }) => Promise<unknown>
+  "myfuncWithBadReturn": (args: {    arg1: number;  }) => Promise<unknown>
+  "myfuncWithComplexReturn": (args: {    arg1: number;  }) => Promise<unknown>
 }
