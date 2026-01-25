@@ -5,13 +5,17 @@ import * as ts from "typescript";
  * using only built-in/primitive types
  */
 export const resolveTypeToStructure = (
+  functionName: string,
   checker: ts.TypeChecker,
   type: ts.Type,
   depth = 0,
+  maxDepth = 10,
 ): string => {
   // Prevent infinite recursion
-  if (depth > 10) {
-    console.warn("Max type resolution depth reached for type:", checker.typeToString(type));
+  if (depth > maxDepth) {
+    console.warn(
+      `Max type resolution depth (${maxDepth}) reached for function ${JSON.stringify(functionName)} ReturnType`,
+    );
     return "unknown";
   }
 
@@ -37,7 +41,9 @@ export const resolveTypeToStructure = (
 
   // Handle union types
   if (type.isUnion()) {
-    const parts = type.types.map((t) => resolveTypeToStructure(checker, t, depth + 1));
+    const parts = type.types.map((t) =>
+      resolveTypeToStructure(functionName, checker, t, depth + 1),
+    );
     // Deduplicate
     const unique = [...new Set(parts)];
     return unique.length === 1 ? unique[0]! : unique.join(" | ");
@@ -45,7 +51,9 @@ export const resolveTypeToStructure = (
 
   // Handle intersection types
   if (type.isIntersection()) {
-    const parts = type.types.map((t) => resolveTypeToStructure(checker, t, depth + 1));
+    const parts = type.types.map((t) =>
+      resolveTypeToStructure(functionName, checker, t, depth + 1),
+    );
     return parts.join(" & ");
   }
 
@@ -56,7 +64,7 @@ export const resolveTypeToStructure = (
   if (typeName === "Promise") {
     const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArg) {
-      const innerType = resolveTypeToStructure(checker, typeArg, depth + 1);
+      const innerType = resolveTypeToStructure(functionName, checker, typeArg, depth + 1);
       return `Promise<${innerType}>`;
     }
     return "Promise<unknown>";
@@ -66,7 +74,7 @@ export const resolveTypeToStructure = (
   if (checker.isArrayType(type)) {
     const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArg) {
-      const elementType = resolveTypeToStructure(checker, typeArg, depth + 1);
+      const elementType = resolveTypeToStructure(functionName, checker, typeArg, depth + 1);
       return `${elementType}[]`;
     }
     return "unknown[]";
@@ -75,7 +83,9 @@ export const resolveTypeToStructure = (
   // Handle tuple types
   if (checker.isTupleType(type)) {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
-    const elements = typeArgs.map((t) => resolveTypeToStructure(checker, t, depth + 1));
+    const elements = typeArgs.map((t) =>
+      resolveTypeToStructure(functionName, checker, t, depth + 1),
+    );
     return `[${elements.join(", ")}]`;
   }
 
@@ -83,8 +93,8 @@ export const resolveTypeToStructure = (
   if (typeName === "Map") {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length === 2) {
-      const keyType = resolveTypeToStructure(checker, typeArgs[0]!, depth + 1);
-      const valueType = resolveTypeToStructure(checker, typeArgs[1]!, depth + 1);
+      const keyType = resolveTypeToStructure(functionName, checker, typeArgs[0]!, depth + 1);
+      const valueType = resolveTypeToStructure(functionName, checker, typeArgs[1]!, depth + 1);
       return `Map<${keyType}, ${valueType}>`;
     }
     return "Map<unknown, unknown>";
@@ -94,7 +104,7 @@ export const resolveTypeToStructure = (
   if (typeName === "Set") {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length > 0) {
-      const elementType = resolveTypeToStructure(checker, typeArgs[0]!, depth + 1);
+      const elementType = resolveTypeToStructure(functionName, checker, typeArgs[0]!, depth + 1);
       return `Set<${elementType}>`;
     }
     return "Set<unknown>";
@@ -127,11 +137,12 @@ export const resolveTypeToStructure = (
     const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
       const paramType = checker.getTypeOfSymbolAtLocation(param, param.valueDeclaration!);
-      const paramTypeStr = resolveTypeToStructure(checker, paramType, depth + 1);
+      const paramTypeStr = resolveTypeToStructure(functionName, checker, paramType, depth + 1);
       const isOptional = param.flags & ts.SymbolFlags.Optional;
       return `${param.getName()}${isOptional ? "?" : ""}: ${paramTypeStr}`;
     });
     const returnType = resolveTypeToStructure(
+      functionName,
       checker,
       checker.getReturnTypeOfSignature(sig),
       depth + 1,
@@ -149,7 +160,7 @@ export const resolveTypeToStructure = (
       if (!propDecl) continue;
 
       const propType = checker.getTypeOfSymbolAtLocation(prop, propDecl);
-      const propTypeStr = resolveTypeToStructure(checker, propType, depth + 1);
+      const propTypeStr = resolveTypeToStructure(functionName, checker, propType, depth + 1);
       const isOptional = prop.flags & ts.SymbolFlags.Optional;
       const propName = prop.getName();
 
@@ -165,10 +176,14 @@ export const resolveTypeToStructure = (
     const numberIndexType = type.getNumberIndexType();
 
     if (stringIndexType) {
-      members.push(`[key: string]: ${resolveTypeToStructure(checker, stringIndexType, depth + 1)}`);
+      members.push(
+        `[key: string]: ${resolveTypeToStructure(functionName, checker, stringIndexType, depth + 1)}`,
+      );
     }
     if (numberIndexType) {
-      members.push(`[key: number]: ${resolveTypeToStructure(checker, numberIndexType, depth + 1)}`);
+      members.push(
+        `[key: number]: ${resolveTypeToStructure(functionName, checker, numberIndexType, depth + 1)}`,
+      );
     }
 
     if (members.length === 0) {

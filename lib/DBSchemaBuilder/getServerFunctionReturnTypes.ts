@@ -59,10 +59,7 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
   /**
    * Extract return type from a defineFunction call
    */
-  const extractFromDefineCall = (
-    callExpr: ts.CallExpression,
-    propertyName: ts.PropertyName | string,
-  ) => {
+  const extractFromDefineCall = (callExpr: ts.CallExpression, propertyName: string) => {
     const arg = callExpr.arguments[0];
     if (!arg) {
       return;
@@ -92,7 +89,7 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
 
     const rt = checker.getReturnTypeOfSignature(sig);
     // const typeString = checker.typeToString(rt);
-    result.set(propertyName, resolveTypeToStructure(checker, rt));
+    result.set(propertyName, resolveTypeToStructure(propertyName, checker, rt));
   };
 
   /**
@@ -237,8 +234,6 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
 
       // Return of a variable: return result
       if (ts.isIdentifier(unwrapped)) {
-        const identName = unwrapped.getText();
-
         const symbol = checker.getSymbolAtLocation(unwrapped);
         const decl = getDeclarationFromSymbol(symbol);
         if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
