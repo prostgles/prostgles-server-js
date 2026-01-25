@@ -13,9 +13,11 @@ export const resolveTypeToStructure = (
   maxDepth = 10,
 ): string => {
   const depth = parentTypes.length;
+  const getParentNames = () => parentTypes.map((t) => checker.typeToString(t));
   if (depth > maxDepth) {
     console.warn(
       `Max type resolution depth (${maxDepth}) reached for function ${JSON.stringify(functionName)} ReturnType`,
+      getParentNames().join(" -> "),
     );
     return "unknown";
   }
@@ -92,6 +94,7 @@ export const resolveTypeToStructure = (
   if (callSignatures.length > 0) {
     console.error(
       "Function types are not supported in return types. Failing function: " + functionName,
+      getParentNames().join(" -> "),
     );
     const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
