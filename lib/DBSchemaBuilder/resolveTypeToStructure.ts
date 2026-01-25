@@ -81,9 +81,6 @@ export const resolveTypeToStructure = (
       const resolvedArgs = typeArgs.map((t) =>
         resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
       );
-      if (typeName === "Array") {
-        return `${resolvedArgs[0]}[]`;
-      }
       return `${typeName}<${resolvedArgs.join(", ")}>`;
     }
     return typeName;
