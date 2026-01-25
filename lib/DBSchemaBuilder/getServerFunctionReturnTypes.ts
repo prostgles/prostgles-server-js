@@ -52,6 +52,24 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
       result.set(p.name.getText(), checker.typeToString(rt));
     }
   };
+
+  const getActualSymbol = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => {
+    if (!symbol) return undefined;
+
+    // Follow alias to get the actual symbol (for imports)
+    if (symbol.flags & ts.SymbolFlags.Alias) {
+      return checker.getAliasedSymbol(symbol);
+    }
+    return symbol;
+  };
+
+  const getDeclarationFromSymbol = (symbol: ts.Symbol | undefined): ts.Declaration | undefined => {
+    const actualSymbol = getActualSymbol(symbol);
+    if (!actualSymbol) return undefined;
+
+    return actualSymbol.valueDeclaration ?? actualSymbol.declarations?.[0];
+  };
+
   const resolveFunctionBody = (expr: ts.Expression): ts.Block | undefined => {
     // Case 1: Inline arrow function
     if (ts.isArrowFunction(expr) && ts.isBlock(expr.body)) {
@@ -66,7 +84,7 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
     // Case 3: Identifier referencing a function
     if (ts.isIdentifier(expr)) {
       const symbol = checker.getSymbolAtLocation(expr);
-      const decl = symbol?.valueDeclaration;
+      const decl = getDeclarationFromSymbol(symbol);
 
       if (decl) {
         // Variable declaration: const getServerFunctions = () => { ... }
