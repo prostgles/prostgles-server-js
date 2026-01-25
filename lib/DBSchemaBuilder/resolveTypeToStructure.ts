@@ -5,19 +5,23 @@ import * as ts from "typescript";
  * using only built-in/primitive types
  */
 export const resolveTypeToStructure = (
+  globalBuiltIns: Set<string>,
   functionName: string,
   checker: ts.TypeChecker,
   type: ts.Type,
-  depth = 0,
+  parentTypes: ts.Type[] = [],
   maxDepth = 10,
 ): string => {
-  // Prevent infinite recursion
+  const depth = parentTypes.length;
   if (depth > maxDepth) {
     console.warn(
       `Max type resolution depth (${maxDepth}) reached for function ${JSON.stringify(functionName)} ReturnType`,
+      parentTypes,
     );
     return "unknown";
   }
+
+  const nextParentTypes = [...parentTypes, type];
 
   // Handle primitive types
   if (type.flags & ts.TypeFlags.String) return "string";
@@ -42,7 +46,7 @@ export const resolveTypeToStructure = (
   // Handle union types
   if (type.isUnion()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(functionName, checker, t, depth + 1),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
     );
     // Deduplicate
     const unique = [...new Set(parts)];
@@ -52,7 +56,7 @@ export const resolveTypeToStructure = (
   // Handle intersection types
   if (type.isIntersection()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(functionName, checker, t, depth + 1),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
     );
     return parts.join(" & ");
   }
@@ -61,10 +65,28 @@ export const resolveTypeToStructure = (
   const symbol = type.getSymbol();
   const typeName = symbol?.getName();
 
+  if (typeName && globalBuiltIns.has(typeName)) {
+    // Check for type arguments (e.g., ReadableStream<Uint8Array>)
+    const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
+    if (typeArgs.length > 0) {
+      const resolvedArgs = typeArgs.map((t) =>
+        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
+      );
+      return `${typeName}<${resolvedArgs.join(", ")}>`;
+    }
+    return typeName;
+  }
+
   if (typeName === "Promise") {
     const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArg) {
-      const innerType = resolveTypeToStructure(functionName, checker, typeArg, depth + 1);
+      const innerType = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        typeArg,
+        nextParentTypes,
+      );
       return `Promise<${innerType}>`;
     }
     return "Promise<unknown>";
@@ -74,7 +96,13 @@ export const resolveTypeToStructure = (
   if (checker.isArrayType(type)) {
     const [typeArg] = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArg) {
-      const elementType = resolveTypeToStructure(functionName, checker, typeArg, depth + 1);
+      const elementType = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        typeArg,
+        nextParentTypes,
+      );
       return `${elementType}[]`;
     }
     return "unknown[]";
@@ -84,7 +112,7 @@ export const resolveTypeToStructure = (
   if (checker.isTupleType(type)) {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     const elements = typeArgs.map((t) =>
-      resolveTypeToStructure(functionName, checker, t, depth + 1),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
     );
     return `[${elements.join(", ")}]`;
   }
@@ -93,8 +121,20 @@ export const resolveTypeToStructure = (
   if (typeName === "Map") {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length === 2) {
-      const keyType = resolveTypeToStructure(functionName, checker, typeArgs[0]!, depth + 1);
-      const valueType = resolveTypeToStructure(functionName, checker, typeArgs[1]!, depth + 1);
+      const keyType = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        typeArgs[0]!,
+        nextParentTypes,
+      );
+      const valueType = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        typeArgs[1]!,
+        nextParentTypes,
+      );
       return `Map<${keyType}, ${valueType}>`;
     }
     return "Map<unknown, unknown>";
@@ -104,31 +144,16 @@ export const resolveTypeToStructure = (
   if (typeName === "Set") {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length > 0) {
-      const elementType = resolveTypeToStructure(functionName, checker, typeArgs[0]!, depth + 1);
+      const elementType = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        typeArgs[0]!,
+        nextParentTypes,
+      );
       return `Set<${elementType}>`;
     }
     return "Set<unknown>";
-  }
-
-  // Handle Date, Error, RegExp, etc. (global built-in types)
-  const globalBuiltIns = [
-    "Date",
-    "Error",
-    "RegExp",
-    "URL",
-    "URLSearchParams",
-    "Buffer",
-    "Blob",
-    "File",
-    "FormData",
-    "Headers",
-    "Request",
-    "Response",
-    "ReadableStream",
-    "WritableStream",
-  ];
-  if (typeName && globalBuiltIns.includes(typeName)) {
-    return typeName;
   }
 
   // Handle function types
@@ -137,15 +162,22 @@ export const resolveTypeToStructure = (
     const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
       const paramType = checker.getTypeOfSymbolAtLocation(param, param.valueDeclaration!);
-      const paramTypeStr = resolveTypeToStructure(functionName, checker, paramType, depth + 1);
+      const paramTypeStr = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        paramType,
+        nextParentTypes,
+      );
       const isOptional = param.flags & ts.SymbolFlags.Optional;
       return `${param.getName()}${isOptional ? "?" : ""}: ${paramTypeStr}`;
     });
     const returnType = resolveTypeToStructure(
+      globalBuiltIns,
       functionName,
       checker,
       checker.getReturnTypeOfSignature(sig),
-      depth + 1,
+      nextParentTypes,
     );
     return `(${params.join(", ")}) => ${returnType}`;
   }
@@ -160,7 +192,13 @@ export const resolveTypeToStructure = (
       if (!propDecl) continue;
 
       const propType = checker.getTypeOfSymbolAtLocation(prop, propDecl);
-      const propTypeStr = resolveTypeToStructure(functionName, checker, propType, depth + 1);
+      const propTypeStr = resolveTypeToStructure(
+        globalBuiltIns,
+        functionName,
+        checker,
+        propType,
+        nextParentTypes,
+      );
       const isOptional = prop.flags & ts.SymbolFlags.Optional;
       const propName = prop.getName();
 
@@ -177,12 +215,12 @@ export const resolveTypeToStructure = (
 
     if (stringIndexType) {
       members.push(
-        `[key: string]: ${resolveTypeToStructure(functionName, checker, stringIndexType, depth + 1)}`,
+        `[key: string]: ${resolveTypeToStructure(globalBuiltIns, functionName, checker, stringIndexType, nextParentTypes)}`,
       );
     }
     if (numberIndexType) {
       members.push(
-        `[key: number]: ${resolveTypeToStructure(functionName, checker, numberIndexType, depth + 1)}`,
+        `[key: number]: ${resolveTypeToStructure(globalBuiltIns, functionName, checker, numberIndexType, nextParentTypes)}`,
       );
     }
 

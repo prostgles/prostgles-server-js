@@ -2,6 +2,13 @@ import * as ts from "typescript";
 import { dirname } from "path";
 import { resolveTypeToStructure } from "./resolveTypeToStructure";
 
+let globalBuiltinsCache:
+  | {
+      instancePath: string;
+      names: Set<string>;
+    }
+  | undefined = undefined;
+
 export const getServerFunctionReturnTypes = (instancePath: string) => {
   const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
   if (!configPath) throw new Error("tsconfig.json not found");
@@ -17,6 +24,19 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
   if (!sf) {
     throw new Error(`Source file not found: ${instancePath}`);
   }
+
+  if (!globalBuiltinsCache || globalBuiltinsCache.instancePath !== instancePath) {
+    // get all global type symbols
+    const globals = checker
+      .getSymbolsInScope(program.getSourceFiles()[0]!, ts.SymbolFlags.Type)
+      .filter((sym) => sym.declarations?.some((d) => d.getSourceFile().hasNoDefaultLib))
+      .map((sym) => sym.getName());
+    globalBuiltinsCache = {
+      instancePath,
+      names: new Set(globals),
+    };
+  }
+  const globalBuiltins = globalBuiltinsCache.names;
 
   const getActualSymbol = (symbol: ts.Symbol | undefined) => {
     if (!symbol) return undefined;
@@ -89,7 +109,7 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
 
     const rt = checker.getReturnTypeOfSignature(sig);
     // const typeString = checker.typeToString(rt);
-    result.set(propertyName, resolveTypeToStructure(propertyName, checker, rt));
+    result.set(propertyName, resolveTypeToStructure(globalBuiltins, propertyName, checker, rt));
   };
 
   /**
