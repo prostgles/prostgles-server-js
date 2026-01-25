@@ -5,13 +5,14 @@ import { getMethodsDocs } from "./getMethodsDocs";
 import { getResolvedTypes } from "./getResolvedTypes";
 import { TS_Object } from "./getSerializableType/getSerializableType";
 import { renderTsType } from "./renderTsType";
+import { writeFileSyncIfDifferent } from "writeFileSyncIfDifferent";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
 
 export const generateClientDocs = async (fromIndex: number) => {
   const clientFilePath = path.resolve(
-    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`
+    `${testFolderPath}/client/node_modules/prostgles-client/dist/prostgles.d.ts`,
   );
   const excludedTypes = [
     "FullFilter",
@@ -51,13 +52,13 @@ export const generateClientDocs = async (fromIndex: number) => {
 
   const isomorphicMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => isomotphicMethodNames[methodName]
-    )
+      ([methodName]) => isomotphicMethodNames[methodName],
+    ),
   );
   const clientMd = getMethodsDocs(
     getObjectEntries(tableHandler.properties).filter(
-      ([methodName]) => !isomotphicMethodNames[methodName]
-    )
+      ([methodName]) => !isomotphicMethodNames[methodName],
+    ),
   );
 
   const InitOptions = resolvedTypes[1] as TS_Object; // (typeof import("./clientTypes").definitions)[1];
@@ -116,26 +117,22 @@ export const generateClientDocs = async (fromIndex: number) => {
       .join(", "),
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}${toTwoDigit(fromIndex)}_Client_setup.md`, docs, {
-    encoding: "utf-8",
-  });
+  writeFileSyncIfDifferent(`${docsFolder}${toTwoDigit(fromIndex)}_Client_setup.md`, docs);
 
   clientMd.forEach((methodContent, i) => {
     if (!methodContent) return;
     const methodName = methodContent.split(" ")[1]!.split("<")[0];
-    fs.writeFileSync(
+    writeFileSyncIfDifferent(
       `${docsFolder}${toTwoDigit(i + fromIndex + 1)}_${methodName}.md`,
       `> Available on client only\n\n` + methodContent,
-      { encoding: "utf-8" }
     );
   });
 
   isomorphicMd.forEach((methodContent, i) => {
     const methodName = methodContent.split(" ")[1]!.split("<")[0];
-    fs.writeFileSync(
+    writeFileSyncIfDifferent(
       `${docsFolder}${toTwoDigit(i + fromIndex + 1 + clientMd.length)}_${methodName}.md`,
       methodContent,
-      { encoding: "utf-8" }
     );
   });
 };

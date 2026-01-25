@@ -1,9 +1,9 @@
-import * as fs from "fs";
 import * as path from "path";
 import { getObjectEntries } from "prostgles-types";
 import { getResolvedTypes } from "./getResolvedTypes";
 import { renderTsType } from "./renderTsType";
 import { TS_Object } from "./getSerializableType/getSerializableType";
+import { writeFileSyncIfDifferent } from "./writeFileSyncIfDifferent";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
@@ -122,11 +122,10 @@ export const generateServerDocs = () => {
     `\`\`\``,
   ].join("\n");
 
-  fs.writeFileSync(`${docsFolder}01_Server_setup.md`, docs, { encoding: "utf-8" });
+  writeFileSyncIfDifferent(`${docsFolder}01_Server_setup.md`, docs);
 
-  fs.writeFileSync(
+  writeFileSyncIfDifferent(
     `${docsFolder}02_Server_configuration.md`,
     [`### Configuration options`, configurationPropsMarkdown.join("\n")].join("\n\n"),
-    { encoding: "utf-8" },
   );
 };
