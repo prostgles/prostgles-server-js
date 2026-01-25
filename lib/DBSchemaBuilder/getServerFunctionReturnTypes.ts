@@ -3,7 +3,7 @@ import { dirname } from "path";
 import { resolveTypeToStructure } from "./resolveTypeToStructure";
 import { getGlobalBuiltinTypes } from "./getGlobalBuiltinTypes";
 
-export const getServerFunctionReturnTypes = (instancePath: string) => {
+export const getServerFunctionReturnTypes = (instancePath: string): Map<string, string> => {
   const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
   if (!configPath) throw new Error("tsconfig.json not found");
 
@@ -90,9 +90,14 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
       return;
     }
 
-    const rt = checker.getReturnTypeOfSignature(sig);
-    // const typeString = checker.typeToString(rt);
-    result.set(propertyName, resolveTypeToStructure(globalBuiltins, propertyName, checker, rt));
+    const returnType = checker.getReturnTypeOfSignature(sig);
+    const resolvedReturnType = resolveTypeToStructure(
+      globalBuiltins,
+      propertyName,
+      checker,
+      returnType,
+    );
+    result.set(propertyName, resolvedReturnType);
   };
 
   /**

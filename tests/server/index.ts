@@ -251,7 +251,7 @@ function dd() {
         }),
         myfuncWithBadReturn: forAllUsers({
           input: { arg1: { type: "number" } },
-          run: () => "222",
+          run: async () => "222",
         }),
         myfuncWithComplexReturn: forAllUsers({
           input: { arg1: { type: "number" } },

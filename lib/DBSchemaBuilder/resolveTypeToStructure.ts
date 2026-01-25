@@ -16,14 +16,12 @@ export const resolveTypeToStructure = (
   if (depth > maxDepth) {
     console.warn(
       `Max type resolution depth (${maxDepth}) reached for function ${JSON.stringify(functionName)} ReturnType`,
-      parentTypes,
     );
     return "unknown";
   }
 
   const nextParentTypes = [...parentTypes, type];
 
-  // Handle primitive types
   if (type.flags & ts.TypeFlags.String) return "string";
   if (type.flags & ts.TypeFlags.Number) return "number";
   if (type.flags & ts.TypeFlags.Boolean) return "boolean";

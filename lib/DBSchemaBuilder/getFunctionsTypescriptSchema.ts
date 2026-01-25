@@ -26,8 +26,10 @@ export const getFunctionsTypescriptSchema = (
 
       const removeSemicolon = (v: string) =>
         v.trim().endsWith(";") ? v.trim().slice(0, -1) : v.trim();
-      const returnType = functionReturnTypes?.get(name) ?? "unknown";
-      return `  ${JSON.stringify(name)}: (${removeSemicolon(argumentTypes)}) => Promise<${removeSemicolon(returnType)}>`;
+      const returnType = removeSemicolon(functionReturnTypes?.get(name) ?? "unknown");
+      const returnTypePromise =
+        !returnType.startsWith("Promise<") ? `Promise<${returnType}>` : returnType;
+      return `  ${JSON.stringify(name)}: (${removeSemicolon(argumentTypes)}) => ${returnTypePromise}`;
     },
   );
   if (methodDefinitions.length) {
