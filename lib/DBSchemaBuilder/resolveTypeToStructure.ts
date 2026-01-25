@@ -50,7 +50,7 @@ export const resolveTypeToStructure = (
     );
     // Deduplicate
     const unique = [...new Set(parts)];
-    return unique.length === 1 ? unique[0]! : unique.join(" | ");
+    return unique.length === 1 ? unique[0]! : `(${unique.join(" | ")})`;
   }
 
   // Handle intersection types
@@ -58,7 +58,7 @@ export const resolveTypeToStructure = (
     const parts = type.types.map((t) =>
       resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
     );
-    return parts.join(" & ");
+    return `(${parts.join(" & ")})`;
   }
 
   // Handle Promise<T> - unwrap to Promise<ResolvedT>
