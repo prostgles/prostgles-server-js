@@ -1,5 +1,6 @@
-import { dirname } from "node:path";
 import * as ts from "typescript";
+import { dirname } from "path";
+import { resolveTypeToStructure } from "./resolveTypeToStructure";
 
 export const getServerFunctionReturnTypes = (instancePath: string) => {
   const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
@@ -9,105 +10,176 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
   const { fileNames, options } = ts.parseJsonConfigFileContent(config, ts.sys, dirname(configPath));
 
   const program = ts.createProgram(fileNames, options);
-
   const checker = program.getTypeChecker();
   const sf = program.getSourceFile(instancePath);
-  const result: Map<string, string> = new Map();
+  const result = new Map();
+
   if (!sf) {
     throw new Error(`Source file not found: ${instancePath}`);
   }
 
-  const getActualSymbol = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => {
+  const getActualSymbol = (symbol: ts.Symbol | undefined) => {
     if (!symbol) return undefined;
     if (symbol.flags & ts.SymbolFlags.Alias) {
-      return checker.getAliasedSymbol(symbol);
+      const aliased = checker.getAliasedSymbol(symbol);
+      return aliased;
     }
     return symbol;
   };
 
-  const getDeclarationFromSymbol = (symbol: ts.Symbol | undefined): ts.Declaration | undefined => {
+  const getDeclarationFromSymbol = (symbol: ts.Symbol | undefined) => {
     const actualSymbol = getActualSymbol(symbol);
     if (!actualSymbol) return undefined;
     return actualSymbol.valueDeclaration ?? actualSymbol.declarations?.[0];
   };
 
   /**
-   * Extract return type from a defineFunction/defineAdminFunction/definePublicFunction call
+   * Unwrap AsExpression, ParenthesizedExpression, etc. to get the actual expression
    */
-  const extractFromDefineCall = (callExpr: ts.CallExpression, propertyName: string) => {
+  const unwrapExpression = (expr: ts.Expression) => {
+    let current = expr;
+    let iterations = 0;
+    while (iterations < 10) {
+      iterations++;
+      if (ts.isAsExpression(current)) {
+        current = current.expression;
+      } else if (ts.isParenthesizedExpression(current)) {
+        current = current.expression;
+      } else if (ts.isSatisfiesExpression(current)) {
+        current = current.expression;
+      } else if (ts.isTypeAssertionExpression(current)) {
+        current = current.expression;
+      } else {
+        break;
+      }
+    }
+    return current;
+  };
+
+  /**
+   * Extract return type from a defineFunction call
+   */
+  const extractFromDefineCall = (
+    callExpr: ts.CallExpression,
+    propertyName: ts.PropertyName | string,
+  ) => {
     const arg = callExpr.arguments[0];
-    if (!arg || !ts.isObjectLiteralExpression(arg)) return;
+    if (!arg) {
+      return;
+    }
+
+    if (!ts.isObjectLiteralExpression(arg)) {
+      return;
+    }
 
     const runProp = arg.properties.find(
       (x): x is ts.PropertyAssignment => ts.isPropertyAssignment(x) && x.name.getText() === "run",
     );
-    if (!runProp) return;
+    if (!runProp) {
+      return;
+    }
 
     const runExpr = runProp.initializer;
-    if (!ts.isFunctionLike(runExpr)) return;
+
+    if (!ts.isFunctionLike(runExpr)) {
+      return;
+    }
 
     const sig = checker.getSignatureFromDeclaration(runExpr);
-    if (!sig) return;
+    if (!sig) {
+      return;
+    }
 
     const rt = checker.getReturnTypeOfSignature(sig);
-    result.set(propertyName, checker.typeToString(rt));
+    // const typeString = checker.typeToString(rt);
+    result.set(propertyName, resolveTypeToStructure(checker, rt));
   };
 
   /**
-   * Check if a call expression is a define function call (defineFunction, defineAdminFunction, etc.)
+   * Check if a call expression is a define function call
    */
   const isDefineFunctionCall = (node: ts.Node): node is ts.CallExpression => {
     if (!ts.isCallExpression(node)) return false;
     const callee = node.expression;
     if (ts.isIdentifier(callee)) {
       const name = callee.getText();
-      return name.includes("define") && name.toLowerCase().includes("function");
+      const isDefine =
+        name.toLowerCase().includes("define") && name.toLowerCase().includes("function");
+
+      return isDefine;
     }
     return false;
   };
 
   /**
-   * Extract methods from an object literal expression (the return value)
+   * Extract methods from an object literal that contains method definitions
    */
-  const extractFromObjectLiteral = (obj: ts.ObjectLiteralExpression) => {
+  const extractMethodsFromObjectLiteral = (obj: ts.ObjectLiteralExpression, depth = 0) => {
     for (const prop of obj.properties) {
-      // Handle: methodName: defineFunction({ ... })
       if (ts.isPropertyAssignment(prop)) {
+        const propName = prop.name.getText();
+
         if (isDefineFunctionCall(prop.initializer)) {
-          extractFromDefineCall(prop.initializer, prop.name.getText());
+          extractFromDefineCall(prop.initializer, propName);
+        }
+
+        if (ts.isCallExpression(prop.initializer)) {
+          extractFromDefineCall(prop.initializer, propName);
         }
       }
 
-      // Handle: ...adminMethods (spread of a variable containing methods)
       if (ts.isSpreadAssignment(prop)) {
         const spreadExpr = prop.expression;
 
-        // If it's an identifier, resolve it
         if (ts.isIdentifier(spreadExpr)) {
           const symbol = checker.getSymbolAtLocation(spreadExpr);
+
           const decl = getDeclarationFromSymbol(symbol);
 
           if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
-            // The variable might be an object literal with methods
             if (ts.isObjectLiteralExpression(decl.initializer)) {
-              extractMethodsFromObjectLiteral(decl.initializer);
+              extractMethodsFromObjectLiteral(decl.initializer, depth + 2);
             }
           }
         }
 
-        // If it's directly an object literal
         if (ts.isObjectLiteralExpression(spreadExpr)) {
-          extractMethodsFromObjectLiteral(spreadExpr);
+          extractMethodsFromObjectLiteral(spreadExpr, depth + 2);
+        }
+
+        // Handle await expressions: ...await someAsyncFunction()
+        if (ts.isAwaitExpression(spreadExpr)) {
+          const awaitedExpr = spreadExpr.expression;
+
+          if (ts.isCallExpression(awaitedExpr)) {
+            // Resolve the function being called and extract from its return
+            const calleeExpr = awaitedExpr.expression;
+            if (ts.isIdentifier(calleeExpr)) {
+              const symbol = checker.getSymbolAtLocation(calleeExpr);
+              const decl = getDeclarationFromSymbol(symbol);
+
+              if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
+                const body = resolveFunctionBody(decl.initializer);
+                if (body) {
+                  extractFromFunctionBody(body, depth + 2);
+                }
+              }
+              if (decl && ts.isFunctionDeclaration(decl) && decl.body) {
+                extractFromFunctionBody(decl.body, depth + 2);
+              }
+            }
+          }
         }
       }
 
-      // Handle shorthand: { methodName } where methodName is a variable
       if (ts.isShorthandPropertyAssignment(prop)) {
+        const propName = prop.name.getText();
+
         const symbol = checker.getShorthandAssignmentValueSymbol(prop);
         const decl = symbol?.valueDeclaration;
         if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
           if (isDefineFunctionCall(decl.initializer)) {
-            extractFromDefineCall(decl.initializer, prop.name.getText());
+            extractFromDefineCall(decl.initializer, propName);
           }
         }
       }
@@ -115,112 +187,91 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
   };
 
   /**
-   * Extract methods from an object literal that contains method definitions
-   * (like the adminMethods object)
+   * Find return statements in a function body
    */
-  const extractMethodsFromObjectLiteral = (obj: ts.ObjectLiteralExpression) => {
-    for (const prop of obj.properties) {
-      if (ts.isPropertyAssignment(prop)) {
-        if (isDefineFunctionCall(prop.initializer)) {
-          extractFromDefineCall(prop.initializer, prop.name.getText());
-        }
+  const findReturnStatements = (node: ts.Node) => {
+    const returns: ts.ReturnStatement[] = [];
+
+    const visit = (n: ts.Node) => {
+      if (ts.isReturnStatement(n)) {
+        returns.push(n);
       }
-    }
+      if (!ts.isFunctionLike(n) || n === node) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(node, visit);
+    return returns;
   };
 
   /**
-   * Find return statements in a function body and extract from returned object literals
+   * Extract from function body
    */
-  const extractFromFunctionBody = (body: ts.Block | ts.ConciseBody) => {
+  const extractFromFunctionBody = (body: ts.FunctionBody | ts.ConciseBody, depth = 0) => {
     // Handle concise body: () => ({ ... })
     if (!ts.isBlock(body)) {
-      if (ts.isObjectLiteralExpression(body)) {
-        extractFromObjectLiteral(body);
-      }
-      // Handle: () => someVariable
-      if (ts.isIdentifier(body)) {
-        const symbol = checker.getSymbolAtLocation(body);
-        const decl = getDeclarationFromSymbol(symbol);
-        if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
-          if (ts.isObjectLiteralExpression(decl.initializer)) {
-            extractFromObjectLiteral(decl.initializer);
-          }
-        }
+      const unwrapped = unwrapExpression(body);
+      if (ts.isObjectLiteralExpression(unwrapped)) {
+        extractMethodsFromObjectLiteral(unwrapped, depth + 1);
       }
       return;
     }
 
-    // Find all return statements (there might be multiple in async functions)
-    const findReturnStatements = (node: ts.Node): ts.ReturnStatement[] => {
-      const returns: ts.ReturnStatement[] = [];
-
-      const visit = (n: ts.Node) => {
-        if (ts.isReturnStatement(n)) {
-          returns.push(n);
-        }
-        // Don't descend into nested functions
-        if (!ts.isFunctionLike(n)) {
-          ts.forEachChild(n, visit);
-        }
-      };
-
-      ts.forEachChild(node, visit);
-      return returns;
-    };
-
     const returnStatements = findReturnStatements(body);
 
-    for (const ret of returnStatements) {
-      if (!ret.expression) continue;
+    for (let i = 0; i < returnStatements.length; i++) {
+      const ret = returnStatements[i];
+
+      if (!ret?.expression) {
+        continue;
+      }
+
+      // Unwrap any type assertions
+      const unwrapped = unwrapExpression(ret.expression);
 
       // Direct object literal return
-      if (ts.isObjectLiteralExpression(ret.expression)) {
-        extractFromObjectLiteral(ret.expression);
+      if (ts.isObjectLiteralExpression(unwrapped)) {
+        extractMethodsFromObjectLiteral(unwrapped, depth + 2);
       }
 
       // Return of a variable: return result
-      if (ts.isIdentifier(ret.expression)) {
-        const symbol = checker.getSymbolAtLocation(ret.expression);
+      if (ts.isIdentifier(unwrapped)) {
+        const identName = unwrapped.getText();
+
+        const symbol = checker.getSymbolAtLocation(unwrapped);
         const decl = getDeclarationFromSymbol(symbol);
         if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
           if (ts.isObjectLiteralExpression(decl.initializer)) {
-            extractFromObjectLiteral(decl.initializer);
+            extractMethodsFromObjectLiteral(decl.initializer, depth + 2);
           }
-        }
-      }
-
-      // Handle: return { ...a, ...b } as SomeType
-      if (ts.isAsExpression(ret.expression)) {
-        if (ts.isObjectLiteralExpression(ret.expression.expression)) {
-          extractFromObjectLiteral(ret.expression.expression);
         }
       }
     }
   };
 
-  const resolveFunctionBody = (expr: ts.Expression): ts.Block | ts.ConciseBody | undefined => {
-    // Case 1: Inline arrow function (including async)
+  const resolveFunctionBody = (expr: ts.Expression) => {
+    // Arrow function (including async)
     if (ts.isArrowFunction(expr)) {
       return expr.body;
     }
 
-    // Case 2: Inline function expression
+    // Function expression
     if (ts.isFunctionExpression(expr)) {
       return expr.body;
     }
 
-    // Case 3: Identifier referencing a function
+    // Identifier referencing a function
     if (ts.isIdentifier(expr)) {
       const symbol = checker.getSymbolAtLocation(expr);
+
       const decl = getDeclarationFromSymbol(symbol);
 
       if (decl) {
-        // Variable declaration: const getServerFunctions = () => { ... }
         if (ts.isVariableDeclaration(decl) && decl.initializer) {
           return resolveFunctionBody(decl.initializer);
         }
 
-        // Function declaration: function getServerFunctions() { ... }
         if (ts.isFunctionDeclaration(decl) && decl.body) {
           return decl.body;
         }
@@ -230,18 +281,21 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
     return undefined;
   };
 
-  const visit = (n: ts.Node): void => {
+  const visit = (n: ts.Node) => {
+    // Look for: functions: someExpression
     if (ts.isPropertyAssignment(n) && n.name.getText() === "functions") {
       const body = resolveFunctionBody(n.initializer);
       if (body) {
         extractFromFunctionBody(body);
+      } else {
+        console.warn("Could not resolve functions property initializer:", n.initializer.getText());
       }
     }
 
-    // Also handle shorthand: { functions }
+    // Look for: { functions } (shorthand)
     if (ts.isShorthandPropertyAssignment(n) && n.name.getText() === "functions") {
       const symbol = checker.getShorthandAssignmentValueSymbol(n);
-      const decl = getDeclarationFromSymbol(symbol);
+      const decl = symbol?.valueDeclaration;
 
       if (decl && ts.isVariableDeclaration(decl) && decl.initializer) {
         const body = resolveFunctionBody(decl.initializer);
@@ -255,5 +309,6 @@ export const getServerFunctionReturnTypes = (instancePath: string) => {
   };
 
   visit(sf);
+
   return result;
 };
