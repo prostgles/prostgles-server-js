@@ -5,7 +5,7 @@ import { getMethodsDocs } from "./getMethodsDocs";
 import { getResolvedTypes } from "./getResolvedTypes";
 import { TS_Object } from "./getSerializableType/getSerializableType";
 import { renderTsType } from "./renderTsType";
-import { writeFileSyncIfDifferent } from "writeFileSyncIfDifferent";
+import { writeFileSyncIfDifferent } from "./writeFileSyncIfDifferent";
 
 const testFolderPath = `${__dirname}/../../../tests/`;
 const docsFolder = `${__dirname}/../../`;
