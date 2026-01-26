@@ -1,5 +1,5 @@
 import type { AnyObject } from "prostgles-types";
-import { CHANNELS } from "prostgles-types";
+import { CHANNELS, getProperty, isDefined } from "prostgles-types";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
@@ -189,17 +189,26 @@ export class AuthHandler {
       return this.validateSid(rawSid);
     }
 
-    const [tokenType, base64Token] = maybeClientReq.httpReq.headers.authorization?.split(" ") ?? [];
-    let bearerSid: string | undefined;
-    if (tokenType && base64Token) {
-      if (tokenType.trim() !== "Bearer") {
-        throw "Only Bearer Authorization header allowed";
-      }
-      bearerSid = Buffer.from(base64Token, "base64").toString();
+    const authorizationHeader = maybeClientReq.httpReq.headers.authorization;
+    const authToken = (["Bearer", "Basic"] as const)
+      .map((type) =>
+        authorizationHeader?.startsWith(type) ?
+          { type, token: authorizationHeader.slice(type.length + 1) }
+        : undefined,
+      )
+      .find(isDefined);
+
+    if (authorizationHeader && !authToken) {
+      throw "Invalid Authorization header format";
     }
+    if (authToken && authToken.type !== "Bearer") {
+      throw "Only Bearer Authorization header allowed";
+    }
+
+    const bearerSid = authToken && Buffer.from(authToken.token, "base64").toString();
+
     return this.validateSid(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      bearerSid ?? (maybeClientReq.httpReq.cookies?.[sidKeyName] as string | undefined),
+      bearerSid ?? (getProperty(maybeClientReq.httpReq.cookies, sidKeyName) as string | undefined),
     );
   }
 

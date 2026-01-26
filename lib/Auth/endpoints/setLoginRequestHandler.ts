@@ -1,7 +1,7 @@
 import type e from "express";
 import type { Response } from "express";
 import type { AuthRequest, AuthResponse } from "prostgles-types";
-import { isDefined, isObject } from "prostgles-types";
+import { getJSONBSchemaValidationError } from "prostgles-types";
 import type { AuthHandler } from "../AuthHandler";
 import { HTTP_FAIL_CODES } from "../AuthHandler";
 import type { LoginParams } from "../AuthTypes";
@@ -37,36 +37,25 @@ export function setLoginRequestHandler(this: AuthHandler, app: e.Express) {
 }
 
 export const parseLoginData = (
-  bodyData: any
+  bodyData: any,
 ): [string, undefined] | [undefined, AuthRequest.LoginData] => {
-  const loginData: AuthRequest.LoginData = {
-    username: "",
-    remember_me: !!bodyData?.remember_me,
-  };
+  const loginDataValidation = getJSONBSchemaValidationError(
+    {
+      type: {
+        username: "string",
+        password: { type: "string", optional: true },
+        remember_me: { type: "boolean", optional: true },
+        totp_token: { type: "string", optional: true },
+        totp_recovery_code: { type: "string", optional: true },
+      },
+    },
+    bodyData,
+  );
 
-  (["username", "password", "totp_token", "totp_recovery_code"] as const).forEach((prop) => {
-    const valOrError = getStringOrUndefined(bodyData[prop], prop);
-    if (isObject(valOrError)) {
-      return valOrError;
-    }
-    if (prop === "username") {
-      if (!isDefined(valOrError) || !valOrError) {
-        return ["username error: Expected non-empty string"];
-      }
-      loginData[prop] = valOrError;
-    } else {
-      loginData[prop] = valOrError;
-    }
-  });
+  if (loginDataValidation.error !== undefined) {
+    return [loginDataValidation.error, undefined];
+  }
+  const loginData = loginDataValidation.data;
 
   return [undefined, loginData];
-};
-
-const getStringOrUndefined = (
-  val: any,
-  propName: string
-): string | undefined | { error: string } => {
-  const isStringOrUndefined = typeof val === "string" || val === undefined;
-  if (!isStringOrUndefined) return { error: `${propName} error: Expected string or undefined` };
-  return val;
 };

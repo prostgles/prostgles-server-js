@@ -9,7 +9,7 @@ export async function login(
   this: AuthHandler,
   req: ExpressReq,
   res: LoginResponseHandler,
-  loginParams: LoginParams
+  loginParams: LoginParams,
 ) {
   const start = Date.now();
   const { responseThrottle = 500 } = this.opts;
@@ -32,7 +32,7 @@ export async function login(
           loginSignupConfig: this.opts.loginSignupConfig,
           websiteUrl,
           data,
-        })
+        }),
     );
 
     if (typeof result === "string" || !result.session) {
@@ -66,7 +66,13 @@ export async function login(
 
   if (!loginResponse.session) {
     if (!loginResponse.response.success) {
-      return res.status(HTTP_FAIL_CODES.BAD_REQUEST).json(loginResponse.response);
+      const errorCode = loginResponse.response.code;
+      const statusCode =
+        errorCode === "server-error" ? HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR
+        : errorCode === "password-missing" ? HTTP_FAIL_CODES.UNAUTHORIZED
+        : errorCode === "totp-token-missing" ? HTTP_FAIL_CODES.UNAUTHORIZED
+        : HTTP_FAIL_CODES.BAD_REQUEST;
+      return res.status(statusCode).json(loginResponse.response);
     }
     return res.json(loginResponse.response);
   }
@@ -81,13 +87,13 @@ export const getBasicSessionErrorCode = (session: Pick<BasicSession, "expires" |
   }
   if (sid && (typeof sid !== "string" || typeof expires !== "number")) {
     console.error(
-      "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }"
+      "Bad login result type. \nExpecting: undefined | null | { sid: string; expires: number }",
     );
     return "server-error";
   }
   if (expires < Date.now()) {
     console.error(
-      "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()"
+      "auth.login() is returning an expired session. Can only login with a session.expires greater than Date.now()",
     );
     return "server-error";
   }
