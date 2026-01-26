@@ -118,16 +118,23 @@ export const resolveTypeToStructure = (
 
   // Handle object types - expand to structural form
   const props = type.getProperties();
-  const oProps = checker.getPropertiesOfType(type);
+  const apparent = checker.getApparentType(type);
+  const oProps = checker.getPropertiesOfType(apparent);
   const properties = props.length ? props : oProps;
   if (properties.length > 0 || type.flags & ts.TypeFlags.Object) {
     const members: string[] = [];
 
     for (const prop of properties) {
       const propDecl = prop.valueDeclaration ?? prop.declarations?.[0];
-      if (!propDecl) continue;
+      let propType: ts.Type;
+      if (propDecl) {
+        propType = checker.getTypeOfSymbolAtLocation(prop, propDecl);
+      } else {
+        // For mapped type properties or synthetic properties without declarations,
+        // get the type directly from the symbol
+        propType = checker.getTypeOfSymbol(prop);
+      }
 
-      const propType = checker.getTypeOfSymbolAtLocation(prop, propDecl);
       const propTypeStr = resolveTypeToStructure(
         globalBuiltIns,
         functionName,
