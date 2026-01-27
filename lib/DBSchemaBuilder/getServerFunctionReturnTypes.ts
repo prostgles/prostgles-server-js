@@ -60,7 +60,7 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
           finalRunReturnType.symbol?.valueDeclaration &&
           ts.isFunctionLike(finalRunReturnType.symbol.valueDeclaration)
         ) {
-          finalRunReturnType = checker.getAwaitedType(
+          finalRunReturnType = unwrapMaybePromise(
             checker.getReturnTypeOfSignature(finalRunReturnType.getCallSignatures()[0]!),
           );
         }

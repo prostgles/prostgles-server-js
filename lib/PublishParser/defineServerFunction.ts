@@ -54,3 +54,58 @@ export const createServerFunctionWithContext = <Context>(
         ),
     }) satisfies ServerFunctionDefinition;
 };
+
+type InputOf<T> = T extends { input?: infer I } ? I : undefined;
+
+// if inference fails or is invalid → fall back to undefined
+type SafeInput<I> = I extends Record<string, JSONB.FieldType> ? I : undefined;
+
+type ServerFunctionArgsFrom<Context, Def> = {
+  input?: InputOf<Def>;
+  description?: string;
+  run: (
+    args: JSONBObjectTypeIfDefined<SafeInput<InputOf<Def>>>,
+    context: Context,
+  ) => MaybePromise<any>;
+};
+
+type ServerFunctionBlock<Context, Defs> = {
+  [K in keyof Defs]: ServerFunctionArgsFrom<Context, Defs[K]>;
+};
+
+type WrappedDef<Context, Def> =
+  Def extends (
+    {
+      input?: infer I;
+      description?: infer D;
+      run: (a: any, c: Context) => infer R;
+    }
+  ) ?
+    {
+      input?: SafeInput<I>;
+      description?: D extends string ? D : string | undefined;
+      run: undefined | ((a: any) => R); // keep return type, widen args
+    }
+  : never;
+
+type WrappedBlock<Context, Defs> = {
+  [K in keyof Defs]: WrappedDef<Context, Defs[K]>;
+};
+
+export const createServerFunctionBlockWithContext = <Context>(context: Context | undefined) => {
+  return <const Defs extends Record<string, any>>(
+    defs: Defs & ServerFunctionBlock<Context, Defs>,
+  ): WrappedBlock<Context, Defs> => {
+    const wrapped = {} as WrappedBlock<Context, Defs>;
+
+    for (const key in defs) {
+      const def = defs[key];
+      wrapped[key] = {
+        ...def,
+        run: context === undefined ? undefined : (args: any) => def.run(args, context),
+      };
+    }
+
+    return wrapped satisfies Record<string, ServerFunctionDefinition>;
+  };
+};

@@ -12,6 +12,8 @@ export const useProstglesTest = async (
   getSocketOptions: (watchSchema?: boolean) => UseProstglesClientProps,
 ) => {
   await sql(`DROP TABLE IF EXISTS ${newly_created_table};`);
+  /** Wait for schema changes to propagate */
+  await sql(`select pg_sleep(3);`);
   await describe("useProstgles hook", async (t) => {
     const clientOptions = getSocketOptions();
     await test("useProstglesClient", async (t) => {

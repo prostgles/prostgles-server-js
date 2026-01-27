@@ -1,6 +1,9 @@
 import express from "express";
 import path from "path";
-import prostgles, { createServerFunctionWithContext } from "prostgles-server";
+import prostgles, {
+  createServerFunctionBlockWithContext,
+  createServerFunctionWithContext,
+} from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig } from "./testTableConfig";
@@ -226,6 +229,9 @@ function dd() {
       const forAdmins = createServerFunctionWithContext(
         params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined,
       );
+      const forDefaultUsers = createServerFunctionBlockWithContext(
+        params?.user?.type === "default" ? { ...params, type: "default" as const } : undefined,
+      );
       const result = {
         myfunc: forAllUsers({
           input: { arg1: { type: "number" } },
@@ -266,6 +272,23 @@ function dd() {
             } else {
               return [1, 2, 3];
             }
+          },
+        }),
+        ...forDefaultUsers({
+          myfuncForDefault: {
+            run: async () => {
+              await new Promise((res) => setTimeout(res, 100));
+            },
+          },
+          myfuncForDefault2: {
+            input: { name: "string" },
+            run: async () => {
+              await new Promise((res) => setTimeout(res, 100));
+              if (Math.PI) {
+                return { a: 1 };
+              }
+              return { b: "1" };
+            },
           },
         }),
       } as const;

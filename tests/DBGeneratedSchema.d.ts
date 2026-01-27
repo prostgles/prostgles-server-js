@@ -562,4 +562,6 @@ export type GeneratedFunctionSchema = {
   "myAdminFunc": (args: {    arg1: number;  }) => Promise<number>;
   "myfuncWithBadReturn": (args: {    arg1: number;  }) => Promise<string>;
   "myfuncWithComplexReturn": (args: {    arg1: number;  }) => Promise<(Array<number> | { a: number; b: string; c: { d: boolean } })>;
+  "myfuncForDefault": () => Promise<void>;
+  "myfuncForDefault2": (args: {    name: string;  }) => Promise<({ a: number; b?: undefined } | { b: string; a?: undefined })>;
 }
