@@ -226,7 +226,7 @@ function dd() {
       const forAdmins = createServerFunctionWithContext(
         params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined,
       );
-      return {
+      const result = {
         myfunc: forAllUsers({
           input: { arg1: { type: "number" } },
           run: (
@@ -268,7 +268,9 @@ function dd() {
             }
           },
         }),
-      };
+      } as const;
+
+      return result;
     },
     publish: testPublish,
     publishRawSQL: async (params) => {

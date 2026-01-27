@@ -29,16 +29,19 @@ export type ServerFunctionDefinitions<S = void, SUser extends SessionUser = Sess
   params: undefined | PublishParams<S, SUser>,
 ) => MaybePromise<Record<string, ServerFunctionDefinition>>;
 
-export const createServerFunctionWithContext = <C>(
+export const createServerFunctionWithContext = <Context>(
   /**
    * undefined if not allowed
    */
-  context: C | undefined,
+  context: Context | undefined,
 ) => {
-  return <TInput extends Record<string, JSONB.FieldType> | undefined = undefined>(args: {
-    input?: TInput;
+  return <
+    Input extends Record<string, JSONB.FieldType> | undefined,
+    Run extends (args: JSONBObjectTypeIfDefined<Input>, context: Context) => MaybePromise<any>,
+  >(args: {
+    input?: Input;
     description?: string;
-    run: (args: JSONBObjectTypeIfDefined<TInput>, context: C) => MaybePromise<unknown>;
+    run: Run;
   }) =>
     ({
       ...args,
@@ -46,8 +49,8 @@ export const createServerFunctionWithContext = <C>(
         context === undefined ? undefined : (
           (validatedArgs: any) => {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            return args.run(validatedArgs, context);
+            return args.run(validatedArgs, context) as Run;
           }
         ),
-    }) as ServerFunctionDefinition;
+    }) satisfies ServerFunctionDefinition;
 };
