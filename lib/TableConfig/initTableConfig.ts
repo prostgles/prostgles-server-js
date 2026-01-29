@@ -258,21 +258,30 @@ export const initTableConfig = async function (this: TableConfigurator) {
               .filter((v) => v)
               .join(" ") + ";";
           const indexDefinitionHash = md5(indexDefinition);
-          const indexExistsAndDefinitionChanged = currIndexes.some(
+          const indexExistsWithDifferentDefinition = currIndexes.some(
             (idx) => idx.indexname === indexName && idx.description !== indexDefinitionHash,
           );
-          if (
-            indexExistsAndDefinitionChanged ||
-            replace ||
-            (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)
-          ) {
-            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)} CASCADE;`);
+          const indexShouldBeReplaced =
+            replace || (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes);
+          const oldIndexToBeDroppedName = indexName + "_old_idx_to_drop";
+          if (indexShouldBeReplaced) {
+            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
+          } else if (indexExistsWithDifferentDefinition) {
+            /** Try to prevent cascading dependency issues when removing it */
+            queries.push(
+              `ALTER INDEX ${asName(indexName)} RENAME TO ${asName(oldIndexToBeDroppedName)};`,
+            );
           }
-          if (!currIndexes.some((idx) => idx.indexname === indexName)) {
+          if (
+            indexExistsWithDifferentDefinition ||
+            indexShouldBeReplaced ||
+            !currIndexes.some((idx) => idx.indexname === indexName)
+          ) {
             queries.push(indexDefinition);
             queries.push(
               `COMMENT ON INDEX ${asName(indexName)} IS ${asValue(indexDefinitionHash)};`,
             );
+            queries.push(`DROP INDEX IF EXISTS ${oldIndexToBeDroppedName};`);
           }
         },
       );
