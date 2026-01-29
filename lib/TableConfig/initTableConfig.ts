@@ -266,7 +266,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
             replace ||
             (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)
           ) {
-            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
+            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)} CASCADE;`);
           }
           if (!currIndexes.some((idx) => idx.indexname === indexName)) {
             queries.push(indexDefinition);
