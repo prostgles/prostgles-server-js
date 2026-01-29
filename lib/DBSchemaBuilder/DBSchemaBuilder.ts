@@ -1,11 +1,4 @@
-import type {
-  AnyObject,
-  DBSchema,
-  SQLHandler,
-  TableHandler,
-  TableSchema,
-  ViewHandler,
-} from "prostgles-types";
+import type { AnyObject, DBSchema, TableHandler, ViewHandler } from "prostgles-types";
 import type { TX } from "../DboBuilder/DboBuilderTypes";
 import type {
   PublishAllOrNothing,
@@ -13,47 +6,6 @@ import type {
   PublishViewRule,
 } from "../PublishParser/PublishParser";
 import { type PublishObject } from "../PublishParser/PublishParser";
-import type { TableConfig } from "../TableConfig/TableConfig";
-import { escapeTSNames } from "../utils/utils";
-import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
-
-export const getDBTypescriptSchema = ({
-  tablesOrViews,
-  config,
-}: {
-  tablesOrViews: TableSchema[];
-  config: TableConfig | undefined;
-}): string => {
-  const tables: string[] = [];
-
-  /** Tables and columns are sorted to avoid infinite loops due to changing order */
-  tablesOrViews
-    .slice(0)
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((tableOrView) => {
-      const { privileges, columns } = tableOrView;
-      const cols = columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
-      tables.push(`${escapeTSNames(tableOrView.name)}: {
-    is_view: ${tableOrView.is_view};
-    select: ${privileges.select};
-    insert: ${privileges.insert};
-    update: ${privileges.update};
-    delete: ${privileges.delete};
-    columns: {${cols
-      .map(
-        (column) => `
-      ${getColumnTypescriptDefinition({ tablesOrViews, config, tableOrView, column })}`,
-      )
-      .join("")}
-    };
-  };\n  `);
-    });
-  return `
-export type DBGeneratedSchema = {
-  ${tables.join("")}
-}
-`;
-};
 
 export type ServerViewHandler<
   T extends AnyObject = AnyObject,

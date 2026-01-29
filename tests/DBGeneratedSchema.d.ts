@@ -2,11 +2,7 @@
 
 export type DBGeneratedSchema = {
   "\"\"\"*\"\"\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"*\""?: null | string;
       id?: number;
@@ -14,11 +10,7 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted0\"\"\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id0\""?: number;
       "\"quoted1_id\""?: null | number;
@@ -26,11 +18,7 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted1\"\"\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id1\""?: number;
       "\"quoted2_id\""?: null | number;
@@ -38,44 +26,28 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted2\"\"\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id2\""?: number;
       "\"text_col2\""?: null | string;
     };
   };
   "\"*\"": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "*"?: null | string;
       id?: number;
     };
   };
   api_table: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       col1?: null | string;
       id?: number;
     };
   };
   ex_j_ins: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -84,11 +56,7 @@ export type DBGeneratedSchema = {
     };
   };
   files: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: string;
       cloud_url?: null | string;
@@ -108,11 +76,7 @@ export type DBGeneratedSchema = {
     };
   };
   geography_columns: {
-    is_view: true;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       coord_dimension?: null | number;
       f_geography_column?: null | string;
@@ -124,11 +88,7 @@ export type DBGeneratedSchema = {
     };
   };
   geometry_columns: {
-    is_view: true;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       coord_dimension?: null | number;
       f_geometry_column?: null | string;
@@ -140,11 +100,7 @@ export type DBGeneratedSchema = {
     };
   };
   insert_rules: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -152,11 +108,7 @@ export type DBGeneratedSchema = {
     };
   };
   items: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       h?: null | string[];
       id?: number;
@@ -164,11 +116,7 @@ export type DBGeneratedSchema = {
     };
   };
   items_multi: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       items0_id?: null | number;
@@ -179,11 +127,7 @@ export type DBGeneratedSchema = {
     };
   };
   items2: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       hh?: null | string[];
       id?: number;
@@ -192,11 +136,7 @@ export type DBGeneratedSchema = {
     };
   };
   items3: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       h?: null | string[];
       id?: number;
@@ -204,11 +144,7 @@ export type DBGeneratedSchema = {
     };
   };
   items4: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -217,11 +153,7 @@ export type DBGeneratedSchema = {
     };
   };
   items4_pub: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -230,11 +162,7 @@ export type DBGeneratedSchema = {
     };
   };
   items4a: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       items_id?: null | number;
@@ -243,43 +171,27 @@ export type DBGeneratedSchema = {
     };
   };
   lookup_col1: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       description?: null | string;
       id: "a" | "b"
     };
   };
   newly_created_table: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
     };
   };
   obj_table: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       obj?: null | any;
     };
   };
   planes: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       flight_number?: null | string;
       id?: number;
@@ -289,22 +201,14 @@ export type DBGeneratedSchema = {
     };
   };
   "prostgles_test.basic": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       txt?: null | string;
     };
   };
   "prostgles_test.basic1": {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       id_basic?: null | number;
@@ -312,11 +216,7 @@ export type DBGeneratedSchema = {
     };
   };
   "prostgles_test.mv_basic1": {
-    is_view: true;
-    select: true;
-    insert: false;
-    update: false;
-    delete: false;
+  is_view: true;,  select: true;
     columns: {
       id: number;
       id_basic: number;
@@ -324,11 +224,7 @@ export type DBGeneratedSchema = {
     };
   };
   rec: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       parent_id?: null | number;
@@ -336,21 +232,13 @@ export type DBGeneratedSchema = {
     };
   };
   rec_ref: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
     };
   };
   self_join: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       my_id?: null | number;
@@ -359,11 +247,7 @@ export type DBGeneratedSchema = {
     };
   };
   shapes: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       geog?: null | string;
       geom?: null | string;
@@ -371,11 +255,7 @@ export type DBGeneratedSchema = {
     };
   };
   spatial_ref_sys: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       auth_name?: null | string;
       auth_srid?: null | number;
@@ -385,42 +265,26 @@ export type DBGeneratedSchema = {
     };
   };
   symbols: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id: string;
     };
   };
   table_name3434: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id: number;
     };
   };
   table_name3434cccc: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
       id2?: null | number;
     };
   };
   tjson: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       colOneOf: "a" | "b" | "c"
       json: {    a: boolean;   arr: "1" | "2" | "3";   arr1: 1 | 2 | 3;   arr2: number[];   arrStr?: null | string[];   o?: | null
@@ -439,22 +303,14 @@ export type DBGeneratedSchema = {
     };
   };
   tr1: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t1?: null | string;
     };
   };
   tr2: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t1?: null | string;
@@ -463,11 +319,7 @@ export type DBGeneratedSchema = {
     };
   };
   tr3: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t2?: null | string;
@@ -475,11 +327,7 @@ export type DBGeneratedSchema = {
     };
   };
   trades: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       price: string;
@@ -487,11 +335,7 @@ export type DBGeneratedSchema = {
     };
   };
   users: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       email: string;
       id?: number;
@@ -500,11 +344,7 @@ export type DBGeneratedSchema = {
     };
   };
   users_public_info: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       avatar?: null | string;
       id?: number;
@@ -513,11 +353,7 @@ export type DBGeneratedSchema = {
     };
   };
   uuid_text: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       col1?: null | "a" | "b"
       col2?: null | "a" | "b"
@@ -526,22 +362,14 @@ export type DBGeneratedSchema = {
     };
   };
   v_items: {
-    is_view: true;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
       name?: null | string;
     };
   };
   various: {
-    is_view: false;
-    select: true;
-    insert: true;
-    update: true;
-    delete: true;
+  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       h?: null | string[];
