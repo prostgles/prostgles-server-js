@@ -2,7 +2,6 @@
 
 export type DBGeneratedSchema = {
   "\"\"\"*\"\"\"": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"*\""?: null | string;
       id?: number;
@@ -10,7 +9,6 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted0\"\"\"": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id0\""?: number;
       "\"quoted1_id\""?: null | number;
@@ -18,7 +16,6 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted1\"\"\"": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id1\""?: number;
       "\"quoted2_id\""?: null | number;
@@ -26,28 +23,24 @@ export type DBGeneratedSchema = {
     };
   };
   "\"\"\"quoted2\"\"\"": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "\"id2\""?: number;
       "\"text_col2\""?: null | string;
     };
   };
   "\"*\"": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       "*"?: null | string;
       id?: number;
     };
   };
   api_table: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       col1?: null | string;
       id?: number;
     };
   };
   ex_j_ins: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -56,7 +49,6 @@ export type DBGeneratedSchema = {
     };
   };
   files: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: string;
       cloud_url?: null | string;
@@ -76,7 +68,6 @@ export type DBGeneratedSchema = {
     };
   };
   geography_columns: {
-  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       coord_dimension?: null | number;
       f_geography_column?: null | string;
@@ -88,7 +79,6 @@ export type DBGeneratedSchema = {
     };
   };
   geometry_columns: {
-  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       coord_dimension?: null | number;
       f_geometry_column?: null | string;
@@ -100,7 +90,6 @@ export type DBGeneratedSchema = {
     };
   };
   insert_rules: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -108,7 +97,6 @@ export type DBGeneratedSchema = {
     };
   };
   items: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       h?: null | string[];
       id?: number;
@@ -116,7 +104,6 @@ export type DBGeneratedSchema = {
     };
   };
   items_multi: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       items0_id?: null | number;
@@ -127,7 +114,6 @@ export type DBGeneratedSchema = {
     };
   };
   items2: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       hh?: null | string[];
       id?: number;
@@ -136,7 +122,6 @@ export type DBGeneratedSchema = {
     };
   };
   items3: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       h?: null | string[];
       id?: number;
@@ -144,7 +129,6 @@ export type DBGeneratedSchema = {
     };
   };
   items4: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -153,7 +137,6 @@ export type DBGeneratedSchema = {
     };
   };
   items4_pub: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       id?: number;
@@ -162,7 +145,6 @@ export type DBGeneratedSchema = {
     };
   };
   items4a: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       items_id?: null | number;
@@ -171,27 +153,23 @@ export type DBGeneratedSchema = {
     };
   };
   lookup_col1: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       description?: null | string;
       id: "a" | "b"
     };
   };
   newly_created_table: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
     };
   };
   obj_table: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       obj?: null | any;
     };
   };
   planes: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       flight_number?: null | string;
       id?: number;
@@ -201,14 +179,12 @@ export type DBGeneratedSchema = {
     };
   };
   "prostgles_test.basic": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       txt?: null | string;
     };
   };
   "prostgles_test.basic1": {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       id_basic?: null | number;
@@ -216,7 +192,6 @@ export type DBGeneratedSchema = {
     };
   };
   "prostgles_test.mv_basic1": {
-  is_view: true;,  select: true;
     columns: {
       id: number;
       id_basic: number;
@@ -224,7 +199,6 @@ export type DBGeneratedSchema = {
     };
   };
   rec: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       parent_id?: null | number;
@@ -232,13 +206,11 @@ export type DBGeneratedSchema = {
     };
   };
   rec_ref: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
     };
   };
   self_join: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       my_id?: null | number;
@@ -247,7 +219,6 @@ export type DBGeneratedSchema = {
     };
   };
   shapes: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       geog?: null | string;
       geom?: null | string;
@@ -255,7 +226,6 @@ export type DBGeneratedSchema = {
     };
   };
   spatial_ref_sys: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       auth_name?: null | string;
       auth_srid?: null | number;
@@ -265,26 +235,22 @@ export type DBGeneratedSchema = {
     };
   };
   symbols: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id: string;
     };
   };
   table_name3434: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id: number;
     };
   };
   table_name3434cccc: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
       id2?: null | number;
     };
   };
   tjson: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       colOneOf: "a" | "b" | "c"
       json: {    a: boolean;   arr: "1" | "2" | "3";   arr1: 1 | 2 | 3;   arr2: number[];   arrStr?: null | string[];   o?: | null
@@ -303,14 +269,12 @@ export type DBGeneratedSchema = {
     };
   };
   tr1: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t1?: null | string;
     };
   };
   tr2: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t1?: null | string;
@@ -319,7 +283,6 @@ export type DBGeneratedSchema = {
     };
   };
   tr3: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       t2?: null | string;
@@ -327,7 +290,6 @@ export type DBGeneratedSchema = {
     };
   };
   trades: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: number;
       price: string;
@@ -335,7 +297,6 @@ export type DBGeneratedSchema = {
     };
   };
   users: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       email: string;
       id?: number;
@@ -344,7 +305,6 @@ export type DBGeneratedSchema = {
     };
   };
   users_public_info: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       avatar?: null | string;
       id?: number;
@@ -353,7 +313,6 @@ export type DBGeneratedSchema = {
     };
   };
   uuid_text: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       col1?: null | "a" | "b"
       col2?: null | "a" | "b"
@@ -362,14 +321,12 @@ export type DBGeneratedSchema = {
     };
   };
   v_items: {
-  is_view: true;,  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       id?: null | number;
       name?: null | string;
     };
   };
   various: {
-  select: true;,  insert: true;,  update: true;,  delete: true;
     columns: {
       added?: null | string;
       h?: null | string[];

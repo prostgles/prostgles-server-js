@@ -17,20 +17,9 @@ export const getDBGeneratedSchema = ({
     .slice(0)
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((tableOrView) => {
-      const { privileges, columns, is_view } = tableOrView;
-      const { select, insert, update, delete: del } = privileges;
+      const { columns } = tableOrView;
       const cols = columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
       tables.push(`${escapeTSNames(tableOrView.name)}: {
-${addIfTrue(
-  {
-    is_view,
-    select,
-    insert,
-    update,
-    delete: del,
-  },
-  "  ",
-)}
     columns: {${cols
       .map(
         (column) => `
@@ -45,10 +34,4 @@ export type DBGeneratedSchema = {
   ${tables.join("")}
 }
 `;
-};
-
-const addIfTrue = (obj: Record<string, boolean | undefined>, leadingText: string) => {
-  return Object.entries(obj)
-    .filter(([, v]) => v)
-    .map(([k]) => `${leadingText}${k}: true;`);
 };
