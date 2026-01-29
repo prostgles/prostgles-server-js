@@ -248,13 +248,13 @@ export const initTableConfig = async function (this: TableConfigurator) {
             ]
               .filter((v) => v)
               .join(" ") + ";";
-          const indexDefinitionHash = md5(indexDefinition);
+          const indexDefinitionHash = md5(indexDefinition) as string;
           const indexExistsWithDifferentDefinition = currIndexes.some(
             (idx) => idx.indexname === indexName && idx.description !== indexDefinitionHash,
           );
           const indexShouldBeReplaced =
             replace || (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes);
-          const oldIndexToBeDroppedName = indexName + "_old_idx_to_drop";
+          const oldIndexToBeDroppedName = "idx_" + indexDefinitionHash;
           if (indexShouldBeReplaced) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
           } else if (indexExistsWithDifferentDefinition) {
