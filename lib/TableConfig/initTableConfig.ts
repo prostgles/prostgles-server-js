@@ -12,6 +12,7 @@ import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getPGIndexes } from "./getPGIndexes";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { runMigrations } from "./runMigrations";
+import { md5 } from "prostgles-types/dist/md5";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -244,22 +245,33 @@ export const initTableConfig = async function (this: TableConfigurator) {
       const currIndexes = await getPGIndexes(this.db, tableName, "public");
       Object.entries(tableConf.indexes).forEach(
         ([indexName, { columns, concurrently, replace, unique, using, where = "" }]) => {
-          if (replace || (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)) {
+          const indexDefinition =
+            [
+              "CREATE",
+              unique && "UNIQUE",
+              concurrently && "CONCURRENTLY",
+              `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
+              using && "USING " + using,
+              `(${columns})`,
+              where && `WHERE ${where}`,
+            ]
+              .filter((v) => v)
+              .join(" ") + ";";
+          const indexDefinitionHash = md5(indexDefinition);
+          const indexExistsAndDefinitionChanged = currIndexes.some(
+            (idx) => idx.indexname === indexName && idx.description !== indexDefinitionHash,
+          );
+          if (
+            indexExistsAndDefinitionChanged ||
+            replace ||
+            (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes)
+          ) {
             queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
           }
           if (!currIndexes.some((idx) => idx.indexname === indexName)) {
+            queries.push(indexDefinition);
             queries.push(
-              [
-                "CREATE",
-                unique && "UNIQUE",
-                concurrently && "CONCURRENTLY",
-                `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
-                using && "USING " + using,
-                `(${columns})`,
-                where && `WHERE ${where}`,
-              ]
-                .filter((v) => v)
-                .join(" ") + ";",
+              `COMMENT ON INDEX ${asName(indexName)} IS ${asValue(indexDefinitionHash)};`,
             );
           }
         },
