@@ -233,15 +233,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
     }
 
     if ("indexes" in tableConf && tableConf.indexes) {
-      /*
-          CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ [ IF NOT EXISTS ] name ] ON [ ONLY ] table_name [ USING method ]
-            ( { column_name | ( expression ) } [ COLLATE collation ] [ opclass [ ( opclass_parameter = value [, ... ] ) ] ] [ ASC | DESC ] [ NULLS { FIRST | LAST } ] [, ...] )
-            [ INCLUDE ( column_name [, ...] ) ]
-            [ NULLS [ NOT ] DISTINCT ]
-            [ WITH ( storage_parameter [= value] [, ... ] ) ]
-            [ TABLESPACE tablespace_name ]
-            [ WHERE predicate ]
-      */
       const currIndexes = await getPGIndexes(this.db, tableName, "public");
       Object.entries(tableConf.indexes).forEach(
         ([indexName, { columns, concurrently, replace, unique, using, where = "" }]) => {
@@ -281,7 +272,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
             queries.push(
               `COMMENT ON INDEX ${asName(indexName)} IS ${asValue(indexDefinitionHash)};`,
             );
-            queries.push(`DROP INDEX IF EXISTS ${oldIndexToBeDroppedName};`);
+            queries.push(`DROP INDEX IF EXISTS ${asName(oldIndexToBeDroppedName)};`);
           }
         },
       );
