@@ -654,7 +654,9 @@ export const clientOnlyQueries = async (
         "postValidation failed",
       );
 
-      const funcError = await serverFunctions.myfunc?.(undefined).catch((err) => err);
+      const funcError = await serverFunctions
+        .myfunc?.(undefined as unknown as any)
+        .catch((err) => err);
       assert.deepStrictEqual(funcError, {
         error: "input is of invalid type. Expecting { arg1: number }",
       });
