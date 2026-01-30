@@ -41,6 +41,8 @@ export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser>
   | "publish"
   | "functions"
   | "publishRawSQL"
+  | "tsGeneratedTypesDir"
+  | "tsGeneratedTypesFunctionsPath"
 >;
 export type OnInitReason =
   | {
@@ -89,6 +91,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: () => string;
+  reWriteDBSchema: () => void;
   update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
@@ -221,6 +224,7 @@ export const initProstgles = async function (
       pgp,
       io: this.opts.io,
       getTSSchema: this.getTSFileContent,
+      reWriteDBSchema: () => this.writeDBSchema(true),
       options: this.opts,
       update: async (...args) => {
         await updateConfiguration(this, onReady, ...args);

@@ -45,6 +45,13 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
     });
   }
 
+  if (
+    includes(optionsThatChanged, "tsGeneratedTypesDir") ||
+    includes(optionsThatChanged, "tsGeneratedTypesFunctionsPath")
+  ) {
+    prgl.writeDBSchema();
+  }
+
   if (isEmpty(newOpts)) return;
 
   /**
