@@ -7,10 +7,10 @@ import {
   omitKeys,
   type ColumnInfo,
 } from "prostgles-types";
-import type { LocalParams, TableHandlers } from "../../DboBuilder";
-import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
-import type { TableHandler } from "../TableHandler";
 import type { AuthClientRequest } from "../../../Auth/AuthTypes";
+import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
+import type { LocalParams, TableHandlers } from "../../DboBuilder";
+import type { TableHandler } from "../TableHandler";
 
 type InsertNestedRecordsArgs = {
   data: AnyObject | AnyObject[];
@@ -81,7 +81,8 @@ export async function insertNestedRecords(
       ),
     };
   }
-
+  const { onConflict } = insertParams || {};
+  const rootOnConflict = isObject(onConflict) ? onConflict.action : onConflict;
   const _data = await Promise.all(
     insertedRows.map(async (row) => {
       // const { preValidate, validate } = tableRules?.insert ?? {};
@@ -130,6 +131,7 @@ export async function insertNestedRecords(
               newLocalParams,
               colInsert.tableName,
               row[colInsert.insertedFieldName] as AnyObject | AnyObject[],
+              rootOnConflict,
             );
             const [colRow, ...otherColRows] = colRows;
             if (!Array.isArray(colRows) || !colRow || otherColRows.length) {
@@ -209,7 +211,7 @@ export async function insertNestedRecords(
             }
 
             const childInsert = async (cdata: AnyObject | AnyObject[], tableName: string) => {
-              return referencedInsert(this, dbTX, localParams, tableName, cdata);
+              return referencedInsert(this, dbTX, localParams, tableName, cdata, rootOnConflict);
             };
 
             const joinPath = getJoinPath(this, targetTable);
@@ -376,6 +378,7 @@ const referencedInsert = async (
   localParams: LocalParams | undefined,
   targetTable: string,
   targetData: AnyObject | AnyObject[],
+  onConflict: Extract<InsertParams["onConflict"], string> | undefined,
 ): Promise<AnyObject[]> => {
   getJoinPath(tableHandler, targetTable);
 
@@ -388,7 +391,7 @@ const referencedInsert = async (
   return Promise.all(
     ((Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]).map((m) =>
       (dbTX[targetTable] as TableHandler)
-        .insert(m, { returning: "*" }, undefined, childRules, localParams)
+        .insert(m, { returning: "*", onConflict }, undefined, childRules, localParams)
         .catch((e) => {
           return Promise.reject(e);
         }),
