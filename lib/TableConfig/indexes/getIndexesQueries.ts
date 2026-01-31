@@ -48,7 +48,7 @@ export const getIndexesQueries = async (
           await t.any(indexDefinition);
           return getPGIndexes(t, tableName, "public");
         });
-        indexExistsWithDifferentDefinition = futureIndexes.some(
+        indexExistsWithDifferentDefinition = !futureIndexes.some(
           (idx) => idx.indexname === indexName && matchingIndex.indexdef === idx.indexdef,
         );
       }
