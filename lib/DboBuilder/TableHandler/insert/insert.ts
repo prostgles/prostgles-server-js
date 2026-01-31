@@ -127,7 +127,7 @@ export async function insert(
      */
     const mediaOrNestedInsert = await insertNestedRecords.bind(this)({
       data: preValidatedrowOrRows,
-      param2: insertParams,
+      insertParams,
       tableRules,
       localParams,
     });
