@@ -44,7 +44,7 @@ export const getIndexesQueries = async (
       let indexExistsWithDifferentDefinition = indexExistsWithDifferentComment;
       if (indexExistsWithDifferentComment && !matchingIndex.description) {
         const futureIndexes = await executeSqlWithRollback(db, async (t) => {
-          await t.any(`DROP INDEX IF EXISTS ${asName(indexName)};`);
+          await t.any(`DROP INDEX IF EXISTS ${asName(indexName)} CASCADE;`);
           await t.any(indexDefinition);
           return getPGIndexes(t, tableName, "public");
         });
