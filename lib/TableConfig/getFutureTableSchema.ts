@@ -5,6 +5,7 @@ import type { ColumnMinimalInfo } from "./getColumnSQLDefinitionQuery";
 import { getTableColumns } from "./getColumnSQLDefinitionQuery";
 import type { ConstraintDef } from "./getConstraintDefinitionQueries";
 import { type PGConstraint, fetchTableConstraints } from "./fetchTableConstraints";
+import type pgPromise from "pg-promise";
 
 type Args = {
   db: DB;
@@ -26,14 +27,7 @@ export const getFutureTableSchema = async ({
   constraints: PGConstraint[];
   cols: ColumnMinimalInfo[];
 }> => {
-  const { TransactionMode, isolationLevel } = pgp.txMode;
-
-  let constraints: PGConstraint[] = [];
-  let cols: ColumnMinimalInfo[] = [];
-  const txMode = new TransactionMode({
-    tiLevel: isolationLevel.serializable,
-  });
-  await db.tx({ mode: txMode }, async (t) => {
+  const { constraints, cols } = await executeSqlWithRollback(db, async (t) => {
     /** To prevent deadlocks we use a random table name -> Not feasible because named constraints cannot be recreated without dropping the existing ones from actual table */
     // const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5);
 
@@ -42,7 +36,7 @@ export const getFutureTableSchema = async ({
     const consQueries = constraintDefs
       .map(
         (c) =>
-          `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`
+          `ALTER TABLE ${tableEsc} ADD ${c.name ? ` CONSTRAINT ${asName(c.name)}` : ""} ${c.content};`,
       )
       .join("\n");
 
@@ -56,11 +50,28 @@ export const getFutureTableSchema = async ({
 
     await t.any(query);
 
-    constraints = await fetchTableConstraints({ db: t, table: tableName });
-    cols = await getTableColumns({ db: t, table: tableName });
+    const constraints = await fetchTableConstraints({ db: t, table: tableName });
+    const cols = await getTableColumns({ db: t, table: tableName });
 
-    return t.any("ROLLBACK");
+    return { constraints, cols };
   });
 
   return { cols, constraints };
+};
+
+export const executeSqlWithRollback = async <R>(
+  db: DB,
+  txHandler: (t: pgPromise.ITask<{}>) => Promise<R>,
+): Promise<R> => {
+  const { TransactionMode, isolationLevel } = pgp.txMode;
+
+  const txMode = new TransactionMode({
+    tiLevel: isolationLevel.serializable,
+  });
+  const res = await db.tx({ mode: txMode }, async (t) => {
+    const result = await txHandler(t);
+    await t.any("ROLLBACK");
+    return result;
+  });
+  return res;
 };

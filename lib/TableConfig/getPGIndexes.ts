@@ -14,7 +14,7 @@ type PGIndex = {
   description: string | null;
 };
 export const getPGIndexes = async (
-  db: DB,
+  db: Pick<DB, "any">,
   tableName: string,
   schema: string,
 ): Promise<PGIndex[]> => {

@@ -13,6 +13,7 @@ import { getPGIndexes } from "./getPGIndexes";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { runMigrations } from "./runMigrations";
 import { md5 } from "prostgles-types/dist/md5";
+import { getIndexesQueries } from "./indexes/getIndexesQueries";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -232,51 +233,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
         });
     }
 
-    if ("indexes" in tableConf && tableConf.indexes) {
-      const currIndexes = await getPGIndexes(this.db, tableName, "public");
-      Object.entries(tableConf.indexes).forEach(
-        ([indexName, { columns, concurrently, replace, unique, using, where = "" }]) => {
-          const indexDefinition =
-            [
-              "CREATE",
-              unique && "UNIQUE",
-              concurrently && "CONCURRENTLY",
-              `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
-              using && "USING " + using,
-              `(${columns})`,
-              where && `WHERE ${where}`,
-            ]
-              .filter((v) => v)
-              .join(" ") + ";";
-          const indexDefinitionHash = md5(indexDefinition) as string;
-          const indexExistsWithDifferentDefinition = currIndexes.some(
-            (idx) => idx.indexname === indexName && idx.description !== indexDefinitionHash,
-          );
-          const indexShouldBeReplaced =
-            replace || (typeof replace !== "boolean" && tableConf.replaceUniqueIndexes);
-          const oldIndexToBeDroppedName = "idx_" + indexDefinitionHash;
-          if (indexShouldBeReplaced) {
-            queries.push(`DROP INDEX IF EXISTS ${asName(indexName)};`);
-          } else if (indexExistsWithDifferentDefinition) {
-            /** Try to prevent cascading dependency issues when removing it */
-            queries.push(
-              `ALTER INDEX ${asName(indexName)} RENAME TO ${asName(oldIndexToBeDroppedName)};`,
-            );
-          }
-          if (
-            indexExistsWithDifferentDefinition ||
-            indexShouldBeReplaced ||
-            !currIndexes.some((idx) => idx.indexname === indexName)
-          ) {
-            queries.push(indexDefinition);
-            queries.push(
-              `COMMENT ON INDEX ${asName(indexName)} IS ${asValue(indexDefinitionHash)};`,
-            );
-            queries.push(`DROP INDEX IF EXISTS ${asName(oldIndexToBeDroppedName)};`);
-          }
-        },
-      );
-    }
+    const indexQueries = await getIndexesQueries(this.db, tableName, tableConf);
+    queries.push(...indexQueries);
 
     const { triggers, dropIfExists, dropIfExistsCascade } = tableConf;
     if (triggers) {
