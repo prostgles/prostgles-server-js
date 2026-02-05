@@ -31,6 +31,8 @@ export function setupAuthRoutes(this: AuthHandler) {
     throw "Invalid or empty string provided within publicRoutes ";
   }
 
+  setupUserContextMiddleware.bind(this)(app);
+
   if (signupWithEmail) {
     setRegisterRequestHandler.bind(this)(signupWithEmail, app);
   }
@@ -71,8 +73,6 @@ export function setupAuthRoutes(this: AuthHandler) {
 
   /* Redirect if not logged in and requesting non public content */
   setCatchAllRequestHandler.bind(this)(app);
-
-  setupUserContextMiddleware.bind(this)(app);
 
   setLogoutRequestHandler.bind(this)(app);
 }
