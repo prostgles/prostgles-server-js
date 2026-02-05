@@ -3,7 +3,7 @@ import type { ExpressApp } from "../../RestApi";
 import type { Express } from "express";
 import { matchesRoute } from "./matchesRoute";
 
-const getRouter = (app: ExpressApp | Express) => {
+export const getRouter = (app: ExpressApp | Express) => {
   const router = (app._router || app.router) as ExpressApp["_router"] | undefined;
   if (typeof router === "string") {
     throw new Error("app.router is a string");
@@ -28,7 +28,7 @@ const getRouter = (app: ExpressApp | Express) => {
 export const removeExpressRoute = (
   app: ExpressApp | Express | undefined,
   _routePaths: (string | undefined)[],
-  method?: "get" | "post" | "put" | "delete"
+  method?: "get" | "post" | "put" | "delete",
 ) => {
   if (!app) return;
   const routePaths = _routePaths.filter(isDefined);
@@ -63,7 +63,7 @@ export const removeExpressRoutesTest = async (app: ExpressApp | Express) => {
       res.json({ v: 2 });
     });
     const r = (await fetch("http://localhost:3001/removeExpressRoute").then((res) =>
-      res.json()
+      res.json(),
     )) as {
       v: number;
     };

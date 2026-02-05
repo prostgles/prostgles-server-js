@@ -9,7 +9,7 @@ import type { DboBuilder } from "./DboBuilder";
 import type { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSQL";
-const Cursor: typeof CursorType = require("pg-cursor");
+const Cursor = require("pg-cursor") as typeof CursorType;
 
 type ClientStreamedRequest = {
   socket: PRGLIOSocket;
@@ -18,6 +18,7 @@ type ClientStreamedRequest = {
   persistConnection?: boolean;
 };
 type StreamedQuery = ClientStreamedRequest & {
+  id: number;
   cursor: CursorType | undefined;
   client: pg.Client | undefined;
   stop?: VoidFunction;
@@ -30,19 +31,19 @@ type Info = {
   duration: number;
 };
 
-const shortSocketIds: Record<string, number> = {};
+const socketIdToLastQueryId: Map<string, number> = new Map();
 const getSetShortSocketId = (socketId: string) => {
   const shortId = socketId.slice(0, 3);
-  const currId = shortSocketIds[shortId] ?? 0;
+  const currId = socketIdToLastQueryId.get(shortId) ?? 0;
   const newId = currId + 1;
-  shortSocketIds[shortId] = newId;
+  socketIdToLastQueryId.set(shortId, newId);
   return newId;
 };
 
 export class QueryStreamer {
   db: DB;
   dboBuilder: DboBuilder;
-  socketQueries: Record<string, Record<string, StreamedQuery>> = {};
+  socketQueries: Map<string, Map<number, StreamedQuery>> = new Map();
   adminClient: pg.Client;
   constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
@@ -73,14 +74,14 @@ export class QueryStreamer {
     return client;
   };
   onDisconnect = (socketId: string) => {
-    const socketQueries = this.socketQueries[socketId];
+    const socketQueries = this.socketQueries.get(socketId);
     if (!socketQueries) return;
     Object.values(socketQueries).forEach(({ client, stop }) => {
       stop?.();
       /** end does not stop active query?! */
       void client?.end();
     });
-    delete this.socketQueries[socketId];
+    this.socketQueries.delete(socketId);
   };
 
   create = (query: ClientStreamedRequest): SocketSQLStreamServer => {
@@ -89,13 +90,12 @@ export class QueryStreamer {
     const id = getSetShortSocketId(socketId);
     const channel = `${CHANNELS.SQL_STREAM}__${socketId}_${id}`;
     const unsubChannel = `${channel}.unsubscribe`;
-    if (this.socketQueries[id] && !persistConnection) {
+    if (this.socketQueries.get(socketId)?.get(id) && !persistConnection) {
       throw `Must stop existing query ${id} first`;
     }
 
-    this.socketQueries[socketId] ??= {};
     let errored = false;
-    const socketQuery = {
+    const socketQuery: StreamedQuery = {
       ...query,
       id,
       client: undefined,
@@ -116,13 +116,13 @@ export class QueryStreamer {
         } satisfies SocketSQLStreamPacket);
       },
     };
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    this.socketQueries[socketId][id] ??= socketQuery;
+    const socketQueries = this.socketQueries.get(socketId) ?? new Map<number, StreamedQuery>();
+    this.socketQueries.set(socketId, socketQueries.set(id, socketQuery));
     let processID = -1;
     let streamState: "started" | "ended" | "errored" | undefined;
 
     const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
-      const socketQuery = this.socketQueries[socketId]?.[id];
+      const socketQuery = this.socketQueries.get(socketId)?.get(id);
       if (!socketQuery) {
         throw "socket query not found";
       }
@@ -137,7 +137,7 @@ export class QueryStreamer {
         | { reachedEnd: true; rows: any[]; info: Info }
         | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
         if (!(info as any).fields) throw "No fields";
-        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(info.fields as any);
+        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(info.fields);
         const packet: SocketSQLStreamPacket = {
           type: "data",
           rows,
@@ -161,7 +161,7 @@ export class QueryStreamer {
           socketQuery.onError(err);
           void currentClient.end();
         });
-      this.socketQueries[socketId]![id]!.client = currentClient;
+      socketQuery.client = currentClient;
       try {
         if (!client) {
           await currentClient.connect();
@@ -179,7 +179,7 @@ export class QueryStreamer {
         const cursor = currentClient.query(
           new Cursor(query.query, undefined, { rowMode: "array" }),
         );
-        this.socketQueries[socketId]![id]!.cursor = cursor;
+        socketQuery.cursor = cursor;
         let streamLimitReached = false;
         let reachedEnd = false;
         void (async () => {
@@ -209,7 +209,7 @@ export class QueryStreamer {
             streamState = "ended";
 
             if (!query.options?.persistStreamConnection) {
-              delete this.socketQueries[socketId]?.[id];
+              this.socketQueries.get(socketId)?.delete(id);
               void currentClient.end();
             }
             void cursor.close();
@@ -249,10 +249,10 @@ export class QueryStreamer {
     const cleanup = () => {
       socket.removeAllListeners(unsubChannel);
       socket.removeAllListeners(channel);
-      delete this.socketQueries[socketId]?.[id];
+      this.socketQueries.get(socketId)?.delete(id);
     };
     const stop = async (opts: { terminate?: boolean } | undefined, cb: BasicCallback) => {
-      const { client: queryClient } = this.socketQueries[socketId]?.[id] ?? {};
+      const { client: queryClient } = this.socketQueries.get(socketId)?.get(id) ?? {};
       if (!queryClient) return;
       if (opts?.terminate) {
         setTimeout(() => {
@@ -271,7 +271,7 @@ export class QueryStreamer {
         cb(null, error);
       }
     };
-    this.socketQueries[socketId][id].stop = () =>
+    socketQuery.stop = () =>
       stop({ terminate: true }, () => {
         /* Empty */
       });
@@ -291,7 +291,7 @@ export class QueryStreamer {
         try {
           /* Persisted connection query */
           if (runCount) {
-            const persistedClient = this.socketQueries[socketId]?.[id];
+            const persistedClient = this.socketQueries.get(socketId)?.get(id);
             if (!persistedClient) throw "Persisted query client not found";
 
             await startStream(persistedClient.client, {

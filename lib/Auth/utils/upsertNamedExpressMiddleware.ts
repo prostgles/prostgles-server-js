@@ -1,11 +1,12 @@
 import type e from "express";
 import type { RequestHandler } from "express";
 import type { ExpressApp } from "../../RestApi";
+import { getRouter } from "./removeExpressRoute";
 
 export const upsertNamedExpressMiddleware = (
   app: e.Express,
   handler: RequestHandler,
-  name: string
+  name: string,
 ) => {
   const funcName = name;
   Object.defineProperty(handler, "name", { value: funcName });
@@ -13,14 +14,13 @@ export const upsertNamedExpressMiddleware = (
   app.use(handler);
 };
 
-export const removeExpressRouteByName = (app: ExpressApp | undefined, name: string) => {
-  const routes = app?._router?.stack;
-  if (routes) {
-    app._router!.stack = routes.filter((route) => {
-      if (route.name === name) {
-        return false;
-      }
-      return true;
-    });
-  }
+export const removeExpressRouteByName = (app: ExpressApp, name: string) => {
+  const { router, getStack } = getRouter(app);
+  const newRoutes = getStack().filter((route) => {
+    if (route.name === name) {
+      return false;
+    }
+    return true;
+  });
+  router.stack = newRoutes;
 };
