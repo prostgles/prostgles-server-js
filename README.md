@@ -28,7 +28,6 @@ $ npm install prostgles-server
 
 ```typescript
 import prostgles from "prostgles-server";
-import prostgles from "prostgles-server";
 
 prostgles({
   dbConnection: {
@@ -73,13 +72,13 @@ prostgles({
   },
   io,
   publish: "*", // Unrestricted INSERT/SELECT/UPDATE/DELETE access to the tables in the database
-  onReady: async (dbo) => {},
+  onReady: async ({ dbo }) => {},
 });
 ```
 
 react.tsx
 
-```js
+```jsx
 const App = () => {
   const { isLoading, dbo } = useProstglesClient();
   if (isLoading) return null;

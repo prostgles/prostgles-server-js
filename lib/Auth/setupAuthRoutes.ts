@@ -8,6 +8,7 @@ import { setMagicLinkOrOTPRequestHandler } from "./endpoints/setMagicLinkOrOTPRe
 import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
+import { setupUserContextMiddleware } from "./middleware/userContextMiddleware";
 
 export function setupAuthRoutes(this: AuthHandler) {
   const { loginSignupConfig, onUseOrSocketConnected } = this.opts;
@@ -44,7 +45,7 @@ export function setupAuthRoutes(this: AuthHandler) {
       const errorInfoOrSession = await onUseOrSocketConnected(
         this.getSIDNoError(reqInfo),
         getClientRequestIPsInfo(reqInfo),
-        reqInfo
+        reqInfo,
       );
 
       if (errorInfoOrSession && "error" in errorInfoOrSession) {
@@ -70,6 +71,8 @@ export function setupAuthRoutes(this: AuthHandler) {
 
   /* Redirect if not logged in and requesting non public content */
   setCatchAllRequestHandler.bind(this)(app);
+
+  setupUserContextMiddleware.bind(this)(app);
 
   setLogoutRequestHandler.bind(this)(app);
 }

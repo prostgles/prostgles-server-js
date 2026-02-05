@@ -1,7 +1,6 @@
 import type e from "express";
 import { type Response } from "express";
 import type { AuthResponse } from "prostgles-types";
-import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
 import { getClientRequestIPsInfo, HTTP_FAIL_CODES, HTTP_SUCCESS_CODES } from "../AuthHandler";
 import type { ExpressReq, LoginSignupConfig, MagicLinkOrOTPData, SessionUser } from "../AuthTypes";
@@ -17,22 +16,17 @@ type MagicLinkResponseHandler = Response<
 export function setMagicLinkOrOTPRequestHandler(
   this: AuthHandler,
   onMagicLink: Required<LoginSignupConfig<void, SessionUser>>["onMagicLinkOrOTP"],
-  app: e.Express
+  app: e.Express,
 ) {
   const handler = async (
     req: ExpressReq,
     res: MagicLinkResponseHandler,
-    data: MagicLinkOrOTPData
+    data: MagicLinkOrOTPData,
   ) => {
     try {
       const response = await throttledAuthCall(async () => {
         const { db, dbo } = this.dbHandles;
-        return onMagicLink(
-          data,
-          dbo,
-          db,
-          getClientRequestIPsInfo({ httpReq: req })
-        );
+        return onMagicLink(data, dbo, db, getClientRequestIPsInfo({ httpReq: req }));
       });
       if (!response.session) {
         res
