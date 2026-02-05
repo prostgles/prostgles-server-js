@@ -128,7 +128,7 @@ export async function syncData(
     },
     getClientRowInfo = (args: SyncBatchInfo = {}) => {
       const { from_synced = null, to_synced = null, end_offset = null } = args;
-      const res = new Promise<any>((resolve, reject) => {
+      const res = new Promise<ClientSyncInfo>((resolve, reject) => {
         const onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
         socket.emit(channel_name, { onSyncRequest }, (resp?: onSyncRequestResponse) => {
           if (resp && "onSyncRequest" in resp && resp.onSyncRequest) {
@@ -188,7 +188,7 @@ export async function syncData(
       };
 
       try {
-        const res = tableHandler.find?.(
+        const res = await tableHandler.find?.(
           _filter,
           {
             select: params.select,
@@ -198,6 +198,7 @@ export async function syncData(
           },
           undefined,
           table_rules,
+          { clientReq: { socket } },
         );
 
         if (!res) throw "_this?.dbo?.[table_name]?.find is missing";
@@ -240,8 +241,8 @@ export async function syncData(
       const start = Date.now();
       const result = await this.dboBuilder
         .getTX(async (dbTX) => {
-          const tbl = dbTX[table_name] as TableHandler;
-          const existingData = await tbl.find(
+          const tableHandlerTx = dbTX[table_name] as TableHandler;
+          const existingData = await tableHandlerTx.find(
             { $or: data.map((d) => pickKeys(d, id_fields)) },
             {
               select: [synced_field, ...id_fields],
@@ -249,6 +250,7 @@ export async function syncData(
             },
             undefined,
             table_rules,
+            { clientReq: { socket } },
           );
           let inserts = data.filter((d) => !existingData.find((ed) => rowsIdsMatch(ed, d)));
           let updates = data.filter((d) =>
@@ -269,18 +271,25 @@ export async function syncData(
                   updateData.push([syncSafeFilter, omitKeys(upd, id_fields)]);
                 }),
               );
-              await tbl.updateBatch(
+              await tableHandlerTx.updateBatch(
                 updateData,
                 { removeDisallowedFields: true },
                 undefined,
                 table_rules,
+                { clientReq: { socket } },
               );
             } else {
               updates = [];
             }
 
             if (table_rules.insert && inserts.length) {
-              await tbl.insert(inserts, { removeDisallowedFields: true }, undefined, table_rules);
+              await tableHandlerTx.insert(
+                inserts,
+                { removeDisallowedFields: true },
+                undefined,
+                table_rules,
+                { clientReq: { socket } },
+              );
             } else {
               inserts = [];
             }
@@ -327,7 +336,7 @@ export async function syncData(
      * Pushes the given data to client
      * @param isSynced = true if
      */
-    pushData = async (data?: AnyObject[], isSynced = false, err: any = null) => {
+    pushData = async (data?: AnyObject[], isSynced = false, err: unknown = null) => {
       const start = Date.now();
       const result = await new Promise((resolve, reject) => {
         socket.emit(channel_name, { data, isSynced }, (resp?: { ok: boolean }) => {
@@ -379,7 +388,7 @@ export async function syncData(
         if (c_fr && s_fr) {
           result = Math.min(c_fr[synced_field], s_fr[synced_field]);
         } else if (c_fr || s_fr) {
-          result = (c_fr || s_fr)[synced_field];
+          result = (c_fr || s_fr)![synced_field];
         }
 
         /* Sync from last matching synced value */
@@ -387,7 +396,7 @@ export async function syncData(
         if (s_lr && c_lr) {
           result = Math.min(...getNumbers([c_lr[synced_field], s_lr[synced_field]]));
         } else {
-          result = Math.min(...getNumbers([c_fr[synced_field], s_fr?.[synced_field]]));
+          result = Math.min(...getNumbers([c_fr![synced_field], s_fr?.[synced_field]]));
         }
 
         const min_count = Math.min(...getNumbers([c_count, s_count]));
@@ -413,6 +422,7 @@ export async function syncData(
               { select: sync_fields, limit: 1 },
               undefined,
               table_rules,
+              { clientReq: { socket } },
             );
           }
 

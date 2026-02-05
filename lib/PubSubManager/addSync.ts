@@ -8,7 +8,7 @@ import { DEFAULT_SYNC_BATCH_SIZE, parseCondition } from "./PubSubManagerUtils";
  */
 export async function addSync(
   this: PubSubManager,
-  syncParams: AddSyncParams
+  syncParams: AddSyncParams,
 ): Promise<{ channelName: string }> {
   const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatchV2(async () => {
@@ -91,9 +91,6 @@ export async function addSync(
             return;
           }
 
-          /*
-           */
-
           /* Server will:
               1. Ask for last_synced  emit(onSyncRequest)
               2. Ask for data >= server_synced    emit(onPullRequest)
@@ -125,7 +122,7 @@ export async function addSync(
     await this.addTrigger(
       { table_name, condition: conditionParsed, tracked_columns: undefined },
       undefined,
-      socket
+      socket,
     );
 
     return { channelName };

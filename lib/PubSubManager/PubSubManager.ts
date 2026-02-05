@@ -236,14 +236,14 @@ export class PubSubManager {
 
   removeSubscription = (
     channelName: string,
-    subInfo: { type: "local"; localFuncs: LocalFuncs } | { type: "ws"; socket: PRGLIOSocket }
+    subInfo: { type: "local"; localFuncs: LocalFuncs } | { type: "ws"; socket: PRGLIOSocket },
   ) => {
     const matchingSubIdx = this.subs.findIndex(
       (s) =>
         s.channel_name === channelName &&
         (subInfo.type === "local" ?
           getOnDataFunc(subInfo.localFuncs) === getOnDataFunc(s.localFuncs)
-        : subInfo.socket.id === s.socket?.id)
+        : subInfo.socket.id === s.socket?.id),
     );
     if (matchingSubIdx > -1) {
       const tableName = this.subs[matchingSubIdx]!.table_info.name;
@@ -258,14 +258,14 @@ export class PubSubManager {
         "Could not unsubscribe localFunc. Subscription might not have initialised yet",
         {
           channelName,
-        }
+        },
       );
     }
   };
 
   getSyncs(table_name: string, condition: string) {
     return this.syncs.filter(
-      (s: SyncParams) => s.table_name === table_name && s.condition === condition
+      (s: SyncParams) => s.table_name === table_name && s.condition === condition,
     );
   }
 
@@ -282,23 +282,34 @@ export class PubSubManager {
   };
   getActiveTriggers = (tableName: string) => {
     const activeTriggers = (this.getTriggerInfo(tableName) ?? []).filter(
-      (c) => c.subs.length || c.syncs.length
+      (c) => c.subs.length || c.syncs.length,
     );
     return activeTriggers;
   };
 
   getSubData = async (
-    sub: Subscription
+    sub: Subscription,
   ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: unknown }> => {
-    const { table_info, filter, selectParams: params, table_rules } = sub; //, subOne = false
+    const { table_info, filter, selectParams: params, table_rules, socket, localFuncs } = sub; //, subOne = false
     const { name: table_name } = table_info;
-
-    if (!this.dbo[table_name]?.find) {
+    const tableHandler = this.dbo[table_name];
+    if (!localFuncs && !socket) {
+      throw new Error("Subscription must have either localFuncs or socket");
+    }
+    if (!tableHandler?.find) {
       throw new Error(`this.dbo.${table_name}.find undefined`);
     }
 
     try {
-      const data = await this.dbo[table_name].find(filter, params, undefined, table_rules);
+      const data = await tableHandler.find(
+        filter,
+        params,
+        undefined,
+        table_rules,
+        socket && {
+          clientReq: { socket },
+        },
+      );
       return { data };
     } catch (err) {
       return { err };
@@ -333,10 +344,10 @@ export class PubSubManager {
             this.subs.map((s) => ({
               tableName: s.table_info.name,
               triggers: s.triggers,
-            }))
+            })),
           ),
           remainingSyncs: JSON.stringify(
-            this.syncs.map((s) => pickKeys(s, ["table_name", "condition"]))
+            this.syncs.map((s) => pickKeys(s, ["table_name", "condition"])),
           ),
         });
 
