@@ -76,7 +76,7 @@ export class QueryStreamer {
   onDisconnect = (socketId: string) => {
     const socketQueries = this.socketQueries.get(socketId);
     if (!socketQueries) return;
-    Object.values(socketQueries).forEach(({ client, stop }) => {
+    Array.from(socketQueries.values()).forEach(({ client, stop }) => {
       stop?.();
       /** end does not stop active query?! */
       void client?.end();

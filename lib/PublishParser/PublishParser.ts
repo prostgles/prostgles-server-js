@@ -1,10 +1,10 @@
-import { isObject } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
+import type { ServerFunctionDefinition } from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
@@ -20,7 +20,6 @@ import {
   type PermissionScope,
   type PublishObject,
 } from "./publishTypesAndUtils";
-import type { ServerFunctionDefinition } from "./defineServerFunction";
 
 export class PublishParser {
   publish: ProstglesInitOptions["publish"];
@@ -63,31 +62,20 @@ export class PublishParser {
     };
   }
 
-  getFunctionHandler = async (
-    params: PublishParams,
-  ): Promise<{ [key: string]: ServerFunctionDefinition } | undefined> => {
-    try {
-      const prostgles = this.prostgles;
-      return await prostgles.opts.functions?.(params);
-    } catch (e) {
-      console.error("Invalid functions:", e);
-      throw e;
-    }
-  };
   async getAllowedFunctions(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
     const publishParams = await this.getPublishParams(clientReq, userData);
-    const functionHandler = await this.getFunctionHandler(publishParams);
-    if (!functionHandler) {
+    const allowedFunctions = await this.prostgles.opts.functions?.(publishParams);
+    if (!allowedFunctions) {
       return;
     }
-    const methods: Map<string, ServerFunctionDefinition> = new Map();
+    const allowedFunctionsMap: Map<string, ServerFunctionDefinition> = new Map();
 
-    for (const [name, method] of Object.entries(functionHandler)) {
+    for (const [name, method] of Object.entries(allowedFunctions)) {
       if (method.run !== undefined) {
-        methods.set(name, method);
+        allowedFunctionsMap.set(name, method);
       }
     }
-    return methods;
+    return allowedFunctionsMap;
   }
 
   /**
@@ -236,9 +224,3 @@ function applyParamsIfFunc<T>(
   //@ts-ignore
   return maybeFunc;
 }
-
-export const getV2Methods = (functions: ProstglesInitOptions["functions"]) => {
-  if (typeof functions !== "function" && isObject(functions)) {
-    return functions;
-  }
-};

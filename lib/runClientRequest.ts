@@ -101,14 +101,14 @@ export const runClientRequest = async function (
   if (clientInfo === "new-session-redirect") {
     throw clientInfo;
   }
-  const validRules = await this.publishParser.getValidatedRequestRule(
+  const parsedTableRule = await this.publishParser.getValidatedRequestRule(
     { tableName, command, clientReq },
     clientInfo,
     scope,
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!validRules) {
+  if (!parsedTableRule) {
     throw `Invalid OR disallowed request: ${tableName}.${command} `;
   }
 
@@ -150,7 +150,7 @@ export const runClientRequest = async function (
     param1,
     param2,
     param3,
-    validRules,
+    parsedTableRule,
     localParams,
   ) as AnyObject | undefined;
 };

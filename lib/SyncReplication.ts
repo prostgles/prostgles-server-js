@@ -115,6 +115,7 @@ export async function syncData(
         { orderBy: orderByAsc, select: sync_fields, limit, offset },
         undefined,
         table_rules,
+        { clientReq: { socket } },
       );
       const last_rows = first_rows.slice(-1); // Why not logic below?
       // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);

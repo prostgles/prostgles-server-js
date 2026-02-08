@@ -505,6 +505,7 @@ export type DbTableInfo = {
 };
 export type PermissionScope = {
   sql?: "commited" | "rolledback";
+  /** TODO: this should match publish types */
   tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", boolean>>>;
   methods?: Record<string, boolean>;
 };

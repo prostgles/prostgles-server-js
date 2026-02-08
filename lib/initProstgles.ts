@@ -74,11 +74,11 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
 export type OnReadyCallback<S, SUser extends SessionUser> = (
   params: OnReadyParams<S>,
   update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>,
-) => any;
+) => void | Promise<void>;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
   update: (newOpts: UpdateableOptions<void, SessionUser>, force?: true) => Promise<void>,
-) => any;
+) => void | Promise<void>;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   db: DBOFullyTyped<S>;
@@ -200,7 +200,7 @@ export const initProstgles = async function (
       if (this.destroyed) {
         console.trace("Prostgles: Instance is destroyed");
       }
-      onReady(
+      void onReady(
         {
           sql: this.dboBuilder.sql,
           dbo: this.dbo!,

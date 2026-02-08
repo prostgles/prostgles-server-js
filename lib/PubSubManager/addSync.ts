@@ -111,7 +111,7 @@ export async function addSync(
           }
         });
       } else {
-        console.warn("UNCLOSED DUPLICATE SYNC FOUND", existing.channel_name);
+        console.warn("addSync: Client tried to create a duplicate sync", existing.channel_name);
       }
 
       return newSync;
