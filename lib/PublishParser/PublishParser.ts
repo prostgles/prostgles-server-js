@@ -164,9 +164,19 @@ export class PublishParser {
     }
 
     if (scope) {
-      const tableScope = scope.tables;
-      if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
-        throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
+      if (scope.sql === "commited") {
+        // Allow all commands
+      } else if (scope.sql === "rolledback") {
+        if (rule.sqlRule === "select") {
+          // Allow select
+        } else {
+          throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope only allows ${scope.sql}`;
+        }
+      } else {
+        const tableScope = scope.tables;
+        if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
+          throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
+        }
       }
     }
 

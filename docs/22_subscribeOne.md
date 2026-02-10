@@ -1,4 +1,4 @@
-## subscribeOne<span style="opacity: 0.6;">(filter: FullFilter, params: SelectParams, onData: SubscribeOneCallback, onError?: SubscribeOnError): Promise&lt;SubscriptionHandler&gt;</span>
+## subscribeOne<span style="opacity: 0.6;">(filter: FullFilter, params: SelectParams, onData: SubscribeOneCallback): Promise&lt;SubscriptionHandler&gt;</span>
 Retrieves first matching record from the view/table and subscribes to changes
 #### Parameters
 
@@ -55,10 +55,6 @@ Retrieves first matching record from the view/table and subscribes to changes
   - **onData** <span style="color: red">required</span> <span style="color: green;">SubscribeOneCallback</span>
 
     Callback fired once after subscribing and then every time the data matching the filter changes
-  - **onError** <span style="color: grey">optional</span> <span style="color: green;">SubscribeOnError</span>
-
-    Error handler that may fire due to schema changes or other post subscribe issues
-    Column or filter issues are thrown during the subscribe call
 #### Return type
 #### <span style="color: green;">SubscriptionHandler</span>
   - **unsubscribe** <span style="color: red">required</span> <span style="color: green;">() =&gt; Promise&lt;void&gt;</span>
