@@ -1743,6 +1743,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Related table subscribe", async () => {
+      await expectNoTriggers();
       await tryRunP("Related table subscribe", async (resolve, reject) => {
         let runs = 0;
         const sub = await db.tr1.subscribe!(
@@ -1760,7 +1761,10 @@ export const isomorphicQueries = async (
             if (runs === 1) {
               await db.tr2.insert!({ tr1_id: _rows[0]!.id, t1: "a", t2: "b" });
             } else if (runs === 2) {
+              debugger;
               await sub.unsubscribe();
+              await tout(4000);
+              await expectNoTriggers();
               resolve(true);
             }
           },
@@ -1856,6 +1860,7 @@ export const isomorphicQueries = async (
         { select: { "*": 1, items: "*" } },
       );
       assert.equal(multiItem?.name, "root_multi");
+      //@ts-ignore
       assert.equal(multiItem?.items.filter((d) => d.name === "multi").length, 4);
     });
 
@@ -1990,6 +1995,47 @@ export const isomorphicQueries = async (
         assert.deepStrictEqual(row.trades.slice(0).reverse(), row.tradesAlso);
         assert.notEqual(row.id, "abc");
       });
+    });
+
+    await test("subscribe triggers with stale schema should fail gracefully and never block other queries", async () => {
+      const sub = await db.various.subscribe!(
+        variousId99,
+        { select: { name: 1 } },
+        async (d, err) => {
+          log("various id=99 count", d.length);
+          if (err) {
+            log("Error in subscription callback: " + JSON.stringify(err));
+          }
+        },
+      ).catch((e) => {
+        log("subscribe failed with error: " + JSON.stringify(e));
+        return Promise.reject(e);
+      });
+
+      const deleteItems = () => sql!(`DELETE FROM various WHERE id = \${id}`, variousId99);
+      await deleteItems();
+
+      await tout(2000);
+      await sql?.(`ALTER TABLE various RENAME COLUMN name TO name_old`).catch((e) => {
+        return Promise.reject(e);
+      });
+      const getVariousCount = () =>
+        sql!(`SELECT COUNT(*) FROM various WHERE id = \${id}`, variousId99, {
+          returnType: "value",
+        }).then(Number);
+      const variousId99Count = await getVariousCount();
+      await sql?.(`INSERT INTO various (id, name_old) VALUES (\${id}, 'test')`, {
+        id: variousId99.id,
+        name_old: "test",
+      }).catch(console.error);
+      console.log("ok");
+      await tout(2000);
+      console.log("ok");
+      const newVariousId99Count = await getVariousCount();
+      assert.equal(variousId99Count + 1, newVariousId99Count);
+      await deleteItems();
+      await sub.unsubscribe?.();
+      await expectNoTriggers();
     });
   });
 

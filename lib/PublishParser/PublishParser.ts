@@ -104,37 +104,21 @@ export class PublishParser {
     command,
     clientReq,
   }: DboTableCommand): Promise<ParsedTableRule> {
+    const rules = await this.getParsedTableRule({ tableName, clientReq }, undefined);
     const clientInfo =
       clientReq && (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
-    const rules = await this.getValidatedRequestRule(
-      { tableName, command, clientReq },
-      clientInfo,
-      undefined,
-    );
+    this.validateRequestRule({ tableName, command, clientReq }, rules, undefined);
     return rules;
   }
 
-  async getValidatedRequestRule(
-    { tableName, command, clientReq }: DboTableCommand,
+  async getParsedTableRule(
+    { tableName, clientReq }: Pick<DboTableCommand, "tableName" | "clientReq">,
     clientInfo: AuthResultWithSID | undefined,
-    scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule> {
-    if (!command || !tableName) throw "command OR tableName are missing";
-
-    const rule = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
-    if (!rule) {
-      throw "Invalid command: " + command;
-    }
-
-    if (scope) {
-      const tableScope = scope.tables;
-      if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
-        throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
-      }
-    }
+    if (!tableName) throw "tableName missing";
 
     /* Must be local request -> allow everything */
     if (!clientReq) {
@@ -150,17 +134,41 @@ export class PublishParser {
     /* Must be from socket. Must have a publish */
     if (!this.publish) throw "publish is missing";
 
+    const tableErrors = clientReq.socket?.prostgles?.tableSchemaErrors[tableName];
     /* Get any publish errors for socket */
-    const errorInfo = clientReq.socket?.prostgles?.tableSchemaErrors[tableName]?.[command];
-
-    if (errorInfo) throw errorInfo.error;
+    Object.values(tableErrors ?? {}).forEach((errorInfo) => {
+      throw errorInfo.error;
+    });
 
     const tableRule = await this.getTableRules({ tableName, clientReq }, clientInfo);
-    if (!tableRule)
+
+    if (!tableRule) {
       throw {
         stack: ["getValidatedRequestRule()"],
         message: "Invalid or disallowed table: " + tableName,
       };
+    }
+    return tableRule;
+  }
+
+  validateRequestRule(
+    { tableName, command }: DboTableCommand,
+    tableRule: ParsedTableRule,
+    scope: PermissionScope | undefined,
+  ) {
+    if (!command || !tableName) throw "command OR tableName are missing";
+
+    const rule = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
+    if (!rule) {
+      throw "Invalid command: " + command;
+    }
+
+    if (scope) {
+      const tableScope = scope.tables;
+      if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
+        throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
+      }
+    }
 
     if (command === "upsert") {
       if (!tableRule.update || !tableRule.insert) {
@@ -177,8 +185,6 @@ export class PublishParser {
         message: `Invalid or disallowed command: ${tableName}.${command}`,
       };
     }
-
-    return tableRule;
   }
 
   async getTableRules(

@@ -101,11 +101,12 @@ export const runClientRequest = async function (
   if (clientInfo === "new-session-redirect") {
     throw clientInfo;
   }
-  const parsedTableRule = await this.publishParser.getValidatedRequestRule(
-    { tableName, command, clientReq },
+
+  const parsedTableRule = await this.publishParser.getParsedTableRule(
+    { tableName, clientReq },
     clientInfo,
-    scope,
   );
+  this.publishParser.validateRequestRule({ tableName, command, clientReq }, parsedTableRule, scope);
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!parsedTableRule) {

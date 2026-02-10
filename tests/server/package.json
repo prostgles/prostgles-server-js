@@ -1,7 +1,6 @@
 {
   "name": "server_tests",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "start": "tsc-watch --onSuccess \"node dist/server/index.js\"",
@@ -10,8 +9,6 @@
     "test-server": "TEST_TYPE=server node --trace-uncaught --test dist/server/index.js ",
     "test-client": "TEST_TYPE=client node --trace-uncaught --test dist/server/index.js "
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "express": "^5.2.1",
     "prostgles-server": "file:../.."

@@ -1,7 +1,12 @@
 import type { SubscriptionChannels } from "prostgles-types";
 import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { tout } from "./init/initPubSubManager";
-import type { BasicCallback, PubSubManager, Subscription, SubscriptionParams } from "./PubSubManager";
+import type {
+  BasicCallback,
+  PubSubManager,
+  Subscription,
+  SubscriptionParams,
+} from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
 import type { AddTriggerParams } from "./addTrigger";
 
@@ -17,11 +22,11 @@ type AddSubResult = SubscriptionChannels & {
 /* The distinct list of {table_name, condition} must have a corresponding trigger in the database */
 export async function addSub(
   this: PubSubManager,
-  subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">
+  subscriptionParams: Omit<AddSubscriptionParams, "channel_name" | "parentSubParams">,
 ): Promise<AddSubResult> {
   const {
     socket,
-    localFuncs,
+    onData,
     table_rules,
     filter = {},
     selectParams = {},
@@ -33,10 +38,10 @@ export async function addSub(
   } = subscriptionParams;
   const table_name = table_info.name;
 
-  if (!socket && !localFuncs) {
+  if (!socket && !onData) {
     throw "socket AND func missing";
   }
-  if (socket && localFuncs) {
+  if (socket && onData) {
     throw "addSub: cannot have socket AND func";
   }
 
@@ -50,7 +55,7 @@ export async function addSub(
   const newSub: Subscription = {
     channel_name,
     filter,
-    localFuncs,
+    onData,
     selectParams: selectParams,
     lastPushed: 0,
     socket,
@@ -74,7 +79,7 @@ export async function addSub(
   const [matchingSub] = this.getClientSubs(newSub);
   if (matchingSub) {
     console.error(
-      `Trying to add a duplicate ${localFuncs ? "local" : "socket"} sub for: ${channel_name}`
+      `Trying to add a duplicate ${onData ? "local" : "socket"} sub for: ${channel_name}`,
     );
     return result;
   }
@@ -104,7 +109,7 @@ export async function addSub(
     void this.pushSubData(newSub);
   };
 
-  if (localFuncs) {
+  if (onData) {
     /**
      * Must ensure sub will start sending data after all triggers are set up.
      * Socket clients are not affected as they need to confirm they are ready to receive data

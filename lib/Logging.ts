@@ -58,6 +58,8 @@ export namespace EventTypes {
     tableName: string;
     localParams?: LocalParams;
   };
+  type MapValue<M> = M extends Map<any, infer V> ? V : never;
+
   export type SyncOrSub = DebugInfo & {
     type: "syncOrSub";
     connectedSocketIds: string[];
@@ -83,7 +85,7 @@ export namespace EventTypes {
           command: "notifListener.Finished";
           op_name: string | undefined;
           condition_ids_str: string | undefined;
-          tableTriggers: PubSubManagerTriggers[string] | undefined;
+          tableTriggers: MapValue<PubSubManagerTriggers> | undefined;
           tableSyncs: string;
           state: "ok" | "error" | "no-triggers" | "invalid_condition_ids";
         })

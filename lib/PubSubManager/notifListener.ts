@@ -101,21 +101,21 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   } else if (conditionIds?.every((id) => Number.isInteger(id))) {
     state = "ok";
     const firedTableConditions = tableTriggerConditions.filter(({ idx }) =>
-      conditionIds.includes(idx)
+      conditionIds.includes(idx),
     );
     const orphanedTableConditions = conditionIds.filter((condId) => {
       const tc = tableTriggerConditions.at(condId);
       return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
     });
     if (orphanedTableConditions.length) {
-      void this.deleteOrphanedTriggers.bind(this)(table_name);
+      void this.deleteOrphanedTriggers(new Set(table_name));
     }
 
     firedTableConditions.map(({ subs, syncs }) => {
       log(
         "notifListener",
         subs.map((s) => s.channel_name),
-        syncs.map((s) => s.channel_name)
+        syncs.map((s) => s.channel_name),
       );
 
       syncs.map((s) => {
@@ -128,8 +128,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           (trg) =>
             this.dbo[trg.table_name] &&
             sub.is_ready &&
-            ((sub.socket_id && this.sockets[sub.socket_id]) || sub.localFuncs)
-        )
+            ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData),
+        ),
       );
 
       activeAndReadySubs.forEach((sub) => {
@@ -143,7 +143,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
           tracked_columns
         ) {
           const subFieldsHaveChanged = changedColumns.some((changedColumn) =>
-            tracked_columns.includes(changedColumn)
+            tracked_columns.includes(changedColumn),
           );
           if (!subFieldsHaveChanged) return;
         }
@@ -181,11 +181,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     state,
     op_name,
     condition_ids_str,
-    tableTriggers: this._triggers[table_name],
+    tableTriggers: this._triggers.get(table_name),
     tableSyncs: JSON.stringify(
       this.syncs
         .filter((s) => s.table_name === table_name)
-        .map((s) => pickKeys(s, ["condition", "socket_id"]))
+        .map((s) => pickKeys(s, ["condition", "socket_id"])),
     ),
     connectedSocketIds: this.connectedSocketIds,
   });

@@ -20,11 +20,11 @@ import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { refreshTriggers } from "./refreshTriggers";
 
 import type { AnyObject, FieldFilter, SelectParams, WAL } from "prostgles-types";
-import { CHANNELS, type SubscribeOptions } from "prostgles-types";
+import { CHANNELS, getSerialisableError, type SubscribeOptions } from "prostgles-types";
 
 import { find, pickKeys } from "prostgles-types";
-import type { LocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
-import { getOnDataFunc, matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
+import type { OnData } from "../DboBuilder/ViewHandler/subscribe";
+import { matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import type { EventTypes } from "../Logging";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import { syncData } from "../SyncReplication";
@@ -109,7 +109,7 @@ export type SubscriptionParams = {
   subscribeOptions: SubscribeOptions;
   tracked_columns: string[] | undefined;
 
-  localFuncs?: LocalFuncs;
+  onData?: OnData;
   socket: PRGLIOSocket | undefined;
 
   lastPushed: number;
@@ -125,7 +125,7 @@ export type Subscription = Pick<
   | "lastPushed"
   | "channel_name"
   | "is_ready"
-  | "localFuncs"
+  | "onData"
   | "socket"
   | "socket_id"
   | "table_info"
@@ -136,7 +136,7 @@ export type Subscription = Pick<
   triggers: AddTriggerParams[];
 };
 
-export type PubSubManagerTriggers = Record<string, { condition: string; hash: string }[]>;
+export type PubSubManagerTriggers = Map<string, { condition: string; hash: string }[]>;
 
 /**
  * Used to facilitate table subscribe and sync
@@ -165,7 +165,7 @@ export class PubSubManager {
    * Triggers used for sync/sub that reflect prostgles.app_triggers.
    * Updated through refreshTriggers()
    */
-  _triggers: PubSubManagerTriggers = {};
+  _triggers: PubSubManagerTriggers = new Map();
   sockets: Record<string, PRGLIOSocket> = {};
 
   subs: Subscription[] = [];
@@ -218,13 +218,13 @@ export class PubSubManager {
 
   getClientSubs({
     channel_name,
-    localFuncs,
+    onData,
     socket_id,
-  }: Pick<Subscription, "localFuncs" | "socket_id" | "channel_name">): Subscription[] {
+  }: Pick<Subscription, "onData" | "socket_id" | "channel_name">): Subscription[] {
     return this.subs.filter((s) => {
       return (
         s.channel_name === channel_name &&
-        (matchesLocalFuncs(localFuncs, s.localFuncs) || (socket_id && s.socket_id === socket_id))
+        (matchesLocalFuncs(onData, s.onData) || (socket_id && s.socket_id === socket_id))
       );
     });
   }
@@ -236,30 +236,31 @@ export class PubSubManager {
 
   removeSubscription = (
     channelName: string,
-    subInfo: { type: "local"; localFuncs: LocalFuncs } | { type: "ws"; socket: PRGLIOSocket },
+    subInfo: { type: "local"; onData: OnData } | { type: "ws"; socket: PRGLIOSocket },
   ) => {
     const matchingSubIdx = this.subs.findIndex(
       (s) =>
         s.channel_name === channelName &&
         (subInfo.type === "local" ?
-          getOnDataFunc(subInfo.localFuncs) === getOnDataFunc(s.localFuncs)
+          subInfo.onData === s.onData
         : subInfo.socket.id === s.socket?.id),
     );
-    if (matchingSubIdx > -1) {
-      const tableName = this.subs[matchingSubIdx]!.table_info.name;
-      const oldActiveTriggers = this.getActiveTriggers(tableName);
+    const matchingSub = this.subs[matchingSubIdx];
+    if (matchingSub) {
+      /** Ensure we check and refresh related table/view triggers as well */
+      const oldActiveTriggers = this.getAllActiveTriggers();
       this.subs.splice(matchingSubIdx, 1);
-      const newActiveTriggers = this.getActiveTriggers(tableName);
+      const newActiveTriggers = this.getAllActiveTriggers();
+      const tableNames = new Set(
+        [...oldActiveTriggers, ...newActiveTriggers].map((t) => t.tableName),
+      );
       if (newActiveTriggers.length < oldActiveTriggers.length) {
-        this.deleteOrphanedTriggers(tableName);
+        this.deleteOrphanedTriggers(tableNames);
       }
     } else {
-      console.error(
-        "Could not unsubscribe localFunc. Subscription might not have initialised yet",
-        {
-          channelName,
-        },
-      );
+      console.error("Could not unsubscribe. Subscription might not have initialised yet", {
+        channelName,
+      });
     }
   };
 
@@ -272,11 +273,11 @@ export class PubSubManager {
   notifListener = notifListener.bind(this);
 
   getTriggerInfo = (tableName: string) => {
-    const tableTriggerConditions = this._triggers[tableName]?.map((cond, idx) => ({
+    const tableTriggerConditions = this._triggers.get(tableName)?.map((triggerInfo, idx) => ({
       idx,
-      ...cond,
-      subs: this.getTriggerSubs(tableName, cond.condition),
-      syncs: this.getSyncs(tableName, cond.condition),
+      ...triggerInfo,
+      subs: this.getTriggerSubs(tableName, triggerInfo.condition),
+      syncs: this.getSyncs(tableName, triggerInfo.condition),
     }));
     return tableTriggerConditions;
   };
@@ -287,13 +288,20 @@ export class PubSubManager {
     return activeTriggers;
   };
 
-  getSubData = async (
-    sub: Subscription,
-  ): Promise<{ data: any[]; err?: undefined } | { data?: undefined; err: unknown }> => {
-    const { table_info, filter, selectParams: params, table_rules, socket, localFuncs } = sub; //, subOne = false
+  getAllActiveTriggers = () => {
+    return Array.from(this._triggers.keys()).flatMap((tableName) => {
+      return this.getActiveTriggers(tableName).map((triggerInfo) => ({
+        ...triggerInfo,
+        tableName,
+      }));
+    });
+  };
+
+  getSubData = async (sub: Subscription) => {
+    const { table_info, filter, selectParams: params, table_rules, socket, onData } = sub; //, subOne = false
     const { name: table_name } = table_info;
     const tableHandler = this.dbo[table_name];
-    if (!localFuncs && !socket) {
+    if (!onData && !socket) {
       throw new Error("Subscription must have either localFuncs or socket");
     }
     if (!tableHandler?.find) {
@@ -301,7 +309,7 @@ export class PubSubManager {
     }
 
     try {
-      const data = await tableHandler.find(
+      const data = (await tableHandler.find(
         filter,
         params,
         undefined,
@@ -309,10 +317,10 @@ export class PubSubManager {
         socket && {
           clientReq: { socket },
         },
-      );
+      )) as AnyObject[];
       return { data };
     } catch (err) {
-      return { err };
+      return { err: getSerialisableError(err) || "Unknown error fetching subscription data" };
     }
   };
 
@@ -401,23 +409,23 @@ export class PubSubManager {
   /** Throttle trigger deletes */
   deletingOrphanedTriggers:
     | {
-        tableNames: string[];
+        tableNames: Set<string>;
         timeout: NodeJS.Timeout;
       }
     | undefined;
-  deleteOrphanedTriggers = (latestTableName: string) => {
+  deleteOrphanedTriggers = (latestTableNames: Set<string>) => {
     this.deletingOrphanedTriggers ??= {
-      tableNames: [latestTableName],
+      tableNames: latestTableNames,
       timeout: setTimeout(() => {
         const tableNames = this.deletingOrphanedTriggers!.tableNames;
         this.deletingOrphanedTriggers = undefined;
-        void deleteOrphanedTriggers.bind(this)(tableNames);
+        void deleteOrphanedTriggers.bind(this)(Array.from(tableNames));
       }, 1000),
     };
 
-    if (!this.deletingOrphanedTriggers.tableNames.includes(latestTableName)) {
-      this.deletingOrphanedTriggers.tableNames.push(latestTableName);
-    }
+    latestTableNames.forEach((latestTableName) => {
+      this.deletingOrphanedTriggers?.tableNames.add(latestTableName);
+    });
   };
 
   addingTrigger: any;

@@ -8,7 +8,7 @@ import { asValue, DELIMITER, NOTIF_CHANNEL, NOTIF_TYPE } from "../PubSubManagerU
  */
 export const udtNamesWithoutEqualityComparison = ["json", "xml"];
 export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
-  return `
+  const dataWatchFunctionQuery = `
   
         CREATE OR REPLACE FUNCTION ${DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
         AS $$
@@ -161,6 +161,25 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
         COMMENT ON FUNCTION ${DB_OBJ_NAMES.data_watch_func} IS 'Prostgles internal function used to notify when data in the table changed';
 
   `;
+
+  /** Ensure every execute is followed by EXCEPTION catch to ensure we remove stale schema/faulty triggers */
+  const queryLines = dataWatchFunctionQuery
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l);
+  queryLines.forEach((line, lineIndex) => {
+    const nextLine = queryLines[lineIndex + 1] ?? "";
+    if (
+      line.toUpperCase().startsWith("EXECUTE") &&
+      !nextLine.toUpperCase().startsWith("EXCEPTION")
+    ) {
+      throw new Error(
+        `Every EXECUTE statement in the data watch function must be followed by an EXCEPTION block to catch errors and avoid stale triggers. Problematic line: ${line}`,
+      );
+    }
+  });
+
+  return dataWatchFunctionQuery;
 };
 
 /**
@@ -208,6 +227,14 @@ IF TG_OP = 'UPDATE' THEN
 
       BEGIN
         EXECUTE query INTO changed_columns;
+        EXCEPTION WHEN OTHERS THEN
+          
+          has_errors := TRUE;
+
+          GET STACKED DIAGNOSTICS 
+            err_text = MESSAGE_TEXT,
+            err_detail = PG_EXCEPTION_DETAIL,
+            err_hint = PG_EXCEPTION_HINT;
       END;
 
       /* It is possible to get no changes */

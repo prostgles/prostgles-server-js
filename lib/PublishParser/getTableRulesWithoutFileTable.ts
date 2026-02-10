@@ -9,7 +9,6 @@ import type {
   ParsedPublishTable,
   PublishTableRule,
   PublishViewRule,
-  SubscribeRule,
 } from "./publishTypesAndUtils";
 import { type PublishObject, RULE_TO_METHODS } from "./publishTypesAndUtils";
 
@@ -17,7 +16,7 @@ export async function getTableRulesWithoutFileTable(
   this: PublishParser,
   { tableName, clientReq }: DboTable,
   clientInfo: AuthResultWithSID | undefined,
-  overridenPublish?: PublishObject
+  overridenPublish?: PublishObject,
 ): Promise<ParsedPublishTable | undefined> {
   if (!tableName) throw new Error("tableName is missing in getTableRules");
 
@@ -111,7 +110,7 @@ export async function getTableRulesWithoutFileTable(
         const rule = parsedTableRule[method];
 
         const ruleInfo = MY_RULES.find(
-          (r) => r.rule === method || (r.methods as readonly string[]).includes(method)
+          (r) => r.rule === method || (r.methods as readonly string[]).includes(method),
         );
         if (!ruleInfo) {
           let extraInfo = "";
@@ -120,7 +119,7 @@ export async function getTableRulesWithoutFileTable(
             RULE_TO_METHODS.find(
               (r) =>
                 r.table_only &&
-                (r.rule === method || (r.methods as readonly string[]).includes(method))
+                (r.rule === method || (r.methods as readonly string[]).includes(method)),
             )
           ) {
             extraInfo = "You've specified table rules to a view\n";
@@ -159,8 +158,8 @@ export async function getTableRulesWithoutFileTable(
         if (method === "select" && !dissallowedRuleKeys.includes(subKey)) {
           const sr = MY_RULES.find((r) => r.rule === subKey);
           if (sr && canSubscribe) {
-            parsedTableRule[subKey] = { ...(sr.no_limits) };
-            parsedTableRule.subscribeOne = { ...(sr.no_limits) };
+            parsedTableRule[subKey] = { ...sr.no_limits };
+            parsedTableRule.subscribeOne = { ...sr.no_limits };
           }
         }
       });

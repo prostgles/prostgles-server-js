@@ -5,6 +5,7 @@ import type {
   FieldFilter,
   SelectParams,
   SubscribeParams,
+  SubscriptionChannels,
 } from "prostgles-types";
 import { asName, isObject, postgresToTsType } from "prostgles-types";
 import type { TableEvent } from "../../Logging";
@@ -23,7 +24,7 @@ import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
 import { size } from "./size";
-import type { LocalFuncs } from "./subscribe";
+import type { OnData } from "./subscribe";
 import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
 import { escapeTSNames } from "../../utils/utils";
@@ -64,7 +65,7 @@ export class ViewHandler {
     tableOrViewInfo: TableSchema,
     dboBuilder: DboBuilder,
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers },
-    joinPaths?: JoinPaths
+    joinPaths?: JoinPaths,
   ) {
     this.db = db;
     this.tx = tx;
@@ -84,7 +85,7 @@ export class ViewHandler {
     this.joins = this.dboBuilder.joins;
     this.columnsForTypes.map(({ name, udt_name, is_nullable }) => {
       this.tsColumnDefs.push(
-        `${escapeTSNames(name)}?: ${postgresToTsType(udt_name) as string} ${is_nullable ? " | null " : ""};`
+        `${escapeTSNames(name)}?: ${postgresToTsType(udt_name) as string} ${is_nullable ? " | null " : ""};`,
       );
     });
   }
@@ -192,7 +193,7 @@ export class ViewHandler {
     selectParams?: SelectParams,
     _param3_unused?: undefined,
     table_rules?: ParsedTableRule,
-    localParams?: LocalParams
+    localParams?: LocalParams,
   ): Promise<any> {
     try {
       const { limit, ...params } = selectParams ?? {};
@@ -205,7 +206,7 @@ export class ViewHandler {
         { ...params, limit: 1, returnType: "row" },
         undefined,
         table_rules,
-        localParams
+        localParams,
       );
       await this._log({
         command: "find",
@@ -226,58 +227,59 @@ export class ViewHandler {
   async subscribe(
     filter: Filter,
     params: SubscribeParams,
-    localFuncs: LocalFuncs
+    onData: OnData,
   ): Promise<{ unsubscribe: () => any }>;
 
   async subscribe(
     filter: Filter,
     params: SubscribeParams,
-    localFuncs: undefined,
-    table_rules: ParsedTableRule | undefined,
-    localParams: LocalParams
-  ): Promise<string>;
+    onData?: OnData,
+    table_rules?: ParsedTableRule,
+    localParams?: LocalParams,
+  ): Promise<SubscriptionChannels>;
 
   async subscribe(
     filter: Filter,
     params: SubscribeParams,
-    localFuncs?: LocalFuncs,
+    onData?: OnData,
     table_rules?: ParsedTableRule,
-    localParams?: LocalParams
-  ): Promise<{ unsubscribe: () => any } | string> {
-    //@ts-ignore
-    return subscribe.bind(this)(
+    localParams?: LocalParams,
+  ): Promise<{ unsubscribe: () => any } | SubscriptionChannels> {
+    const result = await subscribe.bind(this)(
       filter,
       params,
       //@ts-ignore
-      localFuncs,
+      onData,
       table_rules,
-      localParams
+      localParams,
     );
+    return result;
   }
 
   /* This should only be called from server */
   subscribeOne(
     filter: Filter,
     params: SubscribeParams,
-    localFunc: (item: AnyObject) => any
+    onData: (item: AnyObject | undefined, error?: unknown) => any,
   ): Promise<{ unsubscribe: () => any }>;
   subscribeOne(
     filter: Filter,
     params: SubscribeParams,
-    localFunc: undefined,
+    onData: undefined,
     table_rules: ParsedTableRule,
-    localParams: LocalParams
-  ): Promise<string>;
+    localParams: LocalParams,
+  ): Promise<SubscriptionChannels>;
   subscribeOne(
     filter: Filter,
     params: SubscribeParams = {},
-    localFunc?: (item: AnyObject) => any,
+    onData?: (item: AnyObject | undefined, error?: unknown) => void,
     table_rules?: ParsedTableRule,
-    localParams?: LocalParams
-  ): Promise<string | { unsubscribe: () => any }> {
-    //@ts-ignore
-    const func = localParams ? undefined : (rows: AnyObject[]) => localFunc(rows[0]);
-    //@ts-ignore
+    localParams?: LocalParams,
+  ): Promise<SubscriptionChannels | { unsubscribe: () => any }> {
+    const func =
+      localParams || !onData ? undefined : (
+        (rows: AnyObject[], error?: unknown) => onData(rows[0], error)
+      );
     return this.subscribe(filter, { ...params, limit: 2 }, func, table_rules, localParams);
   }
 
@@ -287,7 +289,7 @@ export class ViewHandler {
   getAllowedSelectFields(
     selectParams: FieldFilter = "*",
     allowed_cols: FieldFilter,
-    allow_empty = true
+    allow_empty = true,
   ): string[] {
     const all_columns = this.column_names.slice(0);
     let allowedFields = all_columns.slice(0),
@@ -317,7 +319,7 @@ export class ViewHandler {
   intersectColumns(
     allowedFields: FieldFilter,
     dissallowedFields: FieldFilter,
-    removeDisallowedFields = false
+    removeDisallowedFields = false,
   ): string[] {
     let result: string[] = [];
     if (allowedFields) {
@@ -338,7 +340,7 @@ export class ViewHandler {
   parseFieldFilter(
     fieldParams: FieldFilter = "*",
     allow_empty = true,
-    allowed_cols?: string[]
+    allowed_cols?: string[],
   ): string[] {
     return parseFieldFilter(fieldParams, allow_empty, allowed_cols ?? this.column_names.slice(0));
   }

@@ -155,6 +155,24 @@ export const initProstgles = async function (
         }
       },
     });
+
+    /** Drop stale triggers */
+    await db
+      .any(
+        `
+      WITH active_app_ids AS (
+        SELECT DISTINCT (string_to_array(application_name, ' '))[2] AS app_id
+        FROM pg_stat_activity
+        WHERE application_name LIKE 'prostgles %'
+      )
+      DELETE FROM prostgles.app_triggers
+      WHERE app_id NOT IN (SELECT app_id FROM active_app_ids)
+      AND app_id != $1
+      `,
+        [this.appId],
+      )
+      .catch(() => {});
+
     this.db = db;
     this.pgp = pgp;
     this.isSuperUser = await getIsSuperUser(db);

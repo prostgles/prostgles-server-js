@@ -1,12 +1,10 @@
-import { getSerialisableError } from "prostgles-types";
-import { parseLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import type { EventTypes } from "../Logging";
 import type { Subscription } from "./PubSubManager";
 import { type PubSubManager } from "./PubSubManager";
 import { log } from "./PubSubManagerUtils";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
-  const { socket_id, channel_name } = sub;
+  const { socket_id, channel_name, onData } = sub;
 
   const onLog = (
     state: Extract<EventTypes.SyncOrSub, { type: "syncOrSub"; command: "pushSubData" }>["state"],
@@ -28,7 +26,6 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     onLog("sub_not_found");
     return;
   }
-  const localFuncs = parseLocalFuncs(sub.localFuncs);
 
   if (err) {
     onLog("error");
@@ -39,40 +36,28 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   }
 
   sub.lastPushed = Date.now();
-  return new Promise(async (resolve, reject) => {
-    /* TODO: Retire subOne -> it's redundant */
 
-    const { data, err } = await this.getSubData(sub);
+  const { data, err: subDataError } = await this.getSubData(sub);
 
-    if (data) {
-      if (socket_id && this.sockets[socket_id]) {
-        log("Pushed " + data.length + " records to sub");
-        onLog("Emiting to socket");
-        this.sockets[socket_id].emit(channel_name, { data }, () => {
-          resolve(data);
-        });
+  if (subDataError !== undefined) {
+    onLog("fetch data error");
+  }
+  if (socket_id && this.sockets[socket_id]) {
+    log(`Pushing ${data?.length ?? 0} rows to socket`);
+    onLog("Emiting to socket");
+    this.sockets[socket_id].emit(
+      channel_name,
+      subDataError !== undefined ? { err: subDataError } : { data },
+      () => {
         /* TO DO: confirm receiving data or server will unsubscribe
           { data }, (cb)=> { console.log(cb) });
         */
-      } else if (localFuncs) {
-        onLog("pushed to local client");
-        localFuncs.onData(data);
-        resolve(data);
-      } else {
-        onLog("no client to push data to");
-      }
-    } else {
-      onLog("fetch data error");
-      const errObj = getSerialisableError(err) || "Unknown error fetching subscription data";
-      if (socket_id && this.sockets[socket_id]) {
-        this.sockets[socket_id].emit(channel_name, { err: errObj });
-      } else if (localFuncs) {
-        if (!localFuncs.onError) {
-          console.error("Uncaught subscription error", err);
-        }
-        localFuncs.onError?.(errObj);
-      }
-      reject(errObj);
-    }
-  });
+      },
+    );
+  } else if (onData) {
+    onLog("pushed to local client");
+    onData(data ?? [], subDataError);
+  } else {
+    onLog("no client to push data to");
+  }
 }

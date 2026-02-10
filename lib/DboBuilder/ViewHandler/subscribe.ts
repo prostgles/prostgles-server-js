@@ -1,68 +1,42 @@
 import type { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type {
-  Filter,
-  LocalParams} from "../DboBuilder";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError
-} from "../DboBuilder";
+import type { Filter, LocalParams } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 import type { NewQuery } from "../QueryBuilder/QueryBuilder";
 import type { ViewHandler } from "./ViewHandler";
 import { getValidatedSubscribeOptions } from "./getValidatedSubscribeOptions";
 
-type OnData = (items: AnyObject[]) => any;
-export type LocalFuncs =
-  | {
-      onData: OnData;
-      onError?: (error: any) => void;
-    }
-  | OnData;
+export type OnData = (items: AnyObject[], error?: unknown) => any;
 
-export const getOnDataFunc = (localFuncs: LocalFuncs | undefined): OnData | undefined => {
-  return typeof localFuncs === "function" ? localFuncs : localFuncs?.onData;
-};
 export const matchesLocalFuncs = (
-  localFuncs1: LocalFuncs | undefined,
-  localFuncs2: LocalFuncs | undefined
+  localFuncs1: OnData | undefined,
+  localFuncs2: OnData | undefined,
 ) => {
-  return localFuncs1 && localFuncs2 && getOnDataFunc(localFuncs1) === getOnDataFunc(localFuncs2);
-};
-export const parseLocalFuncs = (
-  localFuncs1: LocalFuncs | undefined
-): Extract<LocalFuncs, { onData: OnData }> | undefined => {
-  return (
-    !localFuncs1 ? undefined
-    : typeof localFuncs1 === "function" ?
-      {
-        onData: localFuncs1,
-      }
-    : localFuncs1
-  );
+  return localFuncs1 && localFuncs2 && localFuncs1 === localFuncs2;
 };
 
 async function subscribe(
   this: ViewHandler,
   filter: Filter,
   params: SubscribeParams,
-  localFuncs: LocalFuncs
+  onData: OnData,
 ): Promise<{ unsubscribe: () => any }>;
 async function subscribe(
   this: ViewHandler,
   filter: Filter,
   params: SubscribeParams,
-  localFuncs: undefined,
+  onData: undefined,
   table_rules: ParsedTableRule | undefined,
-  localParams: LocalParams
+  localParams: LocalParams,
 ): Promise<SubscriptionChannels>;
 async function subscribe(
   this: ViewHandler,
   filter: Filter,
   params: SubscribeParams,
-  localFuncs?: LocalFuncs,
+  onData?: OnData,
   table_rules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<{ unsubscribe: () => any } | SubscriptionChannels> {
   const start = Date.now();
   try {
@@ -74,12 +48,11 @@ async function subscribe(
       throw "subscribe not allowed within transactions";
     }
     const clientReq = localParams?.clientReq;
-    if (!clientReq && !localFuncs) {
-      throw " missing data. provide -> localFunc | localParams { socket } ";
+    if (!clientReq && !onData) {
+      throw " missing data. expecting onData | localParams { socket } ";
     }
-    if (clientReq?.socket && localFuncs) {
-      console.error({ localParams, localFuncs });
-      throw " Cannot have localFunc AND socket ";
+    if (clientReq?.socket && onData) {
+      throw " Cannot have onData and socket ";
     }
 
     const { throttle, throttleOpts, skipFirst, actions, skipChangedColumnsCheck, ...selectParams } =
@@ -93,7 +66,7 @@ async function subscribe(
       { ...selectParams, limit: 0 },
       undefined,
       table_rules,
-      { ...localParams, returnNewQuery: true }
+      { ...localParams, returnNewQuery: true },
     )) as unknown as NewQuery;
     const viewOptions = await getSubscribeRelatedTables.bind(this)({
       filter,
@@ -114,19 +87,20 @@ async function subscribe(
       selectParams: { ...selectParams },
       subscribeOptions: getValidatedSubscribeOptions(
         { actions, skipFirst, throttle, throttleOpts, skipChangedColumnsCheck },
-        table_rules?.subscribe
+        table_rules?.subscribe,
       ),
       lastPushed: 0,
       tracked_columns,
     } as const;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();
-    if (!localFuncs) {
+
+    if (!onData) {
       const { socket } = clientReq ?? {};
       const result = await pubSubManager.addSub({
         ...commonSubOpts,
         socket,
-        localFuncs: undefined,
+        onData: undefined,
         socket_id: socket?.id,
       });
 
@@ -141,13 +115,13 @@ async function subscribe(
       const { channelName, sendFirstData } = await pubSubManager.addSub({
         ...commonSubOpts,
         socket: undefined,
-        localFuncs,
+        onData,
         socket_id: undefined,
       });
 
       const unsubscribe = async () => {
         const pubSubManager = await this.dboBuilder.getPubSubManager();
-        pubSubManager.removeSubscription(channelName, { type: "local", localFuncs });
+        pubSubManager.removeSubscription(channelName, { type: "local", onData });
       };
       await this._log({
         command: "subscribe",

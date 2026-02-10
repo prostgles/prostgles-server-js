@@ -20,7 +20,7 @@ const SUBSCRIBE_METHODS = ["subscribe", "subscribeOne", "sync", "unsubscribe", "
 export async function getSchemaFromPublish(
   this: PublishParser,
   { userData, ...clientReq }: Args,
-  scope: PermissionScope | undefined
+  scope: PermissionScope | undefined,
 ): Promise<{
   schema: TableSchemaForClient;
   tables: DBSchemaTable[];
@@ -60,7 +60,7 @@ export async function getSchemaFromPublish(
         !tableNames.includes(fileTableName)
       ) {
         const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
-          t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName))
+          t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
         );
         if (isReferenced) {
           tableNames.unshift(fileTableName);
@@ -77,17 +77,17 @@ export async function getSchemaFromPublish(
             throw errMsg;
           }
 
-          const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo);
+          const parsedTableRule = await this.getTableRules({ clientReq, tableName }, clientInfo);
 
-          if (!tableRules || isEmpty(tableRules)) return;
-          if (!isObject(tableRules)) {
+          if (!parsedTableRule || isEmpty(parsedTableRule)) return;
+          if (!isObject(parsedTableRule)) {
             throw `Invalid tableRules for table ${tableName}. Expecting an object`;
           }
 
           schema[tableName] = {};
           const tableSchema = schema[tableName];
-          const methods = getKeys(tableRules).filter(
-            (m) => canSubscribe || !includes(SUBSCRIBE_METHODS, m)
+          const methods = getKeys(parsedTableRule).filter(
+            (m) => canSubscribe || !includes(SUBSCRIBE_METHODS, m),
           );
           let tableInfo: TableInfo | undefined;
           let tableColumns: DBSchemaTable["columns"] | undefined;
@@ -98,25 +98,25 @@ export async function getSchemaFromPublish(
               .map(async (method) => {
                 if (method === "sync") {
                   /* Pass sync info */
-                  tableSchema[method] = tableRules[method];
-                } else if (includes(getKeys(tableRules), method) && tableRules[method]) {
+                  tableSchema[method] = parsedTableRule[method];
+                } else if (includes(getKeys(parsedTableRule), method) && parsedTableRule[method]) {
                   //@ts-ignore
                   tableSchema[method] =
                     method === "insert" ?
-                      pickKeys(tableRules[method], ["allowedNestedInserts"])
+                      pickKeys(parsedTableRule[method], ["allowedNestedInserts"])
                     : ({} as AnyObject);
 
                   /* Test for issues with the common table CRUD methods () */
                   if (includes(TABLE_METHODS, method)) {
                     try {
-                      const parsedTableRule = await this.getValidatedRequestRule(
+                      this.validateRequestRule(
                         {
                           tableName,
                           command: method,
                           clientReq,
                         },
-                        clientInfo,
-                        scope
+                        parsedTableRule,
+                        scope,
                       );
                       if (this.prostgles.opts.testRulesOnConnect) {
                         await (this.dbo[tableName] as TableHandler)[method](
@@ -128,7 +128,7 @@ export async function getSchemaFromPublish(
                             ...clientReq,
                             isRemoteRequest: {},
                             testRule: true,
-                          }
+                          },
                         );
                       }
                     } catch (e) {
@@ -146,17 +146,17 @@ export async function getSchemaFromPublish(
                   }
 
                   if (method === "getInfo" || method === "getColumns") {
-                    const tableRules = await this.getValidatedRequestRule(
+                    this.validateRequestRule(
                       { tableName, command: method, clientReq },
-                      clientInfo,
-                      scope
+                      parsedTableRule,
+                      scope,
                     );
                     const res = await (this.dbo[tableName] as TableHandler)[method](
                       undefined,
                       undefined,
                       undefined,
-                      tableRules,
-                      { ...clientReq, isRemoteRequest: {} }
+                      parsedTableRule,
+                      { ...clientReq, isRemoteRequest: {} },
                     );
                     if (method === "getInfo") {
                       tableInfo = res as TableInfo;
@@ -165,7 +165,7 @@ export async function getSchemaFromPublish(
                     }
                   }
                 }
-              })
+              }),
           );
 
           if (tableInfo && tableColumns) {
@@ -175,7 +175,7 @@ export async function getSchemaFromPublish(
               columns: tableColumns,
             });
           }
-        })
+        }),
       );
     }
   } catch (error) {
