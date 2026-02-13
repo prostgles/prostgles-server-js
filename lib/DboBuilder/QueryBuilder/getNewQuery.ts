@@ -6,17 +6,17 @@ import type {
   SelectParams,
   SimpleJoinSelect,
 } from "prostgles-types";
-import { getKeys, isEmpty, omitKeys } from "prostgles-types";
+import { getKeys, includes, isEmpty, omitKeys } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
 import type { PrepareWhereParams } from "../ViewHandler/prepareWhere";
+import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
 import { FUNCTIONS } from "./Functions/Functions";
 import type { NewQuery, NewQueryJoin } from "./QueryBuilder";
 import { SelectItemBuilder } from "./QueryBuilder";
-import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
 
 const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
 const JOIN_PARAM_KEYS = getKeys({
@@ -55,7 +55,7 @@ const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin => {
       params: joinParams,
     };
   }
-  const [joinKey, ...otherKeys] = getKeys(joinParams).filter((k) => JOIN_KEYS.includes(k as any));
+  const [joinKey, ...otherKeys] = getKeys(joinParams).filter((k) => includes(JOIN_KEYS, k));
   if (otherKeys.length) {
     return {
       error: "Cannot specify more than one join type ( $innerJoin OR $leftJoin )",
@@ -63,7 +63,7 @@ const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin => {
   } else if (joinKey) {
     /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
     const invalidParams = Object.keys(joinParams).filter(
-      (k) => ![...JOIN_PARAM_KEYS, ...JOIN_KEYS].includes(k as any)
+      (k) => !includes([...JOIN_PARAM_KEYS, ...JOIN_KEYS], k),
     );
     if (invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");
@@ -94,7 +94,7 @@ export async function getNewQuery(
   selectParams: SelectParams & { alias?: string } = {},
   param3_unused = null,
   tableRules: ParsedTableRule | undefined,
-  localParams: LocalParams | undefined
+  localParams: LocalParams | undefined,
 ): Promise<NewQuery> {
   const { columns } = _this;
 
@@ -175,11 +175,14 @@ export async function getNewQuery(
     let isLocal = true;
     if (localParams && localParams.clientReq) {
       isLocal = false;
-      joinTableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
-        tableName: joinTableName,
-        command: "find",
-        clientReq: localParams.clientReq,
-      });
+      joinTableRules = await _this.dboBuilder.publishParser?.getValidatedRequestRuleWusr(
+        {
+          tableName: joinTableName,
+          command: "find",
+          clientReq: localParams.clientReq,
+        },
+        localParams.scope,
+      );
     }
 
     const isAllowedAccessToTable = isLocal || joinTableRules;
@@ -190,7 +193,7 @@ export async function getNewQuery(
         { ...j_selectParams, alias: j_alias },
         param3_unused,
         joinTableRules,
-        localParams
+        localParams,
       );
       joinQuery.isLeftJoin = j_isLeftJoin;
       joinQuery.tableAlias = j_alias;
@@ -256,7 +259,7 @@ export async function getNewQuery(
       allowedOrderByFields,
       selectParams.alias,
       select,
-      joinQueries
+      joinQueries,
     ),
     offset: prepareOffsetQuery(selectParams.offset),
   };
@@ -278,7 +281,7 @@ const prepareOffsetQuery = (offset?: number) => {
 
 const prepareLimitQuery = (
   limit: number | null | undefined = null,
-  p: ValidatedTableRules
+  p: ValidatedTableRules,
 ): number | null => {
   if (limit !== null && !Number.isInteger(limit)) {
     throw "Unexpected LIMIT. Must be null or an integer";

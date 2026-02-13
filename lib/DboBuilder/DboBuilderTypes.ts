@@ -11,7 +11,7 @@ import type {
 } from "prostgles-types";
 import type { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
 import type { BasicCallback } from "../PubSubManager/PubSubManager";
-import type { PublishAllOrNothing } from "../PublishParser/PublishParser";
+import type { PermissionScope, PublishAllOrNothing } from "../PublishParser/PublishParser";
 import type { FieldSpec } from "./QueryBuilder/Functions/Functions";
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
@@ -188,6 +188,7 @@ export type LocalParams = {
   isRemoteRequest?: {
     user?: UserLike | undefined;
   };
+  scope?: PermissionScope | undefined;
   func?: () => any;
   testRule?: boolean;
   tableAlias?: string;

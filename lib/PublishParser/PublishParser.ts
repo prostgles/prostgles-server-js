@@ -1,3 +1,4 @@
+import { getKeys, includes, pickKeys } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -99,24 +100,24 @@ export class PublishParser {
     return _publish || undefined;
   }
 
-  async getValidatedRequestRuleWusr({
-    tableName,
-    command,
-    clientReq,
-  }: DboTableCommand): Promise<ParsedTableRule> {
-    const rules = await this.getParsedTableRule({ tableName, clientReq }, undefined);
+  async getValidatedRequestRuleWusr(
+    { tableName, command, clientReq }: DboTableCommand,
+    scope: PermissionScope | undefined,
+  ): Promise<ParsedTableRule> {
+    const rules = await this.getParsedTableRule({ tableName, clientReq }, undefined, scope);
     const clientInfo =
       clientReq && (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
-    this.validateRequestRule({ tableName, command, clientReq }, rules, undefined);
+    this.validateRequestRule({ tableName, command, clientReq }, rules, scope);
     return rules;
   }
 
   async getParsedTableRule(
     { tableName, clientReq }: Pick<DboTableCommand, "tableName" | "clientReq">,
     clientInfo: AuthResultWithSID | undefined,
+    scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule> {
     if (!tableName) throw "tableName missing";
 
@@ -140,7 +141,7 @@ export class PublishParser {
       throw errorInfo.error;
     });
 
-    const tableRule = await this.getTableRules({ tableName, clientReq }, clientInfo);
+    const tableRule = await this.getTableRules({ tableName, clientReq }, clientInfo, scope);
 
     if (!tableRule) {
       throw {
@@ -158,7 +159,7 @@ export class PublishParser {
   ) {
     if (!command || !tableName) throw "command OR tableName are missing";
 
-    const rule = RULE_TO_METHODS.find((rtms) => rtms.methods.some((v) => v === command));
+    const rule = RULE_TO_METHODS.find(({ methods }) => includes(methods, command));
     if (!rule) {
       throw "Invalid command: " + command;
     }
@@ -200,19 +201,34 @@ export class PublishParser {
   async getTableRules(
     args: DboTable,
     clientInfo: AuthResultWithSID | undefined,
+    scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule | undefined> {
     const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
+    const applyScopeToTableRules = (tableRules: ParsedTableRule | undefined) => {
+      if (!tableRules) return;
+      if (!scope || scope.sql === "commited") return tableRules;
+      if (scope.sql === "rolledback") {
+        return pickKeys(tableRules, ["select"]);
+      }
+      const tableScope = scope.tables?.[args.tableName];
+      if (!tableScope) return;
+      return pickKeys(
+        tableRules,
+        getKeys(tableScope).filter((k) => tableScope[k]),
+      );
+    };
     if (this.dbo[args.tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         args.tableName,
         fileTablePublishRules,
         args.clientReq,
         clientInfo,
+        scope,
       );
-      return parsePublishTableRule(fileTableRules);
+      return applyScopeToTableRules(parsePublishTableRule(fileTableRules));
     }
 
-    return parsePublishTableRule(fileTablePublishRules);
+    return applyScopeToTableRules(parsePublishTableRule(fileTablePublishRules));
   }
 
   getTableRulesWithoutFileTable = getTableRulesWithoutFileTable.bind(this);

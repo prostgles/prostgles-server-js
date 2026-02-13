@@ -105,6 +105,7 @@ export const runClientRequest = async function (
   const parsedTableRule = await this.publishParser.getParsedTableRule(
     { tableName, clientReq },
     clientInfo,
+    scope,
   );
   this.publishParser.validateRequestRule({ tableName, command, clientReq }, parsedTableRule, scope);
 
@@ -128,6 +129,7 @@ export const runClientRequest = async function (
   const localParams: LocalParams = {
     clientReq,
     isRemoteRequest: { user: sessionUser },
+    scope,
   };
   if (param3 && (param3 as LocalParams).returnQuery) {
     const isAllowed = await canRunSQL(this, clientReq);

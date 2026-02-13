@@ -1,4 +1,4 @@
-import type { AnyObject, EXISTS_KEY, FieldFilter} from "prostgles-types";
+import type { AnyObject, EXISTS_KEY, FieldFilter } from "prostgles-types";
 import { EXISTS_KEYS, asName } from "prostgles-types";
 import type { LocalParams, ExistsFilterConfig } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
@@ -9,7 +9,7 @@ import { getTableJoinQuery } from "./getTableJoinQuery";
 export async function getExistsCondition(
   this: ViewHandler,
   eConfig: ExistsFilterConfig,
-  localParams: LocalParams | undefined
+  localParams: LocalParams | undefined,
 ): Promise<string> {
   const thisTable = this.name;
   const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
@@ -35,11 +35,14 @@ export async function getExistsCondition(
   }
   const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
   if (localParams?.clientReq && this.dboBuilder.publishParser) {
-    t2Rules = (await this.dboBuilder.publishParser.getValidatedRequestRuleWusr({
-      tableName: targetTable,
-      command: "find",
-      clientReq: localParams.clientReq,
-    })) as ParsedTableRule | undefined;
+    t2Rules = (await this.dboBuilder.publishParser.getValidatedRequestRuleWusr(
+      {
+        tableName: targetTable,
+        command: "find",
+        clientReq: localParams.clientReq,
+      },
+      localParams.scope,
+    )) as ParsedTableRule | undefined;
 
     if (!t2Rules || !t2Rules.select) throw "Dissallowed";
     ({ forcedFilter, filterFields } = t2Rules.select);

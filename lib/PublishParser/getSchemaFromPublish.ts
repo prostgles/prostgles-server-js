@@ -77,7 +77,11 @@ export async function getSchemaFromPublish(
             throw errMsg;
           }
 
-          const parsedTableRule = await this.getTableRules({ clientReq, tableName }, clientInfo);
+          const parsedTableRule = await this.getTableRules(
+            { clientReq, tableName },
+            clientInfo,
+            scope,
+          );
 
           if (!parsedTableRule || isEmpty(parsedTableRule)) return;
           if (!isObject(parsedTableRule)) {

@@ -218,7 +218,12 @@ export async function insertNestedRecords(
 
             const { path } = joinPath;
             const [tbl1, tbl2, tbl3] = path;
-            targetTableRules = await getInsertTableRules(this, targetTable, localParams?.clientReq);
+            targetTableRules = await getInsertTableRules(
+              this,
+              targetTable,
+              localParams?.clientReq,
+              localParams?.scope,
+            );
 
             const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
             if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
@@ -342,12 +347,16 @@ export const getInsertTableRules = async (
   tableHandler: TableHandler,
   targetTable: string,
   clientReq: AuthClientRequest | undefined,
+  scope: LocalParams["scope"],
 ) => {
-  const childRules = await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr({
-    tableName: targetTable,
-    command: "insert",
-    clientReq,
-  });
+  const childRules = await tableHandler.dboBuilder.publishParser?.getValidatedRequestRuleWusr(
+    {
+      tableName: targetTable,
+      command: "insert",
+      clientReq,
+    },
+    scope,
+  );
   if (!childRules || !childRules.insert)
     throw "Dissallowed nested insert into table " + targetTable;
   return childRules;
@@ -386,7 +395,12 @@ const referencedInsert = async (
     throw new Error("childInsertErr: Table handler missing for referenced table: " + targetTable);
   }
 
-  const childRules = await getInsertTableRules(tableHandler, targetTable, localParams?.clientReq);
+  const childRules = await getInsertTableRules(
+    tableHandler,
+    targetTable,
+    localParams?.clientReq,
+    localParams?.scope,
+  );
 
   return Promise.all(
     ((Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]).map((m) =>

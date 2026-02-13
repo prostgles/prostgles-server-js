@@ -1,9 +1,10 @@
-import type { AnyObject, FullFilter} from "prostgles-types";
+import type { AnyObject, FullFilter } from "prostgles-types";
 import { includes, isDefined } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { PublishParser } from "./PublishParser";
 import type { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
+import type { LocalParams } from "../DboBuilder/DboBuilder";
 
 /**
  * Permissions for referencedTables columns are propagated to the file table (even if file table has no permissions)
@@ -18,7 +19,8 @@ export async function getFileTableRules(
   fileTableName: string,
   fileTablePublishRules: ParsedPublishTable | undefined,
   clientReq: AuthClientRequest | undefined,
-  clientInfo: AuthResultWithSID | undefined
+  clientInfo: AuthResultWithSID | undefined,
+  scope: LocalParams["scope"],
 ) {
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
@@ -28,7 +30,7 @@ export async function getFileTableRules(
     ?.filter((t) => !t.is_view && t.name !== fileTableName)
     .map((t) => {
       const refCols = t.columns.filter((c) =>
-        c.references?.some((r) => r.ftable === fileTableName)
+        c.references?.some((r) => r.ftable === fileTableName),
       );
       if (!refCols.length) return undefined;
       return {
@@ -40,7 +42,7 @@ export async function getFileTableRules(
     .filter(isDefined);
   if (referencedColumns?.length) {
     for (const { tableName, fileColumns, allColumns } of referencedColumns) {
-      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo);
+      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo, scope);
       if (tableRules) {
         fileColumns.map((column) => {
           const path = [{ table: tableName, on: [{ id: column }] }];
@@ -94,7 +96,7 @@ export async function getFileTableRules(
 
   const getForcedFilter = (
     rule: Pick<UpdateRule, "forcedFilter"> | undefined,
-    forcedFilters: FullFilter<AnyObject, void>[]
+    forcedFilters: FullFilter<AnyObject, void>[],
   ) => {
     return rule && !rule.forcedFilter ?
         {}
@@ -138,7 +140,7 @@ export async function getFileTableRules(
   const rules = await this.getTableRulesWithoutFileTable.bind(this)(
     { clientReq, tableName: fileTableName },
     clientInfo,
-    { [fileTableName]: fileTableRule }
+    { [fileTableName]: fileTableRule },
   );
   return { rules, allowedInserts: allowedNestedInserts };
 }

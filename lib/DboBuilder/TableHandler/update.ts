@@ -116,7 +116,12 @@ export async function update(
             throw `nestedInsert Tablehandler not found for ${nestedInsert.tableName}`;
           const refTableRules =
             !localParams ? undefined : (
-              await getInsertTableRules(this, nestedInsert.tableName, localParams.clientReq)
+              await getInsertTableRules(
+                this,
+                nestedInsert.tableName,
+                localParams.clientReq,
+                localParams.scope,
+              )
             );
           const nestedLocalParams: LocalParams = {
             ...localParams,
