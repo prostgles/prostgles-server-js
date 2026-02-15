@@ -182,8 +182,6 @@ export type PRGLIOSocket = {
 } & CachedSession;
 
 export type LocalParams = {
-  // httpReq?: ExpressReq;
-  // socket?: PRGLIOSocket;
   clientReq?: AuthClientRequest | undefined;
   isRemoteRequest?: {
     user?: UserLike | undefined;

@@ -9,6 +9,7 @@ import { getTableJoinQuery } from "./getTableJoinQuery";
 export async function getExistsCondition(
   this: ViewHandler,
   eConfig: ExistsFilterConfig,
+  tableAlias: string | undefined,
   localParams: LocalParams | undefined,
 ): Promise<string> {
   const thisTable = this.name;
@@ -26,8 +27,7 @@ export async function getExistsCondition(
 
   let t2Rules: ParsedTableRule | undefined = undefined,
     forcedFilter: AnyObject | undefined,
-    filterFields: FieldFilter | undefined,
-    tableAlias;
+    filterFields: FieldFilter | undefined;
 
   /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
   if (localParams?.isRemoteRequest && !localParams.clientReq) {
@@ -71,7 +71,7 @@ export async function getExistsCondition(
   if (eConfig.isJoined) {
     const { query } = getTableJoinQuery({
       path: eConfig.parsedPath,
-      rootTableAlias: thisTable,
+      rootTableAlias: tableAlias ?? thisTable,
       type: "EXISTS",
       finalWhere,
     });
