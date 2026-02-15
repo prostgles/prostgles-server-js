@@ -1701,7 +1701,7 @@ export const isomorphicQueries = async (
           orderBy: { id: true },
           select: {
             "*": 1,
-            tr2: {
+            trD2: {
               $innerJoin: "tr2",
               filter: { t1: "a" },
               select: idAggSelect,
@@ -1719,12 +1719,12 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(normalJoin[0], {
         id: 1,
         t1: null,
-        tr2: [{ ids: [1] }],
+        trD2: [{ ids: [1] }],
       });
       assert.deepStrictEqual(normalJoin[1], {
         id: 2,
         t1: null,
-        tr2: [{ ids: [2] }],
+        trD2: [{ ids: [2] }],
       });
       assert.deepStrictEqual(reverseJoin[0], {
         id: 1,

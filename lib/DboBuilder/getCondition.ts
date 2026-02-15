@@ -1,4 +1,4 @@
-import { pickKeys } from "prostgles-types";
+import { asName, pickKeys } from "prostgles-types";
 import { parseFilterItem } from "../Filtering";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ExistsFilterConfig, LocalParams } from "./DboBuilder";
@@ -74,7 +74,11 @@ export async function getCondition(
       await Promise.all(
         existsConfigs.map(
           async (existsConfig) =>
-            await getExistsCondition.bind(this)(existsConfig, tableAlias, localParams),
+            await getExistsCondition.bind(this)(
+              existsConfig,
+              tableAlias && asName(tableAlias),
+              localParams,
+            ),
         ),
       )
     ).join(" AND ");

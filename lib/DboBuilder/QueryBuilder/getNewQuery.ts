@@ -91,7 +91,7 @@ const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin => {
 export async function getNewQuery(
   _this: ViewHandler,
   filter: Filter,
-  selectParams: SelectParams & { alias?: string } = {},
+  selectParams: SelectParams & { joinExpressionAlias?: string } = {},
   param3_unused = null,
   tableRules: ParsedTableRule | undefined,
   localParams: LocalParams | undefined,
@@ -122,11 +122,10 @@ export async function getNewQuery(
       columns,
     });
 
-  await sBuilder.parseUserSelect(userSelect, async (fTable, _joinParams, throwErr) => {
+  await sBuilder.parseUserSelect(userSelect, async (joinColumnName, _joinParams, throwErr) => {
     const j_selectParams: SelectParams = {};
     let j_filter: Filter = {},
       j_isLeftJoin = true;
-    const j_alias = fTable;
 
     const parsedJoin = parseJoinSelect(_joinParams);
 
@@ -134,8 +133,9 @@ export async function getNewQuery(
       throwErr(parsedJoin.error);
       return;
     }
+    const joinExpressionAlias = joinColumnName;
     const j_path = parseJoinPath({
-      rawPath: parsedJoin.type === "simple" ? fTable : parsedJoin.params.path,
+      rawPath: parsedJoin.type === "simple" ? joinColumnName : parsedJoin.params.path,
       rootTable: _this.name,
       viewHandler: _this,
       allowMultiOrJoin: true,
@@ -160,7 +160,7 @@ export async function getNewQuery(
     }
 
     const joinTableName =
-      parsedJoin.type === "simple" ? fTable
+      parsedJoin.type === "simple" ? joinColumnName
       : typeof j_path === "string" ? j_path
       : j_path.at(-1)?.table;
     if (!joinTableName) {
@@ -190,13 +190,13 @@ export async function getNewQuery(
       const joinQuery: NewQuery = await getNewQuery(
         joinTableHandler,
         j_filter,
-        { ...j_selectParams, alias: j_alias },
+        { ...j_selectParams, joinExpressionAlias },
         param3_unused,
         joinTableRules,
         localParams,
       );
       joinQuery.isLeftJoin = j_isLeftJoin;
-      joinQuery.tableAlias = j_alias;
+      joinQuery.tableAlias = joinExpressionAlias;
       joinQueries.push({
         ...joinQuery,
         joinPath: j_path,
@@ -218,7 +218,7 @@ export async function getNewQuery(
 
   const select = sBuilder.select;
 
-  const tableAlias = selectParams.alias;
+  const tableAlias = selectParams.joinExpressionAlias;
   const commonWhereParams: PrepareWhereParams = {
     filter,
     select,
@@ -257,7 +257,7 @@ export async function getNewQuery(
     orderByItems: prepareSortItems(
       selectParams.orderBy,
       allowedOrderByFields,
-      selectParams.alias,
+      selectParams.joinExpressionAlias,
       select,
       joinQueries,
     ),
