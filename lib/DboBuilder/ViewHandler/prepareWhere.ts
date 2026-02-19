@@ -1,7 +1,7 @@
-import type { AnyObject, FieldFilter} from "prostgles-types/dist";
+import type { AnyObject, FieldFilter } from "prostgles-types/dist";
 import { getKeys, isDefined, isObject } from "prostgles-types/dist";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { ExistsFilterConfig, Filter, LocalParams } from "../DboBuilder";
+import type { ExistsFilterConfig, Filter, LocalParams, PGIdentifier } from "../DboBuilder";
 import { getCondition } from "../getCondition";
 import { type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
 import type { ViewHandler } from "./ViewHandler";
@@ -12,7 +12,7 @@ export type PrepareWhereParams = {
   forcedFilter?: AnyObject;
   filterFields?: FieldFilter;
   addWhere?: boolean;
-  tableAlias?: string;
+  tableAlias?: PGIdentifier;
   localParams: LocalParams | undefined;
   tableRule: ParsedTableRule | undefined;
   isHaving?: boolean;
@@ -20,7 +20,7 @@ export type PrepareWhereParams = {
 
 export async function prepareWhere(
   this: ViewHandler,
-  params: PrepareWhereParams
+  params: PrepareWhereParams,
 ): Promise<{
   condition: string;
   where: string;
@@ -48,7 +48,7 @@ export async function prepareWhere(
   const parseFullFilter = async (
     f: any,
     parentFilter: any = null,
-    isForcedFilterBypass: boolean
+    isForcedFilterBypass: boolean,
   ): Promise<string> => {
     if (!f) throw "Invalid/missing group filter provided";
     if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
@@ -71,7 +71,7 @@ export async function prepareWhere(
       const operand = $and ? " AND " : " OR ";
       const conditions = (
         await Promise.all(
-          group.map(async (gf) => await parseFullFilter(gf, group, isForcedFilterBypass))
+          group.map(async (gf) => await parseFullFilter(gf, group, isForcedFilterBypass)),
         )
       ).filter((c) => c);
 

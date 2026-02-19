@@ -144,7 +144,7 @@ export async function getSchemaFromPublish(
 
                       throw {
                         ...getErrorAsObject(e),
-                        publish_path: `publish.${tableName}.${method}: \n   -> ${e}`,
+                        publish_path: `publish.${tableName}.${method}`,
                       };
                     }
                   }

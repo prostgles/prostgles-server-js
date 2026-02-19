@@ -9,7 +9,7 @@ import { asNameAlias } from "../../utils/asNameAlias";
 export function getValidatedRules(
   this: ViewHandler,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): ValidatedTableRules {
   if (localParams?.clientReq?.socket && !tableRules) {
     throw "INTERNAL ERROR: Unexpected case -> localParams && !tableRules";
@@ -23,15 +23,15 @@ export function getValidatedRules(
         ({
           type: "column",
           name: fieldName,
-          getQuery: ({ tableAlias }) => asNameAlias(fieldName, tableAlias),
+          getQuery: ({ tableAliasRaw: tableAlias }) => asNameAlias(fieldName, tableAlias),
           selected: false,
-        }) as FieldSpec
+        }) as FieldSpec,
     )
     .concat(
       COMPUTED_FIELDS.map((c) => ({
         type: c.type,
         name: c.name,
-        getQuery: ({ tableAlias, allowedFields }) =>
+        getQuery: ({ tableAliasRaw: tableAlias, allowedFields }) =>
           c.getQuery({
             allowedFields,
             ctidField: undefined,
@@ -39,10 +39,10 @@ export function getValidatedRules(
 
             /* CTID not available in AFTER trigger */
             // ctidField: this.is_view? undefined : "ctid",
-            tableAlias,
+            tableAliasRaw: tableAlias,
           }),
         selected: false,
-      }))
+      })),
     );
 
   if (tableRules) {
@@ -50,7 +50,7 @@ export function getValidatedRules(
       throw "INTERNAL ERROR: Unexpected case -> Empty table rules for " + this.name;
     const throwFieldsErr = (
         command: "select" | "update" | "delete" | "insert",
-        fieldType = "fields"
+        fieldType = "fields",
       ) => {
         throw `Invalid publish.${this.name}.${command} rule -> ${fieldType} setting is missing.\nPlease specify allowed ${fieldType} in this format: "*" | { col_name: false } | { col1: true, col2: true }`;
       },
@@ -106,7 +106,7 @@ export function getValidatedRules(
         returningFields: parseFirstSpecifiedFieldFilter(
           tableRules.update.returningFields,
           tableRules.select?.fields,
-          tableRules.update.fields
+          tableRules.update.fields,
         ),
         filterFields: this.parseFieldFilter(tableRules.update.filterFields),
       };
@@ -121,7 +121,7 @@ export function getValidatedRules(
         returningFields: parseFirstSpecifiedFieldFilter(
           tableRules.insert.returningFields,
           tableRules.select?.fields,
-          tableRules.insert.fields
+          tableRules.insert.fields,
         ),
       };
     }

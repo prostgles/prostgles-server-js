@@ -11,7 +11,7 @@ import type {
   ValidatedColumnInfo,
 } from "prostgles-types";
 import { getKeys, isEmpty, isObject, postgresToTsType } from "prostgles-types";
-import type { SortItem } from "../DboBuilder";
+import type { PGIdentifier, SortItem } from "../DboBuilder";
 
 import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
@@ -22,7 +22,7 @@ import { asNameAlias } from "../../utils/asNameAlias";
 
 export type SelectItem = {
   getFields: (args: any[]) => string[] | "*";
-  getQuery: (tableAlias?: string) => string;
+  getQuery: (tableAliasRaw?: string) => string;
   columnPGDataType?: string;
   column_udt_type?: PG_COLUMN_UDT_DATA_TYPE;
   tsDataType?: ValidatedColumnInfo["tsDataType"];
@@ -54,7 +54,7 @@ export type NewQueryRoot = {
    */
   select: SelectItemValidated[];
 
-  table: string;
+  table: PGIdentifier;
   where: string;
   whereOpts: WhereOptions;
   orderByItems: SortItem[];
@@ -62,12 +62,12 @@ export type NewQueryRoot = {
   limit: number | null;
   offset: number;
   isLeftJoin: boolean;
-  tableAlias?: string;
+  tableAlias?: PGIdentifier;
 };
 
 export type NewQueryJoin = NewQuery & {
   joinPath: ParsedJoinPath[];
-  joinAlias: string;
+  joinAlias: PGIdentifier;
 };
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];
@@ -183,7 +183,7 @@ export class SelectItemBuilder {
           allColumns: this.columns,
           allowedFields: this.allowedFields,
           args,
-          tableAlias,
+          tableAliasRaw: tableAlias,
           ctidField: undefined,
 
           /* CTID not available in AFTER trigger */

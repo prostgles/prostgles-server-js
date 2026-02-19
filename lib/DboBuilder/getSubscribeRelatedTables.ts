@@ -76,7 +76,7 @@ export async function getSubscribeRelatedTables(
      * Avoid nested exists error. Will affect performance
      */
     for (const j of newQuery.joins ?? []) {
-      await pushRelatedTable(j.table, j.joinPath);
+      await pushRelatedTable(j.table.raw, j.joinPath);
     }
     for (const e of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
       for (const [index, pathItem] of e.parsedPath.entries()) {

@@ -18,7 +18,7 @@ export function getSelectQuery(
   viewHandler: ViewHandler,
   q: NewQuery,
   depth = 0,
-  selectParamsGroupBy: boolean
+  selectParamsGroupBy: boolean,
 ): string {
   const rootSelect = q.select
     .filter((s) => s.selected)
@@ -27,7 +27,7 @@ export function getSelectQuery(
   const parsedJoins =
     q.joins?.flatMap((q2) => {
       const parsed = getJoinQuery(viewHandler, {
-        q1: { ...q, tableAlias: ROOT_TABLE_ALIAS },
+        q1: { ...q, tableAlias: { raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS } },
         q2: { ...q2 },
         selectParamsGroupBy,
       });
@@ -40,8 +40,8 @@ export function getSelectQuery(
   const selectItems = rootSelect.concat(
     parsedJoins.map((join) => {
       const { joinAlias } = join;
-      return `COALESCE(${asName(joinAlias)}.${join.resultAlias}, '[]') as ${asName(joinAlias)}`;
-    })
+      return `COALESCE(${joinAlias.escaped}.${join.resultAlias.escaped}, '[]') as ${joinAlias.escaped}`;
+    }),
   );
 
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
@@ -62,9 +62,9 @@ export function getSelectQuery(
   if (hasOrJoins) {
     const pkey = viewHandler.columns.find((c) => c.is_pkey);
     joinCtes = [
-      `${q.table} AS (`,
+      `${q.table.escaped} AS (`,
       `  SELECT *, ${pkey ? asName(pkey.name) : "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
-      `  FROM ${q.table}`,
+      `  FROM ${q.table.escaped}`,
       `)`,
       joinCtes.length ? "," : "",
       ...joinCtes,
@@ -81,7 +81,7 @@ export function getSelectQuery(
     ...indentLines(selectItems, { appendCommas: true }),
     `FROM ( `,
     `  SELECT *`,
-    `  FROM ${q.table}`,
+    `  FROM ${q.table.escaped}`,
     ...(q.where ? [`  ${q.where}`] : []),
     `) ${ROOT_TABLE_ALIAS}`,
     ...parsedJoins.flatMap((j) => j.joinLines),
@@ -104,7 +104,7 @@ type IndentLinesOpts = {
 };
 export const indentLines = (
   strArr: (string | undefined | null)[],
-  { numberOfSpaces = 2, indentStr = " ", appendCommas = false }: IndentLinesOpts = {}
+  { numberOfSpaces = 2, indentStr = " ", appendCommas = false }: IndentLinesOpts = {},
 ): string[] => {
   const nonEmptyLines = strArr.filter((v) => v);
 
@@ -120,11 +120,10 @@ const indentLinesToString = (
   strArr: (string | undefined | null)[],
   numberOfSpaces = 0,
   separator = " \n ",
-  indentStr = " "
+  indentStr = " ",
 ) => indentLines(strArr, { numberOfSpaces, indentStr }).join(separator);
-const getTableAlias = (q: NewQuery) =>
-  !q.tableAlias ? q.table : `${q.tableAlias || ""}_${q.table}`;
-export const getTableAliasAsName = (q: NewQuery) => asName(getTableAlias(q));
+export const getTableAliasAsName = (q: NewQuery) =>
+  !q.tableAlias ? q.table.escaped : asName(`${q.tableAlias.raw || ""}_${q.table.raw}`);
 
 export const getRootGroupBy = (q: NewQuery, selectParamsGroupBy?: boolean) => {
   const aggs = q.select.filter((s) => s.selected && s.type === "aggregation");
@@ -133,11 +132,6 @@ export const getRootGroupBy = (q: NewQuery, selectParamsGroupBy?: boolean) => {
   if ((selectParamsGroupBy || aggs.length) && nonAggs.length) {
     /** Add ORDER BY items not included in root select */
     const orderByItems: string[] = [];
-    // q.orderByItems.forEach(sortItem => {
-    //   if (!sortItem.nested && "fieldQuery" in sortItem && !orderByItems.includes(sortItem.fieldQuery)) {
-    //     orderByItems.push(sortItem.fieldQuery);
-    //   }
-    // });
 
     return [
       `GROUP BY ${q.select

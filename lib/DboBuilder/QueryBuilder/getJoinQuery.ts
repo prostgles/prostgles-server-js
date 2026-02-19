@@ -6,7 +6,7 @@ import { type SelectItemValidated } from "./QueryBuilder";
 import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinOnCondition } from "../ViewHandler/getTableJoinQuery";
-import { prepareOrderByQuery } from "../DboBuilder";
+import { prepareOrderByQuery, type PGIdentifier } from "../DboBuilder";
 import { asNameAlias } from "../../utils/asNameAlias";
 
 type Args = {
@@ -47,7 +47,7 @@ const getJoinTable = (
 };
 
 type GetJoinQueryResult = {
-  resultAlias: string;
+  resultAlias: PGIdentifier;
   firstJoinTableJoinFields: string[];
   isOrJoin: boolean;
   type: "cte";
@@ -68,7 +68,7 @@ type GetJoinQueryResult = {
  */
 export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
   const paths = parseJoinPath({
-    rootTable: q1.table,
+    rootTable: q1.table.raw,
     rawPath: q2.joinPath,
     viewHandler: viewHandler,
     allowMultiOrJoin: true,
@@ -78,7 +78,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   if (q2.joins?.length) {
     throw new Error("Nested joins not supported yet");
   }
-  const targetTableAliasRaw = q2.tableAlias || q2.table;
+  const targetTableAliasRaw = q2.tableAlias?.raw || q2.table.raw;
   const targetTableAlias = asName(targetTableAliasRaw);
 
   const firstJoinTablePath = paths[0]!;
@@ -101,7 +101,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
 
   const joinCondition = getJoinOnCondition({
     on: firstJoinTablePath.on,
-    leftAlias: asName(q1.tableAlias || q1.table),
+    leftAlias: q1.tableAlias?.escaped || q1.table.escaped,
     rightAlias: targetTableAlias,
     getRightColName: (col) => getJoinCol(col).alias,
   });
@@ -110,7 +110,9 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   const selectedFields = rootSelectItems
     .filter((s) => s.selected)
     .map((s) => asNameAlias(s.alias, targetTableAliasRaw));
-  const rootNestedSort = q1.orderByItems.filter((d) => d.nested?.joinAlias === q2.joinAlias);
+  const rootNestedSort = q1.orderByItems.filter(
+    (d) => d.nested?.joinAlias.raw === q2.joinAlias.raw,
+  );
   const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields.join(", ")}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
   const { innerQuery } = getInnerJoinQuery({
@@ -151,7 +153,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     ];
     return {
       type: "cte",
-      resultAlias: JSON_AGG_FIELD_NAME,
+      resultAlias: { raw: JSON_AGG_FIELD_NAME, escaped: JSON_AGG_FIELD_NAME },
       joinLines,
       cteLines: [],
       isOrJoin,
@@ -171,7 +173,9 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     `FROM (`,
     ...indentLines(innerQuery),
     `) ${targetTableAlias}`,
-    ...(isOrJoin ? [`LEFT JOIN ${q1.table} ${ROOT_TABLE_ALIAS}`, `ON ${joinCondition}`] : []),
+    ...(isOrJoin ?
+      [`LEFT JOIN ${q1.table.escaped} ${ROOT_TABLE_ALIAS}`, `ON ${joinCondition}`]
+    : []),
     `GROUP BY ${isOrJoin ? rootTableIdField : requiredJoinFields.join(", ")}`,
   ];
 
@@ -190,7 +194,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
 
   return {
     type: "cte",
-    resultAlias: JSON_AGG_FIELD_NAME,
+    resultAlias: { raw: JSON_AGG_FIELD_NAME, escaped: JSON_AGG_FIELD_NAME },
     joinLines,
     cteLines,
     isOrJoin,
@@ -218,8 +222,8 @@ const getInnerJoinQuery = ({
     const prevTable = getJoinTable(
       !i ?
         q1.tableAlias ?
-          asName(q1.tableAlias)
-        : q1.table
+          q1.tableAlias.escaped
+        : q1.table.escaped
       : paths[i - 1]!.table,
       i - 1,
       undefined,
@@ -302,7 +306,7 @@ const getNestedSelectFields = ({
     .map((s) => ({
       ...s,
       isJoinCol: false,
-      query: s.getQuery(targetTableAlias) + " AS " + asName(s.alias),
+      query: s.getQuery(targetTableAlias.raw) + " AS " + asName(s.alias),
     }))
     .concat(
       requiredJoinFields.map((f) => ({

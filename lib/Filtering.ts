@@ -1,6 +1,4 @@
-import type {
-  FilterDataType,
-  FullFilter} from "prostgles-types";
+import type { FilterDataType, FullFilter } from "prostgles-types";
 import {
   BetweenFilterKeys,
   CompareFilterKeys,
@@ -47,7 +45,7 @@ export const FILTER_OPERAND_TO_SQL_OPERAND = Object.fromEntries(
     else if (filterOperand === "$isDistinctFrom") sqlOperand = "IS DISTINCT FROM";
     else if (filterOperand === "$isNotDistinctFrom") sqlOperand = "IS NOT DISTINCT FROM";
     return [filterOperand, sqlOperand];
-  })
+  }),
 ) as Record<(typeof FILTER_OPERANDS)[number], string>;
 
 /**
@@ -57,12 +55,12 @@ export const FILTER_OPERAND_TO_SQL_OPERAND = Object.fromEntries(
 type ParseFilterItemArgs = {
   filter: FullFilter<void, void> | undefined;
   select: SelectItemValidated[] | undefined;
-  tableAlias: string | undefined;
+  tableAliasRaw: string | undefined;
   allowedColumnNames: string[];
 };
 
 export const parseFilterItem = (args: ParseFilterItemArgs): string => {
-  const { filter: _f, select, tableAlias, allowedColumnNames } = args;
+  const { filter: _f, select, tableAliasRaw, allowedColumnNames } = args;
 
   if (!_f || isEmpty(_f)) return "";
 
@@ -84,9 +82,9 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         parseFilterItem({
           filter: { [fk]: _f[fk] },
           select,
-          tableAlias,
+          tableAliasRaw,
           allowedColumnNames,
-        })
+        }),
       )
       .sort() /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
       .join(" AND ");
@@ -106,7 +104,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       const dissallowedFields = fields.filter((fname) => !allowedColumnNames.includes(fname));
       if (dissallowedFields.length) {
         throw new Error(
-          `Invalid/disallowed columns found in filter: ${dissallowedFields.join(", ")}`
+          `Invalid/disallowed columns found in filter: ${dissallowedFields.join(", ")}`,
         );
       }
     }
@@ -114,7 +112,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
   const getLeftQ = (selItm: SelectItemValidated) => {
     validateSelectedItemFilter(selItem);
     if (selItm.type === "function" || selItm.type === "aggregation") return selItm.getQuery();
-    return selItm.getQuery(tableAlias);
+    return selItm.getQuery(tableAliasRaw);
   };
 
   /**
@@ -131,14 +129,14 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     /* See if dot notation. Pick the best matching starting string */
     if (select) {
       selItem = select.find((s) =>
-        dot_notation_delims.find((delimiter) => fKey.startsWith(s.alias + delimiter))
+        dot_notation_delims.find((delimiter) => fKey.startsWith(s.alias + delimiter)),
       );
       validateSelectedItemFilter(selItem);
     }
     if (!selItem) {
       return mErr(
         "Bad filter. Could not match to a column or alias or dot notation" +
-          select?.map((s) => s.alias).join(", ")
+          select?.map((s) => s.alias).join(", "),
       );
     }
 
@@ -148,7 +146,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     if (remainingStr.startsWith("->")) {
       /** Has shorthand operand 'col->>key.<>'  */
       const matchingOperand = CompareFilterKeys.find((operand) =>
-        remainingStr.endsWith(`.${operand}`)
+        remainingStr.endsWith(`.${operand}`),
       );
       if (matchingOperand) {
         remainingStr = remainingStr.slice(0, -matchingOperand.length - 1);

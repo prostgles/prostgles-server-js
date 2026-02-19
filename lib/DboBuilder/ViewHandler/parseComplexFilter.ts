@@ -16,7 +16,7 @@ const allowedComparators = FILTER_OPERANDS; //[">", "<", "=", "<=", ">=", "<>", 
 type Args = {
   filter: AnyObject;
   complexFilterKey: string;
-  tableAlias: string | undefined;
+  tableAliasRaw: string | undefined;
   allowed_colnames: string[];
   columns: TableSchemaColumn[];
 };
@@ -33,7 +33,7 @@ type Args = {
 export const parseComplexFilter = ({
   filter,
   complexFilterKey,
-  tableAlias,
+  tableAliasRaw,
   allowed_colnames,
   columns,
 }: Args) => {
@@ -50,7 +50,7 @@ export const parseComplexFilter = ({
       if (!allowed_colnames.includes(column)) {
         throw `Dissallowed or Invalid column ${column}. Allowed columns: ${allowed_colnames}`;
       }
-      return asNameAlias(column, tableAlias);
+      return asNameAlias(column, tableAliasRaw);
     }
     const { funcName, args } = parseFunctionObject(funcData);
     const funcDef = parseFunction({
@@ -61,7 +61,7 @@ export const parseComplexFilter = ({
     });
     return funcDef.getQuery({
       args,
-      tableAlias,
+      tableAliasRaw,
       allColumns: columns,
       allowedFields: allowed_colnames,
     });

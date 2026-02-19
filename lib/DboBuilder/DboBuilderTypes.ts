@@ -23,6 +23,11 @@ export type TableSchemaColumn = ColumnInfo & {
   privileges: Partial<Record<"INSERT" | "REFERENCES" | "SELECT" | "UPDATE", true>>;
 };
 
+export type PGIdentifier = {
+  raw: string;
+  escaped: string;
+};
+
 export type TableSchema = Pick<TableInfo, "uniqueColumnGroups"> & {
   schema: string;
   name: string;
@@ -58,11 +63,11 @@ export type SortItem = {
   nullEmpty?: boolean;
   key: string;
   nested?: {
-    table: string;
+    table: PGIdentifier;
     selectItemAlias: string;
     isNumeric: boolean;
     wrapperQuerySortItem: string;
-    joinAlias: string;
+    joinAlias: PGIdentifier;
   };
 } & (
   | {

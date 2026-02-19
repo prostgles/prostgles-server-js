@@ -6,9 +6,9 @@ import type {
   SelectParams,
   SimpleJoinSelect,
 } from "prostgles-types";
-import { getKeys, includes, isEmpty, omitKeys } from "prostgles-types";
+import { asName, getKeys, includes, isEmpty, omitKeys } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { Filter, LocalParams, ValidatedTableRules } from "../DboBuilder";
+import type { Filter, LocalParams, PGIdentifier, ValidatedTableRules } from "../DboBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
@@ -91,7 +91,7 @@ const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin => {
 export async function getNewQuery(
   _this: ViewHandler,
   filter: Filter,
-  selectParams: SelectParams & { joinExpressionAlias?: string } = {},
+  selectParams: SelectParams & { joinExpressionAlias?: PGIdentifier } = {},
   param3_unused = null,
   tableRules: ParsedTableRule | undefined,
   localParams: LocalParams | undefined,
@@ -133,7 +133,7 @@ export async function getNewQuery(
       throwErr(parsedJoin.error);
       return;
     }
-    const joinExpressionAlias = joinColumnName;
+    const joinExpressionAlias = { raw: joinColumnName, escaped: asName(joinColumnName) };
     const j_path = parseJoinPath({
       rawPath: parsedJoin.type === "simple" ? joinColumnName : parsedJoin.params.path,
       rootTable: _this.name,
@@ -247,7 +247,7 @@ export async function getNewQuery(
   const resQuery: NewQuery = {
     allFields: _this.column_names.slice(0),
     select,
-    table: _this.name,
+    table: { raw: _this.name, escaped: _this.name },
     joins: joinQueries,
     where,
     whereOpts: filterOpts,

@@ -1773,7 +1773,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Nested sort by computed col", async () => {
-      const getSorted = (asc = false) =>
+      const getSorted = (asc = false, badKey = false) =>
         db.tr1.find!(
           {},
           {
@@ -1784,7 +1784,7 @@ export const isomorphicQueries = async (
               },
             },
             orderBy: {
-              "tr2.maxId": asc,
+              [`${badKey ? "T\n--select 1" : "tr2"}.maxId`]: asc,
             },
           },
         );
@@ -1796,6 +1796,12 @@ export const isomorphicQueries = async (
           .slice(0)
           .reverse(),
         sortedDesc.map((d) => d.tr2[0].maxId),
+      );
+      const sortedDescBad = await getSorted(false, true).catch((e) => e);
+      assert.equal(
+        sortedDescBad.message,
+        "Invalid/disallowed orderBy fields or params: T\n--select 1.maxId",
+        "Bad column name should have been rejected by database",
       );
     });
 

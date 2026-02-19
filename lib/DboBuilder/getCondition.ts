@@ -1,7 +1,7 @@
 import { asName, pickKeys } from "prostgles-types";
 import { parseFilterItem } from "../Filtering";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
-import type { ExistsFilterConfig, LocalParams } from "./DboBuilder";
+import type { ExistsFilterConfig, LocalParams, PGIdentifier } from "./DboBuilder";
 import { pgp } from "./DboBuilder";
 import { FUNCTIONS } from "./QueryBuilder/Functions/Functions";
 import { type SelectItemValidated } from "./QueryBuilder/QueryBuilder";
@@ -24,7 +24,7 @@ export async function getCondition(
     filter: any;
     select: SelectItemValidated[] | undefined;
     allowed_colnames: string[];
-    tableAlias?: string;
+    tableAlias?: PGIdentifier;
     localParams?: LocalParams;
     tableRules?: ParsedTableRule;
     isHaving?: boolean;
@@ -63,7 +63,7 @@ export async function getCondition(
         args: funcArgs,
         allColumns: this.columns,
         allowedFields: allowed_colnames,
-        tableAlias,
+        tableAliasRaw: tableAlias?.raw,
       }),
     );
   });
@@ -74,11 +74,7 @@ export async function getCondition(
       await Promise.all(
         existsConfigs.map(
           async (existsConfig) =>
-            await getExistsCondition.bind(this)(
-              existsConfig,
-              tableAlias && asName(tableAlias),
-              localParams,
-            ),
+            await getExistsCondition.bind(this)(existsConfig, tableAlias?.escaped, localParams),
         ),
       )
     ).join(" AND ");
@@ -94,7 +90,7 @@ export async function getCondition(
       if (!p.select) throw new Error("Computed column filter requires p.select.fields");
       computedColConditions.push(
         compCol.getQuery({
-          tableAlias,
+          tableAliasRaw: tableAlias?.raw,
           allowedFields: p.select.fields,
           allColumns: this.columns,
 
@@ -147,7 +143,7 @@ export async function getCondition(
           fields: [f.name],
           getQuery: (tableAlias) =>
             f.getQuery({
-              tableAlias,
+              tableAliasRaw: tableAlias,
               allColumns: this.columns,
               allowedFields: allowed_colnames,
             }),
@@ -163,7 +159,7 @@ export async function getCondition(
     const complexFilterCondition = parseComplexFilter({
       filter,
       complexFilterKey,
-      tableAlias,
+      tableAliasRaw: tableAlias?.raw,
       allowed_colnames,
       columns: this.columns,
     });
@@ -223,7 +219,7 @@ export async function getCondition(
   const f = pickKeys(filter, filterKeys);
   const q = parseFilterItem({
     filter: f,
-    tableAlias,
+    tableAliasRaw: tableAlias?.raw,
     select: allowedSelect,
     allowedColumnNames:
       !tableRules ?
