@@ -1,4 +1,4 @@
-import { getKeys, isObject } from "prostgles-types";
+import { getKeys, includes, isObject } from "prostgles-types";
 import type { AuthResultWithSID } from "../Auth/AuthTypes";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
@@ -73,7 +73,7 @@ export async function getTableRulesWithoutFileTable(
   });
 
   /* All methods allowed. Add no limits for table rules */
-  if ([true, "*"].includes(rawTableRule as any)) {
+  if (includes([true, "*"], rawTableRule)) {
     parsedTableRule = {};
     MY_RULES.filter((r) => r.no_limits).forEach((r) => {
       parsedTableRule[r.rule] = { ...(r.no_limits as object) } as any;

@@ -40,12 +40,12 @@ Retrieves a matching record from the view/table and subscribes to changes
     - **select** <span style="color: grey">optional</span> <span style="color: green;">Select</span>
 
       Fields/expressions/linked data to select
-      - `"*"` or empty will return all fields
-      - `{ field: 0 }` - all fields except the specified field will be selected
+      - `"*"` or undefined will return all fields
+      - `{ field: 0 }` - all fields except the specified field will be selected. Cannot be combined with inclusive selects (1, true, function or join selects)
       - `{ field: 1 }` - only the specified field will be selected
-      - `{ field: { $funcName: [args] } }` - the field will be selected with the specified function applied
-      - `{ field: 1, referencedTable: "*" }` - field together with all fields from referencedTable will be selected
-      - `{ linkedData: { referencedTable: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable
+      - `{ field: { $funcName: [...args] } }` - the field will be selected with the specified function applied
+      - `{ field: 1, referencedTable: "*" }` - field together with all fields from referencedTable will be returned (as an array). The referencedTable must have a reference to the current table through foreign keys for this to work
+      - `{ linkedData: { $leftJoin: ["lookupTable", "targetTable"], select: { field: 1 } } }` - linkedData will contain the linked/joined records from referencedTable as an array of objects.
     - **orderBy** <span style="color: grey">optional</span> <span style="color: green;">OrderBy</span>
 
       Order by options

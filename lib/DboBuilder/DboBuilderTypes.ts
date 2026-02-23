@@ -292,7 +292,7 @@ export type ValidatedTableRules = CommonTableRules & {
     filterFields: string[];
 
     /* Filter applied to every select */
-    forcedFilter: any;
+    forcedFilter: AnyObject | undefined;
 
     /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
     maxLimit: number | null;
@@ -308,10 +308,10 @@ export type ValidatedTableRules = CommonTableRules & {
     filterFields: string[];
 
     /* Filter applied to every update. Filter fields cannot be updated */
-    forcedFilter: any;
+    forcedFilter: AnyObject | undefined;
 
     /* Data applied to every update */
-    forcedData: any;
+    forcedData: AnyObject;
   };
   insert?: {
     /* Fields you can insert */
@@ -321,14 +321,14 @@ export type ValidatedTableRules = CommonTableRules & {
     returningFields: string[];
 
     /* Data applied to every insert */
-    forcedData: any;
+    forcedData: AnyObject;
   };
   delete?: {
     /* Fields to filter by when deleting */
     filterFields: string[];
 
     /* Filter applied to every deletes */
-    forcedFilter: any;
+    forcedFilter: AnyObject | undefined;
 
     /* Fields you can return after deleting */
     returningFields: string[];

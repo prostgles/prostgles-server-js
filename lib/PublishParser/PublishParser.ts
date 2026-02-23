@@ -1,4 +1,4 @@
-import { getKeys, includes, pickKeys } from "prostgles-types";
+import { getObjectEntries, includes, isDefined, pickKeys } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -212,10 +212,61 @@ export class PublishParser {
       }
       const tableScope = scope.tables?.[args.tableName];
       if (!tableScope) return;
-      return pickKeys(
-        tableRules,
-        getKeys(tableScope).filter((k) => tableScope[k]),
-      );
+
+      const tableHandler = this.dbo[args.tableName];
+      if (!tableHandler) {
+        throw "INTERNAL ERROR: table handler not found for " + args.tableName;
+      }
+      const validatedTableRules = tableHandler.getValidatedRules?.(tableRules);
+      if (!validatedTableRules) {
+        throw "INTERNAL ERROR: getValidatedRules is missing for " + args.tableName;
+      }
+
+      /** Make sure the scope does not allow things outside the validatedTableRules */
+      const result = fromEntries(
+        getObjectEntries(tableScope)
+          .map(([ruleName, ruleScope]) => {
+            if (!ruleScope) return undefined;
+            const rule = tableRules[ruleName];
+            const validatedRule = validatedTableRules[ruleName];
+            if (!validatedRule || !rule) {
+              throw `Invalid scope: ${args.tableName}.${ruleName}. The publish does not allow this command.`;
+            }
+            if (ruleScope === true) {
+              return [ruleName, validatedRule] as const;
+            }
+            const scopeFields = tableHandler.parseFieldFilter!(ruleScope.fields);
+            const scopeForcedFilter =
+              "forcedFilter" in ruleScope ? ruleScope.forcedFilter : undefined;
+
+            const ruleFields = "fields" in validatedRule ? validatedRule.fields : undefined;
+            for (const field of scopeFields) {
+              if (!ruleFields?.includes(field)) {
+                throw `Invalid scope: ${args.tableName}.${ruleName}. The field "${field}" is not allowed to be selected according to the publish rules.`;
+              }
+            }
+            if (!scopeFields.length) {
+              throw `Invalid scope: ${args.tableName}.${ruleName}. At least one field must be selected.`;
+            }
+            const ruleForcedFilter =
+              "forcedFilter" in validatedRule ? validatedRule.forcedFilter : undefined;
+            const combinedForcedFilter =
+              scopeForcedFilter && ruleForcedFilter ?
+                { $and: [scopeForcedFilter, ruleForcedFilter] }
+              : scopeForcedFilter || ruleForcedFilter;
+
+            return [
+              ruleName,
+              {
+                ...rule,
+                fields: fromEntries(scopeFields.map((field) => [field, 1] as const)),
+                ...(scopeForcedFilter ? { forcedFilter: combinedForcedFilter } : {}),
+              } as any,
+            ] as const;
+          })
+          .filter(isDefined),
+      ) as ParsedTableRule;
+      return result;
     };
     if (this.dbo[args.tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
@@ -256,3 +307,9 @@ function applyParamsIfFunc<T>(
   //@ts-ignore
   return maybeFunc;
 }
+
+export const fromEntries = <K extends string | number | symbol, V>(
+  entries: readonly (readonly [K, V])[],
+): Record<K, V> => {
+  return Object.fromEntries(entries) as Record<K, V>;
+};

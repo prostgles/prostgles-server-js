@@ -506,7 +506,29 @@ export type DbTableInfo = {
 export type PermissionScope = {
   sql?: "commited" | "rolledback";
   /** TODO: this should match publish types */
-  tables?: Record<string, Partial<Record<"select" | "update" | "delete" | "insert", boolean>>>;
+  tables?: Record<
+    string,
+    Partial<{
+      select:
+        | true
+        | {
+            fields: FieldFilter;
+            forcedFilter: AnyObject;
+          };
+      insert:
+        | true
+        | {
+            fields: FieldFilter;
+          };
+      update:
+        | true
+        | {
+            fields: FieldFilter;
+            forcedFilter: AnyObject;
+          };
+      delete: true;
+    }>
+  >;
   methods?: Record<string, boolean>;
 };
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {

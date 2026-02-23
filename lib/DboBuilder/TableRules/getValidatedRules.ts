@@ -142,36 +142,35 @@ export function getValidatedRules(
     }
 
     return res;
-  } else {
-    const allCols = this.column_names.slice(0);
-    return {
-      allColumns,
-      getColumns: true,
-      getInfo: true,
-      select: {
-        fields: allCols,
-        filterFields: allCols,
-        orderByFields: allCols,
-        forcedFilter: {},
-        maxLimit: null,
-      },
-      update: {
-        fields: allCols,
-        filterFields: allCols,
-        forcedFilter: {},
-        forcedData: {},
-        returningFields: allCols,
-      },
-      insert: {
-        fields: allCols,
-        forcedData: {},
-        returningFields: allCols,
-      },
-      delete: {
-        filterFields: allCols,
-        forcedFilter: {},
-        returningFields: allCols,
-      },
-    };
   }
+  const allCols = this.column_names.slice(0);
+  return {
+    allColumns,
+    getColumns: true,
+    getInfo: true,
+    select: {
+      fields: allCols,
+      filterFields: allCols,
+      orderByFields: allCols,
+      forcedFilter: {},
+      maxLimit: null,
+    },
+    update: {
+      fields: allCols,
+      filterFields: allCols,
+      forcedFilter: {},
+      forcedData: {},
+      returningFields: allCols,
+    },
+    insert: {
+      fields: allCols,
+      forcedData: {},
+      returningFields: allCols,
+    },
+    delete: {
+      filterFields: allCols,
+      forcedFilter: {},
+      returningFields: allCols,
+    },
+  };
 }
