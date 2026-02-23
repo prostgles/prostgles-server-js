@@ -33,9 +33,8 @@ export const applyScopeToTableRules = (
         if (ruleScope === true || isEmpty(ruleScope)) {
           return [ruleName, rule] as const;
         }
-        const scopeFields = ruleScope.fields;
-        const scopeFieldList =
-          !scopeFields ? undefined : tableHandler.parseFieldFilter!(ruleScope.fields);
+        const scopeFields = "fields" in ruleScope ? ruleScope.fields : undefined;
+        const scopeFieldList = scopeFields && tableHandler.parseFieldFilter!(scopeFields);
         const scopeForcedFilter = "forcedFilter" in ruleScope ? ruleScope.forcedFilter : undefined;
 
         if (scopeFieldList) {

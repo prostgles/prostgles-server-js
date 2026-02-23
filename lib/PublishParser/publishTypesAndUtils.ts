@@ -526,7 +526,11 @@ export type PermissionScope = {
             fields?: FieldFilter;
             forcedFilter?: AnyObject | undefined;
           };
-      delete: true;
+      delete:
+        | true
+        | {
+            forcedFilter?: AnyObject | undefined;
+          };
     }>
   >;
   methods?: Record<string, boolean>;
