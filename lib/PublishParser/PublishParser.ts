@@ -1,10 +1,11 @@
-import { getObjectEntries, includes, isDefined, pickKeys } from "prostgles-types";
+import { includes } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
+import { applyScopeToTableRules } from "./applyScopeToTableRules";
 import type { ServerFunctionDefinition } from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
@@ -203,71 +204,12 @@ export class PublishParser {
     clientInfo: AuthResultWithSID | undefined,
     scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule | undefined> {
+    const { tableName } = args;
+    const tableHandler = this.dbo[tableName];
+    if (!tableHandler) {
+      throw "INTERNAL ERROR: table handler not found for " + args.tableName;
+    }
     const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
-    const applyScopeToTableRules = (tableRules: ParsedTableRule | undefined) => {
-      if (!tableRules) return;
-      if (!scope || scope.sql === "commited") return tableRules;
-      if (scope.sql === "rolledback") {
-        return pickKeys(tableRules, ["select"]);
-      }
-      const tableScope = scope.tables?.[args.tableName];
-      if (!tableScope) return;
-
-      const tableHandler = this.dbo[args.tableName];
-      if (!tableHandler) {
-        throw "INTERNAL ERROR: table handler not found for " + args.tableName;
-      }
-      const validatedTableRules = tableHandler.getValidatedRules?.(tableRules);
-      if (!validatedTableRules) {
-        throw "INTERNAL ERROR: getValidatedRules is missing for " + args.tableName;
-      }
-
-      /** Make sure the scope does not allow things outside the validatedTableRules */
-      const result = fromEntries(
-        getObjectEntries(tableScope)
-          .map(([ruleName, ruleScope]) => {
-            if (!ruleScope) return undefined;
-            const rule = tableRules[ruleName];
-            const validatedRule = validatedTableRules[ruleName];
-            if (!validatedRule || !rule) {
-              throw `Invalid scope: ${args.tableName}.${ruleName}. The publish does not allow this command.`;
-            }
-            if (ruleScope === true) {
-              return [ruleName, validatedRule] as const;
-            }
-            const scopeFields = tableHandler.parseFieldFilter!(ruleScope.fields);
-            const scopeForcedFilter =
-              "forcedFilter" in ruleScope ? ruleScope.forcedFilter : undefined;
-
-            const ruleFields = "fields" in validatedRule ? validatedRule.fields : undefined;
-            for (const field of scopeFields) {
-              if (!ruleFields?.includes(field)) {
-                throw `Invalid scope: ${args.tableName}.${ruleName}. The field "${field}" is not allowed to be selected according to the publish rules.`;
-              }
-            }
-            if (!scopeFields.length) {
-              throw `Invalid scope: ${args.tableName}.${ruleName}. At least one field must be selected.`;
-            }
-            const ruleForcedFilter =
-              "forcedFilter" in validatedRule ? validatedRule.forcedFilter : undefined;
-            const combinedForcedFilter =
-              scopeForcedFilter && ruleForcedFilter ?
-                { $and: [scopeForcedFilter, ruleForcedFilter] }
-              : scopeForcedFilter || ruleForcedFilter;
-
-            return [
-              ruleName,
-              {
-                ...rule,
-                fields: fromEntries(scopeFields.map((field) => [field, 1] as const)),
-                ...(scopeForcedFilter ? { forcedFilter: combinedForcedFilter } : {}),
-              } as any,
-            ] as const;
-          })
-          .filter(isDefined),
-      ) as ParsedTableRule;
-      return result;
-    };
     if (this.dbo[args.tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         args.tableName,
@@ -276,10 +218,20 @@ export class PublishParser {
         clientInfo,
         scope,
       );
-      return applyScopeToTableRules(parsePublishTableRule(fileTableRules));
+      return applyScopeToTableRules(
+        tableName,
+        tableHandler,
+        parsePublishTableRule(fileTableRules),
+        scope,
+      );
     }
 
-    return applyScopeToTableRules(parsePublishTableRule(fileTablePublishRules));
+    return applyScopeToTableRules(
+      tableName,
+      tableHandler,
+      parsePublishTableRule(fileTablePublishRules),
+      scope,
+    );
   }
 
   getTableRulesWithoutFileTable = getTableRulesWithoutFileTable.bind(this);
@@ -307,9 +259,3 @@ function applyParamsIfFunc<T>(
   //@ts-ignore
   return maybeFunc;
 }
-
-export const fromEntries = <K extends string | number | symbol, V>(
-  entries: readonly (readonly [K, V])[],
-): Record<K, V> => {
-  return Object.fromEntries(entries) as Record<K, V>;
-};

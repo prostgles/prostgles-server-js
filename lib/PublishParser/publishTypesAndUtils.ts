@@ -512,19 +512,19 @@ export type PermissionScope = {
       select:
         | true
         | {
-            fields: FieldFilter;
-            forcedFilter: AnyObject;
+            fields?: FieldFilter;
+            forcedFilter?: AnyObject;
           };
       insert:
         | true
         | {
-            fields: FieldFilter;
+            fields?: FieldFilter;
           };
       update:
         | true
         | {
-            fields: FieldFilter;
-            forcedFilter: AnyObject;
+            fields?: FieldFilter;
+            forcedFilter?: AnyObject;
           };
       delete: true;
     }>
