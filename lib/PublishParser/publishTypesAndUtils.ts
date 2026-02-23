@@ -513,7 +513,7 @@ export type PermissionScope = {
         | true
         | {
             fields?: FieldFilter;
-            forcedFilter?: AnyObject;
+            forcedFilter?: AnyObject | undefined;
           };
       insert:
         | true
@@ -524,7 +524,7 @@ export type PermissionScope = {
         | true
         | {
             fields?: FieldFilter;
-            forcedFilter?: AnyObject;
+            forcedFilter?: AnyObject | undefined;
           };
       delete: true;
     }>

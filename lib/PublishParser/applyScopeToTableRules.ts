@@ -1,4 +1,4 @@
-import { getObjectEntries, isDefined, pickKeys } from "prostgles-types";
+import { getObjectEntries, isDefined, isEmpty, pickKeys } from "prostgles-types";
 import { type ParsedTableRule, type PermissionScope } from "./PublishParser";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 export const applyScopeToTableRules = (
@@ -30,21 +30,26 @@ export const applyScopeToTableRules = (
         if (!validatedRule || !rule) {
           throw `Invalid scope: ${tableName}.${ruleName}. The publish does not allow this command.`;
         }
-        if (ruleScope === true) {
-          return [ruleName, validatedRule] as const;
+        if (ruleScope === true || isEmpty(ruleScope)) {
+          return [ruleName, rule] as const;
         }
-        const scopeFields = tableHandler.parseFieldFilter!(ruleScope.fields);
+        const scopeFields = ruleScope.fields;
+        const scopeFieldList =
+          !scopeFields ? undefined : tableHandler.parseFieldFilter!(ruleScope.fields);
         const scopeForcedFilter = "forcedFilter" in ruleScope ? ruleScope.forcedFilter : undefined;
 
-        const ruleFields = "fields" in validatedRule ? validatedRule.fields : undefined;
-        for (const field of scopeFields) {
-          if (!ruleFields?.includes(field)) {
-            throw `Invalid scope: ${tableName}.${ruleName}. The field "${field}" is not allowed to be selected according to the publish rules.`;
+        if (scopeFieldList) {
+          if (!scopeFieldList.length) {
+            throw `Invalid scope: ${tableName}.${ruleName}. At least one field must be selected.`;
+          }
+          const validatedRuleFields = "fields" in validatedRule ? validatedRule.fields : undefined;
+          for (const field of scopeFieldList) {
+            if (!validatedRuleFields?.includes(field)) {
+              throw `Invalid scope: ${tableName}.${ruleName}. The field "${field}" is not allowed to be selected according to the publish rules.`;
+            }
           }
         }
-        if (!scopeFields.length) {
-          throw `Invalid scope: ${tableName}.${ruleName}. At least one field must be selected.`;
-        }
+
         const ruleForcedFilter =
           "forcedFilter" in validatedRule ? validatedRule.forcedFilter : undefined;
         const combinedForcedFilter =
@@ -56,9 +61,11 @@ export const applyScopeToTableRules = (
           ruleName,
           {
             ...rule,
-            fields: fromEntries(scopeFields.map((field) => [field, 1] as const)),
-            ...(scopeForcedFilter ? { forcedFilter: combinedForcedFilter } : {}),
-          } as any,
+            ...(scopeFieldList && {
+              fields: fromEntries(scopeFieldList.map((field) => [field, 1] as const)),
+            }),
+            ...(scopeForcedFilter && { forcedFilter: combinedForcedFilter }),
+          },
         ] as const;
       })
       .filter(isDefined),
