@@ -60,27 +60,28 @@ type ParseFilterItemArgs = {
 };
 
 export const parseFilterItem = (args: ParseFilterItemArgs): string => {
-  const { filter: _f, select, tableAliasRaw, allowedColumnNames } = args;
+  const { filter: filterItem, select, tableAliasRaw, allowedColumnNames } = args;
 
-  if (!_f || isEmpty(_f)) return "";
+  if (!filterItem || isEmpty(filterItem)) return "";
 
-  const mErr = (msg: string) => {
-    throw `${msg}: ${JSON.stringify(_f, null, 2)}`;
+  const makeError = (msg: string) => {
+    throw `${msg}: ${JSON.stringify(filterItem, null, 2)}`;
   };
   const asValue = (v: any) => pgp.as.format("$1", [v]);
 
-  const fKeys = getKeys(_f);
-  if (fKeys.length === 0) {
+  const filterEntries = Object.entries(filterItem);
+  const [firstFilterEntry, ...otherFilterEnties] = filterEntries;
+  if (!firstFilterEntry) {
     return "";
 
     /**
      * { field1: cond1, field2: cond2 }
      */
-  } else if (fKeys.length > 1) {
-    return fKeys
-      .map((fk) =>
+  } else if (otherFilterEnties.length) {
+    return filterEntries
+      .map(([filterKey, filterValue]) =>
         parseFilterItem({
-          filter: { [fk]: _f[fk] },
+          filter: { [filterKey]: filterValue },
           select,
           tableAliasRaw,
           allowedColumnNames,
@@ -90,13 +91,13 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       .join(" AND ");
   }
 
-  const fKey: string = fKeys[0]!;
-
+  // const fKey: string = filterKeys[0]!;
+  const [firstFilterKey, firstFilterValue] = firstFilterEntry;
   let selItem: SelectItemValidated | undefined;
   if (select) {
-    selItem = select.find((s) => fKey === s.alias);
+    selItem = select.find((s) => firstFilterKey === s.alias);
   }
-  let rightF: FilterDataType<any> = (_f as any)[fKey];
+  let rightF = firstFilterValue;
 
   const validateSelectedItemFilter = (selectedItem: SelectItemValidated | undefined) => {
     const fields = selectedItem?.fields;
@@ -129,18 +130,18 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
     /* See if dot notation. Pick the best matching starting string */
     if (select) {
       selItem = select.find((s) =>
-        dot_notation_delims.find((delimiter) => fKey.startsWith(s.alias + delimiter)),
+        dot_notation_delims.find((delimiter) => firstFilterKey.startsWith(s.alias + delimiter)),
       );
       validateSelectedItemFilter(selItem);
     }
     if (!selItem) {
-      return mErr(
+      return makeError(
         "Bad filter. Could not match to a column or alias or dot notation" +
           select?.map((s) => s.alias).join(", "),
       );
     }
 
-    let remainingStr = fKey.slice(selItem.alias.length);
+    let remainingStr = firstFilterKey.slice(selItem.alias.length);
 
     /* Is json path spec */
     if (remainingStr.startsWith("->")) {
@@ -220,7 +221,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         }
 
         const key = remainingStr.slice(currIdx + 1, nIdx);
-        curObj[key] = nextIdx > -1 ? {} : (_f as any)[fKey];
+        curObj[key] = nextIdx > -1 ? {} : firstFilterValue;
         curObj = curObj[key];
 
         currIdx = nextIdx;
@@ -229,19 +230,19 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       rightF = res;
     } else {
       // console.trace(141, select, selItem, remainingStr)
-      mErr("Bad filter. Could not find the valid col name or alias or col json path");
+      makeError("Bad filter. Could not find the valid col name or alias or col json path");
     }
   } else {
     leftQ = getLeftQ(selItem);
   }
 
-  if (!leftQ) mErr("Internal error: leftQ missing?!");
+  if (!leftQ) makeError("Internal error: leftQ missing?!");
 
   const parseRightVal = (val: any, expect?: "csv" | "array" | "json" | "jsonb") => {
     try {
       return parseFilterRightValue(val, { selectItem: selItem, expect });
     } catch (e: any) {
-      return mErr(e);
+      return makeError(e);
     }
   };
 
@@ -278,7 +279,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       (filterKeys.length !== 1 || !isDefined(filterOperand)) &&
       selItem.column_udt_type !== "jsonb"
     ) {
-      return mErr("Bad filter. Expecting one key only");
+      return makeError("Bad filter. Expecting one key only");
     } else if (isObject(filterValue) && !(filterValue instanceof Date)) {
       /**
        * Filter notation
@@ -324,40 +325,31 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
       return leftQ + " >=  " + parseRightVal(filterValue);
     } else if (["<=", "$lte"].includes(filterOperand)) {
       return leftQ + " <= " + parseRightVal(filterValue);
-    } else if (["$in"].includes(filterOperand)) {
-      if (filterValue !== null && !Array.isArray(filterValue))
-        return mErr("In filter expects an array");
+    } else if (["$in", "$nin"].includes(filterOperand)) {
+      const isIn = filterOperand === "$in";
+      if (filterValue !== null && !Array.isArray(filterValue)) {
+        return makeError("In filter expects an array");
+      }
       if (!filterValue?.length) {
-        return " FALSE ";
+        return isIn ? " FALSE " : " TRUE ";
       }
 
-      const filterNonNullValues: any[] = filterValue.filter((v: any) => v !== null);
-      let c1 = "",
-        c2 = "";
-      if (filterNonNullValues.length) {
-        c1 = leftQ + " IN " + parseRightVal(filterNonNullValues, "csv");
+      const nonNullFilterValues = filterValue.filter((v) => v !== null);
+      const conditions: string[] = [];
+      if (nonNullFilterValues.length) {
+        conditions.push(
+          leftQ + (isIn ? " IN " : " NOT IN ") + parseRightVal(nonNullFilterValues, "csv"),
+        );
       }
       if (filterValue.includes(null)) {
-        c2 = ` ${leftQ} IS NULL `;
+        const comparator = isIn ? " IS NULL " : " IS NOT NULL ";
+        conditions.push(` ${leftQ} ${comparator} `);
       }
-      return [c1, c2].filter((c) => c).join(" OR ");
-    } else if (["$nin"].includes(filterOperand)) {
-      if (filterValue !== null && !Array.isArray(filterValue))
-        return mErr("In filter expects an array");
-      if (!filterValue?.length) {
-        return " TRUE ";
-      }
-
-      const nonNullFilterValues: any[] = filterValue.filter((v: any) => v !== null);
-      let c1 = "",
-        c2 = "";
-      if (nonNullFilterValues.length)
-        c1 = leftQ + " NOT IN " + parseRightVal(nonNullFilterValues, "csv");
-      if (filterValue.includes(null)) c2 = ` ${leftQ} IS NOT NULL `;
-      return [c1, c2].filter((c) => c).join(" AND ");
+      const joinedConditions = conditions.join(isIn ? " OR " : " AND ");
+      return conditions.length > 1 ? `(${joinedConditions})` : joinedConditions;
     } else if (["$between"].includes(filterOperand)) {
       if (!Array.isArray(filterValue) || filterValue.length !== 2) {
-        return mErr("Between filter expects an array of two values");
+        return makeError("Between filter expects an array of two values");
       }
       return leftQ + " BETWEEN " + asValue(filterValue[0]) + " AND " + asValue(filterValue[1]);
     } else if (["$ilike"].includes(filterOperand)) {
@@ -389,7 +381,7 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         /* FTSQuery */
       } else if (
         ["@@"].includes(filterOperand) &&
-        TextFilter_FullTextSearchFilterKeys.includes(funcName! as any)
+        includes(TextFilter_FullTextSearchFilterKeys, funcName)
       ) {
         let lq = `to_tsvector(${leftQ}::text)`;
         if (selItem.columnPGDataType === "tsvector") lq = leftQ!;
@@ -398,10 +390,10 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
 
         return res;
       } else {
-        return mErr("Unrecognised filter operand: " + filterOperand + " ");
+        return makeError("Unrecognised filter operand: " + filterOperand + " ");
       }
     } else {
-      return mErr("Unrecognised filter operand: " + filterOperand + " ");
+      return makeError("Unrecognised filter operand: " + filterOperand + " ");
     }
   } else {
     /* Is an equal filter */
