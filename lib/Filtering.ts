@@ -374,6 +374,14 @@ export const parseFilterItem = (args: ParseFilterItemArgs): string => {
         : ["&&", "$overlaps"].includes(filterOperand) ? "&&"
         : "<@";
 
+      if (operand === "<@" || operand === "@>") {
+        if (selItem.column_udt_type === "jsonb") {
+          const filterValueAsString =
+            typeof filterValue === "string" ? filterValue : JSON.stringify(filterValue);
+          return leftQ + operand + parseRightVal(filterValueAsString);
+        }
+      }
+
       /* Array for sure */
       if (Array.isArray(filterValue)) {
         return leftQ + operand + parseRightVal(filterValue, "array");
