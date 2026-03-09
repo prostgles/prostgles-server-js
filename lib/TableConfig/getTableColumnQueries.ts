@@ -1,5 +1,5 @@
 import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
-import { validate_jsonb_schema_sql } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
+import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import type { DB, DBHandlerServer } from "../Prostgles";
 import { getColumnSQLDefinitionQuery, getTableColumns } from "./getColumnSQLDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
@@ -49,7 +49,9 @@ export const getTableColumnQueries = async ({
   /** Must install validation function */
   if (hasJSONBValidation) {
     try {
-      await db.any(validate_jsonb_schema_sql);
+      await db.any(
+        `CREATE SCHEMA IF NOT EXISTS prostgles;\n` + CREATE_VALIDATE_SCHEMA_FUNCTION_SQL,
+      );
     } catch (err: any) {
       console.error("Could not install the jsonb validation function due to error: ", err);
       throw err;
@@ -105,11 +107,11 @@ export const getTableColumnQueries = async ({
         droppedColNames.push(c.column_name);
       } else if (newCol.nullable !== c.nullable) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`
+          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
         );
       } else if (newCol.udt_name !== c.udt_name) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`
+          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
         );
       } else if (newCol.column_default !== c.column_default) {
         const colConfig = colDefs.find((cd) => cd.name === c.column_name);
@@ -120,7 +122,7 @@ export const getTableColumnQueries = async ({
           /** Ignore SERIAL/BIGSERIAL <> nextval mismatch */
         } else {
           alteredColQueries.push(
-            `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`
+            `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`,
           );
         }
       }

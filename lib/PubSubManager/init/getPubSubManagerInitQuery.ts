@@ -1,6 +1,8 @@
 import { tryCatchV2 } from "prostgles-types";
+import { version } from "../../../package.json";
 import type { DboBuilder } from "../../DboBuilder/DboBuilder";
 import { pgp } from "../../DboBuilder/DboBuilderTypes";
+import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import {
   asValue,
   DELIMITER,
@@ -9,7 +11,6 @@ import {
   NOTIF_TYPE,
 } from "../PubSubManagerUtils";
 import { getAppCheckQuery } from "../orphanTriggerCheck";
-import { version } from "../../../package.json";
 import { getDataWatchFunctionQuery } from "./getDataWatchFunctionQuery";
 
 export const DB_OBJ_NAMES = {
@@ -91,6 +92,8 @@ BEGIN
 
         CREATE SCHEMA IF NOT EXISTS prostgles;
         COMMENT ON SCHEMA prostgles IS 'Used by prostgles-server to enable data/schema change tracking through subscribe/sync/watchSchema';
+
+        ${CREATE_VALIDATE_SCHEMA_FUNCTION_SQL}
 
         CREATE TABLE IF NOT EXISTS prostgles.versions(
           version TEXT PRIMARY KEY,
@@ -502,7 +505,7 @@ COMMIT;
  * undefined returned if the database contains the apropriate prostgles schema
  */
 export const getPubSubManagerInitQuery = async function (
-  this: DboBuilder
+  this: DboBuilder,
 ): Promise<string | undefined> {
   const versionNum = await this.db.one("SELECT current_setting('server_version_num')::int as val");
   const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE, versionNum.val);

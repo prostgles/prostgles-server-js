@@ -7,6 +7,8 @@ import prostgles, {
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig } from "./testTableConfig";
+import { VALIDATE_SCHEMA_FUNCTION_SQL_TEST } from "./VALIDATE_SCHEMA_FUNCTION_SQL_TEST";
+
 const app = express();
 app.use(express.json());
 const http = require("http").createServer(app);
@@ -328,7 +330,7 @@ function dd() {
     ],
     onReady: async ({ dbo, sql, db }) => {
       log("prostgles onReady");
-
+      await db.any(VALIDATE_SCHEMA_FUNCTION_SQL_TEST);
       try {
         if (isClientTest) {
           const execPath = path.resolve(`${__dirname}/../../../client`);
