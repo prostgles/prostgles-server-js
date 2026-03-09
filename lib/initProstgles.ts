@@ -4,6 +4,7 @@ import type { SQLHandler } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
+import type { DboBuilder } from "./DboBuilder/DboBuilder";
 import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
 import { getDbConnection } from "./getDbConnection";
 import type { DBHandlerServer, Prostgles } from "./Prostgles";
@@ -90,7 +91,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   /**
    * Generated database public schema TS types for all tables and views
    */
-  getTSSchema: () => string;
+  getTSSchema: typeof DboBuilder.prototype.getTsDefinitions;
   reWriteDBSchema: () => void;
   update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
@@ -241,7 +242,7 @@ export const initProstgles = async function (
       _db: db,
       pgp,
       io: this.opts.io,
-      getTSSchema: this.getTSFileContent,
+      getTSSchema: this.dboBuilder.getTsDefinitions,
       reWriteDBSchema: () => this.writeDBSchema(true),
       options: this.opts,
       update: async (...args) => {

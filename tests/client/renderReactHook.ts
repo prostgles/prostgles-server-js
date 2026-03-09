@@ -12,9 +12,22 @@ const { window } = new JSDOM(`
 	</body>
 </html>
 `);
-global.window = window;
-global.navigator = window.navigator;
-global.document = window.document;
+
+const setGlobal = (key: "window" | "navigator" | "document", value: any) => {
+  try {
+    Object.defineProperty(globalThis, key, {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  } catch {
+    // Node 24 may expose getter-only globals; keep existing value in that case.
+  }
+};
+
+setGlobal("window", window);
+setGlobal("navigator", window.navigator);
+setGlobal("document", window.document);
 
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -184,8 +197,8 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
       if (!resolved) {
         reject(
           new Error(
-            `Expected ${expectedRerenders} rerenders, got ${results.length}:\n${JSON.stringify(results)}`
-          )
+            `Expected ${expectedRerenders} rerenders, got ${results.length}:\n${JSON.stringify(results)}`,
+          ),
         );
       }
     }, timeout);

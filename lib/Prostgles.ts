@@ -176,17 +176,13 @@ export class Prostgles {
     return { fileName, fullPath };
   }
 
-  getTSFileContent = () => {
-    return this.dboBuilder.tsTypesDefinition ?? "";
-  };
-
   /**
    * Will write the Schema Typescript definitions to file (tsGeneratedTypesDir)
    */
   writeDBSchema(force = false) {
     if (this.opts.tsGeneratedTypesDir) {
       const { fullPath, fileName } = this.getTSFileName();
-      const fileContent = this.getTSFileContent();
+      const fileContent = this.dboBuilder.getTsDefinitions();
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.readFile(fullPath, "utf8", function (err, data) {
         if (err || force || data !== fileContent) {
