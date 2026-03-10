@@ -308,7 +308,12 @@ export class DboBuilder {
   }: { excludeFunctions?: boolean; extraTables?: TableSchema[] } = {}) => {
     const tableTsDefinitions = getDBGeneratedSchema({
       config: this.prostgles.opts.tableConfig,
-      tablesOrViews: [...(this.tablesOrViews ?? []), ...extraTables],
+      tablesOrViews: [
+        ...(this.tablesOrViews ?? []),
+        ...extraTables.filter(
+          (et) => !(this.tablesOrViews ?? []).some((tov) => tov.name === et.name),
+        ),
+      ],
     });
 
     return [
