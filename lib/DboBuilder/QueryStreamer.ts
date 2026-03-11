@@ -122,6 +122,7 @@ export class QueryStreamer {
     let streamState: "started" | "ended" | "errored" | undefined;
 
     const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
+      await this.dboBuilder.cacheDBTypes();
       const socketQuery = this.socketQueries.get(socketId)?.get(id);
       if (!socketQuery) {
         throw "socket query not found";
@@ -137,14 +138,7 @@ export class QueryStreamer {
         | { reachedEnd: true; rows: any[]; info: Info }
         | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
         if (!(info as any).fields) throw "No fields";
-        const fields = getDetailedFieldInfo(
-          {
-            DATA_TYPES: this.dboBuilder.DATA_TYPES!,
-            USER_TABLES: this.dboBuilder.USER_TABLES!,
-            USER_TABLE_COLUMNS: this.dboBuilder.USER_TABLE_COLUMNS!,
-          },
-          info.fields,
-        );
+        const fields = getDetailedFieldInfo(this.dboBuilder.dbTypesCache!, info.fields);
         const packet: SocketSQLStreamPacket = {
           type: "data",
           rows,

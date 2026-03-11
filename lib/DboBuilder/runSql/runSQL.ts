@@ -32,8 +32,6 @@ export async function runSQL(
     }
   }
 
-  await this.cacheDBTypes();
-
   if (!(await canRunSQL(this.prostgles, localParams?.clientReq))) {
     throw "Not allowed to run SQL";
   }
@@ -115,17 +113,11 @@ export async function runSQL(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return rows.map((r) => Object.values(r)[0]);
   } else {
+    const typesCache = await this.cacheDBTypes();
     const qres: SQLResult<typeof returnType> = {
       duration: 0,
       ...queryResult,
-      fields: getDetailedFieldInfo(
-        {
-          DATA_TYPES: this.DATA_TYPES!,
-          USER_TABLES: this.USER_TABLES!,
-          USER_TABLE_COLUMNS: this.USER_TABLE_COLUMNS!,
-        },
-        fields,
-      ),
+      fields: getDetailedFieldInfo(typesCache, fields),
     };
     return qres;
   }
@@ -155,12 +147,10 @@ const onSQLResult = async function (
 };
 
 export async function cacheDBTypes(this: DboBuilder, force = false) {
-  if (force || !this.DATA_TYPES || !this.USER_TABLES || !this.USER_TABLE_COLUMNS) {
-    const { DATA_TYPES, USER_TABLES, USER_TABLE_COLUMNS } = await getDbTypes(this.db);
-    this.DATA_TYPES ??= DATA_TYPES;
-    this.USER_TABLES ??= USER_TABLES;
-    this.USER_TABLE_COLUMNS ??= USER_TABLE_COLUMNS;
+  if (force || !this.dbTypesCache) {
+    this.dbTypesCache = await getDbTypes(this.db);
   }
+  return this.dbTypesCache;
 }
 
 export const canRunSQL = async (

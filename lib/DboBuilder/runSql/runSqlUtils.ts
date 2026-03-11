@@ -3,11 +3,11 @@ import { postgresToTsType, type PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types"
 import type { DB } from "../../Prostgles";
 
 export const getDbTypes = async (db: DB) => {
-  const DATA_TYPES = await db.any<{
+  const dataTypes = await db.any<{
     oid: number;
     typname: PG_COLUMN_UDT_DATA_TYPE;
   }>("SELECT oid, typname FROM pg_type");
-  const USER_TABLES = await db.any<{
+  const userTables = await db.any<{
     relid: number;
     relname: string;
     schemaname: string;
@@ -29,7 +29,9 @@ export const getDbTypes = async (db: DB) => {
     ON t.relid = c.table_oid
     GROUP BY relid, relname, schemaname
   `);
-  const USER_TABLE_COLUMNS = await db.any<{
+  const dataTypesMap = new Map(dataTypes.map((dt) => [Number(dt.oid), dt]));
+  const userTablesMap = new Map(userTables.map((t) => [Number(t.relid), t]));
+  const userTableColumns = await db.any<{
     relid: number;
     schemaname: string;
     relname: string;
@@ -42,19 +44,20 @@ export const getDbTypes = async (db: DB) => {
     INNER JOIN pg_catalog.pg_statio_user_tables t
     ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
   `);
-  return { DATA_TYPES, USER_TABLES, USER_TABLE_COLUMNS };
+  const userTableColumnsMap = new Map(
+    userTableColumns.map((c) => [[c.relid, c.ordinal_position].join("-"), c]),
+  );
+  return { dataTypesMap, userTablesMap, userTableColumnsMap };
 };
 
 export const getDetailedFieldInfo = (
-  { DATA_TYPES, USER_TABLES, USER_TABLE_COLUMNS }: Awaited<ReturnType<typeof getDbTypes>>,
+  { dataTypesMap, userTablesMap, userTableColumnsMap }: Awaited<ReturnType<typeof getDbTypes>>,
   fields: pg.IColumn[],
 ) => {
   return fields.map((f) => {
-    const dataType = DATA_TYPES.find((dt) => +dt.oid === +f.dataTypeID)?.typname ?? "text",
-      table = USER_TABLES.find((t) => +t.relid === +f.tableID),
-      column = USER_TABLE_COLUMNS.find(
-        (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID,
-      ),
+    const dataType = dataTypesMap.get(+f.dataTypeID)?.typname ?? "text",
+      table = userTablesMap.get(+f.tableID),
+      column = userTableColumnsMap.get([f.tableID, f.columnID].join("-")),
       tsDataType = postgresToTsType(dataType);
 
     return {

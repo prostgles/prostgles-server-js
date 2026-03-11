@@ -1,3 +1,4 @@
+import type pg from "pg-promise/typescript/pg-subset";
 import type { SQLHandler, SQLOptions } from "prostgles-types";
 import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
 import { getDBGeneratedSchema } from "../DBSchemaBuilder/getDBGeneratedSchema";
@@ -34,29 +35,9 @@ import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSql/runSQL";
 import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
-import type pg from "pg-promise/typescript/pg-subset";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
-
-type OidInfo = {
-  /**
-   * Oid
-   */
-  relid: number;
-  relname: string;
-  schemaname: string;
-};
-
-type TableOidInfo = OidInfo & {
-  pkey_columns: string[] | null;
-};
-
-type TableOidColumnInfo = OidInfo & {
-  column_name: string;
-  udt_name: string;
-  ordinal_position: number;
-};
 
 export class DboBuilder {
   tablesOrViews?: TableSchema[];
@@ -79,9 +60,8 @@ export class DboBuilder {
   /**
    * Used for db.sql field type details
    */
-  DATA_TYPES: Awaited<ReturnType<typeof getDbTypes>>["DATA_TYPES"] | undefined;
-  USER_TABLES: TableOidInfo[] | undefined;
-  USER_TABLE_COLUMNS: TableOidColumnInfo[] | undefined;
+  dbTypesCache?: Awaited<ReturnType<typeof getDbTypes>>;
+
   DATA_TYPES_DBKEY = "";
 
   queryStreamer: QueryStreamer;
@@ -100,15 +80,9 @@ export class DboBuilder {
       .filter(isDefined);
   }
 
-  getDetailedFieldInfo = (fields: pg.IColumn[]) =>
-    getDetailedFieldInfo(
-      {
-        DATA_TYPES: this.DATA_TYPES!,
-        USER_TABLES: this.USER_TABLES!,
-        USER_TABLE_COLUMNS: this.USER_TABLE_COLUMNS!,
-      },
-      fields,
-    );
+  getDetailedFieldInfo = async (fields: pg.IColumn[]) => {
+    return getDetailedFieldInfo(await this.cacheDBTypes(), fields);
+  };
 
   getPubSubManagerPromise?: Promise<PubSubManager>;
   getPubSubManager = async (): Promise<PubSubManager> => {
