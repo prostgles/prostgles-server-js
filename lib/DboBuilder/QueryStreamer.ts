@@ -8,7 +8,7 @@ import type { DB } from "../initProstgles";
 import type { DboBuilder } from "./DboBuilder";
 import type { PRGLIOSocket } from "./DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
-import { getDetailedFieldInfo } from "./runSQL";
+import { getDetailedFieldInfo } from "./runSql/runSqlUtils";
 const Cursor = require("pg-cursor") as typeof CursorType;
 
 type ClientStreamedRequest = {
@@ -137,7 +137,14 @@ export class QueryStreamer {
         | { reachedEnd: true; rows: any[]; info: Info }
         | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
         if (!(info as any).fields) throw "No fields";
-        const fields = getDetailedFieldInfo.bind(this.dboBuilder)(info.fields);
+        const fields = getDetailedFieldInfo(
+          {
+            DATA_TYPES: this.dboBuilder.DATA_TYPES!,
+            USER_TABLES: this.dboBuilder.USER_TABLES!,
+            USER_TABLE_COLUMNS: this.dboBuilder.USER_TABLE_COLUMNS!,
+          },
+          info.fields,
+        );
         const packet: SocketSQLStreamPacket = {
           type: "data",
           rows,

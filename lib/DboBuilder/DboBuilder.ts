@@ -1,4 +1,4 @@
-import type { PG_COLUMN_UDT_DATA_TYPE, SQLHandler, SQLOptions } from "prostgles-types";
+import type { SQLHandler, SQLOptions } from "prostgles-types";
 import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
 import { getDBGeneratedSchema } from "../DBSchemaBuilder/getDBGeneratedSchema";
 import { getFunctionsTypescriptSchema } from "../DBSchemaBuilder/getFunctionsTypescriptSchema";
@@ -31,8 +31,10 @@ import {
   getSerializedClientErrorFromPGError,
 } from "./dboBuilderUtils";
 import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
-import { cacheDBTypes, runSQL } from "./runSQL";
+import { cacheDBTypes, runSQL } from "./runSql/runSQL";
+import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
+import type pg from "pg-promise/typescript/pg-subset";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -77,10 +79,10 @@ export class DboBuilder {
   /**
    * Used for db.sql field type details
    */
-  DATA_TYPES: { oid: string; typname: PG_COLUMN_UDT_DATA_TYPE }[] | undefined;
-  DATA_TYPES_DBKEY = "";
+  DATA_TYPES: Awaited<ReturnType<typeof getDbTypes>>["DATA_TYPES"] | undefined;
   USER_TABLES: TableOidInfo[] | undefined;
   USER_TABLE_COLUMNS: TableOidColumnInfo[] | undefined;
+  DATA_TYPES_DBKEY = "";
 
   queryStreamer: QueryStreamer;
 
@@ -97,6 +99,16 @@ export class DboBuilder {
       })
       .filter(isDefined);
   }
+
+  getDetailedFieldInfo = (fields: pg.IColumn[]) =>
+    getDetailedFieldInfo(
+      {
+        DATA_TYPES: this.DATA_TYPES!,
+        USER_TABLES: this.USER_TABLES!,
+        USER_TABLE_COLUMNS: this.USER_TABLE_COLUMNS!,
+      },
+      fields,
+    );
 
   getPubSubManagerPromise?: Promise<PubSubManager>;
   getPubSubManager = async (): Promise<PubSubManager> => {

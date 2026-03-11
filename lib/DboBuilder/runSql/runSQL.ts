@@ -1,14 +1,12 @@
-import type { ParameterizedQuery } from "pg-promise";
 import type pgPromise from "pg-promise";
+import type { ParameterizedQuery } from "pg-promise";
 import { ParameterizedQuery as PQ } from "pg-promise";
-import type pg from "pg-promise/typescript/pg-subset";
 import type { AnyObject, SQLOptions, SQLResult, SQLResultInfo } from "prostgles-types";
-import { postgresToTsType } from "prostgles-types";
-import type { DB, Prostgles } from "../Prostgles";
-import type { DboBuilder, LocalParams } from "./DboBuilder";
-import { pgp } from "./DboBuilder";
-import type { AuthClientRequest } from "../Auth/AuthTypes";
-
+import type { AuthClientRequest } from "../../Auth/AuthTypes";
+import type { DB, Prostgles } from "../../Prostgles";
+import type { DboBuilder, LocalParams } from "../DboBuilder";
+import { pgp } from "../DboBuilder";
+import { getDbTypes, getDetailedFieldInfo } from "./runSqlUtils";
 export async function runSQL(
   this: DboBuilder,
   queryWithoutRLS: string,
@@ -120,7 +118,14 @@ export async function runSQL(
     const qres: SQLResult<typeof returnType> = {
       duration: 0,
       ...queryResult,
-      fields: getDetailedFieldInfo.bind(this)(fields),
+      fields: getDetailedFieldInfo(
+        {
+          DATA_TYPES: this.DATA_TYPES!,
+          USER_TABLES: this.USER_TABLES!,
+          USER_TABLE_COLUMNS: this.USER_TABLE_COLUMNS!,
+        },
+        fields,
+      ),
     };
     return qres;
   }
@@ -150,56 +155,12 @@ const onSQLResult = async function (
 };
 
 export async function cacheDBTypes(this: DboBuilder, force = false) {
-  if (force) {
-    this.DATA_TYPES = undefined;
-    this.USER_TABLES = undefined;
-    this.USER_TABLE_COLUMNS = undefined;
+  if (force || !this.DATA_TYPES || !this.USER_TABLES || !this.USER_TABLE_COLUMNS) {
+    const { DATA_TYPES, USER_TABLES, USER_TABLE_COLUMNS } = await getDbTypes(this.db);
+    this.DATA_TYPES ??= DATA_TYPES;
+    this.USER_TABLES ??= USER_TABLES;
+    this.USER_TABLE_COLUMNS ??= USER_TABLE_COLUMNS;
   }
-  this.DATA_TYPES ??= await this.db.any("SELECT oid, typname FROM pg_type");
-  this.USER_TABLES ??= await this.db.any(`
-    SELECT 
-      relid, 
-      relname, 
-      schemaname, 
-      array_to_json(array_agg(c.column_name) FILTER (WHERE c.column_name IS NOT NULL)) as pkey_columns
-    FROM pg_catalog.pg_statio_user_tables t
-    LEFT JOIN (
-      SELECT a.attname as column_name, i.indrelid as table_oid
-      FROM   pg_index i
-      JOIN   pg_attribute a ON a.attrelid = i.indrelid
-        AND a.attnum = ANY(i.indkey)
-      WHERE i.indisprimary
-    ) c
-    ON t.relid = c.table_oid
-    GROUP BY relid, relname, schemaname
-  `);
-  this.USER_TABLE_COLUMNS ??= await this.db.any(`
-    SELECT t.relid, t.schemaname,t.relname, c.column_name, c.udt_name, c.ordinal_position
-    FROM information_schema.columns c
-    INNER JOIN pg_catalog.pg_statio_user_tables t
-    ON  c.table_schema = t.schemaname AND c.table_name = t.relname 
-  `);
-}
-
-export function getDetailedFieldInfo(this: DboBuilder, fields: pg.IColumn[]) {
-  return fields.map((f) => {
-    const dataType = this.DATA_TYPES!.find((dt) => +dt.oid === +f.dataTypeID)?.typname ?? "text",
-      table = this.USER_TABLES!.find((t) => +t.relid === +f.tableID),
-      column = this.USER_TABLE_COLUMNS!.find(
-        (c) => +c.relid === +f.tableID && c.ordinal_position === f.columnID,
-      ),
-      tsDataType = postgresToTsType(dataType);
-
-    return {
-      ...f,
-      tsDataType,
-      dataType,
-      udt_name: dataType,
-      tableName: table?.relname,
-      tableSchema: table?.schemaname,
-      columnName: column?.column_name,
-    };
-  });
 }
 
 export const canRunSQL = async (

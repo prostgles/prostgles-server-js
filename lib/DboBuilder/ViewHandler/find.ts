@@ -11,7 +11,7 @@ import {
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
 import type { NewQuery } from "../QueryBuilder/QueryBuilder";
-import { canRunSQL } from "../runSQL";
+import { canRunSQL } from "../runSql/runSQL";
 import type { TableHandler } from "../TableHandler/TableHandler";
 import type { ViewHandler } from "./ViewHandler";
 

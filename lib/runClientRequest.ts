@@ -10,7 +10,7 @@ import type { AuthClientRequest } from "./Auth/AuthTypes";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
 import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
-import { canRunSQL } from "./DboBuilder/runSQL";
+import { canRunSQL } from "./DboBuilder/runSql/runSQL";
 import type { Prostgles } from "./Prostgles";
 import type {
   Awaitable,

@@ -3,7 +3,7 @@ import { asName, tryCatchV2 } from "prostgles-types";
 import { HTTP_FAIL_CODES } from "../Auth/AuthHandler";
 import type { Media } from "../DboBuilder/DboBuilderTypes";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
-import { canCreateTables } from "../DboBuilder/runSQL";
+import { canCreateTables } from "../DboBuilder/runSql/runSQL";
 import type { Prostgles } from "../Prostgles";
 import type { SchemaRelatedOptions } from "../TableConfig/getCreateSchemaQueries";
 import { runClientRequest } from "../runClientRequest";
@@ -21,7 +21,7 @@ export const getFileManagerSchema = ({
   const { tableName: fileTableName = "files", referencedTables = {} } = fileTable;
   if (tableConfig?.[fileTableName]) {
     throw new Error(
-      `FileManager table name (${fileTableName}) is reserved. Please use a different name in tableConfig`
+      `FileManager table name (${fileTableName}) is reserved. Please use a different name in tableConfig`,
     );
   }
   const fileTableQuery = `
@@ -82,7 +82,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
 
   const maxBfSizeMB = (prg.opts.io?.engine.opts.maxHttpBufferSize || 1e6) / 1e6;
   console.log(
-    `Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`
+    `Prostgles: Initiated file manager. Max allowed file size: ${maxBfSizeMB}MB (maxHttpBufferSize = 1e6). To increase this set maxHttpBufferSize in socket.io server init options`,
   );
 
   const canCreate = await canCreateTables(this.db);
@@ -132,12 +132,12 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
               await runQuery(query, msg);
             } catch (e) {
               console.error(
-                `Could not add constraing. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`
+                `Could not add constraing. Err: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
               );
             }
           } else {
             console.error(
-              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${fileTableName}(id)`
+              `Referenced file column ${refTable} (${colName}) exists but is not of required type (UUID). Choose a different column name or ALTER the existing column to match the type and the data found in file table ${fileTableName}(id)`,
             );
           }
         }
@@ -153,7 +153,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
         // }
         // await createColumn();
         console.error(
-          `Referenced file column ${refTable} (${colName}) does not exist. Create it using this query:\n${query}`
+          `Referenced file column ${refTable} (${colName}) does not exist. Create it using this query:\n${query}`,
         );
       }
     }
@@ -210,7 +210,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
           res,
           httpReq: req,
         },
-        undefined
+        undefined,
       )) as Required<Media> | undefined;
 
       if (!media) {
@@ -233,7 +233,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
               id: media.id,
               signed_url: url,
               signed_url_expires: EXPIRES,
-            }
+            },
           );
         }
 

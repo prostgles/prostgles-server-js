@@ -100,6 +100,8 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
     clientReq: AuthClientRequest,
     scope: PermissionScope | undefined,
   ) => ReturnType<typeof getClientHandlers<S>>;
+
+  getFieldsWithTypes: typeof DboBuilder.prototype.getDetailedFieldInfo;
 };
 
 export const initProstgles = async function (
@@ -248,6 +250,7 @@ export const initProstgles = async function (
       update: async (...args) => {
         await updateConfiguration(this, onReady, ...args);
       },
+      getFieldsWithTypes: this.dboBuilder.getDetailedFieldInfo,
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {
         console.log("destroying prgl instance");
