@@ -34,5 +34,7 @@ export const getFunctionsTypescriptSchema = (
   );
   if (methodDefinitions.length) {
     return ["\n", `export type GeneratedFunctionSchema = { `, ...methodDefinitions, `}`].join("\n");
+  } else {
+    return "export type GeneratedFunctionSchema = Record<string, never>;";
   }
 };
