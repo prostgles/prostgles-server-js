@@ -54,17 +54,12 @@ export const getClientHandlers = async <S = void>(
       throw new Error("Transactions are not allowed in client handlers");
     },
   };
-  const sqlPermission = scope?.sql;
   const clientSql = ((query: string, params?: AnyObject, options?: SQLOptions) => {
-    if (!sqlPermission) {
+    if (!scope?.allowSql) {
       throw new Error("SQL is dissallowed by PermissionScope");
     }
 
-    if (sqlPermission === "commited") {
-      return sqlHandler(query, params, options);
-    }
-
-    return sqlHandler(query, params, { ...options, returnType: "default-with-rollback" });
+    return sqlHandler(query, params, options);
   }) as SQLHandler;
   const clientDb = {
     ...tableHandlers,

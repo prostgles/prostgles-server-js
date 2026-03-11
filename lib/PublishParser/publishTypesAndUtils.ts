@@ -504,8 +504,7 @@ export type DbTableInfo = {
   columns: TableSchemaColumn[];
 };
 export type PermissionScope = {
-  sql?: "commited" | "rolledback";
-  /** TODO: this should match publish types */
+  allowSql?: boolean;
   tables?: Record<
     string,
     Partial<{

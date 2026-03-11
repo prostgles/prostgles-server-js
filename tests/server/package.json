@@ -14,9 +14,9 @@
     "prostgles-server": "file:../.."
   },
   "devDependencies": {
-    "@types/node": "^20.9.2",
-    "socket.io": "^4.8.1",
-    "tsc-watch": "^6.2.1",
-    "typescript": "^5.3.3"
+    "@types/node": "^20.19.37",
+    "socket.io": "^4.8.3",
+    "tsc-watch": "^6.3.1",
+    "typescript": "^5.9.3"
   }
 }

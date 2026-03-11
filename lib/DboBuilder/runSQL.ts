@@ -79,10 +79,17 @@ export async function runSQL(
   let queryResult: pgPromise.IResultExt<AnyObject> | undefined;
 
   if (returnType === "default-with-rollback") {
-    await db.tx(async (t) => {
-      queryResult = await t.result<AnyObject>(finalQuery, params);
-      await t.none("ROLLBACK");
-    });
+    const ROLLBACK_SENTINEL = Symbol("rollback");
+    await db
+      .tx(async (t) => {
+        queryResult = await t.result<AnyObject>(finalQuery, params);
+        throw ROLLBACK_SENTINEL;
+      })
+      .catch((err) => {
+        if (err !== ROLLBACK_SENTINEL) {
+          throw err;
+        }
+      });
   } else {
     queryResult = await db.result<AnyObject>(finalQuery, params);
   }

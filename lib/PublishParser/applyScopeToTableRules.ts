@@ -1,6 +1,6 @@
-import { getObjectEntries, isDefined, isEmpty, pickKeys } from "prostgles-types";
-import { type ParsedTableRule, type PermissionScope } from "./PublishParser";
+import { getObjectEntries, isDefined, isEmpty } from "prostgles-types";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import { type ParsedTableRule, type PermissionScope } from "./PublishParser";
 export const applyScopeToTableRules = (
   tableName: string,
   tableHandler: Partial<TableHandler>,
@@ -8,10 +8,7 @@ export const applyScopeToTableRules = (
   scope: PermissionScope | undefined,
 ): ParsedTableRule | undefined => {
   if (!tableRules) return;
-  if (!scope || scope.sql === "commited") return tableRules;
-  if (scope.sql === "rolledback") {
-    return pickKeys(tableRules, ["select"]);
-  }
+  if (!scope || scope.allowSql) return tableRules;
   const tableScope = scope.tables?.[tableName];
   if (!tableScope) return;
 

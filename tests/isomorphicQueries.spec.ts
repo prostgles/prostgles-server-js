@@ -7,6 +7,7 @@ import {
 } from "node:test";
 import {
   SubscriptionHandler,
+  getSerialisableError,
   innerJoin,
   leftJoin,
   pickKeys,
@@ -14,6 +15,7 @@ import {
 } from "prostgles-types";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
+import { error } from "console";
 
 export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
@@ -482,6 +484,55 @@ export const isomorphicQueries = async (
       assert.deepEqual(res.rows, [item]);
       const count = await db.items2.count!();
       assert.equal(count, 1);
+
+      const testCreateTable = async (
+        createTableQuery: string,
+        commited: boolean,
+        expectExist?: boolean,
+      ) => {
+        const commitedTableName = "__rb_test_commit";
+        await sql!(`DROP TABLE IF EXISTS public.\${commitedTableName:raw}`, { commitedTableName });
+
+        const expectTableToExist = async (exists: boolean) => {
+          const probeCount = await sql!(
+            `SELECT to_regclass('public.\${commitedTableName:raw}')::text AS \${commitedTableName:raw};`,
+            {
+              commitedTableName,
+            },
+            { returnType: "rows" },
+          );
+          assert.deepEqual(probeCount, [
+            { [commitedTableName]: exists ? commitedTableName : null },
+          ]);
+        };
+
+        await expectTableToExist(false);
+        await sql!(
+          createTableQuery,
+          {
+            commitedTableName,
+          },
+          { returnType: commited ? undefined : "default-with-rollback" },
+        );
+
+        await expectTableToExist(expectExist ?? commited);
+
+        if (commited) {
+          await sql!(`DROP TABLE IF EXISTS public.${commitedTableName}`);
+        }
+      };
+
+      const nonNestedTransaction = `CREATE TABLE public.\${commitedTableName:raw}(id int);`;
+      await testCreateTable(nonNestedTransaction, true);
+      await testCreateTable(nonNestedTransaction, false);
+
+      const nestedTransaction = `
+        BEGIN; 
+          CREATE TABLE public.\${commitedTableName:raw}(id int); 
+        COMMIT;
+      `;
+      await testCreateTable(nestedTransaction, true);
+      await testCreateTable(nestedTransaction, false, true);
     });
 
     /**

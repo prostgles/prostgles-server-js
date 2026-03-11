@@ -166,14 +166,8 @@ export class PublishParser {
     }
 
     if (scope) {
-      if (scope.sql === "commited") {
+      if (scope.allowSql) {
         // Allow all commands
-      } else if (scope.sql === "rolledback") {
-        if (rule.sqlRule === "select") {
-          // Allow select
-        } else {
-          throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope only allows ${scope.sql}`;
-        }
       } else {
         const tableScope = scope.tables;
         if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
