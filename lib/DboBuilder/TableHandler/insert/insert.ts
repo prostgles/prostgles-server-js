@@ -251,7 +251,7 @@ export async function insert(
       data: preValidatedrowOrRows,
       fields,
       params: insertParams,
-      type: "insert",
+      command: "insert",
       isMultiInsert,
     });
     await this._log({

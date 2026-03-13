@@ -180,7 +180,7 @@ export async function update(
       queryWithoutUserRLS,
       returningFields,
       rule,
-      type: "update",
+      command: "update",
       nestedInsertsResultsObj,
     });
     await this._log({

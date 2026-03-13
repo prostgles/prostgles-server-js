@@ -14,15 +14,15 @@ type RunInsertUpdateQueryArgs = {
   returningFields: FieldFilter | undefined;
 } & (
   | {
-      type: "insert";
+      command: "insert";
       params: InsertParams | undefined;
       rule: InsertRule | undefined;
-      data: AnyObject | AnyObject[];
+      data: AnyObject;
       isMultiInsert: boolean;
       nestedInsertsResultsObj?: undefined;
     }
   | {
-      type: "update";
+      command: "update";
       nestedInsertsResultsObj: Record<string, any>;
       params: UpdateParams | undefined;
       rule: UpdateRule | undefined;
@@ -41,6 +41,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     params,
     nestedInsertsResultsObj,
     data,
+    command,
   } = args;
   const { name } = tableHandler;
 
@@ -149,14 +150,14 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
         tx: tx || tableHandler.db,
         dbx: finalDBtx,
         localParams,
-        command: args.type,
-        data: args.data,
+        command,
+        data,
       });
     }
   }
 
   let returnMany = false;
-  if (args.type === "update") {
+  if (args.command === "update") {
     const { multi = true } = args.params || {};
     if (!multi && result.row_count && +result.row_count > 1) {
       throw `More than 1 row modified: ${result.row_count} rows affected`;

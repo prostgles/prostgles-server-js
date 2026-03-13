@@ -185,11 +185,11 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
 } & (
   | {
       command: "insert";
-      data: R | R[];
+      data: R;
     }
   | {
       command: "update";
-      data: R | Partial<R>;
+      data: Partial<R>;
     }
 );
 
