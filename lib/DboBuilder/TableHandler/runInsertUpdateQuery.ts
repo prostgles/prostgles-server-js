@@ -26,7 +26,7 @@ type RunInsertUpdateQueryArgs = {
       nestedInsertsResultsObj: Record<string, any>;
       params: UpdateParams | undefined;
       rule: UpdateRule | undefined;
-      data: undefined;
+      data: Record<string, any>;
     }
 );
 
@@ -40,6 +40,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     returningFields,
     params,
     nestedInsertsResultsObj,
+    data,
   } = args;
   const { name } = tableHandler;
 
@@ -146,8 +147,10 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       await postValidate({
         row: row,
         tx: tx || tableHandler.db,
-        dbx: finalDBtx as any,
+        dbx: finalDBtx,
         localParams,
+        command: args.type,
+        data: args.data,
       });
     }
   }

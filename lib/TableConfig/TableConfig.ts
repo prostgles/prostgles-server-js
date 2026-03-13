@@ -12,7 +12,7 @@ import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import type { InsertRule, ValidateRowArgs } from "../PublishParser/PublishParser";
+import type { InsertRule, ValidateRowArgsCommon } from "../PublishParser/PublishParser";
 import { initTableConfig } from "./initTableConfig";
 
 type ColExtraInfo = {
@@ -317,7 +317,7 @@ export type TableDefinition<LANG_IDS> = {
   };
 };
 
-type GetPreInsertRowArgs = Omit<ValidateRowArgs, "localParams"> & {
+type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
   // preValidate: InsertRule["preValidate"];
   validate: InsertRule["validate"];
   localParams: LocalParams | undefined;
@@ -486,7 +486,10 @@ export default class TableConfigurator {
 
   getPreInsertRow = async (
     tableHandler: TableHandler,
-    args: Pick<GetPreInsertRowArgs, "localParams" | "row" | "validate" | "dbx" | "tx">,
+    args: Pick<
+      GetPreInsertRowArgs,
+      "localParams" | "row" | "validate" | "dbx" | "tx" | "command" | "data"
+    >,
   ): Promise<AnyObject> => {
     const tableHook = this.config[tableHandler.name]?.hooks?.getPreInsertRow;
     if (tableHandler.is_media) {

@@ -7,11 +7,11 @@ import type { TableHandler } from "./TableHandler/TableHandler";
 export const isFile = (row: any): row is { data: Buffer; name: string } => {
   return Boolean(
     row &&
-      isObject(row) &&
-      getKeys(row).sort().join() === ["name", "data"].sort().join() &&
-      row.data &&
-      (typeof row.data === "string" || Buffer.isBuffer(row.data)) &&
-      typeof row.name === "string",
+    isObject(row) &&
+    getKeys(row).sort().join() === ["name", "data"].sort().join() &&
+    row.data &&
+    (typeof row.data === "string" || Buffer.isBuffer(row.data)) &&
+    typeof row.name === "string",
   );
 };
 
@@ -66,6 +66,8 @@ export async function uploadFile(
       row: media,
       dbx: this.getFinalDbo(localParams),
       localParams,
+      command: "insert",
+      data: media,
     });
     const missingKeys = parsedMediaKeys.filter((k) => !parsedMedia[k]);
     if (missingKeys.length) {

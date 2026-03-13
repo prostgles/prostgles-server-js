@@ -105,6 +105,8 @@ export async function insert(
           localParams,
           row: nonValidated,
           tx: tx || this.db,
+          command: "insert",
+          data: nonValidated,
         });
         if (preValidate) {
           if (!localParams) throw "localParams missing for insert preValidate";
@@ -113,6 +115,8 @@ export async function insert(
             tx: tx || this.db,
             dbx: this.tx?.dbTX || this.dboBuilder.dbo,
             localParams,
+            command: "insert",
+            data: row,
           });
         }
 

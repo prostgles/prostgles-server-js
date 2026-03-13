@@ -173,7 +173,7 @@ export async function update(
 
     const result = await runInsertUpdateQuery({
       tableHandler: this,
-      data: undefined,
+      data: nData,
       fields,
       localParams,
       params,

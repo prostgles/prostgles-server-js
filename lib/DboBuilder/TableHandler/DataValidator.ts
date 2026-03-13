@@ -1,7 +1,7 @@
 import type { AnyObject, FieldFilter } from "prostgles-types/dist";
 import { asName, getKeys, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
 import type { DBHandlerServer } from "../../Prostgles";
-import type { ValidateRowArgs, ValidateRowBasic } from "../../PublishParser/PublishParser";
+import type { ValidateRowArgsCommon, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import type { LocalParams, TableSchemaColumn } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
@@ -32,7 +32,7 @@ type ParseDataArgs = {
   rows: AnyObject[];
   allowedCols: string[];
   dbTx: DBHandlerServer;
-  tx: ValidateRowArgs["tx"];
+  tx: ValidateRowArgsCommon["tx"];
   command: "update" | "insert";
   validationOptions: {
     localParams: undefined | LocalParams;
@@ -225,6 +225,8 @@ const getValidatedRowFieldData = async (
           dbx: dbTx,
           tx,
           localParams: validationOptions.localParams,
+          command,
+          data: row,
         });
       }
       const keysAddedDuringValidate = Object.keys(row).filter(
