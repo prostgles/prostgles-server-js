@@ -351,11 +351,11 @@ type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
 
 export type TableConfig<LANG_IDS = { en: 1 }, S = void, DBX = DBHandlerServer> =
   S extends DBSchema ?
-    {
+    Partial<{
       [TableName in keyof S]:
         | TableDefinition<LANG_IDS, S[TableName]["columns"], DBX>
         | LookupTableDefinition<LANG_IDS>;
-    }
+    }>
   : {
       [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
     };

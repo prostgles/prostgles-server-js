@@ -139,7 +139,7 @@
   
   const fileUrl = file.url;
   ```
-- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
+- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">{ [table_name: string]: TableDefinition&lt;{ en: 1; }, AnyObject, DBHandlerServer&gt; | LookupTableDefinition&lt;{ en: 1; }&gt;; }</span>
 
   Define tables through a JSON-schema like object.
   Allows adding runtime JSONB validation and type safety.
