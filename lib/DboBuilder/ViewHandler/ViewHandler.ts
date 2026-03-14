@@ -28,6 +28,7 @@ import type { OnData } from "./subscribe";
 import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
 import { escapeTSNames } from "../../utils/utils";
+import type { TableDefinition } from "../../TableConfig/TableConfig";
 
 export type JoinPaths = {
   t1: string;
@@ -48,6 +49,7 @@ export class ViewHandler {
   joinGraph?: Graph;
   joinPaths?: JoinPaths;
   dboBuilder: DboBuilder;
+  config: TableDefinition<any> | undefined;
 
   tx?: {
     t: pgPromise.ITask<{}>;
@@ -60,13 +62,22 @@ export class ViewHandler {
   is_view = true;
   filterDef = "";
   is_media = false;
-  constructor(
-    db: DB,
-    tableOrViewInfo: TableSchema,
-    dboBuilder: DboBuilder,
-    tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers },
-    joinPaths?: JoinPaths,
-  ) {
+  constructor({
+    db,
+    config,
+    dboBuilder,
+    tableOrViewInfo,
+    tx,
+    joinPaths,
+  }: {
+    db: DB;
+    tableOrViewInfo: TableSchema;
+    dboBuilder: DboBuilder;
+    config: TableDefinition<any> | undefined;
+    tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
+    joinPaths?: JoinPaths;
+  }) {
+    this.config = config;
     this.db = db;
     this.tx = tx;
     this.joinPaths = joinPaths;

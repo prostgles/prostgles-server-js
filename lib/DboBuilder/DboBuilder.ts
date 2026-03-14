@@ -244,13 +244,14 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      const tableHandler = new (tov.is_view ? ViewHandler : TableHandler)(
-        this.db,
-        tov,
-        this,
-        undefined,
-        this.shortestJoinPaths,
-      );
+      const tableHandler = new (tov.is_view ? ViewHandler : TableHandler)({
+        db: this.db,
+        tableOrViewInfo: tov,
+        dboBuilder: this,
+        tx: undefined,
+        config: this.prostgles.opts.tableConfig?.[tov.name],
+        joinPaths: this.shortestJoinPaths,
+      });
       this.dbo[tov.name] = tableHandler;
       this.dboMap.set(tov.name, tableHandler);
     });
@@ -339,13 +340,14 @@ export class DboBuilder {
       const dbTX: DbTxTableHandlers = {};
       this.tablesOrViews?.map((tov) => {
         const TableOrViewHandler = tov.is_view ? ViewHandler : TableHandler;
-        dbTX[tov.name] = new TableOrViewHandler(
-          this.db,
-          tov,
-          this,
-          { t, dbTX },
-          this.shortestJoinPaths,
-        );
+        dbTX[tov.name] = new TableOrViewHandler({
+          db: this.db,
+          tableOrViewInfo: tov,
+          dboBuilder: this,
+          tx: { t, dbTX },
+          config: this.prostgles.opts.tableConfig?.[tov.name],
+          joinPaths: this.shortestJoinPaths,
+        });
       });
       // dbTX.sql = (q, args, opts, localParams) => {
       //   if (localParams?.tx) {

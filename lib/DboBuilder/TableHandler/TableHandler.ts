@@ -9,7 +9,13 @@ import type {
 } from "prostgles-types";
 import { asName } from "prostgles-types";
 import type { DB } from "../../Prostgles";
-import type { SyncRule, ParsedTableRule } from "../../PublishParser/PublishParser";
+import type {
+  SyncRule,
+  ParsedTableRule,
+  InsertRule,
+  UpdateRule,
+  DeleteRule,
+} from "../../PublishParser/PublishParser";
 import type TableConfigurator from "../../TableConfig/TableConfig";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
@@ -26,6 +32,7 @@ import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
 import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
+import type { TableDefinition } from "../../TableConfig/TableConfig";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -39,14 +46,22 @@ export type ValidatedParams = {
 
 export class TableHandler extends ViewHandler {
   dataValidator: DataValidator;
-  constructor(
-    db: DB,
-    tableOrViewInfo: TableSchema,
-    dboBuilder: DboBuilder,
-    tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers },
-    joinPaths?: JoinPaths
-  ) {
-    super(db, tableOrViewInfo, dboBuilder, tx, joinPaths);
+  constructor({
+    db,
+    config,
+    dboBuilder,
+    tableOrViewInfo,
+    tx,
+    joinPaths,
+  }: {
+    db: DB;
+    tableOrViewInfo: TableSchema;
+    dboBuilder: DboBuilder;
+    config: TableDefinition<any> | undefined;
+    tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
+    joinPaths?: JoinPaths;
+  }) {
+    super({ db, tableOrViewInfo, dboBuilder, config, tx, joinPaths });
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.remove = this.delete;
@@ -58,6 +73,20 @@ export class TableHandler extends ViewHandler {
 
   getFinalDBtx = (localParams: LocalParams | undefined) => {
     return localParams?.tx?.dbTX ?? this.tx?.dbTX;
+  };
+  shouldWrapInTx = (
+    command:
+      | { name: "update"; rule: undefined | UpdateRule }
+      | { name: "insert"; rule: undefined | InsertRule },
+    localParams: LocalParams | undefined,
+  ) => {
+    const rule = command.rule;
+    const finalDBtx = this.getFinalDBtx(localParams);
+    const hasAfterChecks =
+      rule?.postValidate ||
+      rule?.checkFilter ||
+      this.config?.hooks?.afterEach?.some(({ commands }) => commands[command.name]);
+    return !finalDBtx && hasAfterChecks;
   };
   getFinalDbo = (localParams: LocalParams | undefined) => {
     return this.getFinalDBtx(localParams) ?? this.dboBuilder.dbo;
@@ -73,14 +102,14 @@ export class TableHandler extends ViewHandler {
     param2?: InsertParams,
     param3_unused?: undefined,
     tableRules?: ParsedTableRule,
-    _localParams?: LocalParams
+    _localParams?: LocalParams,
   ): Promise<any> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
   }
 
   prepareReturning = async (
     returning: Select | undefined,
-    allowedFields: string[]
+    allowedFields: string[],
   ): Promise<SelectItemValidated[]> => {
     const result: SelectItemValidated[] = [];
     if (returning) {
@@ -111,7 +140,7 @@ export class TableHandler extends ViewHandler {
     params?: DeleteParams,
     param3_unused?: undefined,
     table_rules?: ParsedTableRule,
-    localParams?: LocalParams
+    localParams?: LocalParams,
   ): Promise<any> {
     return _delete.bind(this)(filter, params, param3_unused, table_rules, localParams);
   }
@@ -121,7 +150,7 @@ export class TableHandler extends ViewHandler {
     params?: UpdateParams,
     param3_unused?: undefined,
     tableRules?: ParsedTableRule,
-    localParams?: LocalParams
+    localParams?: LocalParams,
   ) {
     return this.delete(filter, params, param3_unused, tableRules, localParams);
   }
@@ -134,7 +163,7 @@ export class TableHandler extends ViewHandler {
     params: { select?: FieldFilter },
     param3_unused: undefined,
     table_rules: ParsedTableRule,
-    localParams: LocalParams
+    localParams: LocalParams,
   ) {
     const start = Date.now();
     try {
@@ -187,7 +216,7 @@ export class TableHandler extends ViewHandler {
         { select, limit: 0 },
         undefined,
         table_rules,
-        localParams
+        localParams,
       ).then(async (_isValid) => {
         const { filterFields, forcedFilter } = table_rules.select || {};
         const condition = (

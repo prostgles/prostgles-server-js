@@ -28,24 +28,21 @@ export async function insert(
     const { removeDisallowedFields = false } = insertParams ?? {};
     const { returnQuery = false, nestedInsert } = localParams ?? {};
 
-    const finalDBtx = this.getFinalDBtx(localParams);
     const rule = tableRules?.[ACTION];
-    const { postValidate, checkFilter, validate, allowedNestedInserts, requiredNestedInserts } =
-      rule ?? {};
+    const { validate, allowedNestedInserts, requiredNestedInserts } = rule ?? {};
 
+    const finalDBtx = this.getFinalDBtx(localParams);
     /** Post validate and checkFilter require a transaction dbo handler because they happen after the insert */
-    if (postValidate || checkFilter) {
-      if (!finalDBtx) {
-        return this.dboBuilder.getTX((_dbtx) =>
-          _dbtx[this.name]?.[ACTION]?.(
-            rowOrRows,
-            insertParams,
-            param3_unused,
-            tableRules,
-            localParams,
-          ),
-        );
-      }
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams)) {
+      return this.dboBuilder.getTX((_dbtx) =>
+        _dbtx[this.name]?.[ACTION]?.(
+          rowOrRows,
+          insertParams,
+          param3_unused,
+          tableRules,
+          localParams,
+        ),
+      );
     }
 
     const { testOnly, fields, forcedData, returningFields } = await insertTest.bind(this)({

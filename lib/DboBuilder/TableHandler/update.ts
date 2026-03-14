@@ -32,7 +32,7 @@ export async function update(
         ),
       );
     const rule = tableRules?.[ACTION];
-    if (rule?.postValidate && !finalDBtx) {
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams)) {
       return wrapInTx();
     }
 

@@ -41,7 +41,7 @@ export const parseI18N = <Config extends LangToTranslation>(params: {
   return defaultValue;
 };
 
-type BaseTableDefinition = {
+type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
   info?: {
     label?: string | LangToTranslation;
   };
@@ -55,6 +55,15 @@ type BaseTableDefinition = {
     getPreInsertRow?: (
       args: GetPreInsertRowArgs,
     ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
+    afterEach?: {
+      commands: Partial<Record<"insert" | "update", 1>>;
+      changedFields?: string[];
+      validate: <R = AnyObject, DBX = DBHandlerServer>(
+        params: Omit<ValidateRowArgsCommon<R, DBX>, "localParams"> & {
+          localParams: undefined | LocalParams;
+        },
+      ) => Promise<void>;
+    }[];
   };
   triggers?: {
     [triggerName: string]: {
@@ -89,7 +98,7 @@ type BaseTableDefinition = {
   };
 };
 
-type LookupTableDefinition<LANG_IDS> = {
+type LookupTableDefinition<LANG_IDS> = BaseTableDefinition & {
   isLookupTable: {
     values: {
       [id_value: string]:
@@ -230,7 +239,7 @@ type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
  * Each column definition cannot reference to tables that appear later in the table definition.
  * These references should be specified in constraints property
  */
-export type TableDefinition<LANG_IDS> = {
+export type TableDefinition<LANG_IDS> = BaseTableDefinition & {
   onMount?: (params: {
     dbo: DBHandlerServer;
     _db: DB;
@@ -323,12 +332,8 @@ type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
   localParams: LocalParams | undefined;
 };
 
-/**
- * Helper utility to create lookup tables for TEXT columns
- */
 export type TableConfig<LANG_IDS = { en: 1 }> = {
-  [table_name: string]: BaseTableDefinition &
-    (TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>);
+  [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
 };
 
 /**

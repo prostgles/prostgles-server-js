@@ -49,7 +49,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     params?.returning,
     tableHandler.parseFieldFilter(returningFields),
   );
-  const { checkFilter, postValidate } = rule ?? {};
+  const { checkFilter } = rule ?? {};
   let checkCondition = "WHERE FALSE";
   if (checkFilter) {
     const checkCond = await tableHandler.prepareWhere({
@@ -111,7 +111,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   const tx = localParams?.tx?.t || tableHandler.tx?.t;
   if (tx) {
-    result = await tx[queryType](query).catch((err: any) =>
+    result = await tx[queryType](query).catch((err: unknown) =>
       getClientErrorFromPGError(err, {
         type: "tableMethod",
         localParams,
@@ -138,21 +138,58 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     );
   }
 
+  const rows = result.modified ?? [];
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
-  if (postValidate) {
-    if (!finalDBtx) throw new Error("Unexpected: no dbTX for postValidate");
-    if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
+  const { postValidate } = rule ?? {};
+  const afterHooks = tableHandler.config?.hooks?.afterEach;
+  let changedFieldsSet = undefined as undefined | Set<string>;
+  const getChangedFieldsSet = () => {
+    changedFieldsSet ??= new Set<string>(rows.map((row) => Object.keys(row)).flat());
+    return changedFieldsSet;
+  };
+  const applicableAfterHooks = afterHooks?.filter(({ commands, changedFields }) => {
+    return (
+      commands[command] &&
+      (!changedFields || changedFields.some((f) => getChangedFieldsSet().has(f)))
+    );
+  });
 
-    const rows = result.modified ?? [];
+  if (postValidate && !localParams) {
+    throw new Error("Unexpected: no localParams for postValidate");
+  }
+  const validationHooks = [
+    ...(applicableAfterHooks ?? []).map(
+      (h) => ({ type: "afterEach", validate: h.validate, localParams }) as const,
+    ),
+    ...(postValidate && localParams ?
+      [{ type: "postValidate", validate: postValidate, localParams } as const]
+    : []),
+  ];
+
+  if (validationHooks.length) {
+    if (!finalDBtx) throw new Error("Unexpected: no dbTX for after hooks/postValidate");
+
     for (const row of rows) {
-      await postValidate({
+      const commonParams = {
         row: row,
         tx: tx || tableHandler.db,
         dbx: finalDBtx,
-        localParams,
         command,
         data,
-      });
+      } as const;
+      for (const hook of validationHooks) {
+        if (hook.type === "afterEach") {
+          await hook.validate({
+            ...commonParams,
+            localParams: hook.localParams,
+          });
+        } else {
+          await hook.validate({
+            ...commonParams,
+            localParams: hook.localParams,
+          });
+        }
+      }
     }
   }
 
