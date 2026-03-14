@@ -19,6 +19,7 @@ import type {
   ValidateRowsArgsCommon,
 } from "../PublishParser/PublishParser";
 import { initTableConfig } from "./initTableConfig";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -63,7 +64,7 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
     afterEach?: {
       commands: Partial<Record<"insert" | "update", 1>>;
       changedFields?: string[];
-      validate: <R = AnyObject, DBX = DBHandlerServer>(
+      validate: (
         params: ValidateRowArgsCommon<R, DBX> & {
           localParams: undefined | LocalParams;
         },
@@ -72,7 +73,7 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
     afterAll?: {
       commands: Partial<Record<"insert" | "update", 1>>;
       changedFields?: string[];
-      validate: <R = AnyObject, DBX = DBHandlerServer>(
+      validate: (
         params: ValidateRowsArgsCommon<R, DBX> & {
           localParams: undefined | LocalParams;
         },
@@ -349,11 +350,11 @@ type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
   localParams: LocalParams | undefined;
 };
 
-export type TableConfig<LANG_IDS = { en: 1 }, S = void, DBX = DBHandlerServer> =
+export type TableConfig<LANG_IDS = { en: 1 }, S = void> =
   S extends DBSchema ?
     Partial<{
       [TableName in keyof S]:
-        | TableDefinition<LANG_IDS, S[TableName]["columns"], DBX>
+        | TableDefinition<LANG_IDS, S[TableName]["columns"], DBOFullyTyped<S>>
         | LookupTableDefinition<LANG_IDS>;
     }>
   : {
