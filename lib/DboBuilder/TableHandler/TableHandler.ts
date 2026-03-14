@@ -7,7 +7,7 @@ import type {
   Select,
   UpdateParams,
 } from "prostgles-types";
-import { asName } from "prostgles-types";
+import { asName, isDefined } from "prostgles-types";
 import type { DB } from "../../Prostgles";
 import type {
   SyncRule,
@@ -74,18 +74,53 @@ export class TableHandler extends ViewHandler {
   getFinalDBtx = (localParams: LocalParams | undefined) => {
     return localParams?.tx?.dbTX ?? this.tx?.dbTX;
   };
+
+  getHooksAndChecks = (
+    command:
+      | { name: "update"; rule: undefined | UpdateRule }
+      | { name: "insert"; rule: undefined | InsertRule },
+  ) => {
+    const { checkFilter, postValidate } = command.rule ?? {};
+    const afterEachHooks = this.config?.hooks?.afterEach
+      ?.map((hook) => {
+        const { commands } = hook;
+        if (!commands[command.name]) {
+          return;
+        }
+        return {
+          type: "afterEach",
+          ...hook,
+        } as const;
+      })
+      .filter(isDefined);
+
+    const afterAllHooks = this.config?.hooks?.afterAll
+      ?.map((hook) => {
+        const { commands } = hook;
+        if (!commands[command.name]) {
+          return;
+        }
+        return {
+          type: "afterAll",
+          ...hook,
+        } as const;
+      })
+      .filter(isDefined);
+    return [
+      ...(afterEachHooks ?? []),
+      ...(postValidate ? [{ type: "postValidate", validate: postValidate } as const] : []),
+      ...(checkFilter ? [{ type: "checkFilter", checkFilter } as const] : []),
+      ...(afterAllHooks ?? []),
+    ];
+  };
   shouldWrapInTx = (
     command:
       | { name: "update"; rule: undefined | UpdateRule }
       | { name: "insert"; rule: undefined | InsertRule },
     localParams: LocalParams | undefined,
   ) => {
-    const rule = command.rule;
     const finalDBtx = this.getFinalDBtx(localParams);
-    const hasAfterChecks =
-      rule?.postValidate ||
-      rule?.checkFilter ||
-      this.config?.hooks?.afterEach?.some(({ commands }) => commands[command.name]);
+    const hasAfterChecks = this.getHooksAndChecks(command).length > 0;
     return !finalDBtx && hasAfterChecks;
   };
   getFinalDbo = (localParams: LocalParams | undefined) => {

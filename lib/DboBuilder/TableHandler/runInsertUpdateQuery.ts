@@ -17,7 +17,7 @@ type RunInsertUpdateQueryArgs = {
       command: "insert";
       params: InsertParams | undefined;
       rule: InsertRule | undefined;
-      data: AnyObject;
+      data: AnyObject | AnyObject[];
       isMultiInsert: boolean;
       nestedInsertsResultsObj?: undefined;
     }
@@ -141,13 +141,18 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   const rows = result.modified ?? [];
   const finalDBtx = tableHandler.getFinalDBtx(localParams);
   const { postValidate } = rule ?? {};
-  const afterHooks = tableHandler.config?.hooks?.afterEach;
+  const hooks = tableHandler.getHooksAndChecks(
+    command === "insert" ? { name: command, rule } : { name: command, rule },
+  );
   let changedFieldsSet = undefined as undefined | Set<string>;
   const getChangedFieldsSet = () => {
     changedFieldsSet ??= new Set<string>(rows.map((row) => Object.keys(row)).flat());
     return changedFieldsSet;
   };
-  const applicableAfterHooks = afterHooks?.filter(({ commands, changedFields }) => {
+  const applicableHooks = hooks.filter((hook) => {
+    if (hook.type === "checkFilter") return;
+    if (hook.type === "postValidate") return true;
+    const { commands, changedFields } = hook;
     return (
       commands[command] &&
       (!changedFields || changedFields.some((f) => getChangedFieldsSet().has(f)))
@@ -157,17 +162,9 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   if (postValidate && !localParams) {
     throw new Error("Unexpected: no localParams for postValidate");
   }
-  const validationHooks = [
-    ...(applicableAfterHooks ?? []).map(
-      (h) => ({ type: "afterEach", validate: h.validate, localParams }) as const,
-    ),
-    ...(postValidate && localParams ?
-      [{ type: "postValidate", validate: postValidate, localParams } as const]
-    : []),
-  ];
 
-  if (validationHooks.length) {
-    if (!finalDBtx) throw new Error("Unexpected: no dbTX for after hooks/postValidate");
+  if (applicableHooks.length) {
+    if (!finalDBtx) throw new Error("Unexpected: no dbTX for hooks/postValidate");
 
     for (const row of rows) {
       const commonParams = {
@@ -177,18 +174,32 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
         command,
         data,
       } as const;
-      for (const hook of validationHooks) {
+      for (const hook of applicableHooks) {
         if (hook.type === "afterEach") {
           await hook.validate({
             ...commonParams,
-            localParams: hook.localParams,
+            localParams,
           });
-        } else {
+        } else if (hook.type === "postValidate") {
+          if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
           await hook.validate({
             ...commonParams,
-            localParams: hook.localParams,
+            localParams,
           });
         }
+      }
+    }
+
+    for (const hook of applicableHooks) {
+      if (hook.type === "afterAll") {
+        await hook.validate({
+          tx: tx || tableHandler.db,
+          dbx: finalDBtx,
+          command,
+          data: Array.isArray(data) ? data : [data],
+          rows,
+          localParams,
+        });
       }
     }
   }

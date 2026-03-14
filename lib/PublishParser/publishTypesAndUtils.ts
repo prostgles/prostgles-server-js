@@ -181,7 +181,6 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   row: R;
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
-  localParams: LocalParams;
 } & (
   | {
       command: "insert";
@@ -193,6 +192,27 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
 );
 
+export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+  rows: R[];
+  dbx: DBX;
+  tx: pgPromise.ITask<{}> | DB;
+} & (
+  | {
+      command: "insert";
+      data: R[];
+    }
+  | {
+      command: "update";
+      data: Partial<R>[];
+    }
+);
+
+export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = ValidateRowArgsCommon<
+  R,
+  DBX
+> & {
+  localParams: LocalParams;
+};
 export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHandlerServer> = {
   update: U;
   filter: F;
@@ -200,13 +220,13 @@ export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHa
   localParams: LocalParams;
 };
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgsCommon<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
 ) => R | Promise<R>;
 export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgsCommon<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
 ) => void | Promise<void>;
-export type PostValidateRowBasic = (args: ValidateRowArgsCommon) => void | Promise<void>;
-export type ValidateRowBasic = (args: ValidateRowArgsCommon) => AnyObject | Promise<AnyObject>;
+export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
+export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
 export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (
   args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>,
 ) => Partial<R> | Promise<Partial<R>>;

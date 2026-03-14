@@ -3,6 +3,7 @@ import type {
   ALLOWED_EXTENSION,
   AnyObject,
   ColumnInfo,
+  DBSchema,
   JSONB,
   StrictUnion,
   TableInfo,
@@ -12,7 +13,11 @@ import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import type { InsertRule, ValidateRowArgsCommon } from "../PublishParser/PublishParser";
+import type {
+  InsertRule,
+  ValidateRowArgsCommon,
+  ValidateRowsArgsCommon,
+} from "../PublishParser/PublishParser";
 import { initTableConfig } from "./initTableConfig";
 
 type ColExtraInfo = {
@@ -59,7 +64,16 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
       commands: Partial<Record<"insert" | "update", 1>>;
       changedFields?: string[];
       validate: <R = AnyObject, DBX = DBHandlerServer>(
-        params: Omit<ValidateRowArgsCommon<R, DBX>, "localParams"> & {
+        params: ValidateRowArgsCommon<R, DBX> & {
+          localParams: undefined | LocalParams;
+        },
+      ) => Promise<void>;
+    }[];
+    afterAll?: {
+      commands: Partial<Record<"insert" | "update", 1>>;
+      changedFields?: string[];
+      validate: <R = AnyObject, DBX = DBHandlerServer>(
+        params: ValidateRowsArgsCommon<R, DBX> & {
           localParams: undefined | LocalParams;
         },
       ) => Promise<void>;
@@ -239,7 +253,11 @@ type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
  * Each column definition cannot reference to tables that appear later in the table definition.
  * These references should be specified in constraints property
  */
-export type TableDefinition<LANG_IDS> = BaseTableDefinition & {
+export type TableDefinition<
+  LANG_IDS = { en: 1 },
+  R = AnyObject,
+  DBX = DBHandlerServer,
+> = BaseTableDefinition<R, DBX> & {
   onMount?: (params: {
     dbo: DBHandlerServer;
     _db: DB;
@@ -327,14 +345,20 @@ export type TableDefinition<LANG_IDS> = BaseTableDefinition & {
 };
 
 type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
-  // preValidate: InsertRule["preValidate"];
   validate: InsertRule["validate"];
   localParams: LocalParams | undefined;
 };
 
-export type TableConfig<LANG_IDS = { en: 1 }> = {
-  [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
-};
+export type TableConfig<LANG_IDS = { en: 1 }, S = void, DBX = DBHandlerServer> =
+  S extends DBSchema ?
+    {
+      [TableName in keyof S]:
+        | TableDefinition<LANG_IDS, S[TableName]["columns"], DBX>
+        | LookupTableDefinition<LANG_IDS>;
+    }
+  : {
+      [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
+    };
 
 /**
  * Will be run between initSQL and fileTable
