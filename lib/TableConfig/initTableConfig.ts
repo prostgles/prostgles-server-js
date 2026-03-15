@@ -1,4 +1,4 @@
-import { asName as _asName, type AnyObject } from "prostgles-types";
+import { asName as _asName, getSerialisableError, type AnyObject } from "prostgles-types";
 import {
   asValue,
   EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID,
@@ -160,7 +160,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
   /* Create/Alter columns */
   for (const [tableName, tableConf] of Object.entries(this.config)) {
     const tableHandler = this.dbo[tableName];
-
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
     /* isLookupTable table has already been created */
@@ -318,7 +317,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
       if (err.position) {
         const pos = +err.position;
         if (Number.isInteger(pos)) {
-          return Promise.reject((err as Error).toString() + "\n At:" + q.slice(pos - 50, pos + 50));
+          return Promise.reject(
+            JSON.stringify(getSerialisableError(err)) + "\n At:" + q.slice(pos - 50, pos + 50),
+          );
         }
       }
 

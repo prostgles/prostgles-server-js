@@ -41,7 +41,6 @@ export const getTableColumnQueries = async ({
   }
 
   const hasJSONBValidation = getKeys(tableConf.columns).some((c) => {
-    // eslint-disable-next-line security/detect-object-injection
     const cConf = tableConf.columns?.[c];
     return cConf && isObject(cConf) && (cConf.jsonbSchema || cConf.jsonbSchemaType);
   });

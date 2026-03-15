@@ -54,6 +54,9 @@ export const getFutureTableSchema = async ({
     const cols = await getTableColumns({ db: t, table: tableName });
 
     return { constraints, cols };
+  }).catch((e) => {
+    console.error("Error in getFutureTableSchema for " + tableName, e);
+    throw e;
   });
 
   return { cols, constraints };
