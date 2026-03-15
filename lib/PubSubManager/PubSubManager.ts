@@ -117,6 +117,8 @@ export type SubscriptionParams = {
    * Prevent out of order pushes
    */
   pushRequestedVersion: number;
+  isPushing?: boolean;
+  reRun?: boolean;
   is_throttling?: any;
   is_ready?: boolean;
 };
@@ -128,6 +130,8 @@ export type Subscription = Pick<
   | "is_throttling"
   | "lastPushed"
   | "pushRequestedVersion"
+  | "isPushing"
+  | "reRun"
   | "channel_name"
   | "is_ready"
   | "onData"

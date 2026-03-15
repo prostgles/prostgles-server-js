@@ -868,10 +868,10 @@ export const isomorphicQueries = async (
         );
       };
       const expectedDuration = 4000;
-      const COUNT = 1_000;
+      const UPDATE_COUNT = 1_000;
       const updateAll = async () => {
         const start = Date.now();
-        await Promise.all(Array.from({ length: COUNT }, (_, i) => i + 1000).map(updateInTx));
+        await Promise.all(Array.from({ length: UPDATE_COUNT }, (_, i) => i + 1000).map(updateInTx));
         const duration = Date.now() - start;
         log("updateAll done in " + duration);
         await db.various.delete!({ id: { ">": 100 } });
@@ -897,7 +897,13 @@ export const isomorphicQueries = async (
         `Update should take less than ${expectedDuration} seconds but took ${duration2}`,
       );
 
-      assert.equal(callOffsets.length < 5, true); // Gets throttled due to out of order pushSubData rejections
+      const callLimit = 100;
+      assert.equal(
+        callOffsets.length < callLimit,
+        true,
+        // Gets throttled due to out of order pushSubData rejections
+        `Expecting callOffsets.length to be less than ${callLimit} but got ${callOffsets.length}`,
+      );
       const allowedPercentage = 1;
       assert.equal(
         duration2 < duration1 + duration1 * allowedPercentage,

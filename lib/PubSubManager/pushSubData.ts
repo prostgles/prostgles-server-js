@@ -4,6 +4,10 @@ import { type PubSubManager } from "./PubSubManager";
 import { log } from "./PubSubManagerUtils";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
+  if (sub.isPushing) {
+    sub.reRun = true;
+    return;
+  }
   sub.pushRequestedVersion = incrementWithReset(sub.pushRequestedVersion);
   const { socket_id, channel_name, onData, pushRequestedVersion } = sub;
   const isActiveSub = () => this.subs.some((s) => s.channel_name === channel_name);
@@ -38,33 +42,42 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     return true;
   }
 
-  const { data, err: subDataError } = await this.getSubData(sub);
+  try {
+    sub.isPushing = true;
+    const { data, err: subDataError } = await this.getSubData(sub);
 
-  if (!isActiveSub() || sub.pushRequestedVersion !== pushRequestedVersion) {
-    return;
-  }
-  if (subDataError !== undefined) {
-    onLog("fetch data error");
-  }
-  if (socket_id && this.sockets[socket_id]) {
-    log(`Pushing ${data?.length ?? 0} rows to socket`);
-    onLog("Emiting to socket");
-    this.sockets[socket_id].emit(
-      channel_name,
-      subDataError !== undefined ? { err: subDataError } : { data },
-      () => {
-        /* TO DO: confirm receiving data or server will unsubscribe
+    if (!isActiveSub() || sub.pushRequestedVersion !== pushRequestedVersion) {
+      return;
+    }
+    if (subDataError !== undefined) {
+      onLog("fetch data error");
+    }
+    if (socket_id && this.sockets[socket_id]) {
+      log(`Pushing ${data?.length ?? 0} rows to socket`);
+      onLog("Emiting to socket");
+      this.sockets[socket_id].emit(
+        channel_name,
+        subDataError !== undefined ? { err: subDataError } : { data },
+        () => {
+          /* TO DO: confirm receiving data or server will unsubscribe
           { data }, (cb)=> { console.log(cb) });
         */
-      },
-    );
-    sub.lastPushed = Date.now();
-  } else if (onData) {
-    onLog("pushed to local client");
-    onData(data ?? [], subDataError);
-    sub.lastPushed = Date.now();
-  } else {
-    onLog("no client to push data to");
+        },
+      );
+      sub.lastPushed = Date.now();
+    } else if (onData) {
+      onLog("pushed to local client");
+      onData(data ?? [], subDataError);
+      sub.lastPushed = Date.now();
+    } else {
+      onLog("no client to push data to");
+    }
+  } finally {
+    sub.isPushing = false;
+    if (sub.reRun) {
+      sub.reRun = false;
+      void this.pushSubData(sub);
+    }
   }
 }
 
