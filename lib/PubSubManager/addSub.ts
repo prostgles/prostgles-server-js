@@ -10,7 +10,7 @@ import type {
 import { parseCondition } from "./PubSubManagerUtils";
 import type { AddTriggerParams } from "./addTrigger";
 
-type AddSubscriptionParams = SubscriptionParams & {
+export type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
 };
 
@@ -53,6 +53,7 @@ export async function addSub(
   } satisfies AddTriggerParams;
 
   const newSub: Subscription = {
+    pushRequestedVersion: 0,
     channel_name,
     filter,
     onData,

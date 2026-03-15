@@ -1,9 +1,10 @@
 import type { AnyObject, SubscribeParams, SubscriptionChannels } from "prostgles-types";
+import type { AddSubscriptionParams } from "../../PubSubManager/addSub";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
-import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 import type { NewQuery } from "../QueryBuilder/QueryBuilder";
+import { getSubscribeRelatedTables } from "../getSubscribeRelatedTables";
 import type { ViewHandler } from "./ViewHandler";
 import { getValidatedSubscribeOptions } from "./getValidatedSubscribeOptions";
 
@@ -82,7 +83,6 @@ async function subscribe(
       viewOptions,
       table_rules,
       condition: newQuery.whereOpts.condition,
-      table_name: this.name,
       filter: { ...filter },
       selectParams: { ...selectParams },
       subscribeOptions: getValidatedSubscribeOptions(
@@ -91,7 +91,8 @@ async function subscribe(
       ),
       lastPushed: 0,
       tracked_columns,
-    } as const;
+      pushRequestedVersion: 0,
+    } as const satisfies Partial<AddSubscriptionParams>;
 
     const pubSubManager = await this.dboBuilder.getPubSubManager();
 

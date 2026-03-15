@@ -113,6 +113,10 @@ export type SubscriptionParams = {
   socket: PRGLIOSocket | undefined;
 
   lastPushed: number;
+  /**
+   * Prevent out of order pushes
+   */
+  pushRequestedVersion: number;
   is_throttling?: any;
   is_ready?: boolean;
 };
@@ -123,6 +127,7 @@ export type Subscription = Pick<
   | "subscribeOptions"
   | "is_throttling"
   | "lastPushed"
+  | "pushRequestedVersion"
   | "channel_name"
   | "is_ready"
   | "onData"

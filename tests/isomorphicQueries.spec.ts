@@ -896,8 +896,8 @@ export const isomorphicQueries = async (
         true,
         `Update should take less than ${expectedDuration} seconds but took ${duration2}`,
       );
-      assert.equal(callOffsets.length, 2 + COUNT * 2);
-      //TODO: throttle notify to reduce this
+
+      assert.equal(callOffsets.length < 5, true); // Gets throttled due to out of order pushSubData rejections
       const allowedPercentage = 1;
       assert.equal(
         duration2 < duration1 + duration1 * allowedPercentage,

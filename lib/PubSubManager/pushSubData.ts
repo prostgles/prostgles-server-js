@@ -4,7 +4,9 @@ import { type PubSubManager } from "./PubSubManager";
 import { log } from "./PubSubManagerUtils";
 
 export async function pushSubData(this: PubSubManager, sub: Subscription, err?: any) {
-  const { socket_id, channel_name, onData } = sub;
+  sub.pushRequestedVersion = incrementWithReset(sub.pushRequestedVersion);
+  const { socket_id, channel_name, onData, pushRequestedVersion } = sub;
+  const isActiveSub = () => this.subs.some((s) => s.channel_name === channel_name);
 
   const onLog = (
     state: Extract<EventTypes.SyncOrSub, { type: "syncOrSub"; command: "pushSubData" }>["state"],
@@ -21,8 +23,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     });
   };
 
-  if (!this.subs.some((s) => s.channel_name === channel_name)) {
-    // Might be throttling a sub that was removed
+  if (!isActiveSub()) {
     onLog("sub_not_found");
     return;
   }
@@ -31,14 +32,17 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     onLog("error");
     if (socket_id) {
       this.sockets[socket_id]?.emit(channel_name, { err });
+    } else if (onData) {
+      onData([], err);
     }
     return true;
   }
 
-  sub.lastPushed = Date.now();
-
   const { data, err: subDataError } = await this.getSubData(sub);
 
+  if (!isActiveSub() || sub.pushRequestedVersion !== pushRequestedVersion) {
+    return;
+  }
   if (subDataError !== undefined) {
     onLog("fetch data error");
   }
@@ -54,10 +58,16 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
         */
       },
     );
+    sub.lastPushed = Date.now();
   } else if (onData) {
     onLog("pushed to local client");
     onData(data ?? [], subDataError);
+    sub.lastPushed = Date.now();
   } else {
     onLog("no client to push data to");
   }
 }
+
+export const incrementWithReset = (value: number, max = Number.MAX_SAFE_INTEGER): number => {
+  return value >= max ? 0 : value + 1;
+};
