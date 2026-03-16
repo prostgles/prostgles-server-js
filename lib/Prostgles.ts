@@ -182,7 +182,7 @@ export class Prostgles {
   writeDBSchema(force = false) {
     if (this.opts.tsGeneratedTypesDir) {
       const { fullPath, fileName } = this.getTSFileName();
-      const fileContent = this.dboBuilder.getTsDefinitions();
+      const { tsSchema: fileContent } = this.dboBuilder.getTsDefinitions();
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.readFile(fullPath, "utf8", function (err, data) {
         if (err || force || data !== fileContent) {
