@@ -4,11 +4,11 @@ import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
 
 export const getDBGeneratedSchema = ({
-  tablesOrViews,
   config,
+  tablesOrViews,
 }: {
-  tablesOrViews: TableSchema[];
   config: TableConfig | undefined;
+  tablesOrViews: TableSchema[];
 }): string => {
   const tables: string[] = [];
 

@@ -26,7 +26,10 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 //  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
   { db, runSQL }: Pick<DboBuilder, "db" | "runSQL">,
-  schemaFilter: ProstglesInitOptions["schemaFilter"],
+  {
+    schemaFilter,
+    ddlWithRollback,
+  }: { schemaFilter: ProstglesInitOptions["schemaFilter"]; ddlWithRollback?: string },
 ): Promise<{
   result: TableSchema[];
   durations: Record<string, number>;
@@ -34,6 +37,10 @@ export async function getTablesForSchemaPostgresSQL(
   const { sql, schemaNames } = getSchemaFilter(schemaFilter);
 
   return db.tx(async (t) => {
+    if (ddlWithRollback) {
+      await t.any(ddlWithRollback);
+    }
+
     /**
      * Multiple queries to reduce load on low power machines
      */
@@ -323,6 +330,7 @@ export async function getTablesForSchemaPostgresSQL(
       },
     };
 
+    await t.any("ROLLBACK");
     return res;
   });
 }
