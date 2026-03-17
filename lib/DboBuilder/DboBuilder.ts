@@ -288,6 +288,12 @@ export class DboBuilder {
     return this.dbo;
   }
 
+  getSchema = () => {
+    if (!this.tablesOrViews) {
+      throw new Error("Unexpected error: tablesOrViews is undefined");
+    }
+    return this.tablesOrViews;
+  };
   getTsDefinitions = <DDL extends string | undefined = undefined>({
     excludeFunctions,
     extraTables = [],

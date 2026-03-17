@@ -92,6 +92,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
    * Generated database public schema TS types for all tables and views
    */
   getTSSchema: typeof DboBuilder.prototype.getTsDefinitions;
+  getSchema: typeof DboBuilder.prototype.getSchema;
   reWriteDBSchema: () => void;
   update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
@@ -245,6 +246,7 @@ export const initProstgles = async function (
       pgp,
       io: this.opts.io,
       getTSSchema: this.dboBuilder.getTsDefinitions,
+      getSchema: this.dboBuilder.getSchema,
       reWriteDBSchema: () => this.writeDBSchema(true),
       options: this.opts,
       update: async (...args) => {

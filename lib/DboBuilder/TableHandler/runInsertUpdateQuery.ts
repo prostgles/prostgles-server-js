@@ -146,7 +146,9 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   );
   let changedFieldsSet = undefined as undefined | Set<string>;
   const getChangedFieldsSet = () => {
-    changedFieldsSet ??= new Set<string>(rows.map((row) => Object.keys(row)).flat());
+    changedFieldsSet ??= new Set<string>(
+      (isArray(data) ? data : [data]).map((row) => Object.keys(row)).flat(),
+    );
     return changedFieldsSet;
   };
   const applicableHooks = hooks.filter((hook) => {
@@ -227,3 +229,5 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   return returnMany ? modified_returning : modified_returning?.[0];
 };
+
+const isArray = <T>(data: T): data is Extract<T, readonly unknown[]> => Array.isArray(data);
