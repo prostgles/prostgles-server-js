@@ -92,7 +92,7 @@ export async function addSub(
       const relatedSub = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),
-        tracked_columns: undefined,
+        tracked_columns: relatedTable.trackedColumns,
       } satisfies AddTriggerParams;
 
       newSub.triggers.push(relatedSub);

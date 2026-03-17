@@ -2,6 +2,7 @@ import { isDefined } from "prostgles-types";
 import { log } from "../../PubSubManager/PubSubManagerUtils";
 import type { DboBuilder, TableSchema } from "../DboBuilder";
 import type { NewQuery } from "../QueryBuilder/QueryBuilder";
+import type { ViewSubscriptionOptions } from "../../PubSubManager/PubSubManager";
 
 export const getViewRelatedTableJoinCondition = async ({
   dboBuilder,
@@ -32,7 +33,7 @@ export const getViewRelatedTableJoinCondition = async ({
       /** Exclude non comparable data types */
       const tableColumns = table.columns.map((tc) => {
         const viewColumnName = columns.find(
-          (c) => c.tableColumnOID === tc.ordinal_position
+          (c) => c.tableColumnOID === tc.ordinal_position,
         )?.viewColumnName;
         return {
           ...tc,
@@ -41,7 +42,7 @@ export const getViewRelatedTableJoinCondition = async ({
       });
       const primaryKeyColumns = tableColumns.filter((c) => c.is_pkey);
       const compareableColumns = tableColumns.filter(
-        (c) => c.viewColumnName && !["json", "xml"].includes(c.udt_name)
+        (c) => c.viewColumnName && !["json", "xml"].includes(c.udt_name),
       );
       const allPkeyColumnsInView =
         primaryKeyColumns.length && primaryKeyColumns.every((pk) => isDefined(pk.viewColumnName));
@@ -80,7 +81,7 @@ export const getViewRelatedTableJoinCondition = async ({
         } catch (e) {
           log(
             `Could not not override subscribed view (${viewNameEscaped}) table (${tableName}). Will not check condition`,
-            e
+            e,
           );
         }
       }
@@ -90,8 +91,9 @@ export const getViewRelatedTableJoinCondition = async ({
         tableName: tableName,
         tableNameEscaped: tableName,
         condition,
-      };
-    })
+        trackedColumns: undefined,
+      } satisfies ViewSubscriptionOptions["relatedTables"][number] & { tableOID: number };
+    }),
   );
 
   return res;

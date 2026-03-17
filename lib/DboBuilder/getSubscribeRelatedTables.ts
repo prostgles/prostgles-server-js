@@ -1,5 +1,5 @@
 import type { AnyObject, ParsedJoinPath, SubscribeParams } from "prostgles-types";
-import { asName, reverseParsedPath } from "prostgles-types";
+import { asName, isDefined, reverseParsedPath } from "prostgles-types";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import type { Filter, LocalParams } from "./DboBuilder";
@@ -35,7 +35,11 @@ export async function getSubscribeRelatedTables(
     };
 
     const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
-    const pushRelatedTable = async (relatedTableName: string, joinPath: ParsedJoinPath[]) => {
+    const pushRelatedTable = async (
+      relatedTableName: string,
+      joinPath: ParsedJoinPath[],
+      selectedColumnNames: string[] | undefined,
+    ) => {
       const relatedTableOrViewHandler = this.dboBuilder.dbo[relatedTableName];
       if (!relatedTableOrViewHandler) {
         throw `Table ${relatedTableName} not found`;
@@ -55,6 +59,7 @@ export async function getSubscribeRelatedTables(
       viewOptions.relatedTables.push({
         tableName: relatedTableName,
         tableNameEscaped: asName(relatedTableName),
+        trackedColumns: selectedColumnNames,
         condition: (
           await relatedTableOrViewHandler.prepareWhere!({
             select: undefined,
@@ -76,11 +81,17 @@ export async function getSubscribeRelatedTables(
      * Avoid nested exists error. Will affect performance
      */
     for (const j of newQuery.joins ?? []) {
-      await pushRelatedTable(j.table.raw, j.joinPath);
+      await pushRelatedTable(
+        j.table.raw,
+        j.joinPath,
+        Array.from(
+          new Set(j.select.map((s) => (s.selected ? s.columnName : undefined)).filter(isDefined)),
+        ),
+      );
     }
     for (const e of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
       for (const [index, pathItem] of e.parsedPath.entries()) {
-        await pushRelatedTable(pathItem.table, e.parsedPath.slice(0, index + 1));
+        await pushRelatedTable(pathItem.table, e.parsedPath.slice(0, index + 1), undefined);
       }
     }
     if (!viewOptions.relatedTables.length) {

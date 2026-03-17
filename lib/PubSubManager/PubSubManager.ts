@@ -87,6 +87,7 @@ export type ViewSubscriptionOptions = (
     tableName: string;
     tableNameEscaped: string;
     condition: string;
+    trackedColumns: string[] | undefined;
   }[];
 };
 
