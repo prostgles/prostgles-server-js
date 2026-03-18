@@ -16,7 +16,7 @@ export async function addTrigger(
   this: PubSubManager,
   params: AddTriggerParams,
   viewOptions: ViewSubscriptionOptions | undefined,
-  socket: PRGLIOSocket | undefined
+  socket: PRGLIOSocket | undefined,
 ) {
   const addedTrigger = await tryCatchV2(async () => {
     const { table_name } = { ...params };
@@ -89,7 +89,7 @@ export async function addTrigger(
       ;
 
       COMMIT WORK;
-    `)
+    `),
     );
 
     /** This might be redundant due to trigger on app_triggers */
@@ -120,7 +120,7 @@ export async function addTrigger(
 
 const getColumnsInfo = (
   { tracked_columns, table_name }: AddTriggerParams,
-  tableHandler: Partial<TableHandler>
+  tableHandler: Partial<TableHandler>,
 ) => {
   let hasPkey = false as boolean;
   const cols = tableHandler.columns?.map((c) => {
@@ -146,18 +146,26 @@ const getColumnsInfo = (
           .filter((c) => c.is_pkey)
           .map((c) => `n.${asName(c.name)} = o.${asName(c.name)}`)
           .join(" AND "),
-        tracked_columns: cols.reduce(
-          (acc, { name }) => ({
+        // tracked_columns: cols.reduce(
+        //   (acc, { name }) => ({
+        //     ...acc,
+        //     [name]: 1,
+        //   }),
+        //   {} as Record<string, number>
+        // ),
+        tracked_columns: tracked_columns.reduce(
+          (acc, name) => ({
             ...acc,
             [name]: 1,
           }),
-          {} as Record<string, number>
+          {} as Record<string, number>,
         ),
         where_statement: cols
           // .filter((c) => !c.is_pkey && tracked_columns.includes(c.name))
+          .filter((c) => tracked_columns.includes(c.name))
           .map(
             (c) =>
-              `column_name = ${asValue(c.name)} AND (ROW(n.*) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`
+              `column_name = ${asValue(c.name)} AND (ROW(n.*) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`,
           )
           .join(" OR \n"),
       };
