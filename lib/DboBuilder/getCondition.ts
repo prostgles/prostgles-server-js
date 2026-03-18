@@ -1,5 +1,5 @@
-import { asName, pickKeys } from "prostgles-types";
-import { parseFilterItem } from "../Filtering";
+import { pickKeys } from "prostgles-types";
+import { parseFilterItem } from "../Filtering/Filtering";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ExistsFilterConfig, LocalParams, PGIdentifier } from "./DboBuilder";
 import { pgp } from "./DboBuilder";
@@ -29,7 +29,7 @@ export async function getCondition(
     tableRules?: ParsedTableRule;
     isHaving?: boolean;
   },
-): Promise<{ exists: ExistsFilterConfig[]; condition: string }> {
+): Promise<{ exists: ExistsFilterConfig[]; condition: string; columnsUsed: string[] }> {
   const {
     filter: rawFilter,
     select,
@@ -179,21 +179,22 @@ export async function getCondition(
       !existsConfigs.find((ek) => ek.existType === k),
   );
 
-  const validFieldNames = allowedSelect.map((s) => s.alias);
+  const selectAliases = allowedSelect.map((s) => s.alias);
   const invalidColumn = filterKeys.find(
-    (fName) =>
-      !validFieldNames.find(
-        (c) =>
-          c === fName ||
-          (fName.startsWith(c) &&
-            (fName.slice(c.length).includes("->") || fName.slice(c.length).includes("."))),
+    (filterKey) =>
+      !selectAliases.find(
+        (alias) =>
+          alias === filterKey ||
+          (filterKey.startsWith(alias) &&
+            (filterKey.slice(alias.length).includes("->") ||
+              filterKey.slice(alias.length).includes("."))),
       ),
   );
 
   if (invalidColumn) {
-    const selItem = select?.find((s) => s.alias === invalidColumn);
+    const selectItem = select?.find((s) => s.alias === invalidColumn);
     let isComplexFilter = false;
-    if (selItem?.type === "aggregation") {
+    if (selectItem?.type === "aggregation") {
       if (!params.isHaving) {
         throw new Error(
           `Filtering by ${this.name}.${invalidColumn} is not allowed. Aggregations cannot be filtered. Use HAVING clause instead.`,
@@ -227,7 +228,7 @@ export async function getCondition(
       : this.parseFieldFilter(tableRules.select?.filterFields ?? tableRules.select?.fields),
   });
 
-  let templates: string[] = [q].filter((q) => q);
+  let templates: string[] = q?.condition ? [q.condition] : [];
 
   if (existsCond) templates.push(existsCond);
   templates = templates.concat(funcConds);
@@ -236,6 +237,7 @@ export async function getCondition(
 
   /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
   return {
+    columnsUsed: q?.columnsUsed ?? [],
     exists: existsConfigs,
     condition: templates.sort().join(" AND \n"),
   };

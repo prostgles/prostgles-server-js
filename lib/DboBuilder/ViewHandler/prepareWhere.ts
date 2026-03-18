@@ -22,6 +22,7 @@ export async function prepareWhere(
   this: ViewHandler,
   params: PrepareWhereParams,
 ): Promise<{
+  columnsUsed: string[];
   condition: string;
   where: string;
   filter: AnyObject;
@@ -45,14 +46,15 @@ export async function prepareWhere(
 
   const exists: ExistsFilterConfig[] = [];
 
+  type FilterItemResult = { condition: string; columnsUsed: string[] };
   const parseFullFilter = async (
     f: any,
     parentFilter: AnyObject | null = null,
     isForcedFilterBypass: boolean,
-  ): Promise<string> => {
+  ): Promise<FilterItemResult> => {
     if (!f) throw "Invalid/missing group filter provided";
     if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
-    let result = "";
+    const result = { condition: "", columnsUsed: [] as string[] };
     const keys = getKeys(f);
     if (!keys.length) {
       return result;
@@ -69,19 +71,21 @@ export async function prepareWhere(
 
     if (group && group.length) {
       const operand = $and ? " AND " : " OR ";
-      const conditions = (
+      const conditionItems = (
         await Promise.all(
           group.map(async (gf) => await parseFullFilter(gf, group, isForcedFilterBypass)),
         )
-      ).filter((c) => c);
+      ).filter((c) => c.condition);
 
-      if (conditions.length) {
-        if (conditions.length === 1) return conditions.join(operand);
-        else return ` ( ${conditions.sort().join(operand)} ) `;
+      if (conditionItems.length) {
+        const conditions = conditionItems.map((c) => c.condition);
+        const columnsUsed = conditionItems.map((c) => c.columnsUsed).flat();
+        if (conditions.length === 1) return { columnsUsed, condition: conditions.join(operand) };
+        else return { columnsUsed, condition: ` ( ${conditions.sort().join(operand)} ) ` };
       }
     } else if (!group) {
       /** forcedFilters do not get checked against publish and are treated as server-side requests */
-      const cond = await getCondition.bind(this)({
+      const { condition, exists, columnsUsed } = await getCondition.bind(this)({
         filter: { ...f },
         select,
         allowed_colnames:
@@ -91,8 +95,9 @@ export async function prepareWhere(
         tableRules: isForcedFilterBypass ? undefined : tableRule,
         isHaving: params.isHaving,
       });
-      result = cond.condition;
-      exists.push(...cond.exists);
+      result.condition = condition;
+      result.columnsUsed = columnsUsed;
+      exists.push(...exists);
     }
     return result;
   };
@@ -101,8 +106,12 @@ export async function prepareWhere(
   const forcedFilterCond =
     forcedFilter ? await parseFullFilter(forcedFilter, null, true) : undefined;
   const filterCond = await parseFullFilter(filter, null, false);
-  let cond = [forcedFilterCond, filterCond].filter((c) => c).join(" AND ");
+  let combinedConditions = [forcedFilterCond, filterCond]
+    .map((c) => (c?.condition ? c.condition : undefined))
+    .filter(isDefined)
+    .join(" AND ");
 
+  const combinedColumnsUsed = [...(forcedFilterCond?.columnsUsed ?? []), ...filterCond.columnsUsed];
   const finalFilter =
     forcedFilter ?
       {
@@ -110,9 +119,15 @@ export async function prepareWhere(
       }
     : { ...filter };
 
-  const condition = cond;
-  if (cond && addKeywords) {
-    cond = `WHERE ${cond}`;
+  const condition = combinedConditions;
+  if (combinedConditions && addKeywords) {
+    combinedConditions = `WHERE ${combinedConditions}`;
   }
-  return { condition, where: cond || "", filter: finalFilter, exists };
+  return {
+    columnsUsed: combinedColumnsUsed,
+    condition,
+    where: combinedConditions || "",
+    filter: finalFilter,
+    exists,
+  };
 }

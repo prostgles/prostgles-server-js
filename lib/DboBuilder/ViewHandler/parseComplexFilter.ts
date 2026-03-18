@@ -1,16 +1,13 @@
 import type { AnyObject } from "prostgles-types";
 import { isObject } from "prostgles-types";
-import {
-  FILTER_OPERANDS,
-  FILTER_OPERAND_TO_SQL_OPERAND,
-  parseFilterRightValue,
-} from "../../Filtering";
+import { FILTER_OPERANDS, FILTER_OPERAND_TO_SQL_OPERAND } from "../../Filtering/Filtering";
 import { FUNCTIONS } from "../QueryBuilder/Functions/Functions";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import type { TableSchemaColumn } from "../DboBuilderTypes";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { parseFunction } from "../QueryBuilder/Functions/parseFunction";
 import { asNameAlias } from "../../utils/asNameAlias";
+import { parseFilterRightValue } from "../../Filtering/parseFilterRightValue";
 
 const allowedComparators = FILTER_OPERANDS; //[">", "<", "=", "<=", ">=", "<>", "!="]
 type Args = {
