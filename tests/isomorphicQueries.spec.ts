@@ -698,16 +698,16 @@ export const isomorphicQueries = async (
       });
       await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
-      assert.equal(runs, 2);
+      assert.equal(runs, 2, "First update!");
       await db.various.update!(variousId99, { name: "zz3zz1" });
       await tout(200);
-      assert.equal(runs, 2); // No change
+      assert.equal(runs, 2, "Updating to same value"); // No change
       await db.various.update!(variousId99, { tsv: "hehe" });
       await tout(200);
-      assert.equal(runs, 2); // Still no change to the selected data
+      assert.equal(runs, 2, "Updating other col"); // Still no change to the selected data
       await db.various.delete!(variousId99);
       await tout(200);
-      assert.equal(runs, 3);
+      assert.equal(runs, 3, "Delete should trigger");
       await sub.unsubscribe();
     });
 
@@ -725,6 +725,12 @@ export const isomorphicQueries = async (
         },
       );
       await db.various.update!(variousId99, { name: "zz3zz1" });
+      // const trgs = await sql!(
+      //   `SELECT * FROM prostgles.v_triggers WHERE table_name = 'various'`,
+      //   {},
+      //   { returnType: "rows" },
+      // );
+      // assert.deepStrictEqual(trgs, {}, "There should be no triggers before starting the test");
       await tout(200);
       assert.equal(runs, 2);
       await db.various.update!(variousId99, { name: "zz3zz1" });

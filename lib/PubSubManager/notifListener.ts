@@ -69,10 +69,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   }
 
   const [_, table_name, op_name, condition_ids_str, raw_changed_columns_str = ""] = dataArr;
-  const changedColumns =
-    !raw_changed_columns_str ? undefined
-    : raw_changed_columns_str === "{}" ? []
-    : raw_changed_columns_str.slice(1, -1).split(",");
+  const changedColumnsByTriggerId =
+    !raw_changed_columns_str ? undefined : (
+      (JSON.parse(raw_changed_columns_str) as Record<string, string[]>)
+    );
   const conditionIds = condition_ids_str?.split(",").map((v) => +v);
 
   if (!table_name) {
@@ -111,7 +111,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       void this.deleteOrphanedTriggers(new Set(table_name));
     }
 
-    firedTableConditions.map(({ subs, syncs }) => {
+    firedTableConditions.map(({ idx, subs, syncs }) => {
+      const changedColumns = changedColumnsByTriggerId && (changedColumnsByTriggerId[idx] ?? []);
       log(
         "notifListener",
         subs.map((s) => s.channel_name),

@@ -12,8 +12,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
   
         CREATE OR REPLACE FUNCTION ${DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
         AS $$
-
-            DECLARE t_ids TEXT[];
+ 
             DECLARE c_ids INTEGER[];  
             DECLARE err_c_ids INTEGER[]; 
             DECLARE condition_checks_union_query TEXT := '';          
@@ -30,125 +29,53 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
             DECLARE escaped_table  TEXT;
  
             DECLARE _columns_info JSONB := NULL;
-
-            DECLARE changed_columns _TEXT := NULL; 
+            DECLARE changed_columns_by_trigger_id JSONB := NULL;
+            DECLARE changed_columns _TEXT := NULL;  
 
             BEGIN
  
                 escaped_table := concat_ws('.', CASE WHEN TG_TABLE_SCHEMA <> CURRENT_SCHEMA THEN format('%I', TG_TABLE_SCHEMA) END, format('%I', TG_TABLE_NAME));
             
-                ${CHANGED_COLUMNS_CHECK}
+                ${CHANGED_COLUMNS_FOR_EACH_TRIGGER_CHECK}
 
-                SELECT string_agg(
-                  format(
-                    $c$ 
-                      SELECT CASE WHEN EXISTS( 
-                        SELECT 1 
-                        FROM %s 
-                        WHERE %s 
-                      ) THEN %s::text END AS t_id
-                    $c$, 
-                    table_name, 
-                    condition, 
-                    id 
-                  ),
-                  E' UNION \n ' 
-                ) 
-                INTO condition_checks_union_query
-                FROM prostgles.v_triggers
-                WHERE table_name = escaped_table; 
+                ${EACH_TRIGGER_CHECK_ALL_COLUMNS}
 
+                IF (c_ids IS NOT NULL OR has_errors) THEN
 
-                /* condition_checks_union_query = 'old_table union new_table' or any one of the tables */
-                IF condition_checks_union_query IS NOT NULL THEN
+                  FOR v_trigger IN
+                      SELECT app_id, string_agg(c_id::text, ',') as cids
+                      FROM prostgles.v_triggers
+                      WHERE c_id = ANY(c_ids) 
+                      OR has_errors
+                      GROUP BY app_id
+                  LOOP
+                      
+                      PERFORM pg_notify( 
+                        ${asValue(NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
+                        LEFT(concat_ws(
+                          ${asValue(DELIMITER)},
 
-                    SELECT  
-                      format(
-                        E'WITH %I AS (\n %s \n) ', 
-                        TG_TABLE_NAME, 
-                        concat_ws(
-                          E' UNION ALL \n ',
-                          CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM old_table ' END,
-                          CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM new_table ' END 
-                        )
-                      ) 
-                      || 
-                      COALESCE((
-                        SELECT ', ' || string_agg(format(E' %s AS ( \n %s \n ) ', related_view_name, related_view_def), ', ')
-                        FROM (
-                          SELECT DISTINCT related_view_name, related_view_def 
-                          FROM prostgles.v_triggers
-                          WHERE table_name = escaped_table
-                          AND related_view_name IS NOT NULL
-                          AND related_view_def  IS NOT NULL
-                        ) t
-                      ), '')
-                      || 
-                      format(
-                        $c$
-                            SELECT ARRAY_AGG(DISTINCT t.t_id)
-                            FROM ( 
-                              %s 
-                            ) t
-                        $c$, 
-                        condition_checks_union_query
-                      )
-                    INTO query; 
-
-                    BEGIN 
-                      EXECUTE query INTO t_ids; 
-
-                      EXCEPTION WHEN OTHERS THEN
-                        
-                        has_errors := TRUE;
-
-                        GET STACKED DIAGNOSTICS 
-                          err_text = MESSAGE_TEXT,
-                          err_detail = PG_EXCEPTION_DETAIL,
-                          err_hint = PG_EXCEPTION_HINT;
-
-                    END;
-
-                    --RAISE NOTICE 'has_errors: % ', has_errors;
-                    --RAISE NOTICE 'condition_checks_union_query: % , cids: %', condition_checks_union_query, c_ids;
-
-                    IF (t_ids IS NOT NULL OR has_errors) THEN
-
-                        FOR v_trigger IN
-                            SELECT app_id, string_agg(c_id::text, ',') as cids
-                            FROM prostgles.v_triggers
-                            WHERE id = ANY(t_ids) 
-                            OR has_errors
-                            GROUP BY app_id
-                        LOOP
-                            
-                            PERFORM pg_notify( 
-                              ${asValue(NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
-                              LEFT(concat_ws(
-                                ${asValue(DELIMITER)},
-
-                                ${asValue(NOTIF_TYPE.data)}, 
-                                COALESCE(escaped_table, 'MISSING'), 
-                                COALESCE(TG_OP, 'MISSING'), 
-                                CASE WHEN has_errors 
-                                  THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
-                                  ELSE COALESCE(v_trigger.cids, '') 
-                                END,
-                                COALESCE(changed_columns::TEXT, '')
-                                ${debugMode ? ", COALESCE(current_query(), 'current_query ??'), ' ', query" : ""}
-                              ), 7999/4) -- Some chars are 2bytes -> 'Ω'
-                            );
-                        END LOOP;
+                          ${asValue(NOTIF_TYPE.data)}, 
+                          COALESCE(escaped_table, 'MISSING'), 
+                          COALESCE(TG_OP, 'MISSING'), 
+                          CASE WHEN has_errors 
+                            THEN concat_ws('; ', 'error', err_text, err_detail, err_hint, 'query: ' || query ) 
+                            ELSE COALESCE(v_trigger.cids, '') 
+                          END,
+                          COALESCE(changed_columns_by_trigger_id::TEXT, '')
+                          ${debugMode ? ", COALESCE(current_query(), 'current_query ??'), ' ', query" : ""}
+                        ), 7999/4) -- Some chars are 2bytes -> 'Ω'
+                      );
+                  END LOOP;
 
 
-                        IF has_errors THEN
+                  IF has_errors THEN
 
-                          DELETE FROM prostgles.app_triggers;
-                          RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
+                    DELETE FROM prostgles.app_triggers;
+                    RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
 
-                        END IF;
-                        
-                    END IF;
+                  END IF;
+                    
                 END IF;
 
                 ${getAppCheckQuery()}
@@ -182,10 +109,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
   return dataWatchFunctionQuery;
 };
 
-/**
- * TODO: check columns for specific t_id trigger conditions
- */
-const CHANGED_COLUMNS_CHECK = `
+const CHANGED_COLUMNS_FOR_EACH_TRIGGER_CHECK = `
 -- Determine changed columns for UPDATE operations
 IF TG_OP = 'UPDATE' THEN
  
@@ -197,32 +121,35 @@ IF TG_OP = 'UPDATE' THEN
     AND columns_info IS NULL
   ) THEN
 
-    SELECT columns_info
-    INTO _columns_info
-    FROM prostgles.v_triggers
-    WHERE table_name = escaped_table
-    AND columns_info IS NOT NULL;
-  
-    IF _columns_info IS NOT NULL THEN
+    changed_columns_by_trigger_id := COALESCE(changed_columns_by_trigger_id, '{}');
+ 
+    FOR v_trigger IN
+      SELECT * 
+      FROM prostgles.v_triggers
+      WHERE table_name = escaped_table
+      AND columns_info IS NOT NULL
+    LOOP
+
       query := format(
         $c$
           WITH changed AS (
             SELECT column_name
-            FROM jsonb_object_keys(%L) as column_name
+            FROM jsonb_object_keys(%1$L) as column_name
             WHERE EXISTS (
               SELECT 1 
-              FROM old_table o 
-              LEFT JOIN new_table n 
-              ON %s 
-              WHERE %s
+              FROM      (SELECT * FROM old_table WHERE %4$s ) o 
+              LEFT JOIN (SELECT * FROM new_table WHERE %4$s ) n 
+              ON %2$s 
+              WHERE %3$s
             )
           )
           SELECT array_agg(column_name) 
           FROM changed;
         $c$,
-        _columns_info->'tracked_columns',
-        _columns_info->>'join_condition',
-        _columns_info->>'where_statement'
+        v_trigger.columns_info->'tracked_columns',
+        v_trigger.columns_info->>'join_condition',
+        v_trigger.columns_info->>'where_statement',
+        v_trigger.condition
       );
 
       BEGIN
@@ -236,18 +163,109 @@ IF TG_OP = 'UPDATE' THEN
             err_detail = PG_EXCEPTION_DETAIL,
             err_hint = PG_EXCEPTION_HINT;
       END;
-
+ 
       /* It is possible to get no changes */
-      changed_columns := COALESCE(changed_columns, '{}');
-
-    END IF;  
+      IF changed_columns IS NOT NULL THEN 
+      
+        changed_columns := COALESCE(changed_columns, '{}');
+        changed_columns_by_trigger_id := jsonb_set(
+          changed_columns_by_trigger_id,
+          ARRAY[v_trigger.c_id::TEXT],
+          to_jsonb(changed_columns)
+        );
+      END IF; 
+   
+    --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.c_id::TEXT || changed_columns_by_trigger_id::TEXT );
+     
+    END LOOP;
+   
 
   END IF;
 END IF;
 
 `;
 
+const EACH_TRIGGER_CHECK_ALL_COLUMNS = `
+
+  SELECT string_agg(
+    format(
+      $c$ 
+        SELECT CASE WHEN EXISTS( 
+          SELECT 1 
+          FROM %s 
+          WHERE %s 
+        ) THEN %s::text END AS c_id
+      $c$, 
+      table_name, 
+      condition, 
+      c_id 
+    ),
+    E' UNION \n ' 
+  ) 
+  INTO condition_checks_union_query
+  FROM prostgles.v_triggers
+  WHERE table_name = escaped_table; 
+
+
+  /* condition_checks_union_query = 'old_table union new_table' or any one of the tables */
+  IF condition_checks_union_query IS NOT NULL THEN
+
+    SELECT  
+      format(
+        E'WITH %I AS (\n %s \n) ', 
+        TG_TABLE_NAME, 
+        concat_ws(
+          E' UNION ALL \n ',
+          CASE WHEN (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM old_table ' END,
+          CASE WHEN (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN ' SELECT * FROM new_table ' END 
+        )
+      ) 
+      || 
+      COALESCE((
+        SELECT ', ' || string_agg(format(E' %s AS ( \n %s \n ) ', related_view_name, related_view_def), ', ')
+        FROM (
+          SELECT DISTINCT related_view_name, related_view_def 
+          FROM prostgles.v_triggers
+          WHERE table_name = escaped_table
+          AND related_view_name IS NOT NULL
+          AND related_view_def  IS NOT NULL
+        ) t
+      ), '')
+      || 
+      format(
+        $c$
+            SELECT ARRAY_AGG(DISTINCT t.c_id)
+            FROM ( 
+              %s 
+            ) t
+        $c$, 
+        condition_checks_union_query
+      )
+    INTO query; 
+
+    BEGIN 
+      EXECUTE query INTO c_ids; 
+
+      EXCEPTION WHEN OTHERS THEN
+        
+        has_errors := TRUE;
+
+        GET STACKED DIAGNOSTICS 
+          err_text = MESSAGE_TEXT,
+          err_detail = PG_EXCEPTION_DETAIL,
+          err_hint = PG_EXCEPTION_HINT;
+
+    END;
+
+      --RAISE NOTICE 'has_errors: % ', has_errors;
+      --RAISE NOTICE 'condition_checks_union_query: % , cids: %', condition_checks_union_query, c_ids;
+  END IF;
+
+
+`;
+
 /**
+ * TODO: test performance and maybe add as an alternative for cases where there are no join clauses
  * Given:
  * 1. two transition tables (old_table and new_table)
  * 2. a list of primary keys
