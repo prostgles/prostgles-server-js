@@ -146,7 +146,17 @@ export type Subscription = Pick<
   triggers: AddTriggerParams[];
 };
 
-export type PubSubManagerTriggers = Map<string, { condition: string; hash: string }[]>;
+export type TableTriggerInfo = {
+  condition: string;
+  hash: string;
+  columnInfo: {
+    join_condition: string;
+    tracked_columns: Record<string, number>;
+    where_statement: string;
+  } | null;
+};
+
+export type PubSubManagerTriggers = Map<string, TableTriggerInfo[]>;
 
 /**
  * Used to facilitate table subscribe and sync

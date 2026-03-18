@@ -48,6 +48,10 @@ export class DboBuilder {
 
   db: DB;
 
+  /**
+   * @deprecated
+   * Use dboMap instead. Will be removed in future versions.
+   */
   dbo: DBHandlerServer;
 
   dboMap: Map<string, TableHandler | ViewHandler> = new Map();

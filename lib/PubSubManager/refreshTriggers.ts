@@ -1,4 +1,4 @@
-import type { PubSubManager } from "./PubSubManager";
+import type { PubSubManager, TableTriggerInfo } from "./PubSubManager";
 
 export async function refreshTriggers(this: PubSubManager) {
   const start = Date.now();
@@ -6,6 +6,7 @@ export async function refreshTriggers(this: PubSubManager) {
     table_name: string;
     condition: string;
     condition_hash: string;
+    columns_info: TableTriggerInfo["columnInfo"];
   }>(
     `
         SELECT *
@@ -23,7 +24,11 @@ export async function refreshTriggers(this: PubSubManager) {
     this._triggers.set(t.table_name, this._triggers.get(t.table_name) ?? []);
     const tableTriggers = this._triggers.get(t.table_name)!;
     if (!tableTriggers.map((t) => t.condition).includes(t.condition)) {
-      tableTriggers.push({ condition: t.condition, hash: t.condition_hash });
+      tableTriggers.push({
+        condition: t.condition,
+        hash: t.condition_hash,
+        columnInfo: t.columns_info,
+      });
     }
   });
 

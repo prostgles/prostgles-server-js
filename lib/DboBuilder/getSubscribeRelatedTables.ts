@@ -1,5 +1,5 @@
 import type { AnyObject, ParsedJoinPath, SubscribeParams } from "prostgles-types";
-import { asName, isDefined, reverseParsedPath } from "prostgles-types";
+import { asName, isDefined, isEmpty, reverseParsedPath } from "prostgles-types";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import type { Filter, LocalParams } from "./DboBuilder";
@@ -39,8 +39,9 @@ export async function getSubscribeRelatedTables(
       relatedTableName: string,
       joinPath: ParsedJoinPath[],
       selectedColumnNames: string[] | undefined,
+      targetTableFilter: Filter,
     ) => {
-      const relatedTableOrViewHandler = this.dboBuilder.dbo[relatedTableName];
+      const relatedTableOrViewHandler = this.dboBuilder.dboMap.get(relatedTableName);
       if (!relatedTableOrViewHandler) {
         throw `Table ${relatedTableName} not found`;
       }
@@ -56,24 +57,36 @@ export async function getSubscribeRelatedTables(
         type: "table",
         relatedTables: [],
       };
+
+      const reversedJoinFilter = {
+        $existsJoined: {
+          path: reverseParsedPath(joinPath, this.name),
+          filter: nonExistsFilter,
+        },
+      };
+      const filter =
+        isEmpty(targetTableFilter) ? reversedJoinFilter : (
+          { $and: [targetTableFilter, reversedJoinFilter] }
+        );
+      const joinConditionInfo = await relatedTableOrViewHandler.prepareWhere({
+        select: undefined,
+        filter,
+        addWhere: false,
+        localParams: undefined,
+        tableRule: undefined,
+      });
+
+      const relatedTableJoinPathItem = joinPath.at(-1);
+      const joinColumns =
+        relatedTableJoinPathItem?.on.map((columnPair) => Object.values(columnPair)).flat() ?? [];
+
+      const trackedColumns = Array.from(new Set([...(selectedColumnNames ?? []), ...joinColumns]));
+
       viewOptions.relatedTables.push({
         tableName: relatedTableName,
         tableNameEscaped: asName(relatedTableName),
-        trackedColumns: selectedColumnNames,
-        condition: (
-          await relatedTableOrViewHandler.prepareWhere!({
-            select: undefined,
-            filter: {
-              $existsJoined: {
-                path: reverseParsedPath(joinPath, this.name),
-                filter: nonExistsFilter,
-              },
-            },
-            addWhere: false,
-            localParams: undefined,
-            tableRule: undefined,
-          })
-        ).where,
+        trackedColumns,
+        condition: joinConditionInfo.where,
       });
     };
 
@@ -84,14 +97,19 @@ export async function getSubscribeRelatedTables(
       await pushRelatedTable(
         j.table.raw,
         j.joinPath,
-        Array.from(
-          new Set(j.select.map((s) => (s.selected ? s.columnName : undefined)).filter(isDefined)),
-        ),
+        j.select.map((s) => (s.selected ? s.columnName : undefined)).filter(isDefined),
+        {},
       );
     }
-    for (const e of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
-      for (const [index, pathItem] of e.parsedPath.entries()) {
-        await pushRelatedTable(pathItem.table, e.parsedPath.slice(0, index + 1), undefined);
+    for (const existsFilter of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
+      for (const [index, pathItem] of existsFilter.parsedPath.entries()) {
+        const isLast = index === existsFilter.parsedPath.length - 1;
+        await pushRelatedTable(
+          pathItem.table,
+          existsFilter.parsedPath.slice(0, index + 1),
+          undefined,
+          isLast ? existsFilter.targetTableFilter : {},
+        );
       }
     }
     if (!viewOptions.relatedTables.length) {

@@ -47,7 +47,7 @@ export async function prepareWhere(
 
   const parseFullFilter = async (
     f: any,
-    parentFilter: any = null,
+    parentFilter: AnyObject | null = null,
     isForcedFilterBypass: boolean,
   ): Promise<string> => {
     if (!f) throw "Invalid/missing group filter provided";
