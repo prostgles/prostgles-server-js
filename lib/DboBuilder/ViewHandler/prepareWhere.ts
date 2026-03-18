@@ -51,13 +51,13 @@ export async function prepareWhere(
     f: any,
     parentFilter: AnyObject | null = null,
     isForcedFilterBypass: boolean,
-  ): Promise<FilterItemResult> => {
+  ): Promise<FilterItemResult | undefined> => {
     if (!f) throw "Invalid/missing group filter provided";
     if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
-    const result = { condition: "", columnsUsed: [] as string[] };
+
     const keys = getKeys(f);
     if (!keys.length) {
-      return result;
+      return;
     }
     if (keys.includes($and_key) || keys.includes($or_key)) {
       if (keys.length > 1)
@@ -75,7 +75,9 @@ export async function prepareWhere(
         await Promise.all(
           group.map(async (gf) => await parseFullFilter(gf, group, isForcedFilterBypass)),
         )
-      ).filter((c) => c.condition);
+      )
+        .filter(isDefined)
+        .filter((c) => c.condition);
 
       if (conditionItems.length) {
         const conditions = conditionItems.map((c) => c.condition);
@@ -85,7 +87,7 @@ export async function prepareWhere(
       }
     } else if (!group) {
       /** forcedFilters do not get checked against publish and are treated as server-side requests */
-      const { condition, exists, columnsUsed } = await getCondition.bind(this)({
+      const itemInfo = await getCondition.bind(this)({
         filter: { ...f },
         select,
         allowed_colnames:
@@ -95,11 +97,12 @@ export async function prepareWhere(
         tableRules: isForcedFilterBypass ? undefined : tableRule,
         isHaving: params.isHaving,
       });
-      result.condition = condition;
-      result.columnsUsed = columnsUsed;
-      exists.push(...exists);
+      exists.push(...itemInfo.exists);
+      return {
+        condition: itemInfo.condition,
+        columnsUsed: itemInfo.columnsUsed,
+      };
     }
-    return result;
   };
 
   /* A forced filter condition will not check if the existsJoined filter tables have been published */
@@ -111,7 +114,10 @@ export async function prepareWhere(
     .filter(isDefined)
     .join(" AND ");
 
-  const combinedColumnsUsed = [...(forcedFilterCond?.columnsUsed ?? []), ...filterCond.columnsUsed];
+  const combinedColumnsUsed = [
+    ...(forcedFilterCond?.columnsUsed ?? []),
+    ...(filterCond?.columnsUsed ?? []),
+  ];
   const finalFilter =
     forcedFilter ?
       {
