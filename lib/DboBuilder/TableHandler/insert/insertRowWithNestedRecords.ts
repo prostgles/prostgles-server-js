@@ -216,20 +216,18 @@ export async function insertRowWithNestedRecords(
       insertedChildren = await childInsert(childDataItems, targetTable);
 
       /* Insert in key_lookup table */
-      await Promise.all(
-        insertedChildren.map(async (t3Child) => {
-          const tbl2Row: AnyObject = {};
+      for (const t3Child of insertedChildren) {
+        const tbl2Row: AnyObject = {};
 
-          colsRefT3.map((col) => {
-            tbl2Row[col.name] = t3Child[col.references![0]!.fcols[0]!];
-          });
-          colsRefT1.map((col) => {
-            tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
-          });
+        colsRefT3.map((col) => {
+          tbl2Row[col.name] = t3Child[col.references![0]!.fcols[0]!];
+        });
+        colsRefT1.map((col) => {
+          tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
+        });
 
-          await childInsert(tbl2Row, tbl2!);
-        }),
-      );
+        await childInsert(tbl2Row, tbl2!);
+      }
     } else {
       console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
       throw "Unexpected path for Nested inserts";
@@ -299,13 +297,14 @@ const referencedInsert = async (
     localParams?.scope,
   );
 
-  return Promise.all(
-    ((Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]).map((m) =>
-      (dbTX[targetTable] as TableHandler)
-        .insert(m, { returning: "*", onConflict }, undefined, childRules, localParams)
-        .catch((e) => {
-          return Promise.reject(e);
-        }),
-    ),
-  ) as Promise<AnyObject[]>;
+  const results: AnyObject[] = [];
+  for (const dataItem of (Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]) {
+    const result: AnyObject = await (dbTX[targetTable] as TableHandler)
+      .insert(dataItem, { returning: "*", onConflict }, undefined, childRules, localParams)
+      .catch((e) => {
+        return Promise.reject(e);
+      });
+    results.push(result);
+  }
+  return results;
 };
