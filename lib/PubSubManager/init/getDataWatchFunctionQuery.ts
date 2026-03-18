@@ -43,7 +43,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                 IF (c_ids IS NOT NULL OR has_errors) THEN
 
                   FOR v_trigger IN
-                      SELECT app_id, string_agg(c_id::text, ',') as cids
+                      SELECT app_id, string_agg(DISTINCT c_id::text, ',') as cids
                       FROM prostgles.v_triggers
                       WHERE c_id = ANY(c_ids) 
                       OR has_errors
@@ -128,6 +128,9 @@ IF TG_OP = 'UPDATE' THEN
       FROM prostgles.v_triggers
       WHERE table_name = escaped_table
       AND columns_info IS NOT NULL
+      /* These require the views to be added before as CTEs to ensure the condition works */
+      AND related_view_name IS NULL
+      AND related_view_def  IS NULL
     LOOP
 
       query := format(
@@ -138,7 +141,7 @@ IF TG_OP = 'UPDATE' THEN
             WHERE EXISTS (
               SELECT 1 
               FROM      (SELECT * FROM old_table as %5$I WHERE %4$s ) o 
-              LEFT JOIN (SELECT * FROM new_table as %5$I WHERE %4$s ) n 
+              FULL OUTER JOIN (SELECT * FROM new_table as %5$I WHERE %4$s ) n 
               ON %2$s 
               WHERE %3$s
             )
