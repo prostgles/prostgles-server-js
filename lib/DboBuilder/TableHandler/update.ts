@@ -3,10 +3,11 @@ import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { prepareNewData } from "./DataValidator";
-import { getInsertTableRules, getReferenceColumnInserts } from "./insert/insertNestedRecords";
+import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import type { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
+import { getInsertTableRules } from "./insert/getInsertTableRules";
 
 export async function update(
   this: TableHandler,

@@ -153,6 +153,10 @@ export const isomorphicQueries = async (
 
     await test("Prepare data", async () => {
       if (!sql) throw "sql missing";
+
+      await db.items.delete!();
+      await db.items2.delete!();
+
       const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], {
         returning: "*",
       });
