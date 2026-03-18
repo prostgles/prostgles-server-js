@@ -137,8 +137,8 @@ IF TG_OP = 'UPDATE' THEN
             FROM jsonb_object_keys(%1$L) as column_name
             WHERE EXISTS (
               SELECT 1 
-              FROM      (SELECT * FROM old_table WHERE %4$s ) o 
-              LEFT JOIN (SELECT * FROM new_table WHERE %4$s ) n 
+              FROM      (SELECT * FROM old_table as %5$I WHERE %4$s ) o 
+              LEFT JOIN (SELECT * FROM new_table as %5$I WHERE %4$s ) n 
               ON %2$s 
               WHERE %3$s
             )
@@ -149,7 +149,8 @@ IF TG_OP = 'UPDATE' THEN
         v_trigger.columns_info->'tracked_columns',
         v_trigger.columns_info->>'join_condition',
         v_trigger.columns_info->>'where_statement',
-        v_trigger.condition
+        v_trigger.condition,
+        TG_TABLE_NAME
       );
 
       BEGIN
