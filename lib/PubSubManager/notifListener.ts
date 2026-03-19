@@ -113,8 +113,12 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
     const triggeredSubs = new Set<Subscription>();
     firedTableConditions.map(({ table_condition_id, condition, subs, syncs }) => {
+      /**
+       * Each trigger with column_info AND no related view gets checked.
+       * If table_condition_id not present we assume all columns are changed.
+       */
       const changedColumns =
-        !changedColumnsByTriggerId ? "*" : (changedColumnsByTriggerId[table_condition_id] ?? []);
+        !changedColumnsByTriggerId ? "*" : (changedColumnsByTriggerId[table_condition_id] ?? "*");
       log(
         "notifListener",
         subs.map((s) => s.channel_name),
@@ -130,9 +134,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       subs.forEach((sub) => {
         const { triggers, subscribeOptions } = sub;
         const { actions, skipChangedColumnsCheck } = subscribeOptions;
-
+        const tableHandler = this.dboBuilder.dboMap.get(table_name);
         const subIsActive =
-          sub.is_ready && ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData);
+          tableHandler &&
+          sub.is_ready &&
+          ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData);
         if (!subIsActive) return;
 
         const didTrigger = triggers.find((subTrigger) => {

@@ -37,7 +37,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                 escaped_table := concat_ws('.', CASE WHEN TG_TABLE_SCHEMA <> CURRENT_SCHEMA THEN format('%I', TG_TABLE_SCHEMA) END, format('%I', TG_TABLE_NAME));
             
                 ${CHANGED_COLUMNS_FOR_EACH_TRIGGER_CHECK}
-
+                
                 ${EACH_TRIGGER_CHECK_ALL_COLUMNS}
 
                 IF (c_ids IS NOT NULL OR has_errors) THEN
@@ -117,6 +117,7 @@ IF TG_OP = 'UPDATE' THEN
     SELECT * 
     FROM prostgles.v_triggers
     WHERE table_name = escaped_table
+    --AND table_condition_id = ANY(c_ids)
     AND columns_info IS NOT NULL
     /* These require the views to be added before as CTEs to ensure the condition works */
     AND related_view_name IS NULL
@@ -159,20 +160,14 @@ IF TG_OP = 'UPDATE' THEN
           err_detail = PG_EXCEPTION_DETAIL,
           err_hint = PG_EXCEPTION_HINT;
     END;
+ 
+    changed_columns := COALESCE(changed_columns, '{}');
+    changed_columns_by_trigger_id := jsonb_set(
+      changed_columns_by_trigger_id,
+      ARRAY[v_trigger.table_condition_id::TEXT],
+      to_jsonb(changed_columns)
+    );
 
-    /* It is possible to get no changes */
-    IF changed_columns IS NOT NULL THEN 
-    
-      changed_columns := COALESCE(changed_columns, '{}');
-      changed_columns_by_trigger_id := jsonb_set(
-        changed_columns_by_trigger_id,
-        ARRAY[v_trigger.table_condition_id::TEXT],
-        to_jsonb(changed_columns)
-      );
-    END IF; 
-  
-  --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.table_condition_id::TEXT || changed_columns_by_trigger_id::TEXT );
-    
   END LOOP;
   
 END IF;
