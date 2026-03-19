@@ -1,5 +1,5 @@
 import type { PubSubManager } from "./PubSubManager";
-import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "./PubSubManagerUtils";
+import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {
   const conditions = tableNames.map((tableName) => {
@@ -19,7 +19,7 @@ export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]
         AND ( ${conditions.join(" OR ")} )
         --RETURNING *
         `,
-      { appId: this.appId }
+      { appId: this.appId },
     )
     .then(async (_rows) => {
       // log("Orphaned triggers deleted", _rows.length);

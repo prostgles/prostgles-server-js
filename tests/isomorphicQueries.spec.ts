@@ -23,16 +23,29 @@ export const isomorphicQueries = async (
 ) => {
   log("Starting isomorphic queries");
 
-  const expectNoTriggers = async () => {
-    await tout(2500); // this should be higher than the 1k timeout in deleteOrphanedTriggers
+  const getTriggers = async () => {
     const currentTriggers = await sql!(
       `
-        SELECT table_name, condition, table_condition_id, inserted, id, condition_hash, app_id 
+        SELECT table_name, condition, columns_info, table_condition_id, inserted, id, condition_hash, app_id 
         FROM prostgles.v_triggers
       `,
       {},
       { returnType: "rows" },
     );
+    return currentTriggers as {
+      table_name: string;
+      condition: string;
+      table_condition_id: number;
+      columns_info: null | {
+        tracked_columns: Record<string, 1 | 2>;
+      };
+    }[];
+  };
+
+  const expectNoTriggers = async () => {
+    await tout(2500); // this should be higher than the 1k timeout in deleteOrphanedTriggers
+
+    const currentTriggers = await getTriggers();
     assert.equal(
       currentTriggers.length,
       0,
@@ -192,6 +205,23 @@ export const isomorphicQueries = async (
       ]);
 
       await sql("TRUNCATE files CASCADE");
+    });
+
+    await test("Subscription tracked_columns get merged correctly", async () => {
+      if (!isServer) {
+        // Client forbids name select
+        return;
+      }
+      const sub1 = await db.items4.subscribe!({}, { select: { name: 1 } }, () => {});
+      const triggers1 = (await getTriggers()).filter((t) => t.table_name === "items4");
+      assert.equal(triggers1.length, 1);
+      assert.deepStrictEqual(triggers1[0].columns_info?.tracked_columns, { name: 1 });
+      const sub2 = await db.items4.subscribe!({}, { select: { public: 1 } }, () => {});
+      const triggers2 = (await getTriggers()).filter((t) => t.table_name === "items4");
+      assert.equal(triggers2.length, 1);
+      assert.deepStrictEqual(triggers2[0].columns_info?.tracked_columns, { name: 1, public: 1 });
+      await sub1.unsubscribe();
+      await sub2.unsubscribe();
     });
 
     const json = {

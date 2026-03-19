@@ -30,19 +30,22 @@ export async function addTrigger(
       throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
     }
 
-    const trgVals = {
-      tbl: asValue(table_name),
-      cond: asValue(condition),
-      condHash: asValue(crypto.createHash("md5").update(condition).digest("hex")),
-    };
-
     const tableHandler = this.dbo[table_name];
     if (!tableHandler) {
       throw `Cannot add trigger. Tablehandler for ${table_name} not found`;
     }
 
-    await this.db.tx((t) =>
-      t.any(`
+    const trgVals = {
+      tableName: table_name,
+      condition: condition,
+      conditionHash: crypto.createHash("md5").update(condition).digest("hex"),
+      relatedViewName: viewOptions?.viewName ?? null,
+      relatedViewDef: viewOptions?.definition ?? null,
+      columnsInfo: getColumnsInfo(params, tableHandler),
+    };
+
+    await this.db.any(
+      `
       BEGIN WORK;
       /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
       /* why is this lock level needed? */
@@ -50,7 +53,7 @@ export async function addTrigger(
 
       /** app_triggers is not refreshed when tables are dropped */
       DELETE FROM prostgles.app_triggers at
-      WHERE app_id = ${asValue(this.appId)} 
+      WHERE app_id = \${appId} 
       AND NOT EXISTS (
         SELECT 1  
         FROM pg_catalog.pg_trigger t
@@ -68,28 +71,33 @@ export async function addTrigger(
         columns_info
       ) 
       VALUES (
-        ${trgVals.tbl}, 
-        ${trgVals.cond},
-        ${trgVals.condHash},
-        ${asValue(this.appId)}, 
-        ${asValue(viewOptions?.viewName ?? null)}, 
-        ${asValue(viewOptions?.definition ?? null)},
-        ${asValue(getColumnsInfo(params, tableHandler))}
+        \${tableName}, 
+        \${condition},
+        \${conditionHash},
+        \${appId} , 
+        \${relatedViewName}, 
+        \${relatedViewDef},
+        \${columnsInfo}
       )
       ON CONFLICT (app_id, table_name, condition_hash)
       DO UPDATE  /* upsert tracked_columns where necessary */
-        SET columns_info = CASE WHEN EXCLUDED.columns_info IS NOT NULL THEN 
+        SET columns_info = CASE WHEN EXCLUDED.columns_info IS NOT NULL AND prostgles.app_triggers.columns_info IS NOT NULL THEN 
           jsonb_set(
             prostgles.app_triggers.columns_info, 
             '{tracked_columns}', 
-            prostgles.app_triggers.columns_info->'tracked_columns' || EXCLUDED.columns_info->'tracked_columns'
+            /* THE JSONB CAST IS CRUCIAL IN ENSURING THE MERGE WORKS */
+            (prostgles.app_triggers.columns_info->'tracked_columns')::JSONB || (EXCLUDED.columns_info->'tracked_columns')::JSONB
           ) 
         END 
       WHERE prostgles.app_triggers.columns_info IS NOT NULL
       ;
 
       COMMIT WORK;
-    `),
+    `,
+      {
+        appId: this.appId,
+        ...trgVals,
+      },
     );
 
     /** This might be redundant due to trigger on app_triggers */
@@ -101,13 +109,13 @@ export async function addTrigger(
   await this._log({
     type: "syncOrSub",
     command: "addTrigger",
-    condition: addedTrigger.data?.cond ?? params.condition,
+    condition: addedTrigger.data?.condition ?? params.condition,
     duration: addedTrigger.duration,
     socketId: socket?.id,
-    state: !addedTrigger.data?.tbl ? "fail" : "ok",
+    state: !addedTrigger.data?.tableName ? "fail" : "ok",
     error: addedTrigger.error,
     sid: socket && this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket }),
-    tableName: addedTrigger.data?.tbl ?? params.table_name,
+    tableName: params.table_name,
     connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
     localParams: socket && { clientReq: { socket } },
     triggers: this._triggers,
