@@ -50,6 +50,11 @@ export async function getSubscribeRelatedTables(
         (rt) => rt.tableName === relatedTableName,
       );
       if (alreadyPushed || relatedTableOrViewHandler.is_view) {
+        console.warn({
+          selectedColumnNames,
+          alreadyPushed,
+          is_view: relatedTableOrViewHandler.is_view,
+        });
         return;
       }
 

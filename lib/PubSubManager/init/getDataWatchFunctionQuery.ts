@@ -144,7 +144,20 @@ IF TG_OP = 'UPDATE' THEN
       $c$,
       v_trigger.columns_info->'tracked_columns',
       v_trigger.columns_info->>'join_condition',
-      v_trigger.columns_info->>'where_statement',
+      /* Could maybe move this into a generated stored column */
+     (SELECT string_agg(
+        format(
+          E'column_name = %1$L AND (ROW(n.*) IS NULL OR ROW(o.*) IS NULL OR %2$s)',
+          tc.column_name,
+          CASE
+            WHEN cast_as_text = '2'
+              THEN format('n.%1$I::TEXT IS DISTINCT FROM o.%1$I::TEXT', tc.column_name)
+            ELSE format('n.%1$I IS DISTINCT FROM o.%1$I', tc.column_name)
+          END
+        ),
+        E' OR \n'
+      ) 
+      FROM jsonb_each_text(v_trigger.columns_info->'tracked_columns') AS tc(column_name, cast_as_text)),
       v_trigger.condition,
       TG_TABLE_NAME
     );

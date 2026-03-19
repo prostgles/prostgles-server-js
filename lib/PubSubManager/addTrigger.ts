@@ -130,43 +130,32 @@ const getColumnsInfo = (
       cast_to: udtNamesWithoutEqualityComparison.includes(c.udt_name) ? "::TEXT" : "",
     };
   });
-  tracked_columns?.forEach((colName) => {
-    if (!cols?.some((c) => c.name === colName)) {
-      throw `tracked_columns ${colName} not found in table ${table_name}`;
+
+  if (!hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length) {
+    return null;
+  }
+
+  const trackedColumnsWithInfo = tracked_columns.map((name) => {
+    const colInfo = cols.find((c) => c.name === name);
+    if (!colInfo) {
+      throw `tracked_columns ${name} not found in table ${table_name}`;
     }
+    return colInfo;
   });
 
-  const columns_info =
-    !hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length ?
-      null
-    : {
-        join_condition: cols
-          .filter((c) => c.is_pkey)
-          .map((c) => `n.${asName(c.name)} = o.${asName(c.name)}`)
-          .join(" AND "),
-        // tracked_columns: cols.reduce(
-        //   (acc, { name }) => ({
-        //     ...acc,
-        //     [name]: 1,
-        //   }),
-        //   {} as Record<string, number>
-        // ),
-        tracked_columns: tracked_columns.reduce(
-          (acc, name) => ({
-            ...acc,
-            [name]: 1,
-          }),
-          {} as Record<string, number>,
-        ),
-        where_statement: cols
-          // .filter((c) => !c.is_pkey && tracked_columns.includes(c.name))
-          .filter((c) => tracked_columns.includes(c.name))
-          .map(
-            (c) =>
-              `column_name = ${asValue(c.name)} AND (ROW(n.*) IS NULL OR ROW(o.*) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`,
-          )
-          .join(" OR \n"),
-      };
+  const columns_info = {
+    join_condition: cols
+      .filter((c) => c.is_pkey)
+      .map((c) => `n.${asName(c.name)} = o.${asName(c.name)}`)
+      .join(" AND "),
+    tracked_columns: trackedColumnsWithInfo.reduce(
+      (acc, { name, cast_to }) => ({
+        ...acc,
+        [name]: cast_to ? 2 : 1,
+      }),
+      {} as Record<string, number>,
+    ),
+  };
 
   return columns_info;
 };

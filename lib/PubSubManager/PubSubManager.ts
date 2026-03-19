@@ -149,7 +149,6 @@ export type TableTriggerInfo = {
   columnInfo: {
     join_condition: string;
     tracked_columns: Record<string, number>;
-    where_statement: string;
   } | null;
 };
 
