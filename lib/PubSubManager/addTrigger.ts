@@ -3,7 +3,7 @@ import type { ViewSubscriptionOptions } from "./PubSubManager";
 import { type PubSubManager } from "./PubSubManager";
 import * as crypto from "crypto";
 import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
-import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
+import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, pgp } from "./PubSubManagerUtils";
 import { udtNamesWithoutEqualityComparison } from "./init/getDataWatchFunctionQuery";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 
@@ -44,7 +44,7 @@ export async function addTrigger(
       columnsInfo: getColumnsInfo(params, tableHandler),
     };
 
-    await this.db.any(
+    const q = pgp.as.format(
       `
       BEGIN WORK;
       /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
@@ -99,7 +99,8 @@ export async function addTrigger(
         ...trgVals,
       },
     );
-
+    console.log("addTrigger query", q);
+    await this.db.any(q);
     /** This might be redundant due to trigger on app_triggers */
     await this.refreshTriggers();
 
