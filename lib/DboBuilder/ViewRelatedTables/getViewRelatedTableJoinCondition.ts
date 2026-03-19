@@ -91,7 +91,7 @@ export const getViewRelatedTableJoinCondition = async ({
         tableName: tableName,
         tableNameEscaped: tableName,
         condition,
-        trackedColumns: undefined,
+        tracked_columns: undefined,
       } satisfies ViewSubscriptionOptions["relatedTables"][number] & { tableOID: number };
     }),
   );

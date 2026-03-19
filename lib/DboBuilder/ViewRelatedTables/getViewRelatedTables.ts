@@ -81,7 +81,7 @@ export const getViewRelatedTables = async (
         tableName: rt.table_name,
         tableNameEscaped: [rt.table_schema, rt.table_name].map((v) => JSON.stringify(v)).join("."),
         condition: "TRUE",
-        trackedColumns: undefined,
+        tracked_columns: undefined,
       });
     }
   });

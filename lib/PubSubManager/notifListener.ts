@@ -1,6 +1,6 @@
 import { includes, pickKeys } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import type { PubSubManager } from "./PubSubManager";
+import type { PubSubManager, Subscription } from "./PubSubManager";
 import { DELIMITER, log, NOTIF_TYPE, type NotifTypeName } from "./PubSubManagerUtils";
 
 /* Relay relevant data to relevant subscriptions */
@@ -111,9 +111,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       void this.deleteOrphanedTriggers(new Set(table_name));
     }
 
-    firedTableConditions.map(({ table_condition_id, subs, syncs }) => {
+    const triggeredSubs = new Set<Subscription>();
+    firedTableConditions.map(({ table_condition_id, condition, subs, syncs }) => {
       const changedColumns =
-        changedColumnsByTriggerId && (changedColumnsByTriggerId[table_condition_id] ?? []);
+        !changedColumnsByTriggerId ? "*" : (changedColumnsByTriggerId[table_condition_id] ?? []);
       log(
         "notifListener",
         subs.map((s) => s.channel_name),
@@ -124,56 +125,57 @@ export async function notifListener(this: PubSubManager, data: { payload: string
         void this.syncData(s, undefined, "trigger");
       });
 
-      /* Throttle the subscriptions */
-      const activeAndReadySubs = subs.filter((sub) =>
-        sub.triggers.some(
-          (trg) =>
-            this.dbo[trg.table_name] &&
-            sub.is_ready &&
-            ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData),
-        ),
-      );
+      const operation = (op_name?.toLowerCase() || "insert") as "insert" | "delete" | "update";
 
-      activeAndReadySubs.forEach((sub) => {
-        const operation = (op_name?.toLowerCase() || "insert") as keyof NonNullable<typeof actions>;
+      subs.forEach((sub) => {
         const { triggers, subscribeOptions } = sub;
-        const relevantTrigger = triggers.find((t) => t.table_name === table_name);
-        const tracked_columns = relevantTrigger?.tracked_columns;
-        const { throttle = 0, throttleOpts, actions, skipChangedColumnsCheck } = subscribeOptions;
-        if (
-          !skipChangedColumnsCheck &&
-          changedColumns &&
-          operation === "update" &&
-          tracked_columns
-        ) {
-          const subFieldsHaveChanged = changedColumns.some((changedColumn) =>
-            tracked_columns.includes(changedColumn),
-          );
-          if (!subFieldsHaveChanged) return;
-        }
+        const { actions, skipChangedColumnsCheck } = subscribeOptions;
 
-        const actionIsIgnored =
-          actions &&
-          !includes(parseFieldFilter(actions, false, ["insert", "update", "delete"]), operation);
-        if (actionIsIgnored) {
+        const subIsActive =
+          sub.is_ready && ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData);
+        if (!subIsActive) return;
+
+        const didTrigger = triggers.find((subTrigger) => {
+          const matchesTableCondition =
+            subTrigger.table_name === table_name && subTrigger.condition === condition;
+          if (!matchesTableCondition) return false;
+          const matchesAction =
+            !actions ||
+            includes(parseFieldFilter(actions, false, ["insert", "update", "delete"]), operation);
+          if (!matchesAction) return false;
+
+          const subTrackedColumns = subTrigger.tracked_columns;
+          const matchesChangedColumns =
+            skipChangedColumnsCheck ||
+            operation !== "update" ||
+            changedColumns === "*" ||
+            !subTrackedColumns ||
+            changedColumns.some((changedColumn) => subTrackedColumns.includes(changedColumn));
+          return matchesChangedColumns;
+        });
+        if (!didTrigger) {
           return;
         }
-
-        if (!throttleOpts?.skipFirst && sub.lastPushed <= Date.now() - throttle) {
-          /* It is assumed the policy was checked before this point */
-          void this.pushSubData(sub);
-        } else if (!sub.is_throttling) {
-          log("throttling sub for", throttle, "ms");
-          sub.is_throttling = setTimeout(() => {
-            log("throttling finished. pushSubData...");
-            sub.is_throttling = null;
-            void this.pushSubData(sub);
-          }, throttle);
-        }
+        triggeredSubs.add(sub);
       });
     });
 
-    /* Trigger unknown issue */
+    triggeredSubs.forEach((sub) => {
+      const {
+        subscribeOptions: { throttle = 0, throttleOpts },
+      } = sub;
+      if (!throttleOpts?.skipFirst && sub.lastPushed <= Date.now() - throttle) {
+        /* It is assumed the policy was checked before this point */
+        void this.pushSubData(sub);
+      } else if (!sub.is_throttling) {
+        log("throttling sub for", throttle, "ms");
+        sub.is_throttling = setTimeout(() => {
+          log("throttling finished. pushSubData...");
+          sub.is_throttling = null;
+          void this.pushSubData(sub);
+        }, throttle);
+      }
+    });
   } else {
     state = "invalid_condition_ids";
   }

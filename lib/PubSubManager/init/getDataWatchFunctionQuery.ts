@@ -112,79 +112,69 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
 const CHANGED_COLUMNS_FOR_EACH_TRIGGER_CHECK = `
 -- Determine changed columns for UPDATE operations
 IF TG_OP = 'UPDATE' THEN
- 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM prostgles.v_triggers  
+
+  FOR v_trigger IN
+    SELECT * 
+    FROM prostgles.v_triggers
     WHERE table_name = escaped_table
-    /* If any value is null it means some condition is tracking all columns so we need to check them all */
-    AND columns_info IS NULL
-  ) THEN
+    AND columns_info IS NOT NULL
+    /* These require the views to be added before as CTEs to ensure the condition works */
+    AND related_view_name IS NULL
+    AND related_view_def  IS NULL
+  LOOP
 
     changed_columns_by_trigger_id := COALESCE(changed_columns_by_trigger_id, '{}');
- 
-    FOR v_trigger IN
-      SELECT * 
-      FROM prostgles.v_triggers
-      WHERE table_name = escaped_table
-      AND columns_info IS NOT NULL
-      /* These require the views to be added before as CTEs to ensure the condition works */
-      AND related_view_name IS NULL
-      AND related_view_def  IS NULL
-    LOOP
 
-      query := format(
-        $c$
-          WITH changed AS (
-            SELECT column_name
-            FROM jsonb_object_keys(%1$L) as column_name
-            WHERE EXISTS (
-              SELECT 1 
-              FROM      (SELECT * FROM old_table as %5$I WHERE %4$s ) o 
-              FULL OUTER JOIN (SELECT * FROM new_table as %5$I WHERE %4$s ) n 
-              ON %2$s 
-              WHERE %3$s
-            )
+    query := format(
+      $c$
+        WITH changed AS (
+          SELECT column_name
+          FROM jsonb_object_keys(%1$L) as column_name
+          WHERE EXISTS (
+            SELECT 1 
+            FROM      (SELECT * FROM old_table as %5$I WHERE %4$s ) o 
+            FULL OUTER JOIN (SELECT * FROM new_table as %5$I WHERE %4$s ) n 
+            ON %2$s 
+            WHERE %3$s
           )
-          SELECT array_agg(column_name) 
-          FROM changed;
-        $c$,
-        v_trigger.columns_info->'tracked_columns',
-        v_trigger.columns_info->>'join_condition',
-        v_trigger.columns_info->>'where_statement',
-        v_trigger.condition,
-        TG_TABLE_NAME
+        )
+        SELECT array_agg(column_name) 
+        FROM changed;
+      $c$,
+      v_trigger.columns_info->'tracked_columns',
+      v_trigger.columns_info->>'join_condition',
+      v_trigger.columns_info->>'where_statement',
+      v_trigger.condition,
+      TG_TABLE_NAME
+    );
+
+    BEGIN
+      EXECUTE query INTO changed_columns;
+      EXCEPTION WHEN OTHERS THEN
+        
+        has_errors := TRUE;
+
+        GET STACKED DIAGNOSTICS 
+          err_text = MESSAGE_TEXT,
+          err_detail = PG_EXCEPTION_DETAIL,
+          err_hint = PG_EXCEPTION_HINT;
+    END;
+
+    /* It is possible to get no changes */
+    IF changed_columns IS NOT NULL THEN 
+    
+      changed_columns := COALESCE(changed_columns, '{}');
+      changed_columns_by_trigger_id := jsonb_set(
+        changed_columns_by_trigger_id,
+        ARRAY[v_trigger.table_condition_id::TEXT],
+        to_jsonb(changed_columns)
       );
-
-      BEGIN
-        EXECUTE query INTO changed_columns;
-        EXCEPTION WHEN OTHERS THEN
-          
-          has_errors := TRUE;
-
-          GET STACKED DIAGNOSTICS 
-            err_text = MESSAGE_TEXT,
-            err_detail = PG_EXCEPTION_DETAIL,
-            err_hint = PG_EXCEPTION_HINT;
-      END;
- 
-      /* It is possible to get no changes */
-      IF changed_columns IS NOT NULL THEN 
-      
-        changed_columns := COALESCE(changed_columns, '{}');
-        changed_columns_by_trigger_id := jsonb_set(
-          changed_columns_by_trigger_id,
-          ARRAY[v_trigger.table_condition_id::TEXT],
-          to_jsonb(changed_columns)
-        );
-      END IF; 
-   
-    --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.table_condition_id::TEXT || changed_columns_by_trigger_id::TEXT );
-     
-    END LOOP;
-   
-
-  END IF;
+    END IF; 
+  
+  --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.table_condition_id::TEXT || changed_columns_by_trigger_id::TEXT );
+    
+  END LOOP;
+  
 END IF;
 
 `;

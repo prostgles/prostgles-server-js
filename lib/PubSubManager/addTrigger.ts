@@ -10,7 +10,7 @@ import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 export type AddTriggerParams = {
   table_name: string;
   condition: string;
-  tracked_columns: string[] | undefined;
+  tracked_columns: [string, ...string[]] | undefined;
 };
 export async function addTrigger(
   this: PubSubManager,

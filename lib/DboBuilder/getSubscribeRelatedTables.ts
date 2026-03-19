@@ -80,14 +80,14 @@ export async function getSubscribeRelatedTables(
       const joinColumns =
         relatedTableJoinPathItem?.on.map((columnPair) => Object.values(columnPair)).flat() ?? [];
 
-      const trackedColumns = Array.from(
+      const [firstField, ...otherFields] = Array.from(
         new Set([...(selectedColumnNames ?? []), ...joinColumns, ...joinConditionInfo.columnsUsed]),
       );
 
       viewOptions.relatedTables.push({
         tableName: relatedTableName,
         tableNameEscaped: asName(relatedTableName),
-        trackedColumns,
+        tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
         condition: joinConditionInfo.where,
       });
     };

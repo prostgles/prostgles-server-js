@@ -10,10 +10,8 @@ import type {
 import { parseCondition } from "./PubSubManagerUtils";
 import type { AddTriggerParams } from "./addTrigger";
 
-export type AddSubscriptionParams = SubscriptionParams & {
-  condition: string;
-  tracked_columns: string[] | undefined;
-};
+export type AddSubscriptionParams = SubscriptionParams &
+  Pick<AddTriggerParams, "condition" | "tracked_columns">;
 
 type AddSubResult = SubscriptionChannels & {
   sendFirstData: VoidFunction | undefined;
@@ -92,7 +90,7 @@ export async function addSub(
       const relatedTrigger = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),
-        tracked_columns: relatedTable.trackedColumns,
+        tracked_columns: relatedTable.tracked_columns,
       } satisfies AddTriggerParams;
 
       newSub.triggers.push(relatedTrigger);

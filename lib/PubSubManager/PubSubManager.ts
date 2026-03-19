@@ -83,12 +83,10 @@ export type ViewSubscriptionOptions = (
       definition?: undefined;
     }
 ) & {
-  relatedTables: {
+  relatedTables: (Pick<AddTriggerParams, "condition" | "tracked_columns"> & {
     tableName: string;
     tableNameEscaped: string;
-    condition: string;
-    trackedColumns: string[] | undefined;
-  }[];
+  })[];
 };
 
 export type SubscriptionParams = {
@@ -141,7 +139,7 @@ export type Subscription = Pick<
   | "filter"
   | "table_rules"
 > & {
-  triggers: AddTriggerParams[];
+  triggers: [AddTriggerParams, ...AddTriggerParams[]];
 };
 
 export type TableTriggerInfo = {

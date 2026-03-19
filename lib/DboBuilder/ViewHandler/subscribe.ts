@@ -77,7 +77,10 @@ async function subscribe(
       newQuery,
     });
 
-    const tracked_columns = newQuery.select.filter((s) => s.selected).flatMap((c) => c.fields);
+    const [firstField, ...otherFields] = newQuery.select
+      .filter((s) => s.selected)
+      .flatMap((c) => c.fields);
+
     const commonSubOpts = {
       table_info: this.tableOrViewInfo,
       viewOptions,
@@ -90,7 +93,7 @@ async function subscribe(
         table_rules?.subscribe,
       ),
       lastPushed: 0,
-      tracked_columns,
+      tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
       pushRequestedVersion: 0,
     } as const satisfies Partial<AddSubscriptionParams>;
 
