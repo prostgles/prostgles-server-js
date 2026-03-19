@@ -108,7 +108,6 @@ export type SubscriptionParams = {
   filter: object;
   selectParams: SelectParams;
   subscribeOptions: SubscribeOptions;
-  tracked_columns: string[] | undefined;
 
   onData?: OnData;
   socket: PRGLIOSocket | undefined;
@@ -141,12 +140,12 @@ export type Subscription = Pick<
   | "table_info"
   | "filter"
   | "table_rules"
-  | "tracked_columns"
 > & {
   triggers: AddTriggerParams[];
 };
 
 export type TableTriggerInfo = {
+  table_condition_id: number;
   condition: string;
   hash: string;
   columnInfo: {
@@ -156,7 +155,7 @@ export type TableTriggerInfo = {
   } | null;
 };
 
-export type PubSubManagerTriggers = Map<string, TableTriggerInfo[]>;
+export type PubSubManagerTriggers = Map<string, Map<number, TableTriggerInfo>>;
 
 /**
  * Used to facilitate table subscribe and sync
@@ -293,8 +292,10 @@ export class PubSubManager {
   notifListener = notifListener.bind(this);
 
   getTriggerInfo = (tableName: string) => {
-    const tableTriggerConditions = this._triggers.get(tableName)?.map((triggerInfo, idx) => ({
-      idx,
+    const tableTriggers = this._triggers.get(tableName);
+    if (!tableTriggers) return undefined;
+    const tableTriggerConditions = Array.from(tableTriggers.values()).map((triggerInfo, idx) => ({
+      // idx,
       ...triggerInfo,
       subs: this.getTriggerSubs(tableName, triggerInfo.condition),
       syncs: this.getSyncs(tableName, triggerInfo.condition),

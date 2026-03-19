@@ -135,9 +135,7 @@ const getColumnsInfo = (
       throw `tracked_columns ${colName} not found in table ${table_name}`;
     }
   });
-  /**
-   * TODO: finish tracked_columns by trigger condition
-   */
+
   const columns_info =
     !hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length ?
       null
@@ -165,7 +163,7 @@ const getColumnsInfo = (
           .filter((c) => tracked_columns.includes(c.name))
           .map(
             (c) =>
-              `column_name = ${asValue(c.name)} AND (ROW(n.*) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`,
+              `column_name = ${asValue(c.name)} AND (ROW(n.*) IS NULL OR ROW(o.*) IS NULL OR n.${asName(c.name)}${c.cast_to} IS DISTINCT FROM o.${asName(c.name)}${c.cast_to})`,
           )
           .join(" OR \n"),
       };

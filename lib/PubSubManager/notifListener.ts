@@ -100,8 +100,8 @@ export async function notifListener(this: PubSubManager, data: { payload: string
     /* Trigger ok */
   } else if (conditionIds?.every((id) => Number.isInteger(id))) {
     state = "ok";
-    const firedTableConditions = tableTriggerConditions.filter(({ idx }) =>
-      conditionIds.includes(idx),
+    const firedTableConditions = tableTriggerConditions.filter(({ table_condition_id }) =>
+      conditionIds.includes(table_condition_id),
     );
     const orphanedTableConditions = conditionIds.filter((condId) => {
       const tc = tableTriggerConditions.at(condId);
@@ -111,8 +111,9 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       void this.deleteOrphanedTriggers(new Set(table_name));
     }
 
-    firedTableConditions.map(({ idx, subs, syncs }) => {
-      const changedColumns = changedColumnsByTriggerId && (changedColumnsByTriggerId[idx] ?? []);
+    firedTableConditions.map(({ table_condition_id, subs, syncs }) => {
+      const changedColumns =
+        changedColumnsByTriggerId && (changedColumnsByTriggerId[table_condition_id] ?? []);
       log(
         "notifListener",
         subs.map((s) => s.channel_name),
@@ -135,7 +136,9 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
       activeAndReadySubs.forEach((sub) => {
         const operation = (op_name?.toLowerCase() || "insert") as keyof NonNullable<typeof actions>;
-        const { tracked_columns, subscribeOptions } = sub;
+        const { triggers, subscribeOptions } = sub;
+        const relevantTrigger = triggers.find((t) => t.table_name === table_name);
+        const tracked_columns = relevantTrigger?.tracked_columns;
         const { throttle = 0, throttleOpts, actions, skipChangedColumnsCheck } = subscribeOptions;
         if (
           !skipChangedColumnsCheck &&

@@ -43,9 +43,9 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                 IF (c_ids IS NOT NULL OR has_errors) THEN
 
                   FOR v_trigger IN
-                      SELECT app_id, string_agg(DISTINCT c_id::text, ',') as cids
+                      SELECT app_id, string_agg(DISTINCT table_condition_id::text, ',') as cids
                       FROM prostgles.v_triggers
-                      WHERE c_id = ANY(c_ids) 
+                      WHERE table_condition_id = ANY(c_ids) 
                       OR has_errors
                       GROUP BY app_id
                   LOOP
@@ -174,12 +174,12 @@ IF TG_OP = 'UPDATE' THEN
         changed_columns := COALESCE(changed_columns, '{}');
         changed_columns_by_trigger_id := jsonb_set(
           changed_columns_by_trigger_id,
-          ARRAY[v_trigger.c_id::TEXT],
+          ARRAY[v_trigger.table_condition_id::TEXT],
           to_jsonb(changed_columns)
         );
       END IF; 
    
-    --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.c_id::TEXT || changed_columns_by_trigger_id::TEXT );
+    --PERFORM pg_notify('debug', changed_columns::TEXT || v_trigger.table_condition_id::TEXT || changed_columns_by_trigger_id::TEXT );
      
     END LOOP;
    
@@ -198,11 +198,11 @@ const EACH_TRIGGER_CHECK_ALL_COLUMNS = `
           SELECT 1 
           FROM %s 
           WHERE %s 
-        ) THEN %s::text END AS c_id
+        ) THEN %s::text END AS table_condition_id
       $c$, 
       table_name, 
       condition, 
-      c_id 
+      table_condition_id 
     ),
     E' UNION \n ' 
   ) 
@@ -238,7 +238,7 @@ const EACH_TRIGGER_CHECK_ALL_COLUMNS = `
       || 
       format(
         $c$
-            SELECT ARRAY_AGG(DISTINCT t.c_id)
+            SELECT ARRAY_AGG(DISTINCT t.table_condition_id)
             FROM ( 
               %s 
             ) t

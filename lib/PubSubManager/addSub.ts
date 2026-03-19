@@ -12,6 +12,7 @@ import type { AddTriggerParams } from "./addTrigger";
 
 export type AddSubscriptionParams = SubscriptionParams & {
   condition: string;
+  tracked_columns: string[] | undefined;
 };
 
 type AddSubResult = SubscriptionChannels & {
@@ -66,7 +67,6 @@ export async function addSub(
     is_throttling: false,
     socket_id: socket?.id,
     table_rules,
-    tracked_columns,
     triggers: [mainTrigger],
   };
 
@@ -89,15 +89,15 @@ export async function addSub(
 
   if (viewOptions) {
     for (const relatedTable of viewOptions.relatedTables) {
-      const relatedSub = {
+      const relatedTrigger = {
         table_name: relatedTable.tableName,
         condition: parseCondition(relatedTable.condition),
         tracked_columns: relatedTable.trackedColumns,
       } satisfies AddTriggerParams;
 
-      newSub.triggers.push(relatedSub);
+      newSub.triggers.push(relatedTrigger);
 
-      await this.addTrigger(relatedSub, viewOptions, socket);
+      await this.addTrigger(relatedTrigger, viewOptions, socket);
     }
   }
 

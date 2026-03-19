@@ -15,7 +15,6 @@ import {
 } from "prostgles-types";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
-import { error } from "console";
 
 export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
@@ -28,7 +27,7 @@ export const isomorphicQueries = async (
     await tout(2500); // this should be higher than the 1k timeout in deleteOrphanedTriggers
     const currentTriggers = await sql!(
       `
-        SELECT table_name, condition, c_id, inserted, id, condition_hash, app_id 
+        SELECT table_name, condition, table_condition_id, inserted, id, condition_hash, app_id 
         FROM prostgles.v_triggers
       `,
       {},

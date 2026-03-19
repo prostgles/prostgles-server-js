@@ -219,7 +219,7 @@ BEGIN
         CREATE OR REPLACE VIEW prostgles.v_triggers AS
         SELECT *
           , (ROW_NUMBER() OVER( ORDER BY table_name, condition ))::text AS id 
-          , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS c_id
+          , ROW_NUMBER() OVER(PARTITION BY app_id, table_name ORDER BY table_name, condition ) - 1 AS table_condition_id
         FROM prostgles.app_triggers;
         COMMENT ON VIEW prostgles.v_triggers IS 'Augment trigger table with natural IDs and per app IDs';
 
