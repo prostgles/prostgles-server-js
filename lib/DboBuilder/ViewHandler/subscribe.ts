@@ -80,6 +80,9 @@ async function subscribe(
     const [firstField, ...otherFields] = newQuery.select
       .filter((s) => s.selected)
       .flatMap((c) => c.fields);
+    if (!firstField) {
+      throw "Cannot subscribe to no columns. Use limit 0 if you don't want any data but want to listen to changes";
+    }
 
     const commonSubOpts = {
       table_info: this.tableOrViewInfo,

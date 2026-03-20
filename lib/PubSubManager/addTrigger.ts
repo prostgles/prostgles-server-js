@@ -141,8 +141,7 @@ const getColumnsInfo = (
     };
   });
 
-  // if (!hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length) {
-  if (!hasPkey || !cols || !tracked_columns?.length) {
+  if (!hasPkey || !cols || !tracked_columns) {
     return null;
   }
 
