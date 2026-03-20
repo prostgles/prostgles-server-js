@@ -1,11 +1,11 @@
+import * as crypto from "crypto";
 import { asName, pickKeys, tryCatchV2 } from "prostgles-types";
+import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { ViewSubscriptionOptions } from "./PubSubManager";
 import { type PubSubManager } from "./PubSubManager";
-import * as crypto from "crypto";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
-import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, pgp } from "./PubSubManagerUtils";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 import { udtNamesWithoutEqualityComparison } from "./init/getDataWatchFunctionQuery";
-import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 
 export type AddTriggerParams = {
   table_name: string;
@@ -44,7 +44,9 @@ export async function addTrigger(
       columnsInfo: getColumnsInfo(params, tableHandler),
     };
 
-    const q = pgp.as.format(
+    const TRACKED_COLUMNS = "tracked_columns" as const satisfies keyof AddTriggerParams;
+
+    await this.db.any(
       `
       BEGIN WORK;
       /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
@@ -80,13 +82,13 @@ export async function addTrigger(
         \${columnsInfo}
       )
       ON CONFLICT (app_id, table_name, condition_hash)
-      DO UPDATE  /* upsert tracked_columns where necessary */
+      DO UPDATE  /* upsert ${TRACKED_COLUMNS} where necessary */
         SET columns_info = CASE WHEN EXCLUDED.columns_info IS NOT NULL AND prostgles.app_triggers.columns_info IS NOT NULL THEN 
           jsonb_set(
             prostgles.app_triggers.columns_info, 
-            '{tracked_columns}', 
-            /* THE JSONB CAST IS CRUCIAL IN ENSURING THE MERGE WORKS */
-            (prostgles.app_triggers.columns_info->'tracked_columns')::JSONB || (EXCLUDED.columns_info->'tracked_columns')::JSONB
+            '{${TRACKED_COLUMNS}}', 
+            /* THE PARENTHESES ARE CRUCIAL IN ENSURING THE MERGE WORKS */
+            (prostgles.app_triggers.columns_info->'${TRACKED_COLUMNS}') || (EXCLUDED.columns_info->'${TRACKED_COLUMNS}') 
           ) 
         END 
       WHERE prostgles.app_triggers.columns_info IS NOT NULL
@@ -99,8 +101,7 @@ export async function addTrigger(
         ...trgVals,
       },
     );
-    console.log("addTrigger query", q);
-    await this.db.any(q);
+
     /** This might be redundant due to trigger on app_triggers */
     await this.refreshTriggers();
 
@@ -140,7 +141,8 @@ const getColumnsInfo = (
     };
   });
 
-  if (!hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length) {
+  // if (!hasPkey || !cols || !tracked_columns?.length || tracked_columns.length === cols.length) {
+  if (!hasPkey || !cols || !tracked_columns?.length) {
     return null;
   }
 

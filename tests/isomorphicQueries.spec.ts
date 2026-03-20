@@ -1712,7 +1712,7 @@ export const isomorphicQueries = async (
 
     await test("subscribe to escaped table name", async () => {
       await tryRunP("subscribe to escaped table name", async (resolve, reject) => {
-        const filter = { [`"text_col0"`]: "0" };
+        const filter = { [`"text_col0"`]: { $in: ["0", "1"] } };
         let runs = 0;
         setTimeout(async () => {
           /** Used for debugging */
@@ -1748,10 +1748,10 @@ export const isomorphicQueries = async (
               2,
             ),
           );
-          if (item && item[`"text_col0"`] === "0") {
+          if (item && ["0", "1"].includes(item[`"text_col0"`])) {
             runs++;
             if (runs === 1) {
-              await db[`"""quoted0"""`].update!(filter, filter);
+              await db[`"""quoted0"""`].update!(filter, { [`"text_col0"`]: "1" });
             }
             if (runs < 2) {
               return;
@@ -1857,7 +1857,6 @@ export const isomorphicQueries = async (
             if (runs === 1) {
               await db.tr2.insert!({ tr1_id: _rows[0]!.id, t1: "a", t2: "b" });
             } else if (runs === 2) {
-              debugger;
               await sub.unsubscribe();
               await tout(4000);
               await expectNoTriggers();

@@ -7,6 +7,7 @@ import type { NewQuery } from "./QueryBuilder/QueryBuilder";
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getViewRelatedTables } from "./ViewRelatedTables/getViewRelatedTables";
+import type { AddTriggerParams } from "../PubSubManager/addTrigger";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -46,15 +47,7 @@ export async function getSubscribeRelatedTables(
         throw `Table ${relatedTableName} not found`;
       }
 
-      const alreadyPushed = viewOptions?.relatedTables.find(
-        (rt) => rt.tableName === relatedTableName,
-      );
-      if (alreadyPushed || relatedTableOrViewHandler.is_view) {
-        console.warn({
-          selectedColumnNames,
-          alreadyPushed,
-          is_view: relatedTableOrViewHandler.is_view,
-        });
+      if (relatedTableOrViewHandler.is_view) {
         return;
       }
 
@@ -89,11 +82,25 @@ export async function getSubscribeRelatedTables(
         new Set([...(selectedColumnNames ?? []), ...joinColumns, ...joinConditionInfo.columnsUsed]),
       );
 
+      const tracked_columns: AddTriggerParams["tracked_columns"] =
+        !firstField ? undefined : [firstField, ...otherFields];
+      const condition = joinConditionInfo.where;
+
+      const alreadyPushed = viewOptions.relatedTables.find(
+        (rt) => rt.tableName === relatedTableName && rt.condition === condition,
+      );
+      if (alreadyPushed) {
+        const [firstMerged, ...others] = Array.from(
+          new Set([...(alreadyPushed.tracked_columns ?? []), ...(tracked_columns ?? [])]),
+        );
+        alreadyPushed.tracked_columns = firstMerged ? [firstMerged, ...others] : undefined;
+        return;
+      }
       viewOptions.relatedTables.push({
         tableName: relatedTableName,
         tableNameEscaped: asName(relatedTableName),
-        tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
-        condition: joinConditionInfo.where,
+        tracked_columns,
+        condition,
       });
     };
 
