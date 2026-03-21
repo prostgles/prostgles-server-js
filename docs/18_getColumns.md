@@ -77,7 +77,7 @@ Retrieves columns metadata of the table/view
     If defined then this column is referencing the file table
     Extracted from FileTable config
     Used in SmartForm
-  - **tsDataType** <span style="color: red">required</span> <span style="color: green;">"string" | "number" | "boolean" | "any" | "number[]" | "boolean[]" | "string[]" | "any[]"</span>
+  - **tsDataType** <span style="color: red">required</span> <span style="color: green;">"string" | "number" | "boolean" | "number[]" | "boolean[]" | "string[]" | "any[]" | "any"</span>
 
     TypeScript data type
   - **select** <span style="color: red">required</span> <span style="color: green;">boolean</span>
