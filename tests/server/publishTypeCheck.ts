@@ -10,10 +10,7 @@ export const testPublishTypes = () => {
         select: {
           fields: { h: 1, id: 1 },
           forcedFilter: {
-            $and: [
-              { h: { $overlaps: ["23", "32"] } },
-              { $existsJoined: { items: { "h.$eq": [] } } },
-            ],
+            $and: [{ h: { $overlaps: ["23", "32"] } }, { $existsJoined: { items: { h: [] } } }],
           },
         },
       },
@@ -129,7 +126,7 @@ export const testPublishTypes = () => {
           },
           forcedFilter: {
             // "h.$eq": ["2"]
-            $and: [{ "h.$eq": ["2"] }],
+            $and: [{ h: ["2"] }],
           },
         },
       },

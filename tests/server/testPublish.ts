@@ -107,7 +107,7 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
           return row;
         },
         checkFilter: {
-          $and: [{ "name.<>": "fail-check" }],
+          $and: [{ name: { "<>": "fail-check" } }],
         },
         postValidate: async ({ row, dbx: dboTx, tx }) => {
           /** Records must exist in this transaction */
