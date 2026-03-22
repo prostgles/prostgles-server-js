@@ -1,9 +1,9 @@
-## updateBatch<span style="opacity: 0.6;">(data: [FullFilter<T, S>, Partial<UpsertDataToPGCast<T>>][], params?: SelectParams): Promise&lt;void | UpdateReturnType&lt;P, T, S&gt;&gt;</span>
+## updateBatch<span style="opacity: 0.6;">(data: [FullFilter<T, S>, Partial<RejectAny<{ [K in keyof T]: Record<string, any[]> | CastFromTSToPG<T[K]>; }>>][], params?: SelectParams): Promise&lt;void | UpdateReturnType&lt;P, T, S&gt;&gt;</span>
 Updates multiple records in the table in a batch operation.
 - Each item in the `data` array contains a filter and the corresponding data to update.
 #### Parameters
 
-  - **data** <span style="color: red">required</span> <span style="color: green;">[FullFilter&lt;T, S&gt;, Partial&lt;UpsertDataToPGCast&lt;T&gt;&gt;][]</span>
+  - **data** <span style="color: red">required</span> <span style="color: green;">[FullFilter&lt;T, S&gt;, Partial&lt;RejectAny&lt;{ [K in keyof T]: Record&lt;string, any[]&gt; | CastFromTSToPG&lt;T[K]&gt;; }&gt;&gt;][]</span>
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 

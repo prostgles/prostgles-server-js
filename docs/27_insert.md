@@ -1,8 +1,8 @@
-## insert<span style="opacity: 0.6;">(data: UpsertDataToPGCast | UpsertDataToPGCast<T>[], params?: SelectParams): Promise&lt;InsertReturnType&gt;</span>
+## insert<span style="opacity: 0.6;">(data: { [K in keyof T]: Record<string, any[]> | CastFromTSToPG<T[K]>; } | RejectAny<{ [K in keyof T]: Record<string, any[]> | CastFromTSToPG<T[K]>; }>[], params?: SelectParams): Promise&lt;InsertReturnType&gt;</span>
 Inserts a new record into the table.
 #### Parameters
 
-  - **data** <span style="color: red">required</span> <span style="color: green;">InsertData</span>
+  - **data** <span style="color: red">required</span> <span style="color: green;">{ [K in keyof T]: Record&lt;string, any[]&gt; | CastFromTSToPG&lt;T[K]&gt;; } | RejectAny&lt;{ [K in keyof T]: Record&lt;string, any[]&gt; | CastFromTSToPG&lt;T[K]&gt;; }&gt;[]</span>
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 

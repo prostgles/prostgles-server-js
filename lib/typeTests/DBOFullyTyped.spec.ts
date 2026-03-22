@@ -47,7 +47,7 @@ void describe("DBOFullyTyped test", async () => {
           orderBy: {
             id: 1,
           },
-        }
+        },
       );
 
       r[0]?.id;
@@ -61,7 +61,7 @@ void describe("DBOFullyTyped test", async () => {
         {
           select: { id: 1 },
           orderBy: { tr1_id: 1 },
-        }
+        },
       );
 
       void tr2.find(
@@ -69,7 +69,7 @@ void describe("DBOFullyTyped test", async () => {
         {
           //@ts-expect-error
           select: { bad_col: 1 },
-        }
+        },
       );
 
       void tr2.find(
@@ -77,7 +77,7 @@ void describe("DBOFullyTyped test", async () => {
         {
           //@ts-expect-error
           orderBy: { bad_col: 1 },
-        }
+        },
       );
 
       (await db.items2.find({}, { select: { items_id: 1 }, returnType: "values" })) satisfies (

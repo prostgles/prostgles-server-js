@@ -512,6 +512,9 @@ export type PublishTableRule<
   insert?: InsertRule<Col, S> | PublishAllOrNothing;
   update?: UpdateRule<Col, S> | PublishAllOrNothing;
   delete?: DeleteRule<Col, S> | PublishAllOrNothing;
+  /**
+   * TODO: move to tableConfig
+   */
   sync?: SyncRule<Col>;
   subscribe?: SubscribeRule | PublishAllOrNothing;
 };
