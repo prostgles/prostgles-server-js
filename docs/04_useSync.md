@@ -19,7 +19,7 @@ Retrieves rows matching the filter and keeps them in sync
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
-    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[]</span>
 
       Used to trigger re-fetching
 #### Return type

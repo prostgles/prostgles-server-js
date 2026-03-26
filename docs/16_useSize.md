@@ -58,7 +58,7 @@ Returns result size in bits matching the filter and selectParams
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
-    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[]</span>
 
       Used to trigger re-fetching
 #### Return type

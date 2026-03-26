@@ -76,7 +76,7 @@ Retrieves a matching record from the view/table and subscribes to changes
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
-    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[] | undefined</span>
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[]</span>
 
       Used to trigger re-fetching
 #### Return type
