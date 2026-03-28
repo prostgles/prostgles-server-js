@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.504",
+  "version": "4.2.505",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -57,7 +57,7 @@
     "pg": "^8.19.0",
     "pg-cursor": "^2.19.0",
     "pg-promise": "^12.6.2",
-    "prostgles-types": "^4.0.220"
+    "prostgles-types": "^4.0.221"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
