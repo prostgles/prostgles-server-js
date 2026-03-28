@@ -98,4 +98,5 @@ const tableMethods = getKeys({
   update: 1,
   upsert: 1,
   updateBatch: 1,
+  insertMany: 1,
 } satisfies Record<Exclude<keyof TableHandler, keyof ViewHandler>, 1>);

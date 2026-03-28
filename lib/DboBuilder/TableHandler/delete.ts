@@ -1,14 +1,8 @@
 import type pgPromise from "pg-promise";
 import type { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
 import type { DeleteRule, ParsedTableRule } from "../../PublishParser/PublishParser";
-import type {
-  Filter,
-  LocalParams} from "../DboBuilder";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  withUserRLS,
-} from "../DboBuilder";
+import type { Filter, LocalParams } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import { runQueryReturnType } from "../ViewHandler/find";
 import type { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
@@ -19,7 +13,7 @@ export async function _delete(
   params?: DeleteParams,
   param3_unused?: undefined,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<any> {
   const start = Date.now();
   try {
@@ -85,13 +79,13 @@ export async function _delete(
     await validate?.(filterOpts.filter);
 
     let returningQuery = "";
-    if (returning) {
+    if (returning !== undefined) {
       queryType = "any";
       if (!returningFields) {
         throw "Returning dissallowed";
       }
       returningQuery = this.makeReturnQuery(
-        await this.prepareReturning(returning, this.parseFieldFilter(returningFields))
+        await this.prepareReturning(returning, this.parseFieldFilter(returningFields)),
       );
       queryWithoutRLS += returningQuery;
     }

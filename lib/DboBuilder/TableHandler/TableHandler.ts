@@ -10,17 +10,18 @@ import type {
 import { asName, isDefined } from "prostgles-types";
 import type { DB } from "../../Prostgles";
 import type {
-  SyncRule,
-  ParsedTableRule,
   InsertRule,
+  ParsedTableRule,
+  SyncRule,
   UpdateRule,
-  DeleteRule,
 } from "../../PublishParser/PublishParser";
 import type TableConfigurator from "../../TableConfig/TableConfig";
+import type { TableDefinition } from "../../TableConfig/TableConfig";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
+import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
 import { FUNCTIONS } from "../QueryBuilder/Functions/Functions";
 import { SelectItemBuilder, type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
 import type { JoinPaths } from "../ViewHandler/ViewHandler";
@@ -31,8 +32,6 @@ import { insert } from "./insert/insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
-import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
-import type { TableDefinition } from "../../TableConfig/TableConfig";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -140,6 +139,15 @@ export class TableHandler extends ViewHandler {
     _localParams?: LocalParams,
   ): Promise<any> {
     return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
+  }
+  async insertMany(
+    rows: AnyObject[],
+    param2?: InsertParams,
+    param3_unused?: undefined,
+    tableRules?: ParsedTableRule,
+    _localParams?: LocalParams,
+  ): Promise<any> {
+    return insert.bind(this)(rows, param2, param3_unused, tableRules, _localParams);
   }
 
   prepareReturning = async (

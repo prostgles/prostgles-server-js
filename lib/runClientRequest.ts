@@ -34,6 +34,7 @@ const TABLE_METHODS = {
   getColumns: 1,
   getInfo: 1,
   sync: 1,
+  insertMany: 1,
 } as const satisfies Record<keyof (TableHandler & Pick<TableHandlerServer, "sync">), 1>;
 
 const TABLE_METHODS_KEYS = getKeys(TABLE_METHODS);
