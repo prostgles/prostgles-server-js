@@ -48,6 +48,7 @@ export const generateClientDocs = async (fromIndex: number) => {
     subscribeOne: 1,
     updateBatch: 1,
     upsert: 1,
+    insertMany: 1,
   } satisfies Record<keyof TableHandler, 1>;
 
   const isomorphicMd = getMethodsDocs(
