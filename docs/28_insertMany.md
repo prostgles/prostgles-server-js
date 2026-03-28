@@ -1,8 +1,10 @@
-## insertMany<span style="opacity: 0.6;">(data: UpsertDataToPGCast<T>[], params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, T, S&gt;[]&gt;</span>
+## insertMany<span style="opacity: 0.6;">(data: InsertDataWithNested<T, S>[], params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, T, S&gt;[]&gt;</span>
 Inserts new records into the table.
 #### Parameters
 
-  - **data** <span style="color: red">required</span> <span style="color: green;">UpsertDataToPGCast</span>
+  - **data** <span style="color: red">required</span> <span style="color: green;">InsertDataWithNested</span>
+
+    TODO: pick only joined tables from schema
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 

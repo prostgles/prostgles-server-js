@@ -1,8 +1,10 @@
-## insert<span style="opacity: 0.6;">(data: UpsertDataToPGCast, params?: SelectParams): Promise&lt;GetReturningReturnType&gt;</span>
+## insert<span style="opacity: 0.6;">(data: InsertDataWithNested, params?: SelectParams): Promise&lt;GetReturningReturnType&gt;</span>
 Inserts a new record into the table.
 #### Parameters
 
-  - **data** <span style="color: red">required</span> <span style="color: green;">UpsertDataToPGCast</span>
+  - **data** <span style="color: red">required</span> <span style="color: green;">InsertDataWithNested</span>
+
+    TODO: pick only joined tables from schema
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 
