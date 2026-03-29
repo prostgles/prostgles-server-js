@@ -4,7 +4,7 @@ Inserts new records into the table.
 
   - **data** <span style="color: red">required</span> <span style="color: green;">InsertDataWithNested</span>
 
-    TODO: pick only joined tables from schema
+    TODO: pick only joined tables from schema AND exclude parent fkey columns from the nested data
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 

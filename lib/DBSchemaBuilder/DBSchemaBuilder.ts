@@ -1,10 +1,6 @@
 import type { AnyObject, DBSchema, TableHandler, ViewHandler } from "prostgles-types";
 import type { TX } from "../DboBuilder/DboBuilderTypes";
-import type {
-  PublishAllOrNothing,
-  PublishTableRule,
-  PublishViewRule,
-} from "../PublishParser/PublishParser";
+import type { PublishAllOrNothing, PublishTableRule } from "../PublishParser/PublishParser";
 import { type PublishObject } from "../PublishParser/PublishParser";
 
 export type ServerViewHandler<
@@ -41,8 +37,6 @@ export type PublishFullyTyped<Schema = void> =
     {
       [tov_name in keyof Partial<Schema>]:
         | PublishAllOrNothing
-        | (Schema[tov_name]["is_view"] extends true ?
-            PublishViewRule<Schema[tov_name]["columns"], Schema>
-          : PublishTableRule<Schema[tov_name]["columns"], Schema>);
+        | PublishTableRule<Schema[tov_name]["columns"], Schema>;
     }
   : PublishObject;

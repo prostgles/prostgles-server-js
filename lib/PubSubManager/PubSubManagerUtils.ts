@@ -27,6 +27,7 @@ export const EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID =
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 export const pgp: PGP = pgPromise({});
 export const asValue = (v: any, castAs?: ":csv") => pgp.as.format(`$1${castAs ?? ""}`, [v]);
+export const DEFAULT_SYNC_THROTTLE = 100;
 export const DEFAULT_SYNC_BATCH_SIZE = 50;
 
 let lastLog: { count: number; msg: string } | undefined;

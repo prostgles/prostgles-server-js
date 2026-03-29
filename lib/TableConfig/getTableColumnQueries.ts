@@ -90,7 +90,7 @@ export const getTableColumnQueries = async ({
 
     /** Add new columns */
     newColumnDefs = colDefs
-      .filter((nc) => !tableHandler.columns?.some((c) => nc.name === c.name))
+      .filter((nc) => !tableHandler.columns.some((c) => nc.name === c.name))
       .map((c) => c.def);
 
     /** Altered/Dropped columns */

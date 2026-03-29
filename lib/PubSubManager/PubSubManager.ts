@@ -3,13 +3,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import type {
-  DBHandlerServer,
-  DboBuilder,
-  PRGLIOSocket,
-  TableInfo,
-  TableOrViewInfo,
-} from "../DboBuilder/DboBuilder";
+import type { DBHandlerServer, DboBuilder, PRGLIOSocket } from "../DboBuilder/DboBuilder";
 import type { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import type { DB } from "../Prostgles";
 import { addSync } from "./addSync";
@@ -19,7 +13,14 @@ import { initPubSubManager } from "./init/initPubSubManager";
 import { initialiseEventTriggers } from "./initialiseEventTriggers";
 import { refreshTriggers } from "./refreshTriggers";
 
-import type { AnyObject, FieldFilter, SelectParams, WAL } from "prostgles-types";
+import type {
+  AnyObject,
+  FieldFilter,
+  SelectParams,
+  SyncTableInfo,
+  TableSchema,
+  WAL,
+} from "prostgles-types";
 import { CHANNELS, getSerialisableError, type SubscribeOptions } from "prostgles-types";
 
 import { find, pickKeys } from "prostgles-types";
@@ -56,13 +57,11 @@ export type SyncParams = {
   is_syncing: boolean;
 };
 
-export type AddSyncParams = {
+export type AddSyncParams = SyncTableInfo & {
   socket: PRGLIOSocket;
-  table_info: TableInfo;
+  table_info: TableSchema;
   table_rules: ParsedTableRule;
-  synced_field: string;
   allow_delete?: boolean;
-  id_fields: string[];
   filter: object;
   params: {
     select: FieldFilter;
@@ -99,7 +98,7 @@ export type SubscriptionParams = {
   viewOptions?: ViewSubscriptionOptions;
   parentSubParams: Omit<SubscriptionParams, "parentSubParams"> | undefined;
 
-  table_info: TableOrViewInfo;
+  table_info: TableSchema;
 
   /* Used as input */
   table_rules?: ParsedTableRule;

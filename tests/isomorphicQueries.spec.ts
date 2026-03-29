@@ -146,13 +146,12 @@ export const isomorphicQueries = async (
         /** Excluded because their value may vary */
         oid,
         isFileTable,
+        publishInfo,
         ...tableInfo
       } = (await db.items.getInfo?.()) ?? {};
       assert.deepStrictEqual(tableInfo, {
         comment: null,
-        info: {
-          label: "items",
-        },
+        label: "items",
         isView: false,
         hasFiles: false,
         fileTableName: "files",

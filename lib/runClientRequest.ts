@@ -94,7 +94,8 @@ export const runClientRequest = async function (
     );
   }
 
-  if (!this.dboBuilder.dboMap.has(tableName)) {
+  const tableHandler = this.dboBuilder.dboMap.get(tableName);
+  if (!tableHandler) {
     throw `tableName ${tableName} is invalid or not allowed`;
   }
 
@@ -140,17 +141,14 @@ export const runClientRequest = async function (
       throw "Must be allowed to run sql to use returnQuery";
     }
   }
-  const tableHandler = this.dbo[tableName];
-  if (!tableHandler || !tableHandler.column_names) throw `Invalid tableName ${tableName} provided`;
 
   /**
    * satisfies check is used to ensure rules arguments are correctly passed to each method
    */
-  const tableCommand = tableHandler[command]?.bind(tableHandler) satisfies
+  const _tableCommand = tableHandler[command].bind(tableHandler) satisfies
     | undefined
     | TableMethodFunctionWithRulesAndLocalParams;
-  if (!tableCommand) throw `Invalid or disallowed command provided: ${command}`;
-  return (this.dbo[tableName]![command] as TableMethodFunctionWithRulesAndLocalParams)(
+  return (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
     param1,
     param2,
     param3,

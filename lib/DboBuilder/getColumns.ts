@@ -1,15 +1,7 @@
-import type {
-  AnyObject,
-  ValidatedColumnInfo} from "prostgles-types";
-import {
-  _PG_geometric,
-  isDefined,
-  isObject,
-  omitKeys,
-  postgresToTsType,
-} from "prostgles-types";
+import type { AnyObject, ValidatedColumnInfo } from "prostgles-types";
+import { _PG_geometric, isDefined, isObject, omitKeys, postgresToTsType } from "prostgles-types";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
-import type { LocalParams} from "./DboBuilder";
+import type { LocalParams } from "./DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./DboBuilder";
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ViewHandler } from "./ViewHandler/ViewHandler";
@@ -22,13 +14,11 @@ export async function getColumns(
   params?: { rule: "update"; filter: AnyObject },
   _param3?: undefined,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<ValidatedColumnInfo[]> {
   const start = Date.now();
   try {
     const rules = this.getValidatedRules(tableRules, localParams);
-
-    if (!rules.getColumns) throw "Not allowed";
 
     let dynamicUpdateFields = this.column_names;
 

@@ -60,10 +60,10 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
       update: "*",
       insert: "*",
       delete: "*",
-      sync: {
-        id_fields: ["id"],
-        synced_field: "last_updated",
-      },
+      // sync: {
+      //   id_fields: ["id"],
+      //   synced_field: "last_updated",
+      // },
     },
 
     items4: {

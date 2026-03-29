@@ -4,11 +4,11 @@ import {
   isEmpty,
   type SubscribeOptions,
 } from "prostgles-types";
-import { type Required_ish, type SubscribeRule } from "../../PublishParser/PublishParser";
+import { type Required_ish, type SelectRule } from "../../PublishParser/PublishParser";
 
 export const getValidatedSubscribeOptions = (
   rawVal: Required_ish<SubscribeOptions>,
-  subscribeRule: SubscribeRule | undefined
+  selectRule: SelectRule | undefined,
 ): Required_ish<SubscribeOptions> => {
   const { data, error } = getJSONBObjectSchemaValidationError(
     {
@@ -46,13 +46,13 @@ export const getValidatedSubscribeOptions = (
       },
     } as const,
     rawVal,
-    "subscribeParams"
+    "subscribeParams",
   );
   if (error !== undefined) {
     throw error;
   }
 
-  const publishedThrottle = subscribeRule?.throttle || 0;
+  const publishedThrottle = selectRule?.subscribeThrottle || 0;
   const {
     actions,
     throttleOpts,

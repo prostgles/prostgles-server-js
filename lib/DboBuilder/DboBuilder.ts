@@ -1,13 +1,13 @@
 import type pg from "pg-promise/typescript/pg-subset";
 import type { SQLHandler, SQLOptions } from "prostgles-types";
-import { getSerialisableError, isDefined, tryCatchV2 } from "prostgles-types";
+import { getSerialisableError, tryCatchV2 } from "prostgles-types";
 import { getDBGeneratedSchema } from "../DBSchemaBuilder/getDBGeneratedSchema";
 import { getFunctionsTypescriptSchema } from "../DBSchemaBuilder/getFunctionsTypescriptSchema";
 import type { DB, Prostgles } from "../Prostgles";
 import type { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
-import type { DbTableInfo, PublishParser } from "../PublishParser/PublishParser";
+import type { PublishParser } from "../PublishParser/PublishParser";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "../shortestPath";
@@ -23,7 +23,6 @@ import type {
 import { QueryStreamer } from "./QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import type { JoinPaths } from "./ViewHandler/ViewHandler";
-import { ViewHandler } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
 import type { PGConstraint } from "./dboBuilderUtils";
 import {
@@ -54,7 +53,7 @@ export class DboBuilder {
    */
   dbo: DBHandlerServer;
 
-  dboMap: Map<string, TableHandler | ViewHandler> = new Map();
+  dboMap: Map<string, TableHandler> = new Map();
 
   /**
    * Undefined if cannot create table triggers
@@ -70,18 +69,18 @@ export class DboBuilder {
 
   queryStreamer: QueryStreamer;
 
-  get tables(): DbTableInfo[] {
-    return (this.tablesOrViews ?? [])
-      .map(({ name, columns }) => {
-        const info = this.dbo[name]?.tableOrViewInfo;
-        if (!info) return undefined;
-        return {
-          name,
-          columns,
-          info,
-        };
-      })
-      .filter(isDefined);
+  get tables(): TableSchema[] {
+    return this.tablesOrViews ?? [];
+    // .map(({ name, columns }) => {
+    //   const info = this.dboMap.get(name)?.tableOrViewInfo;
+    //   if (!info) return undefined;
+    //   return {
+    //     name,
+    //     info,
+    //     columns,
+    //   } satisfies DbTableInfo;
+    // })
+    // .filter(isDefined);
   }
 
   getDetailedFieldInfo = async (fields: pg.IColumn[]) => {
@@ -247,7 +246,7 @@ export class DboBuilder {
                 Alternatively you can rename the table column\n`;
       }
 
-      const tableHandler = new (tov.is_view ? ViewHandler : TableHandler)({
+      const tableHandler = new TableHandler({
         db: this.db,
         tableOrViewInfo: tov,
         dboBuilder: this,
@@ -358,7 +357,7 @@ export class DboBuilder {
   };
 
   getShortestJoinPath = (
-    viewHandler: ViewHandler,
+    viewHandler: TableHandler,
     target: string,
   ): JoinPaths[number] | undefined => {
     const source = viewHandler.name;
@@ -384,8 +383,7 @@ export class DboBuilder {
     return this.db.tx((t) => {
       const dbTX: DbTxTableHandlers = {};
       this.tablesOrViews?.map((tov) => {
-        const TableOrViewHandler = tov.is_view ? ViewHandler : TableHandler;
-        dbTX[tov.name] = new TableOrViewHandler({
+        dbTX[tov.name] = new TableHandler({
           db: this.db,
           tableOrViewInfo: tov,
           dboBuilder: this,
@@ -394,12 +392,6 @@ export class DboBuilder {
           joinPaths: this.shortestJoinPaths,
         });
       });
-      // dbTX.sql = (q, args, opts, localParams) => {
-      //   if (localParams?.tx) {
-      //     throw "Cannot run transaction within transaction";
-      //   }
-      //   return this.runSQL(q, args, opts, { ...localParams, tx: { dbTX, t } });
-      // };
 
       return cb(dbTX as TH, t);
     });

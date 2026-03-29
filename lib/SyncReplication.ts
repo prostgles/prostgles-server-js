@@ -87,8 +87,8 @@ export async function syncData(
     return;
   }
   const tableHandler = this.dbo[table_name];
-  if (!tableHandler?.find || !tableHandler.count) {
-    throw `dbo.${table_name}.find or .count are missing or not allowed`;
+  if (!tableHandler?.find) {
+    throw `dbo.${table_name}.find missing or not allowed`;
   }
 
   const sync_fields = [synced_field, ...id_fields.sort()],
@@ -110,7 +110,7 @@ export async function syncData(
         };
       }
 
-      const first_rows = await tableHandler.find!(
+      const first_rows = await tableHandler.find(
         _filter,
         { orderBy: orderByAsc, select: sync_fields, limit, offset },
         undefined,
@@ -119,7 +119,7 @@ export async function syncData(
       );
       const last_rows = first_rows.slice(-1); // Why not logic below?
       // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-      const count = await tableHandler.count!(_filter, undefined, undefined, table_rules);
+      const count = await tableHandler.count(_filter, undefined, undefined, table_rules);
 
       return {
         s_fr: first_rows[0] || null,
@@ -189,7 +189,7 @@ export async function syncData(
       };
 
       try {
-        const res = await tableHandler.find?.(
+        const res = await tableHandler.find(
           _filter,
           {
             select: params.select,
@@ -201,8 +201,6 @@ export async function syncData(
           table_rules,
           { clientReq: { socket } },
         );
-
-        if (!res) throw "_this?.dbo?.[table_name]?.find is missing";
 
         return res;
       } catch (e) {
@@ -418,7 +416,7 @@ export async function syncData(
             sync_fields.map((key) => {
               _filter[key] = c_lr[key];
             });
-            server_row = await this.dbo[table_name]?.find?.(
+            server_row = await this.dbo[table_name]?.find(
               _filter,
               { select: sync_fields, limit: 1 },
               undefined,

@@ -117,7 +117,7 @@ export async function initFileManager(this: FileManager, prg: Prostgles) {
     if (!this.dbo[refTable]) {
       throw `Referenced table (${refTable}) from fileTable.referencedTables prostgles init config does not exist`;
     }
-    const cols = await (this.dbo[refTable] as TableHandler).getColumns();
+    const cols = await (this.dbo[refTable]).getColumns();
 
     for (const [colName] of Object.entries(tableConfig.referenceColumns)) {
       const existingCol = cols.find((c) => c.name === colName);

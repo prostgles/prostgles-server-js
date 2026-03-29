@@ -15,18 +15,18 @@ export type SchemaRelatedOptions = Pick<
 export const tableConfigWithMigrations = async (
   db: DB,
   { tableConfig, tableConfigMigrations }: SchemaRelatedOptions,
-  file_table_schema: string
+  file_table_schema: string,
 ) => {
   if (!tableConfigMigrations) return { config: tableConfig };
   const { versionTableName = "schema_version" } = tableConfigMigrations;
 
   if (tableConfig?.[versionTableName]) {
     throw new Error(
-      `Table "${versionTableName}" is reserved for version tracking. Please use a different name in tableConfig.`
+      `Table "${versionTableName}" is reserved for version tracking. Please use a different name in tableConfig.`,
     );
   }
 
-  const newConfig = {
+  const newConfig: TableConfig = {
     ...tableConfig,
     [versionTableName]: {
       columns: {
@@ -45,7 +45,7 @@ export const tableConfigWithMigrations = async (
       versionTableName,
       newConfig,
       tableConfigMigrations,
-      file_table_schema
+      file_table_schema,
     ),
   };
 };
@@ -60,10 +60,10 @@ const getMigration = async (
   versionTableName: string,
   tableConfig: TableConfig,
   { version, onMigrate }: Pick<TableConfigMigrations, "version" | "onMigrate">,
-  file_table_queries: string
+  file_table_queries: string,
 ) => {
   const maxVersion = Number(
-    (await db.oneOrNone<{ v: string }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))?.v
+    (await db.oneOrNone<{ v: string }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))?.v,
   );
   const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
@@ -77,7 +77,7 @@ const getMigration = async (
           AND table_config = \${table_config}
           AND file_table_queries = \${file_table_queries}
         `,
-        { version, table_config: tableConfig, file_table_queries }
+        { version, table_config: tableConfig, file_table_queries },
       )
     )?.v;
 
@@ -94,7 +94,7 @@ const getMigration = async (
   const finishMigration = async (t: pgPromise.ITask<{}>) => {
     await t.none(
       `INSERT INTO ${asName(versionTableName)} (id, table_config, file_table_queries) VALUES (\${version}, \${table_config}, \${file_table_queries})`,
-      { version, table_config: tableConfig, file_table_queries }
+      { version, table_config: tableConfig, file_table_queries },
     );
   };
 

@@ -1,16 +1,10 @@
-import type {
-  DBSchemaTable,
-  TableInfo,
-  TableSchemaErrors,
-  TableSchemaForClient,
-} from "prostgles-types";
-import { getKeys, includes, isEmpty, isObject, pickKeys, type AnyObject } from "prostgles-types";
+import type { DBSchemaTable, TableSchemaErrors } from "prostgles-types";
+import { isEmpty, isObject } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
-import { getErrorAsObject } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
-import { TABLE_METHODS } from "../Prostgles";
 import type { PublishParser } from "./PublishParser";
 import { type PermissionScope, type PublishObject } from "./PublishParser";
+import { getDBSchemaTable } from "./getDBSchemaTable";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;
@@ -22,13 +16,13 @@ export async function getSchemaFromPublish(
   { userData, ...clientReq }: Args,
   scope: PermissionScope | undefined,
 ): Promise<{
-  schema: TableSchemaForClient;
   tables: DBSchemaTable[];
   tableSchemaErrors: TableSchemaErrors;
 }> {
-  const schema: TableSchemaForClient = {};
   const tableSchemaErrors: TableSchemaErrors = {};
-  let tables: DBSchemaTable[] = [];
+  const tables: DBSchemaTable[] = [];
+
+  const txKey = !this.prostgles.opts.transactions ? "" : "tx";
 
   try {
     /* Publish tables and views based on socket */
@@ -37,156 +31,71 @@ export async function getSchemaFromPublish(
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
-    let _publish: PublishObject | undefined;
+    let publish: PublishObject | undefined;
     try {
-      _publish = await this.getPublishAsObject(clientReq, clientInfo);
+      publish = await this.getPublishObject(clientReq, clientInfo);
     } catch (err) {
       console.error("Error within then Publish function ", err);
       throw err;
     }
 
-    if (_publish && Object.keys(_publish).length) {
-      let txKey = "tx";
-      if (!this.prostgles.opts.transactions) txKey = "";
-      if (typeof this.prostgles.opts.transactions === "string")
-        txKey = this.prostgles.opts.transactions;
-
-      const tableNames = Object.keys(_publish).filter((k) => !txKey || txKey !== k);
-
-      const fileTableName = this.prostgles.fileManager?.tableName;
-      if (
-        fileTableName &&
-        this.dbo[fileTableName]?.is_media &&
-        !tableNames.includes(fileTableName)
-      ) {
-        const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
-          t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
-        );
-        if (isReferenced) {
-          tableNames.unshift(fileTableName);
-        }
-      }
-      await Promise.all(
-        tableNames.map(async (tableName) => {
-          const { canSubscribe, tablesOrViews } = this.prostgles.dboBuilder;
-          if (!this.dbo[tableName]) {
-            const errMsg = [
-              `Table ${tableName} does not exist`,
-              `Expecting one of: ${JSON.stringify(tablesOrViews?.map((tov) => tov.name))}`,
-            ].join("\n");
-            throw errMsg;
-          }
-
-          const parsedTableRule = await this.getTableRules(
-            { clientReq, tableName },
-            clientInfo,
-            scope,
-          );
-
-          if (!parsedTableRule || isEmpty(parsedTableRule)) return;
-          if (!isObject(parsedTableRule)) {
-            throw `Invalid tableRules for table ${tableName}. Expecting an object`;
-          }
-
-          schema[tableName] = {};
-          const tableSchema = schema[tableName];
-          const methods = getKeys(parsedTableRule).filter(
-            (m) => canSubscribe || !includes(SUBSCRIBE_METHODS, m),
-          );
-          let tableInfo: TableInfo | undefined;
-          let tableColumns: DBSchemaTable["columns"] | undefined;
-
-          await Promise.all(
-            methods
-              .filter((m) => m !== "select")
-              .map(async (method) => {
-                if (method === "sync") {
-                  /* Pass sync info */
-                  tableSchema[method] = parsedTableRule[method];
-                } else if (includes(getKeys(parsedTableRule), method) && parsedTableRule[method]) {
-                  //@ts-ignore
-                  tableSchema[method] =
-                    method === "insert" ?
-                      pickKeys(parsedTableRule[method], ["allowedNestedInserts"])
-                    : ({} as AnyObject);
-
-                  /* Test for issues with the common table CRUD methods () */
-                  if (includes(TABLE_METHODS, method)) {
-                    try {
-                      this.validateRequestRule(
-                        {
-                          tableName,
-                          command: method,
-                          clientReq,
-                        },
-                        parsedTableRule,
-                        scope,
-                      );
-                      if (this.prostgles.opts.testRulesOnConnect) {
-                        await (this.dbo[tableName] as TableHandler)[method](
-                          {},
-                          {},
-                          undefined,
-                          parsedTableRule,
-                          {
-                            ...clientReq,
-                            isRemoteRequest: {},
-                            testRule: true,
-                          },
-                        );
-                      }
-                    } catch (e) {
-                      console.error(`${tableName}.${method}`, e);
-                      tableSchemaErrors[tableName] ??= {};
-                      tableSchemaErrors[tableName][method] = {
-                        error: "Internal publish error. Check server logs",
-                      };
-
-                      throw {
-                        ...getErrorAsObject(e),
-                        publish_path: `publish.${tableName}.${method}`,
-                      };
-                    }
-                  }
-
-                  if (method === "getInfo" || method === "getColumns") {
-                    this.validateRequestRule(
-                      { tableName, command: method, clientReq },
-                      parsedTableRule,
-                      scope,
-                    );
-                    const res = await (this.dbo[tableName] as TableHandler)[method](
-                      undefined,
-                      undefined,
-                      undefined,
-                      parsedTableRule,
-                      { ...clientReq, isRemoteRequest: {} },
-                    );
-                    if (method === "getInfo") {
-                      tableInfo = res as TableInfo;
-                    } else {
-                      tableColumns = res as DBSchemaTable["columns"];
-                    }
-                  }
-                }
-              }),
-          );
-
-          if (tableInfo && tableColumns) {
-            tables.push({
-              name: tableName,
-              info: tableInfo,
-              columns: tableColumns,
-            });
-          }
-        }),
-      );
+    if (!publish || !Object.keys(publish).length) {
+      return { tables, tableSchemaErrors };
     }
+    const tableNames = Object.keys(publish).filter((k) => !txKey || txKey !== k);
+
+    /**
+     * Add file table to the list of published tables if it's referenced by other published tables.
+     * Access to the file table is controlled through the publish rules of the tables referencing it.
+     */
+    const fileTableName = this.prostgles.fileManager?.tableName;
+    if (fileTableName && this.dbo[fileTableName]?.is_media && !tableNames.includes(fileTableName)) {
+      const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
+        t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
+      );
+      if (isReferenced) {
+        tableNames.unshift(fileTableName);
+      }
+    }
+
+    await Promise.all(
+      tableNames.map(async (tableName) => {
+        const { tablesOrViews } = this.prostgles.dboBuilder;
+        const tableHandler = this.dbo[tableName];
+        if (!tableHandler) {
+          const errMsg = [
+            `Table ${tableName} does not exist`,
+            `Expecting one of: ${JSON.stringify(tablesOrViews?.map((tov) => tov.name))}`,
+          ].join("\n");
+          throw errMsg;
+        }
+
+        const parsedTableRule = await this.getTableRules(
+          { clientReq, tableName },
+          clientInfo,
+          scope,
+        );
+
+        if (!parsedTableRule || isEmpty(parsedTableRule)) return;
+        if (!isObject(parsedTableRule)) {
+          throw `Invalid tableRules for table ${tableName}. Expecting an object`;
+        }
+
+        const tableSchema = await getDBSchemaTable(
+          this,
+          tableHandler,
+          parsedTableRule,
+          clientReq,
+          scope,
+        );
+        tables.push(tableSchema);
+      }),
+    );
   } catch (error) {
     console.error("Publish error", error);
     throw error;
   }
 
-  tables = tables.sort((a, b) => a.name.localeCompare(b.name));
-  return { schema, tables, tableSchemaErrors };
+  // tables = tables.sort((a, b) => a.name.localeCompare(b.name));
+  return { tables, tableSchemaErrors };
 }

@@ -6,12 +6,20 @@ import type {
   EXISTS_KEY,
   RawJoinPath,
   SQLHandler,
+  SyncTableInfo,
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
 import type { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
 import type { BasicCallback } from "../PubSubManager/PubSubManager";
-import type { PermissionScope, PublishAllOrNothing } from "../PublishParser/PublishParser";
+import type {
+  DeleteRule,
+  InsertRule,
+  PermissionScope,
+  PublishAllOrNothing,
+  SelectRule,
+  UpdateRule,
+} from "../PublishParser/PublishParser";
 import type { FieldSpec } from "./QueryBuilder/Functions/Functions";
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
@@ -107,10 +115,10 @@ export type TX<TH = TableHandlers> = {
 };
 
 export type TableHandlers = {
-  [key: string]: Partial<TableHandler>;
+  [key: string]: TableHandler;
 };
 export type DbTxTableHandlers = {
-  [key: string]: Omit<Partial<TableHandler>, "dbTx"> | Omit<TableHandler, "dbTx">;
+  [key: string]: Omit<TableHandler, "dbTx">;
 };
 
 export type SQLHandlerServer = SQLHandler<LocalParams>;
@@ -264,75 +272,78 @@ export type JoinInfo = {
     target: string;
   }[];
 };
+type MergeOverwrite<T, U> = Omit<T, keyof U> & U;
 
-export type CommonTableRules = {
-  /**
-   * True by default. Allows clients to get column information on any columns that are allowed in (select, insert, update) field rules.
-   */
-  getColumns?: PublishAllOrNothing;
-
-  /**
-   * True by default. Allows clients to get table information (oid, comment, label, has_media).
-   */
-  getInfo?: PublishAllOrNothing;
-};
-
-export type ValidatedTableRules = CommonTableRules & {
+export type ValidatedTableRules = {
   /* All columns of the view/table. Includes computed fields as well */
   allColumns: FieldSpec[];
 
-  select?: {
-    /* Fields you can select */
-    fields: string[];
+  select?: MergeOverwrite<
+    SelectRule,
+    {
+      /* Fields you can select */
+      fields: string[];
 
-    /* Fields you can select */
-    orderByFields: string[];
+      /* Fields you can select */
+      orderByFields: string[];
 
-    /* Filter applied to every select */
-    filterFields: string[];
+      /* Filter applied to every select */
+      filterFields: string[];
 
-    /* Filter applied to every select */
-    forcedFilter: AnyObject | undefined;
+      /* Filter applied to every select */
+      forcedFilter: AnyObject | undefined;
 
-    /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
-    maxLimit: number | null;
-  };
-  update?: {
-    /* Fields you can update */
-    fields: string[];
+      /* Max limit allowed for each select. 1000 by default. If null then an unlimited select is allowed when providing { limit: null } */
+      maxLimit: number | null;
 
-    /* Fields you can return after updating */
-    returningFields: string[];
+      syncConfig: SyncTableInfo | undefined;
+    }
+  >;
+  update?: MergeOverwrite<
+    UpdateRule,
+    {
+      /* Fields you can update */
+      fields: string[];
 
-    /* Fields you can use in filtering when updating */
-    filterFields: string[];
+      /* Fields you can return after updating */
+      returningFields: string[];
 
-    /* Filter applied to every update. Filter fields cannot be updated */
-    forcedFilter: AnyObject | undefined;
+      /* Fields you can use in filtering when updating */
+      filterFields: string[];
 
-    /* Data applied to every update */
-    forcedData: AnyObject;
-  };
-  insert?: {
-    /* Fields you can insert */
-    fields: string[];
+      /* Filter applied to every update. Filter fields cannot be updated */
+      forcedFilter: AnyObject | undefined;
 
-    /* Fields you can return after inserting. Will return select.fields by default */
-    returningFields: string[];
+      /* Data applied to every update */
+      forcedData: AnyObject;
+    }
+  >;
+  insert?: MergeOverwrite<
+    InsertRule,
+    {
+      /* Fields you can insert */
+      fields: string[];
 
-    /* Data applied to every insert */
-    forcedData: AnyObject;
-  };
-  delete?: {
-    /* Fields to filter by when deleting */
-    filterFields: string[];
+      /* Fields you can return after inserting. Will return select.fields by default */
+      returningFields: string[];
 
-    /* Filter applied to every deletes */
-    forcedFilter: AnyObject | undefined;
+      /* Data applied to every insert */
+      forcedData: AnyObject;
+    }
+  >;
+  delete?: MergeOverwrite<
+    DeleteRule,
+    {
+      /* Fields to filter by when deleting */
+      filterFields: string[];
 
-    /* Fields you can return after deleting */
-    returningFields: string[];
-  };
+      /* Filter applied to every deletes */
+      forcedFilter: AnyObject | undefined;
+
+      /* Fields you can return after deleting */
+      returningFields: string[];
+    }
+  >;
 };
 
 export type ExistsFilterConfig = {

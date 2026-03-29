@@ -1,11 +1,5 @@
-import { RULE_METHODS } from "prostgles-types";
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type {
-  CommonTableRules,
-  Filter,
-  LocalParams,
-  TableOrViewInfo,
-} from "../DboBuilder/DboBuilder";
+import type { Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
 
 export type Awaitable<T> = T | Promise<T>;
@@ -18,132 +12,16 @@ export type DboTableCommand = DboTable & {
   command: string;
 };
 
-export const RULE_TO_METHODS = [
-  {
-    rule: "getColumns",
-    sqlRule: "select",
-    methods: RULE_METHODS.getColumns,
-    no_limits: true,
-    allowed_params: [],
-    table_only: false,
-    hint: ` expecting false | true | undefined`,
-  },
-  {
-    rule: "getInfo",
-    sqlRule: "select",
-    methods: RULE_METHODS.getInfo,
-    no_limits: true,
-    allowed_params: [],
-    table_only: false,
-    hint: ` expecting false | true | undefined`,
-  },
-  {
-    rule: "insert",
-    sqlRule: "insert",
-    methods: RULE_METHODS.insert,
-    no_limits: <SelectRule>{ fields: "*" },
-    table_only: true,
-    allowed_params: {
-      checkFilter: 1,
-      fields: 1,
-      forcedData: 1,
-      postValidate: 1,
-      preValidate: 1,
-      returningFields: 1,
-      validate: 1,
-      allowedNestedInserts: 1,
-      requiredNestedInserts: 1,
-    } satisfies Record<keyof InsertRule, 1>,
-    hint: ` expecting "*" | true | { fields: string | string[] | {}  }`,
-  },
-  {
-    rule: "update",
-    sqlRule: "update",
-    methods: RULE_METHODS.update,
-    no_limits: <UpdateRule>{
-      fields: "*",
-      filterFields: "*",
-      returningFields: "*",
-    },
-    table_only: true,
-    allowed_params: {
-      checkFilter: 1,
-      dynamicFields: 1,
-      fields: 1,
-      filterFields: 1,
-      forcedData: 1,
-      forcedFilter: 1,
-      postValidate: 1,
-      returningFields: 1,
-      validate: 1,
-    } satisfies Record<keyof UpdateRule, 1>,
-    hint: ` expecting "*" | true | { fields: string | string[] | {}  }`,
-  },
-  {
-    rule: "select",
-    sqlRule: "select",
-    methods: RULE_METHODS.select,
-    no_limits: <SelectRule>{ fields: "*" },
-    table_only: false,
-    allowed_params: {
-      fields: 1,
-      filterFields: 1,
-      forcedFilter: 1,
-      maxLimit: 1,
-      orderByFields: 1,
-      validate: 1,
-    } satisfies Record<keyof SelectRule, 1>,
-    hint: ` expecting "*" | true | { fields: ( string | string[] | {} )  }`,
-  },
-  {
-    rule: "delete",
-    sqlRule: "delete",
-    methods: RULE_METHODS.delete,
-    no_limits: <DeleteRule>{ filterFields: "*" },
-    table_only: true,
-    allowed_params: {
-      returningFields: 1,
-      validate: 1,
-      filterFields: 1,
-      forcedFilter: 1,
-    } satisfies Record<keyof DeleteRule, 1>,
-    hint: ` expecting "*" | true | { filterFields: ( string | string[] | {} ) } \n Will use "select", "update", "delete" and "insert" rules`,
-  },
-  {
-    rule: "sync",
-    sqlRule: "select",
-    methods: RULE_METHODS.sync,
-    no_limits: null,
-    table_only: true,
-    allowed_params: {
-      // allow_delete: 1,
-      batch_size: 1,
-      id_fields: 1,
-      synced_field: 1,
-      throttle: 1,
-    } satisfies Record<keyof SyncRule, 1>,
-    hint: ` expecting "*" | true | { id_fields: string[], synced_field: string }`,
-  },
-  {
-    rule: "subscribe",
-    sqlRule: "select",
-    methods: RULE_METHODS.subscribe,
-    no_limits: <SubscribeRule>{ throttle: 0 },
-    table_only: false,
-    allowed_params: { throttle: 1 } satisfies Record<keyof SubscribeRule, 1>,
-    hint: ` expecting "*" | true | { throttle: number; throttleOpts?: { skipFirst?: boolean; } } \n Will use "select" rules`,
-  },
-] as const;
-
 import type pgPromise from "pg-promise";
 import type {
   AnyObject,
   DBSchema,
   FieldFilter,
   FullFilter,
+  RequiredNestedInsert,
   SelectParams,
   SQLHandler,
-  TableInfo,
+  TableSchema,
 } from "prostgles-types";
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
@@ -266,6 +144,10 @@ export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * Validation logic to check/update data for each request
    */
   validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
+
+  subscribeThrottle?: number;
+
+  disableMethods?: Partial<Record<"sync" | "subscribe", 1>>;
 };
 
 export type CommonInsertUpdateRule<
@@ -324,7 +206,7 @@ export type InsertRule<
     column: string;
   }[];
 
-  requiredNestedInserts?: TableInfo["requiredNestedInserts"];
+  requiredNestedInserts?: RequiredNestedInsert[];
 };
 
 export type UpdateRule<
@@ -374,6 +256,8 @@ export type UpdateRule<
    * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
    */
   postValidate?: S extends DBSchema ? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
+
+  disableMethods?: Partial<Record<"updateBatch", 1>>;
 };
 
 export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
@@ -395,9 +279,10 @@ export type DeleteRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
   /**
    * Validation logic to check/update data for each request
    */
-  validate?(filter: FullFilter<Cols, S>): Awaitable<void>; // UpdateRequestData<Cols>;
+  validate?(filter: FullFilter<Cols, S>): Awaitable<void>;
 };
-export type SyncRule<Cols extends AnyObject = AnyObject> = {
+
+export type SyncConfig<Cols extends AnyObject = AnyObject> = {
   /**
    * Primary keys used in updating data
    */
@@ -423,9 +308,7 @@ export type SyncRule<Cols extends AnyObject = AnyObject> = {
    */
   batch_size?: number;
 };
-export type SubscribeRule = {
-  throttle?: number;
-};
+
 /**
  * Required but possibly undefined type
  * */
@@ -433,24 +316,16 @@ export type Required_ish<T> = {
   [K in keyof Required<T>]: T[K];
 };
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: NonNullable<T[P]> };
-export type ViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
-  /**
-   * What can be read from the table
-   */
-  select?: SelectRule<S>;
-};
-export type TableRule<
-  RowType extends AnyObject = AnyObject,
-  S extends DBSchema | void = void,
-> = ViewRule<RowType> & {
+
+export type TableRule<RowType extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
+  select?: SelectRule<RowType, S>;
   insert?: InsertRule<RowType, S>;
   update?: UpdateRule<RowType, S>;
   delete?: DeleteRule<RowType, S>;
-  sync?: SyncRule<RowType>;
-  subscribe?: SubscribeRule;
+  sync?: SyncConfig<RowType>;
 };
 
-export type ParsedViewRule<S extends AnyObject = AnyObject> = CommonTableRules & {
+export type ParsedViewRule<S extends AnyObject = AnyObject> = {
   /**
    * What can be read from the table
    */
@@ -463,8 +338,6 @@ export type ParsedTableRule<
   insert?: WithRequired<InsertRule<RowType, S>, "returningFields">;
   update?: WithRequired<UpdateRule<RowType, S>, "filterFields" | "returningFields">;
   delete?: WithRequired<DeleteRule<RowType, S>, "returningFields">;
-  sync?: SyncRule<RowType>;
-  subscribe?: SubscribeRule;
 };
 
 export const parsePublishTableRule = <R extends ParsedPublishTable>(tableRules: R | undefined) => {
@@ -500,36 +373,40 @@ export const parsePublishTableRule = <R extends ParsedPublishTable>(tableRules: 
   return parsedTableRules;
 };
 
-export type PublishViewRule<Col extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
-  select?: SelectRule<Col, S> | PublishAllOrNothing;
-  getColumns?: PublishAllOrNothing;
-  getInfo?: PublishAllOrNothing;
-};
 export type PublishTableRule<
   Col extends AnyObject = AnyObject,
   S extends DBSchema | void = void,
-> = PublishViewRule<Col, S> & {
+> = {
+  select?: SelectRule<Col, S> | PublishAllOrNothing;
   insert?: InsertRule<Col, S> | PublishAllOrNothing;
   update?: UpdateRule<Col, S> | PublishAllOrNothing;
   delete?: DeleteRule<Col, S> | PublishAllOrNothing;
-  /**
-   * TODO: move to tableConfig
-   */
-  sync?: SyncRule<Col>;
-  subscribe?: SubscribeRule | PublishAllOrNothing;
 };
+
+export const TABLE_RULE_NO_LIMITS = {
+  select: {
+    fields: "*",
+    disableMethods: undefined,
+    subscribeThrottle: 1,
+  },
+  insert: {
+    fields: "*",
+  },
+  update: {
+    fields: "*",
+    filterFields: "*",
+  },
+  delete: {
+    filterFields: "*",
+  },
+} as const satisfies PublishTableRule;
 
 export type ParsedPublishTable = {
   select?: SelectRule;
-  getColumns?: true;
-  getInfo?: true;
 
   insert?: InsertRule;
   update?: UpdateRule;
   delete?: DeleteRule;
-  sync?: SyncRule;
-  subscribe?: SubscribeRule;
-  subscribeOne?: SubscribeRule;
 };
 export type DbTableInfo = {
   name: string;
@@ -575,7 +452,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   user?: SUser["user"];
   clientReq: AuthClientRequest;
   clientInfo: LoginClientInfo;
-  tables: DbTableInfo[];
+  tables: TableSchema[];
   getClientDBHandlers: (
     /**
      * Used to filter permissions
@@ -585,10 +462,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
 };
 export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;
-export type PublishObject = Record<
-  string,
-  PublishTableRule | PublishViewRule | PublishAllOrNothing
->;
+export type PublishObject = Record<string, PublishTableRule | PublishAllOrNothing>;
 export type ParsedPublishTables = {
   [table_name: string]: ParsedPublishTable;
 };

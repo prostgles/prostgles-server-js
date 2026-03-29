@@ -1,6 +1,6 @@
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
-import type { SQLHandler } from "prostgles-types";
+import type { SQLHandler, TableSchema } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
@@ -10,7 +10,6 @@ import { getDbConnection } from "./getDbConnection";
 import type { DBHandlerServer, Prostgles } from "./Prostgles";
 import { getIsSuperUser } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
-import type { DbTableInfo } from "./PublishParser/PublishParser";
 import { PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
@@ -62,7 +61,7 @@ export type OnInitReason =
 type OnReadyParamsCommon = {
   db: DB;
   sql: SQLHandler;
-  tables: DbTableInfo[];
+  tables: TableSchema[];
   reason: OnInitReason;
 };
 export type OnReadyParamsBasic = OnReadyParamsCommon & {

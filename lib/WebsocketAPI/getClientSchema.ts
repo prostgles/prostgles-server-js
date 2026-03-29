@@ -39,7 +39,10 @@ export async function getClientSchema(
     }
     const { allowed: rawSQL } = await clientCanRunSqlRequest.bind(this)(clientInfo);
 
-    const { schema, tables, tableSchemaErrors } = fullSchema ?? {
+    const tablesWithSelectRules = new Set(
+      fullSchema?.tables.filter((t) => t.publishInfo.select).map((t) => t.name) ?? [],
+    );
+    const { tables, tableSchemaErrors } = fullSchema ?? {
       schema: {},
       tables: [],
       tableSchemaErrors: {},
@@ -48,7 +51,7 @@ export async function getClientSchema(
     if (this.opts.joins) {
       const _joinTables2 = this.dboBuilder
         .getAllJoinPaths()
-        .filter((jp) => ![jp.t1, jp.t2].find((t) => !schema[t] || !schema[t].findOne))
+        .filter((jp) => [jp.t1, jp.t2].every((t) => tablesWithSelectRules.has(t)))
         .map((jp) => [jp.t1, jp.t2].sort());
       _joinTables2.map((jt) => {
         if (!joinTables2.find((_jt) => _jt.join() === jt.join())) {
@@ -82,7 +85,6 @@ export async function getClientSchema(
     }
 
     const clientSchema: ClientSchema = {
-      schema,
       methods: methodSchema,
       tableSchema: tables,
       rawSQL,

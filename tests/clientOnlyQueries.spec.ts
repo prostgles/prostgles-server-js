@@ -356,24 +356,25 @@ export const clientOnlyQueries = async (
      * tableSchema must contan an array of all tables and their columns that have getInfo and getColumns allowed
      */
     await test("Check tableSchema", async () => {
-      const dbTables = Object.keys(db)
-        .map((k) => {
-          const h = db[k];
+      const dbTables = Object.entries(db)
+        .map(([k, h]) => {
           return !!(h.getColumns && h.getInfo) ? k : undefined;
         })
         .filter(isDefined);
       const missingTbl = dbTables.find((t) => !tableSchema.some((st) => st.name === t));
-      if (missingTbl)
+      if (missingTbl) {
         throw `${missingTbl} is missing from tableSchema: ${JSON.stringify(tableSchema)}`;
+      }
       const missingscTbl = tableSchema.find((t) => !dbTables.includes(t.name));
-      if (missingscTbl) throw `${missingscTbl} is missing from db`;
-
+      if (missingscTbl) {
+        throw `${JSON.stringify([missingscTbl.name, missingscTbl.publishInfo])} is missing from db (${dbTables.join(", ")})`;
+      }
       await Promise.all(
-        tableSchema.map(async (tbl) => {
-          const cols = await db[tbl.name]?.getColumns?.();
-          const info = await db[tbl.name]?.getInfo?.();
-          assert.deepStrictEqual(tbl.columns, cols);
-          assert.deepStrictEqual(tbl.info, info);
+        tableSchema.map(async ({ name, columns, ...otherInfo }) => {
+          const cols = await db[name]?.getColumns?.();
+          const info = await db[name]?.getInfo?.();
+          assert.deepStrictEqual(columns, cols);
+          assert.deepStrictEqual(otherInfo, info);
         }),
       );
     });

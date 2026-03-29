@@ -57,7 +57,7 @@ export const updateFile = async function (
     : undefined;
 
   const existingFile: Media | undefined = await (
-    (localParams?.tx?.dbTX[this.name] as TableHandler | undefined) || this
+    (localParams?.tx?.dbTX[this.name]) || this
   ).findOne({ id: existingMediaId });
 
   if (!existingFile?.name) throw new Error("Existing file record not found");

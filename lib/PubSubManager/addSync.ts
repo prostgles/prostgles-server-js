@@ -1,6 +1,6 @@
 import { find, tryCatchV2 } from "prostgles-types";
 import type { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
-import { DEFAULT_SYNC_BATCH_SIZE, parseCondition } from "./PubSubManagerUtils";
+import { parseCondition } from "./PubSubManagerUtils";
 
 /**
  * Returns a sync channel
@@ -17,11 +17,9 @@ export async function addSync(
       table_info = null,
       table_rules,
       synced_field = null,
-      id_fields = [],
       filter = {},
       params,
       condition = "",
-      throttle = 0,
     } = syncParams;
     const conditionParsed = parseCondition(condition);
     if (!socket || !table_info) throw "socket or table_info missing";
@@ -33,18 +31,17 @@ export async function addSync(
 
     this.upsertSocket(socket);
 
+    const syncConfig = this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(table_name);
+    if (!syncConfig) throw `Sync not configured for table ${table_name}`;
     const upsertSync = () => {
       const newSync = {
         channel_name: channelName,
         table_name,
         filter,
         condition: conditionParsed,
-        synced_field,
         sid,
-        id_fields,
         table_rules,
-        throttle: Math.max(throttle || 0, table_rules.sync?.throttle || 0),
-        batch_size: table_rules.sync?.batch_size || DEFAULT_SYNC_BATCH_SIZE,
+        ...syncConfig,
         socket_id: socket.id,
         is_sync: true,
         last_synced: 0,

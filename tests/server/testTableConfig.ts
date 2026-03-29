@@ -1,6 +1,12 @@
 import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfig";
 
 export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
+  planes: {
+    syncConfig: {
+      id_fields: ["id"],
+      synced_field: "last_updated",
+    },
+  },
   tr2: {
     // dropIfExists: true,
     columns: {

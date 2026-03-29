@@ -6,20 +6,24 @@ import type {
   DBSchema,
   JSONB,
   StrictUnion,
-  TableInfo,
 } from "prostgles-types";
 import { isObject } from "prostgles-types";
 import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { uploadFile } from "../DboBuilder/uploadFile";
+import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type {
   InsertRule,
+  SyncConfig,
   ValidateRowArgsCommon,
   ValidateRowsArgsCommon,
 } from "../PublishParser/PublishParser";
+import {
+  DEFAULT_SYNC_BATCH_SIZE,
+  DEFAULT_SYNC_THROTTLE,
+} from "../PubSubManager/PubSubManagerUtils";
 import { initTableConfig } from "./initTableConfig";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 
 type ColExtraInfo = {
   min?: string | number;
@@ -53,6 +57,7 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
   };
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
+  syncConfig?: SyncConfig;
   hooks?: {
     /**
      * Hook used to run custom logic before inserting a row.
@@ -418,17 +423,26 @@ export default class TableConfigurator {
     return undefined;
   };
 
-  getTableInfo = (params: { tableName: string; lang?: string }): TableInfo["info"] | undefined => {
+  getTableSyncConfig = (tableName: string) => {
+    const syncConfig = this.config[tableName]?.syncConfig;
+    return (
+      syncConfig && {
+        ...syncConfig,
+        batch_size: syncConfig.batch_size ?? DEFAULT_SYNC_BATCH_SIZE,
+        throttle: syncConfig.throttle ?? DEFAULT_SYNC_THROTTLE,
+      }
+    );
+  };
+
+  getTableLabel = (params: { tableName: string; lang?: string }) => {
     const tconf = this.config[params.tableName];
 
-    return {
-      label: parseI18N({
-        config: tconf?.info?.label,
-        lang: params.lang,
-        defaultLang: "en",
-        defaultValue: params.tableName,
-      }),
-    };
+    return parseI18N({
+      config: tconf?.info?.label,
+      lang: params.lang,
+      defaultLang: "en",
+      defaultValue: params.tableName,
+    });
   };
 
   getColInfo = (params: {

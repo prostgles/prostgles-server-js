@@ -154,8 +154,8 @@ export async function insertRowWithNestedRecords(
       localParams?.scope,
     );
 
-    const cols2 = this.dboBuilder.dbo[tbl2!]!.columns || [];
-    if (!this.dboBuilder.dbo[tbl2!]) throw "Invalid/disallowed table: " + tbl2;
+    const cols2 = this.dboBuilder.dboMap.get(tbl2!)?.columns || [];
+    if (!this.dboBuilder.dboMap.get(tbl2!)) throw "Invalid/disallowed table: " + tbl2;
     const colsRefT1 = cols2.filter((c) =>
       c.references?.some((rc) => rc.cols.length === 1 && rc.ftable === tbl1),
     );
@@ -299,7 +299,7 @@ const referencedInsert = async (
 
   const results: AnyObject[] = [];
   for (const dataItem of (Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]) {
-    const result: AnyObject = await (dbTX[targetTable] as TableHandler)
+    const result: AnyObject = await dbTX[targetTable]
       .insert(dataItem, { returning: "*", onConflict }, undefined, childRules, localParams)
       .catch((e) => {
         return Promise.reject(e);

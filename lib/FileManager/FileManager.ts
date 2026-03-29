@@ -138,11 +138,10 @@ export class FileManager {
             const fileTable = fullConfig.tableName;
             const daysDelay = fullConfig.delayedDelete?.deleteAfterNDays ?? 0;
             if (fileTable && this.dbo[fileTable]?.delete && daysDelay) {
-              const filesToDelete =
-                (await this.dbo[fileTable].find?.({
-                  deleted_from_storage: null,
-                  deleted: { ">": Date.now() - daysDelay * HOUR * 24 },
-                })) ?? [];
+              const filesToDelete = await this.dbo[fileTable].find({
+                deleted_from_storage: null,
+                deleted: { ">": Date.now() - daysDelay * HOUR * 24 },
+              });
               for (const file of filesToDelete) {
                 await this.deleteFile(file.name);
               }
@@ -278,7 +277,7 @@ export class FileManager {
   }): ValidatedColumnInfo["file"] | undefined => {
     const { colName, tableName } = args;
     const tableConfig = this.prostgles?.opts.fileTable?.referencedTables?.[tableName];
-    const isReferencingFileTable = this.dbo[tableName]?.columns?.some(
+    const isReferencingFileTable = this.dbo[tableName]?.columns.some(
       (c) =>
         c.name === colName &&
         c.references &&

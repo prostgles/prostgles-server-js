@@ -2,9 +2,10 @@ import test, { describe } from "node:test";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
+import assert from "node:assert";
 
 export const isomorphicQueriesTyped = async (
-  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>
+  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
 ) => {
   await describe("isomorphic typed queries", async () => {
     await test("isLookupTable DB Types from colConf", async () => {

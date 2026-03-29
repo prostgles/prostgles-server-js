@@ -159,7 +159,7 @@ export const prepareNewData = ({
   tableConfigurator,
   tableHandler,
 }: ValidatedParams) => {
-  const synced_field = (tableRules ?? {}).sync?.synced_field;
+  const synced_field = tableHandler.config?.syncConfig?.synced_field;
 
   /* Update synced_field if sync is on and missing */
   if (synced_field && !row[synced_field]) {

@@ -54,10 +54,10 @@ export const testPublishTypes = () => {
         update: "*",
         insert: "*",
         delete: "*",
-        sync: {
-          id_fields: ["id"],
-          synced_field: "last_updated",
-        },
+        // sync: {
+        //   id_fields: ["id"],
+        //   synced_field: "last_updated",
+        // },
       },
 
       items4: {

@@ -6,7 +6,7 @@ import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
 import { asNameAlias } from "../../utils/asNameAlias";
 
-export function getValidatedRules(
+export function getValidatedTableRules(
   this: ViewHandler,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
@@ -61,8 +61,6 @@ export function getValidatedRules(
 
     const res: ValidatedTableRules = {
       allColumns,
-      getColumns: tableRules.getColumns ?? true,
-      getInfo: tableRules.getColumns ?? true,
     };
 
     if (tableRules.select) {
@@ -93,6 +91,7 @@ export function getValidatedRules(
         forcedFilter: { ...tableRules.select.forcedFilter },
         filterFields: this.parseFieldFilter(tableRules.select.filterFields),
         maxLimit,
+        syncConfig: this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(this.name),
       };
     }
 
@@ -136,24 +135,18 @@ export function getValidatedRules(
       };
     }
 
-    if (!tableRules.select && !tableRules.update && !tableRules.delete && !tableRules.insert) {
-      if ([null, false].includes(tableRules.getInfo as any)) res.getInfo = false;
-      if ([null, false].includes(tableRules.getColumns as any)) res.getColumns = false;
-    }
-
     return res;
   }
   const allCols = this.column_names.slice(0);
   return {
     allColumns,
-    getColumns: true,
-    getInfo: true,
     select: {
       fields: allCols,
       filterFields: allCols,
       orderByFields: allCols,
       forcedFilter: {},
       maxLimit: null,
+      syncConfig: this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(this.name),
     },
     update: {
       fields: allCols,

@@ -6,6 +6,7 @@ import type {
   SelectParams,
   SubscribeParams,
   SubscriptionChannels,
+  SubscriptionHandler,
 } from "prostgles-types";
 import { asName, isObject, postgresToTsType } from "prostgles-types";
 import type { TableEvent } from "../../Logging";
@@ -16,7 +17,7 @@ import type { Graph } from "../../shortestPath";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
-import { getValidatedRules } from "../TableRules/getValidatedRules";
+import { getValidatedTableRules } from "../TableRules/getValidatedTableRules";
 import { getColumns } from "../getColumns";
 import { count } from "./count";
 import { find } from "./find";
@@ -151,41 +152,6 @@ export class ViewHandler {
 
   validateViewRules = validateViewRules.bind(this);
 
-  // DEAD CODE?!
-  // getShortestJoin(
-  //   table1: string,
-  //   table2: string,
-  //   startAlias: number,
-  //   isInner = false
-  // ): { query: string; toOne: boolean } {
-  //   const getJoinCondition = (
-  //     on: Record<string, string>[],
-  //     leftTable: string,
-  //     rightTable: string
-  //   ) => {
-  //     return on
-  //       .map((cond) =>
-  //         Object.keys(cond)
-  //           .map((lKey) => `${leftTable}.${lKey} = ${rightTable}.${cond[lKey]}`)
-  //           .join("\nAND ")
-  //       )
-  //       .join(" OR ");
-  //   };
-
-  //   // let toOne = true;
-  //   const query = this.joins
-  //     .map(({ tables, on, type }, i) => {
-  //       if (type.split("-")[1] === "many") {
-  //         // toOne = false;
-  //       }
-  //       const tl = `tl${startAlias + i}`,
-  //         tr = `tr${startAlias + i}`;
-  //       return `FROM ${tables[0]} ${tl} ${isInner ? "INNER" : "LEFT"} JOIN ${tables[1]} ${tr} ON ${getJoinCondition(on, tl, tr)}`;
-  //     })
-  //     .join("\n");
-  //   return { query, toOne: false };
-  // }
-
   checkFilter(filter: any) {
     if (filter === null || (filter && !isObject(filter)))
       throw `invalid filter -> ${JSON.stringify(filter)} \nExpecting:    undefined | {} | { field_name: "value" } | { field: { $gt: 22 } } ... `;
@@ -195,7 +161,7 @@ export class ViewHandler {
 
   getColumns = getColumns.bind(this);
 
-  getValidatedRules = getValidatedRules.bind(this);
+  getValidatedRules = getValidatedTableRules.bind(this);
 
   find = find.bind(this);
 
@@ -239,7 +205,7 @@ export class ViewHandler {
     filter: Filter,
     params: SubscribeParams,
     onData: OnData,
-  ): Promise<{ unsubscribe: () => any }>;
+  ): Promise<SubscriptionHandler>;
 
   async subscribe(
     filter: Filter,
@@ -255,7 +221,7 @@ export class ViewHandler {
     onData?: OnData,
     table_rules?: ParsedTableRule,
     localParams?: LocalParams,
-  ): Promise<{ unsubscribe: () => any } | SubscriptionChannels> {
+  ): Promise<SubscriptionHandler | SubscriptionChannels> {
     const result = await subscribe.bind(this)(
       filter,
       params,
@@ -272,7 +238,7 @@ export class ViewHandler {
     filter: Filter,
     params: SubscribeParams,
     onData: (item: AnyObject | undefined, error?: unknown) => any,
-  ): Promise<{ unsubscribe: () => any }>;
+  ): Promise<SubscriptionHandler>;
   subscribeOne(
     filter: Filter,
     params: SubscribeParams,
@@ -286,7 +252,7 @@ export class ViewHandler {
     onData?: (item: AnyObject | undefined, error?: unknown) => void,
     table_rules?: ParsedTableRule,
     localParams?: LocalParams,
-  ): Promise<SubscriptionChannels | { unsubscribe: () => any }> {
+  ): Promise<SubscriptionChannels | SubscriptionHandler> {
     const func =
       localParams || !onData ? undefined : (
         (rows: AnyObject[], error?: unknown) => onData(rows[0], error)

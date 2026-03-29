@@ -1,6 +1,6 @@
 import type { AnyObject, FieldFilter, FullFilter } from "prostgles-types";
 import { asName } from "prostgles-types";
-import type { LocalParams} from "../DboBuilder";
+import type { LocalParams } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
@@ -53,13 +53,13 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
         if (keys.length) {
           const dataCols = keys.filter((k) => this.column_names.includes(k));
           const nestedInsertCols = keys.filter(
-            (k) => !this.column_names.includes(k) && this.dboBuilder.dbo[k]?.insert
+            (k) => !this.column_names.includes(k) && this.dboBuilder.dboMap.has(k),
           );
           if (nestedInsertCols.length) {
             throw `Nested insert not supported for forcedData rule: ${nestedInsertCols}`;
           }
           const badCols = keys.filter(
-            (k) => !dataCols.includes(k) && !nestedInsertCols.includes(k)
+            (k) => !dataCols.includes(k) && !nestedInsertCols.includes(k),
           );
           if (badCols.length) {
             throw `Invalid columns found in forced filter: ${badCols.join(", ")}`;
@@ -72,7 +72,7 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
                     (k) =>
                       asValue(forcedData![k]) +
                       "::" +
-                      this.columns.find((c) => c.name === k)!.udt_name
+                      this.columns.find((c) => c.name === k)!.udt_name,
                   )
                   .join(", ") +
                 ")",
@@ -81,7 +81,7 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
               "EXPLAIN INSERT INTO " +
                 this.escapedName +
                 " (${colNames:raw}) SELECT * FROM ( VALUES ${values:raw} ) t WHERE FALSE;",
-              { colNames, values }
+              { colNames, values },
             );
             await this.db.any(query);
           } catch (e: any) {

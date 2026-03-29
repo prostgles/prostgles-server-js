@@ -1,4 +1,4 @@
-import { includes } from "prostgles-types";
+import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -17,7 +17,6 @@ import type {
   PublishParams,
 } from "./publishTypesAndUtils";
 import {
-  RULE_TO_METHODS,
   parsePublishTableRule,
   type PermissionScope,
   type PublishObject,
@@ -37,7 +36,9 @@ export class PublishParser {
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
     const { dbo, db } = prostgles;
-    if (!dbo || !db) throw "INTERNAL ERROR: dbo and/or db missing";
+    if (!dbo || !db) {
+      throw "INTERNAL ERROR: dbo and/or db missing";
+    }
     this.dbo = dbo;
     this.db = db;
   }
@@ -83,14 +84,14 @@ export class PublishParser {
   /**
    * Parses the first level of publish. (If false then nothing if * then all tables and views)
    */
-  async getPublishAsObject(
+  async getPublishObject(
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
-    const _publish = await applyParamsIfFunc(this.publish, publishParams);
+    const publish = await applyParamsIfFunc(this.publish, publishParams);
 
-    if (_publish === "*") {
+    if (publish === "*") {
       const publish: PublishObject = {};
       this.prostgles.dboBuilder.tablesOrViews?.map((tov) => {
         publish[tov.name] = "*";
@@ -98,7 +99,7 @@ export class PublishParser {
       return publish;
     }
 
-    return _publish || undefined;
+    return publish || undefined;
   }
 
   async getValidatedRequestRuleWusr(
@@ -124,13 +125,12 @@ export class PublishParser {
 
     /* Must be local request -> allow everything */
     if (!clientReq) {
-      return RULE_TO_METHODS.reduce(
-        (a, v) => ({
-          ...a,
-          [v.rule]: v.no_limits,
-        }),
-        {},
-      );
+      return {
+        select: { fields: "*", filterFields: "*", orderByFields: "*" },
+        insert: { returningFields: "*", fields: "*" },
+        update: { fields: "*", returningFields: "*", filterFields: "*" },
+        delete: { returningFields: "*", filterFields: "*" },
+      };
     }
 
     /* Must be from socket. Must have a publish */
@@ -160,7 +160,10 @@ export class PublishParser {
   ) {
     if (!command || !tableName) throw "command OR tableName are missing";
 
-    const rule = RULE_TO_METHODS.find(({ methods }) => includes(methods, command));
+    const [rule] =
+      getObjectEntries(SQL_COMMAND_TABLE_METHODS).find(([_, methods]) =>
+        includes(methods, command),
+      ) ?? [];
     if (!rule) {
       throw "Invalid command: " + command;
     }
@@ -170,7 +173,15 @@ export class PublishParser {
         // Allow all commands
       } else {
         const tableScope = scope.tables;
-        if (!tableScope?.[tableName] || !tableScope[tableName][rule.sqlRule]) {
+        const tableScopeCommands = tableScope?.[tableName];
+        const methodAllowedInScope =
+          tableScopeCommands &&
+          (rule === "schema" ?
+            getObjectEntries(tableScopeCommands).some(([_, value]) => {
+              return value;
+            })
+          : tableScopeCommands[rule]);
+        if (!methodAllowedInScope) {
           throw `Invalid or disallowed command: ${tableName}.${command}. The PermissionsScope does not allow this command.`;
         }
       }
@@ -185,7 +196,9 @@ export class PublishParser {
       }
     }
 
-    if (!tableRule[rule.rule]) {
+    const isAllowed =
+      rule === "schema" ? getObjectEntries(tableRule).some(([_, value]) => value) : tableRule[rule];
+    if (!isAllowed) {
       throw {
         stack: ["getValidatedRequestRule()"],
         message: `Invalid or disallowed command: ${tableName}.${command}`,

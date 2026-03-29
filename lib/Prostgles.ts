@@ -27,7 +27,15 @@ import { pushSocketSchema } from "./WebsocketAPI/pushSocketSchema";
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 export type DBorTx = DB | pgPromise.ITask<{}>;
 
-export const TABLE_METHODS = ["update", "find", "findOne", "insert", "delete", "upsert"] as const;
+export const TABLE_METHODS = [
+  "update",
+  "find",
+  "findOne",
+  "insert",
+  "insertMany",
+  "delete",
+  "upsert",
+] as const satisfies (keyof TableHandler)[];
 
 /*
     1. Connect to db
@@ -51,6 +59,7 @@ const DEFAULT_KEYWORDS = {
 
 import { randomUUID } from "crypto";
 import * as fs from "fs";
+import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 
 export class Prostgles {
   /**

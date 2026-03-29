@@ -26,7 +26,7 @@ export async function addTrigger(
       condition = "TRUE";
     }
 
-    if (this.dbo[table_name]?.tableOrViewInfo?.isHyperTable) {
+    if (this.dbo[table_name]?.tableOrViewInfo.isHyperTable) {
       throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
     }
 

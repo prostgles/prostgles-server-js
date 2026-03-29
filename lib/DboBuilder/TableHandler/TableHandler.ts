@@ -9,12 +9,7 @@ import type {
 } from "prostgles-types";
 import { asName, isDefined } from "prostgles-types";
 import type { DB } from "../../Prostgles";
-import type {
-  InsertRule,
-  ParsedTableRule,
-  SyncRule,
-  UpdateRule,
-} from "../../PublishParser/PublishParser";
+import type { InsertRule, ParsedTableRule, UpdateRule } from "../../PublishParser/PublishParser";
 import type TableConfigurator from "../../TableConfig/TableConfig";
 import type { TableDefinition } from "../../TableConfig/TableConfig";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
@@ -214,31 +209,33 @@ export class TableHandler extends ViewHandler {
         throw "Cannot subscribe. PubSubManager not initiated";
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!localParams.clientReq) throw "Sync not allowed within the server code";
       const { socket } = localParams.clientReq;
       if (!socket) throw "socket missing";
 
+      const syncConfig = this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(this.name);
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!table_rules || !table_rules.sync || !table_rules.select)
+      if (!table_rules || !table_rules.select || !syncConfig) {
         throw "sync or select table rules missing";
+      }
 
       if (this.tx) throw "Sync not allowed within transactions";
 
       const ALLOWED_PARAMS = ["select"];
       const invalidParams = Object.keys(params).filter((k) => !ALLOWED_PARAMS.includes(k));
-      if (invalidParams.length)
+      if (invalidParams.length) {
         throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
+      }
 
-      const { synced_field }: SyncRule = table_rules.sync;
+      const { synced_field } = syncConfig;
 
-      if (!table_rules.sync.id_fields.length || !synced_field) {
+      if (!syncConfig.id_fields.length || !synced_field) {
         const err = "INTERNAL ERROR: id_fields OR synced_field missing from publish";
         console.error(err);
         throw err;
       }
 
-      const id_fields = this.parseFieldFilter(table_rules.sync.id_fields, false);
+      const id_fields = this.parseFieldFilter(syncConfig.id_fields, false);
       const syncFields = [...id_fields, synced_field];
 
       const allowedSelect = this.parseFieldFilter(table_rules.select.fields);
@@ -279,8 +276,7 @@ export class TableHandler extends ViewHandler {
           .addSync({
             table_info: this.tableOrViewInfo,
             condition,
-            id_fields,
-            synced_field,
+            ...syncConfig,
             socket,
             table_rules,
             filter: { ...filter },

@@ -6,22 +6,22 @@ import { describe, test } from "node:test";
 export const clientRestApi = async (
   db: DBHandlerClient,
   tableSchema: DBSchemaTable[],
-  token: string
+  token: string,
 ) => {
-  await describe("clientRestApi", async () => {
-    const rest = async (
-      { tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean },
-      ...params: any[]
-    ) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...(params ?? []));
-    const dbRest = (tableName: string, command: string, ...params: any[]) =>
-      rest({ tableName, command }, ...(params ?? []));
-    const dbRestNoAuth = (tableName: string, command: string, ...params: any[]) =>
-      rest({ tableName, command, noAuth: true }, ...(params ?? []));
-    const sqlRest = (query: string, ...params: any[]) =>
-      post({ path: `db/sql`, token }, query, ...(params ?? []));
-    const dbMethod = (methodName: string, input?: unknown) =>
-      post({ path: `methods/${methodName}`, token, onlyFirstParam: true }, input);
+  const rest = async (
+    { tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean },
+    ...params: any[]
+  ) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...(params ?? []));
+  const dbRest = (tableName: string, command: string, ...params: any[]) =>
+    rest({ tableName, command }, ...(params ?? []));
+  const dbRestNoAuth = (tableName: string, command: string, ...params: any[]) =>
+    rest({ tableName, command, noAuth: true }, ...(params ?? []));
+  const sqlRest = (query: string, ...params: any[]) =>
+    post({ path: `db/sql`, token }, query, ...(params ?? []));
+  const dbMethod = (methodName: string, input?: unknown) =>
+    post({ path: `methods/${methodName}`, token, onlyFirstParam: true }, input);
 
+  await describe("clientRestApi", async () => {
     await test("Rest api test", async () => {
       const dataFilter = { id: 123123123, last_updated: Date.now() };
       const dataFilter1 = { id: 123123124, last_updated: Date.now() };
@@ -36,7 +36,7 @@ export const clientRestApi = async (
             message:
               'planes.last_updated is invalid/disallowed for filtering. Allowed columns: "id", "x", "y", "flight_number"',
           },
-        }
+        },
       );
       const itemRNA = await dbRestNoAuth("planes", "findOne", { id: dataFilter.id });
       assert.deepStrictEqual(item, itemR);
@@ -56,16 +56,16 @@ export const clientRestApi = async (
       const restTableSchema = await post({ path: "schema", token });
       assert.deepStrictEqual(tableSchema, restTableSchema.tableSchema);
       await Promise.all(
-        tableSchema.map(async (tbl) => {
-          const cols = await db[tbl.name]?.getColumns?.();
-          const info = await db[tbl.name]?.getInfo?.();
-          if (db[tbl.name]?.getColumns) {
-            const restCols = await dbRest(tbl.name, "getColumns", {});
-            assert.deepStrictEqual(tbl.columns, cols);
-            assert.deepStrictEqual(tbl.columns, restCols);
-            assert.deepStrictEqual(tbl.info, info);
+        tableSchema.map(async ({ name, columns, ...otherInfo }) => {
+          const cols = await db[name]?.getColumns?.();
+          const info = await db[name]?.getInfo?.();
+          if (db[name]?.getColumns) {
+            const restCols = await dbRest(name, "getColumns", {});
+            assert.deepStrictEqual(columns, cols);
+            assert.deepStrictEqual(columns, restCols);
+            assert.deepStrictEqual(otherInfo, info);
           }
-        })
+        }),
       );
 
       const err = await dbMethod("myfunc", {}).catch((error) => error);
@@ -83,7 +83,7 @@ export const clientRestApi = async (
         });
 
         const res1 = await dbRest("planes", "find", JSON.parse(`{"${key}": {}}`)).catch(
-          (error) => error
+          (error) => error,
         );
         assert.deepStrictEqual(
           res1,
@@ -92,7 +92,7 @@ export const clientRestApi = async (
             error: {
               message: `planes.${key} is invalid/disallowed for filtering. Allowed columns: "id", "x", "y", "flight_number", "last_updated"`,
             },
-          }
+          },
         );
 
         const methodRes = await dbMethod(key, {}).catch((error) => error);

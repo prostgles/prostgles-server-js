@@ -83,8 +83,6 @@ void describe("DBSchemaBuilder type tests", async () => {
               fields: "*" as const,
               forcedFilter: { col1: 32, col2: "" },
             },
-            getColumns: true,
-            getInfo: true,
             delete: {
               filterFields: { col1: 1 },
             },
@@ -95,15 +93,13 @@ void describe("DBSchemaBuilder type tests", async () => {
               forcedFilter: { col1: 2 },
             },
           },
-        };
+        } as const;
         const res: PublishFullyTyped<S> = {
           tbl1: {
             select: {
               fields: "*",
               forcedFilter: { col1: 32, col2: "" },
             },
-            getColumns: true,
-            getInfo: true,
             delete: {
               filterFields: { col1: 1 },
             },

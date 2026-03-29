@@ -90,7 +90,7 @@ async function subscribe(
       selectParams: { ...selectParams },
       subscribeOptions: getValidatedSubscribeOptions(
         { actions, skipFirst, throttle, throttleOpts, skipChangedColumnsCheck },
-        table_rules?.subscribe,
+        table_rules?.select,
       ),
       lastPushed: 0,
       tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
