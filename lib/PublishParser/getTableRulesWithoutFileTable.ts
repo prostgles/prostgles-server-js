@@ -79,7 +79,7 @@ export async function getTableRulesWithoutFileTable(
             ...selectRule.disableMethods,
             subscribe: 1,
           },
-      subscribeThrottle: selectRule.subscribeThrottle ?? 1,
+      subscribeThrottle: selectRule.subscribeThrottle ?? 0,
     },
     insert: insertRule,
     update: updateRule,

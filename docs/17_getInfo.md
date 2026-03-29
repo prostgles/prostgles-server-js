@@ -31,16 +31,21 @@ Retrieves the table/view info
     Name of the fileTable (if enabled)
     Used in UI
   - **dynamicRules** <span style="color: grey">optional</span> <span style="color: green;">{ update?: boolean | undefined; }</span>
-
-    Used for getColumns in cases where the columns are dynamic based on the request.
-    See dynamicFields from Update rules
     - **update** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
-  - **info** <span style="color: grey">optional</span> <span style="color: green;">{ label?: string | undefined; }</span>
+  - **label** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     Additional table info provided through TableConfig
-    - **label** <span style="color: grey">optional</span> <span style="color: green;">string</span>
   - **uniqueColumnGroups** <span style="color: grey">optional</span> <span style="color: green;">string</span>
-  - **requiredNestedInserts** <span style="color: grey">optional</span> <span style="color: green;">RequiredNestedInsert</span>
-    - **ftable** <span style="color: red">required</span> <span style="color: green;">string</span>
-    - **minRows** <span style="color: grey">optional</span> <span style="color: green;">number</span>
-    - **maxRows** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+  - **publishInfo** <span style="color: red">required</span> <span style="color: green;">{ select?: { disabledMethods?: Partial&lt;Record&lt;"findOne" | "find" | "count" | "size" | "subscribe" | "subscribeOne" | "sync", 1&gt;&gt; | undefined; syncConfig: SyncTableInfo | undefined; } | undefined; update?: { ...; } | undefined; insert?: { ...; } | undefined; delete?: {} | undefined; }</span>
+    - **select** <span style="color: grey">optional</span> <span style="color: green;">{ disabledMethods?: Partial&lt;Record&lt;"findOne" | "find" | "count" | "size" | "subscribe" | "subscribeOne" | "sync", 1&gt;&gt; | undefined; syncConfig: SyncTableInfo | undefined; }</span>
+      - **disabledMethods** <span style="color: grey">optional</span> <span style="color: green;">Partial</span>
+      - **syncConfig** <span style="color: red">required</span> <span style="color: green;">SyncTableInfo | undefined</span>
+    - **update** <span style="color: grey">optional</span> <span style="color: green;">{ disabledMethods?: Partial&lt;Record&lt;"update" | "upsert" | "updateBatch", 1&gt;&gt; | undefined; }</span>
+      - **disabledMethods** <span style="color: grey">optional</span> <span style="color: green;">Partial</span>
+    - **insert** <span style="color: grey">optional</span> <span style="color: green;">{ requiredNestedInserts?: RequiredNestedInsert[] | undefined; allowedNestedInserts?: string[] | undefined; }</span>
+      - **requiredNestedInserts** <span style="color: grey">optional</span> <span style="color: green;">RequiredNestedInsert[]</span>
+
+        Controlled through the publish.table_name.insert config
+        If defined then any insert on this table must also contain nested inserts for the specified tables that reference this table
+      - **allowedNestedInserts** <span style="color: grey">optional</span> <span style="color: green;">string</span>
+    - **delete** <span style="color: grey">optional</span> <span style="color: green;">{}</span>

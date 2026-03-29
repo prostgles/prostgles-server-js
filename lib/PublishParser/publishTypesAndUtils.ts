@@ -387,7 +387,7 @@ export const TABLE_RULE_NO_LIMITS = {
   select: {
     fields: "*",
     disableMethods: undefined,
-    subscribeThrottle: 1,
+    subscribeThrottle: 0,
   },
   insert: {
     fields: "*",
