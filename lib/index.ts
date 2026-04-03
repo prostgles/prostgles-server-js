@@ -17,6 +17,7 @@ export type { PublishParams } from "./PublishParser/publishTypesAndUtils";
 export type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
 export type { DBHandlerServer } from "./Prostgles";
 export type { CloudClient, LocalConfig } from "./FileManager/FileManager";
+export type { DB } from "./initProstgles";
 export type * from "./TableConfig/TableConfig";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
