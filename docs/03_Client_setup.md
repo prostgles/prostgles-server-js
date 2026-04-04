@@ -79,4 +79,4 @@ const prostglesClient = prostgles<DBGeneratedSchema>
 
 The following table/view methods are available on client-side only.
 
-useSync, sync, syncOne, useSyncOne, useSubscribe, useSubscribeOne, useFind, useFindOne, useCount, useSize
+useSync, sync, syncOne, useSyncOne, _sync, useSubscribe, useSubscribeOne, useFind, useFindOne, useCount, useSize
