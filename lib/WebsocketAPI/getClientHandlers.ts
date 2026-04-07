@@ -1,6 +1,7 @@
 import {
   getKeys,
   type AnyObject,
+  type ClientSchema,
   type SQLHandler,
   type SQLOptions,
   type TableHandler,
@@ -18,6 +19,7 @@ export type ClientHandlers<S = void> = {
   clientSql: SQLHandler;
   clientDb: DBOFullyTyped<S, false>;
   clientMethods: Record<string, ServerFunctionDefinition>;
+  clientSchema: ClientSchema;
 };
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
@@ -78,7 +80,7 @@ export const getClientHandlers = async <S = void>(
     }),
   );
 
-  return { clientDb, clientSql, clientMethods };
+  return { clientDb, clientSql, clientMethods, clientSchema };
 };
 
 const viewMethods = getKeys({
