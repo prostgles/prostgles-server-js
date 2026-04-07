@@ -58,7 +58,7 @@ export const getClientHandlers = async <S = void>(
     },
   };
   const clientSql = ((query: string, params?: AnyObject, options?: SQLOptions) => {
-    if (!scope?.allowSql) {
+    if (scope && !scope.allowSql) {
       throw new Error("SQL is dissallowed by PermissionScope");
     }
 

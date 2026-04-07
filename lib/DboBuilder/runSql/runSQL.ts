@@ -7,6 +7,7 @@ import type { DB, Prostgles } from "../../Prostgles";
 import type { DboBuilder, LocalParams } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
 import { getDbTypes, getDetailedFieldInfo } from "./runSqlUtils";
+
 export async function runSQL(
   this: DboBuilder,
   queryWithoutRLS: string,
