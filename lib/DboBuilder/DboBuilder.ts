@@ -196,6 +196,7 @@ export class DboBuilder {
           getSerializedClientErrorFromPGError(error, {
             type: "sql",
             localParams,
+            prostgles: this.prostgles,
           }),
         ),
       );

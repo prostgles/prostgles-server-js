@@ -92,13 +92,14 @@ export class RestApi {
         {
           res,
           httpReq: req,
-        }
+        },
       );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "method",
         localParams: { clientReq: { httpReq: req, res } },
+        prostgles: this.prostgles,
       });
       res.status(400).json({ error });
     }
@@ -111,6 +112,7 @@ export class RestApi {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "method",
         localParams: { clientReq: { httpReq: req, res } },
+        prostgles: this.prostgles,
       });
       res.status(400).json({ error });
     }
@@ -127,13 +129,14 @@ export class RestApi {
         {
           res,
           httpReq: req,
-        }
+        },
       );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "sql",
         localParams: { clientReq: { httpReq: req, res } },
+        prostgles: this.prostgles,
       });
       res.status(400).json({ error });
     }
@@ -165,14 +168,15 @@ export class RestApi {
           httpReq: req,
           res,
         },
-        undefined
+        undefined,
       );
       res.json(data);
     } catch (rawError) {
       const error = getSerializedClientErrorFromPGError(rawError, {
         type: "tableMethod",
         localParams: { clientReq: { httpReq: req, res } },
-        view: this.prostgles.dboBuilder.dbo[tableName],
+        view: this.prostgles.dboBuilder.dboMap.get(tableName),
+        prostgles: this.prostgles,
       });
       res.status(400).json({ error });
     }

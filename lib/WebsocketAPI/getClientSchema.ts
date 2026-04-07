@@ -1,9 +1,9 @@
 import { isObject, omitKeys, tryCatchV2, type ClientSchema } from "prostgles-types";
+import { version } from "../../package.json";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 import type { Prostgles } from "../Prostgles";
 import type { PermissionScope, PublishParser } from "../PublishParser/PublishParser";
 import { clientCanRunSqlRequest } from "../runClientRequest";
-import { version } from "../../package.json";
 
 export async function getClientSchema(
   this: Prostgles,
@@ -42,11 +42,7 @@ export async function getClientSchema(
     const tablesWithSelectRules = new Set(
       fullSchema?.tables.filter((t) => t.publishInfo.select).map((t) => t.name) ?? [],
     );
-    const { tables, tableSchemaErrors } = fullSchema ?? {
-      schema: {},
-      tables: [],
-      tableSchemaErrors: {},
-    };
+    const { tables = [], tableSchemaErrors = {} } = fullSchema ?? {};
     const joinTables2: string[][] = [];
     if (this.opts.joins) {
       const _joinTables2 = this.dboBuilder

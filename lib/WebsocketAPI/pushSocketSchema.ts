@@ -6,7 +6,8 @@ import { makeSocketError } from "./onSocketConnected";
 export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
   try {
     const clientSchema = await this.getClientSchema({ socket }, undefined);
-    socket.prostgles = clientSchema;
+    socket.prostgles ??= new Map();
+    socket.prostgles.set(this.appId, clientSchema);
     if (clientSchema.rawSQL) {
       socket.removeAllListeners(CHANNELS.SQL);
       socket.on(
@@ -15,7 +16,7 @@ export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
           sqlRequestData: SQLRequest,
           cb = (..._callback: any) => {
             /* Empty */
-          }
+          },
         ) => {
           runClientSqlRequest
             .bind(this)(sqlRequestData, { socket })
@@ -25,7 +26,7 @@ export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
             .catch((err) => {
               makeSocketError(cb, err);
             });
-        }
+        },
       );
     }
     await this.dboBuilder.prostgles.opts.onLog?.({

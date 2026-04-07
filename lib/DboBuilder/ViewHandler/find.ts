@@ -161,6 +161,7 @@ export const find = async function (
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 };
@@ -198,6 +199,7 @@ export const runQueryReturnType = async ({
           type: "tableMethod",
           localParams,
           view: handler,
+          prostgles: handler.dboBuilder.prostgles,
         }),
       );
   } else if (sqlTypes.some((v) => v === returnType)) {
@@ -223,6 +225,7 @@ export const runQueryReturnType = async ({
           type: "tableMethod",
           localParams,
           view: handler,
+          prostgles: handler.dboBuilder.prostgles,
         }),
       );
   }

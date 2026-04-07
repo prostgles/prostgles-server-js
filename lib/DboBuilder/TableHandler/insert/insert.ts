@@ -264,6 +264,7 @@ export async function insert(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

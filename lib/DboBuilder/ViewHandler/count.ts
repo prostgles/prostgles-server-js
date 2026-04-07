@@ -14,7 +14,7 @@ export async function count(
   selectParams?: SelectParams,
   _param3_unused?: undefined,
   table_rules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<number> {
   const filter = _filter || {};
   const { limit: _limit, ...selectParamsWithoutLimit } = selectParams ?? {};
@@ -25,7 +25,7 @@ export async function count(
       { select: selectParamsWithoutLimit.select ?? "", limit: 0 },
       undefined,
       table_rules,
-      localParams
+      localParams,
     ).then(async (_allowed) => {
       const findQuery = (await this.find(filter, selectParamsWithoutLimit, undefined, table_rules, {
         ...localParams,
@@ -62,6 +62,7 @@ export async function count(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

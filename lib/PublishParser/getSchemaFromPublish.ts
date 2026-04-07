@@ -1,7 +1,6 @@
 import type { DBSchemaTable, TableSchemaErrors } from "prostgles-types";
 import { isEmpty, isObject } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
-import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { PublishParser } from "./PublishParser";
 import { type PermissionScope, type PublishObject } from "./PublishParser";
 import { getDBSchemaTable } from "./getDBSchemaTable";
@@ -9,8 +8,6 @@ import { getDBSchemaTable } from "./getDBSchemaTable";
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;
 };
-const SUBSCRIBE_METHODS = ["subscribe", "subscribeOne", "sync", "unsubscribe", "unsync"] as const;
-
 export async function getSchemaFromPublish(
   this: PublishParser,
   { userData, ...clientReq }: Args,

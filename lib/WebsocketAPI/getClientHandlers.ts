@@ -27,7 +27,8 @@ export const getClientHandlers = async <S = void>(
   scope: PermissionScope | undefined,
 ): Promise<ClientHandlers> => {
   const clientSchema =
-    clientReq.socket?.prostgles ?? (await getClientSchema.bind(prostgles)(clientReq, scope));
+    clientReq.socket?.prostgles?.get(prostgles.appId) ??
+    (await getClientSchema.bind(prostgles)(clientReq, scope));
   const sqlHandler: SQLHandler | undefined = ((
     query: string,
     params?: unknown,
@@ -35,7 +36,7 @@ export const getClientHandlers = async <S = void>(
   ) => runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
   const tableHandlers = Object.fromEntries(
     prostgles.dboBuilder.tablesOrViews!.map((table) => {
-      const methods = table.is_view ? viewMethods : [...viewMethods, ...tableMethods];
+      const methods = [...viewMethods, ...tableMethods];
       const handlers = Object.fromEntries(
         methods.map((command) => {
           const method = (param1: unknown, param2: unknown, param3: unknown) =>

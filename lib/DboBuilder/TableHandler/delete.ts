@@ -147,6 +147,7 @@ export async function _delete(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

@@ -26,6 +26,7 @@ export const getViewRelatedTables = async (
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: viewHandler.dboBuilder.prostgles,
     });
   }
   const { fields } = await dboBuilder.runSQL(

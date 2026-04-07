@@ -136,7 +136,9 @@ export class PublishParser {
     /* Must be from socket. Must have a publish */
     if (!this.publish) throw "publish is missing";
 
-    const tableErrors = clientReq.socket?.prostgles?.tableSchemaErrors[tableName];
+    const tableErrors = clientReq.socket?.prostgles?.get(this.prostgles.appId)?.tableSchemaErrors[
+      tableName
+    ];
     /* Get any publish errors for socket */
     Object.values(tableErrors ?? {}).forEach((errorInfo) => {
       throw errorInfo.error;

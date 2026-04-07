@@ -16,7 +16,6 @@ import type {
   DeleteRule,
   InsertRule,
   PermissionScope,
-  PublishAllOrNothing,
   SelectRule,
   UpdateRule,
 } from "../PublishParser/PublishParser";
@@ -157,7 +156,7 @@ export type CachedSessionData = {
 };
 
 export type CachedSession = {
-  __prglCache?: CachedSessionData;
+  __prglCache?: Map<string, CachedSessionData>;
 };
 
 export type PRGLIOSocket = {
@@ -191,7 +190,7 @@ export type PRGLIOSocket = {
   _user?: AnyObject;
 
   /** Used for publish error caching */
-  prostgles?: ClientSchema;
+  prostgles?: Map<string, ClientSchema>;
 } & CachedSession;
 
 export type LocalParams = {

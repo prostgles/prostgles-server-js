@@ -303,6 +303,7 @@ export class TableHandler extends ViewHandler {
         type: "tableMethod",
         localParams,
         view: this,
+        prostgles: this.dboBuilder.prostgles,
       });
     }
 

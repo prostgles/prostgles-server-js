@@ -107,6 +107,7 @@ export class QueryStreamer {
         const errorWithoutQuery = getSerializedClientErrorFromPGError(rawError, {
           type: "sql",
           localParams: { clientReq: { socket } },
+          prostgles: this.dboBuilder.prostgles,
         });
         // For some reason query is not present on the error object from sql stream mode
         const error = { ...errorWithoutQuery, query: query.query };

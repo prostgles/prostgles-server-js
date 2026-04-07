@@ -1,8 +1,6 @@
 import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type {
-  Filter,
-  LocalParams} from "../DboBuilder";
+import type { Filter, LocalParams } from "../DboBuilder";
 import {
   getClientErrorFromPGError,
   getErrorAsObject,
@@ -17,7 +15,7 @@ export async function updateBatch(
   params?: UpdateParams,
   _?: undefined,
   tableRules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<any> {
   const start = Date.now();
   try {
@@ -32,11 +30,11 @@ export async function updateBatch(
           data,
           { ...(params ?? {}), returning: undefined },
           tableRules,
-          { ...(localParams ?? {}), returnQuery: "noRLS" }
+          { ...(localParams ?? {}), returnQuery: "noRLS" },
         )) as unknown as string;
 
         return query;
-      })
+      }),
     );
     const queries = [withUserRLS(localParams, ""), ...updateQueries];
 
@@ -61,7 +59,8 @@ export async function updateBatch(
           localParams,
           view: this,
           allowedKeys: [],
-        })
+          prostgles: this.dboBuilder.prostgles,
+        }),
       );
 
     await this._log({
@@ -83,6 +82,7 @@ export async function updateBatch(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

@@ -117,6 +117,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
         localParams,
         view: tableHandler,
         allowedKeys: allowedFieldKeys,
+        prostgles: tableHandler.dboBuilder.prostgles,
       }),
     );
   } else {
@@ -128,6 +129,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
           localParams,
           view: tableHandler,
           allowedKeys: allowedFieldKeys,
+          prostgles: tableHandler.dboBuilder.prostgles,
         }),
       );
   }

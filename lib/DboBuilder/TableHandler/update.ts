@@ -203,6 +203,7 @@ export async function update(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

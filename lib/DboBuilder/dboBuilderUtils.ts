@@ -1,6 +1,6 @@
 import type { AnyObject } from "prostgles-types";
 import { getSerialisableError, isObject, omitKeys, pickKeys } from "prostgles-types";
-import type { DB } from "../Prostgles";
+import type { DB, Prostgles } from "../Prostgles";
 import { asNameAlias } from "../utils/asNameAlias";
 import type { LocalParams, SortItem } from "./DboBuilderTypes";
 import { pgp } from "./DboBuilderTypes";
@@ -19,20 +19,17 @@ export const getErrorAsObject = (rawError: any) => {
   return { message: serializedError };
 };
 
-const circularError = new Error("Circular error data");
-//@ts-ignore
-circularError.someProp = circularError;
-getErrorAsObject(circularError);
-
 type GetSerializedClientErrorFromPGErrorArgs =
   | {
       type: "sql";
       localParams: LocalParams | undefined;
+      prostgles: Prostgles;
     }
   | {
       type: "tableMethod";
       localParams: LocalParams | undefined;
       view: ViewHandler | Partial<TableHandler> | undefined;
+      prostgles: Prostgles;
       allowedKeys?: string[];
     }
   | {
@@ -40,9 +37,9 @@ type GetSerializedClientErrorFromPGErrorArgs =
       localParams: LocalParams | undefined;
       allowedKeys?: string[];
       view?: undefined;
+      prostgles: Prostgles;
     };
 
-const sensitiveErrorKeys = ["hint", "detail", "context"] as const;
 const otherKeys = [
   "column",
   "code",
@@ -71,7 +68,7 @@ export function getSerializedClientErrorFromPGError(
   const showFullError =
     isServerSideRequest ||
     args.type === "sql" ||
-    args.localParams?.clientReq?.socket?.prostgles?.rawSQL;
+    args.localParams?.clientReq?.socket?.prostgles?.get(args.prostgles.appId)?.rawSQL;
   if (showFullError) {
     return err;
   }

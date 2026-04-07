@@ -197,6 +197,7 @@ export class ViewHandler {
         type: "tableMethod",
         localParams,
         view: this,
+        prostgles: this.dboBuilder.prostgles,
       });
     }
   }

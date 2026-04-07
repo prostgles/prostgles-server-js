@@ -129,6 +129,7 @@ export async function getColumns(
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 }

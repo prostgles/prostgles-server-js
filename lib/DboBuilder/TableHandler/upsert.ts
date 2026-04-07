@@ -10,7 +10,7 @@ export const upsert = async function (
   newData: AnyObject,
   params?: UpdateParams,
   table_rules?: ParsedTableRule,
-  localParams?: LocalParams
+  localParams?: LocalParams,
 ): Promise<any> {
   const start = Date.now();
   try {
@@ -26,7 +26,7 @@ export const upsert = async function (
               params,
               undefined,
               table_rules,
-              localParams
+              localParams,
             );
           }
         });
@@ -56,6 +56,7 @@ export const upsert = async function (
       type: "tableMethod",
       localParams,
       view: this,
+      prostgles: this.dboBuilder.prostgles,
     });
   }
 };

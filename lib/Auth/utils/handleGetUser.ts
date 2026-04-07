@@ -14,13 +14,15 @@ export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
  */
 export async function handleGetUserThrottled(
   this: AuthHandler,
-  clientReq: AuthClientRequest
+  clientReq: AuthClientRequest,
 ): Promise<GetUserOrRedirected> {
   const getSessionForCaching = this.opts.cacheSession?.getSession;
 
   /** Get cached session if available */
   const __prglCache =
-    !this.opts.cacheSession ? undefined : (clientReq.httpReq ?? clientReq.socket).__prglCache;
+    !this.opts.cacheSession ?
+      undefined
+    : (clientReq.httpReq ?? clientReq.socket).__prglCache?.get(this.prostgles.appId);
   if (clientReq.socket && __prglCache) {
     const { userData, session } = __prglCache;
     const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
@@ -47,7 +49,7 @@ export async function handleGetUserThrottled(
       dbo,
       db,
       getClientRequestIPsInfo(clientReq),
-      clientReq
+      clientReq,
     );
     if (isAuthError(clientInfoOrErr)) {
       return {
@@ -81,9 +83,11 @@ export async function handleGetUserThrottled(
           session,
         };
         if (clientReq.socket) {
-          clientReq.socket.__prglCache = __prglCache;
+          clientReq.socket.__prglCache ??= new Map();
+          clientReq.socket.__prglCache.set(this.prostgles.appId, __prglCache);
         } else {
-          clientReq.httpReq.__prglCache = __prglCache;
+          clientReq.httpReq.__prglCache ??= new Map();
+          clientReq.httpReq.__prglCache.set(this.prostgles.appId, __prglCache);
         }
       }
     }
@@ -98,7 +102,7 @@ export async function handleGetUserThrottled(
 }
 
 export const isAuthError = (
-  dataOrError: AuthResultOrError
+  dataOrError: AuthResultOrError,
 ): dataOrError is AuthResponse.AuthFailure["code"] | AuthResponse.AuthFailure => {
   return Boolean(typeof dataOrError === "string" || (dataOrError && "success" in dataOrError));
 };
