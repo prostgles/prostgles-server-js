@@ -51,11 +51,13 @@ export const getColumnSQLDefinitionQuery = async ({
     const defaultValueSQL =
       colConf.defaultValue !== undefined ? ` DEFAULT ${asValue(colConf.defaultValue)}` : "";
     if (jsonbSchema) {
-      const getJsonbSchemaCoreData = <T extends JSONB.JSONBSchema>(jsonbSchema: T): T => {
+      const getJsonbSchemaCoreData = <T extends JSONB.JSONBSchema | JSONB.FieldType>(
+        jsonbSchema: T,
+      ): T => {
         if (typeof jsonbSchema === "string") return jsonbSchema;
 
-        const { title, description, ...withoutInfo } = jsonbSchema;
-        const { allowedValues, type } = withoutInfo;
+        const { title, description, ...withoutInfo } = jsonbSchema as JSONB.FieldTypeObj;
+        const { allowedValues, type, oneOf, oneOfType, arrayOf, arrayOfType, record } = withoutInfo;
         return {
           ...withoutInfo,
           ...(allowedValues && {
@@ -65,6 +67,13 @@ export const getColumnSQLDefinitionQuery = async ({
             type: fromEntries(
               getObjectEntries(type).map(([k, v]) => [k, getJsonbSchemaCoreData(v)] as const),
             ),
+          }),
+          ...(oneOf && { oneOf: oneOf.map((v) => getJsonbSchemaCoreData(v)) }),
+          ...(oneOfType && { oneOfType: oneOfType.map((v) => getJsonbSchemaCoreData(v)) }),
+          ...(arrayOf && { arrayOf: getJsonbSchemaCoreData(arrayOf) }),
+          ...(arrayOfType && { arrayOf: getJsonbSchemaCoreData(arrayOfType) }),
+          ...(record && {
+            record: { ...record, values: record.values && getJsonbSchemaCoreData(record.values) },
           }),
         } as T;
       };
