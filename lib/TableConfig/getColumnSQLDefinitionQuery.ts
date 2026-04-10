@@ -71,7 +71,7 @@ export const getColumnSQLDefinitionQuery = async ({
           ...(oneOf && { oneOf: oneOf.map((v) => getJsonbSchemaCoreData(v)) }),
           ...(oneOfType && { oneOfType: oneOfType.map((v) => getJsonbSchemaCoreData(v)) }),
           ...(arrayOf && { arrayOf: getJsonbSchemaCoreData(arrayOf) }),
-          ...(arrayOfType && { arrayOf: getJsonbSchemaCoreData(arrayOfType) }),
+          ...(arrayOfType && { arrayOfType: getJsonbSchemaCoreData(arrayOfType) }),
           ...(record && {
             record: { ...record, values: record.values && getJsonbSchemaCoreData(record.values) },
           }),
