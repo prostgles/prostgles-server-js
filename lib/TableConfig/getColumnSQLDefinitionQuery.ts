@@ -1,17 +1,10 @@
-import {
-  asName,
-  getObjectEntries,
-  isObject,
-  omitKeys,
-  pickKeys,
-  type JSONB,
-} from "prostgles-types";
-import type { DB } from "../Prostgles";
-import { asValue } from "../PubSubManager/PubSubManagerUtils";
-import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import type { BaseColumnTypes, ColumnConfig } from "./TableConfig";
 import type pgPromise from "pg-promise";
+import { asName, getObjectEntries, isObject, pickKeys, type JSONB } from "prostgles-types";
+import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
+import type { DB } from "../Prostgles";
 import { fromEntries } from "../PublishParser/applyScopeToTableRules";
+import { asValue } from "../PubSubManager/PubSubManagerUtils";
+import type { BaseColumnTypes, ColumnConfig } from "./TableConfig";
 
 type Args = {
   column: string;
@@ -58,20 +51,22 @@ export const getColumnSQLDefinitionQuery = async ({
 
         const { title, description, ...withoutInfo } = jsonbSchema as JSONB.FieldTypeObj;
         const { allowedValues, type, oneOf, oneOfType, arrayOf, arrayOfType, record } = withoutInfo;
+        const parseType = (type: JSONB.ObjectType["type"]) =>
+          fromEntries(
+            getObjectEntries(type).map(([k, v]) => [k, getJsonbSchemaCoreData(v)] as const),
+          );
         return {
           ...withoutInfo,
           ...(allowedValues && {
             allowedValues: allowedValues.map((v) => (isObject(v) ? v.value : v)),
           }),
           ...(isObject(type) && {
-            type: fromEntries(
-              getObjectEntries(type).map(([k, v]) => [k, getJsonbSchemaCoreData(v)] as const),
-            ),
+            type: parseType(type),
           }),
           ...(oneOf && { oneOf: oneOf.map((v) => getJsonbSchemaCoreData(v)) }),
-          ...(oneOfType && { oneOfType: oneOfType.map((v) => getJsonbSchemaCoreData(v)) }),
+          ...(oneOfType && { oneOfType: oneOfType.map((type) => parseType(type)) }),
           ...(arrayOf && { arrayOf: getJsonbSchemaCoreData(arrayOf) }),
-          ...(arrayOfType && { arrayOfType: getJsonbSchemaCoreData(arrayOfType) }),
+          ...(arrayOfType && { arrayOfType: parseType(arrayOfType) }),
           ...(record && {
             record: { ...record, values: record.values && getJsonbSchemaCoreData(record.values) },
           }),
