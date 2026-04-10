@@ -1,9 +1,17 @@
-import { asName, pickKeys } from "prostgles-types";
+import {
+  asName,
+  getObjectEntries,
+  isObject,
+  omitKeys,
+  pickKeys,
+  type JSONB,
+} from "prostgles-types";
 import type { DB } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import type { BaseColumnTypes, ColumnConfig } from "./TableConfig";
 import type pgPromise from "pg-promise";
+import { fromEntries } from "../PublishParser/applyScopeToTableRules";
 
 type Args = {
   column: string;
@@ -43,12 +51,32 @@ export const getColumnSQLDefinitionQuery = async ({
     const defaultValueSQL =
       colConf.defaultValue !== undefined ? ` DEFAULT ${asValue(colConf.defaultValue)}` : "";
     if (jsonbSchema) {
+      const getJsonbSchemaCoreData = <T extends JSONB.JSONBSchema>(jsonbSchema: T): T => {
+        if (typeof jsonbSchema === "string") return jsonbSchema;
+
+        const { title, description, ...withoutInfo } = jsonbSchema;
+        const { allowedValues, type } = withoutInfo;
+        return {
+          ...withoutInfo,
+          ...(allowedValues && {
+            allowedValues: allowedValues.map((v) => (isObject(v) ? v.value : v)),
+          }),
+          ...(isObject(type) && {
+            type: fromEntries(
+              getObjectEntries(type).map(([k, v]) => [k, getJsonbSchemaCoreData(v)] as const),
+            ),
+          }),
+        } as T;
+      };
+
       const jsonbSchemaStr =
         asValue({
           ...pickKeys(colConf, ["enum", "nullable", "info"]),
-          ...(jsonbSchema.jsonbSchemaType ?
-            { type: jsonbSchema.jsonbSchemaType }
-          : jsonbSchema.jsonbSchema),
+          ...getJsonbSchemaCoreData(
+            jsonbSchema.jsonbSchemaType ?
+              { type: jsonbSchema.jsonbSchemaType }
+            : jsonbSchema.jsonbSchema,
+          ),
         }) + "::TEXT";
 
       /** Validate default value against jsonbSchema  */
@@ -130,6 +158,6 @@ export const getTableColumns = ({
     FROM information_schema.columns
     WHERE table_name = $1
   `,
-    [table]
+    [table],
   );
 };
