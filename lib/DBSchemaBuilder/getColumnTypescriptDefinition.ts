@@ -1,5 +1,7 @@
 import {
+  _PG_numbers,
   getJSONBSchemaTSTypes,
+  includes,
   isDefined,
   isObject,
   postgresToTsType,
@@ -107,6 +109,9 @@ export const getDataType = ({
   return typeFromUdtName;
 };
 
+/**
+ * TODO: need to separate pg-ts output type vs json-to-pg input type (pg casts can resolve strings to numbers)
+ */
 const getColTypeForDBSchema = (udt_name: TableSchemaColumn["udt_name"]): string => {
   if (udt_name === "interval") {
     const units = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
@@ -114,5 +119,9 @@ const getColTypeForDBSchema = (udt_name: TableSchemaColumn["udt_name"]): string 
     return `{ ${units.map((u) => `${u}?: number;`).join(" ")} }`;
   }
 
-  return postgresToTsType(udt_name);
+  const tsType = postgresToTsType(udt_name);
+  if (tsType === "string" && includes(_PG_numbers, udt_name)) {
+    return "number | string";
+  }
+  return tsType;
 };

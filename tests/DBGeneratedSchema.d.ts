@@ -57,10 +57,10 @@ export type DBGeneratedSchema = {
     columns: {
       added?: string;
       cloud_url?: null | string;
-      content_length?: string;
+      content_length?: number | string;
       content_type: string;
-      deleted?: null | string;
-      deleted_from_storage?: null | string;
+      deleted?: null | number | string;
+      deleted_from_storage?: null | number | string;
       description?: null | string;
       etag?: null | string;
       extension: string;
@@ -68,7 +68,7 @@ export type DBGeneratedSchema = {
       name: string;
       original_name: string;
       signed_url?: null | string;
-      signed_url_expires?: null | string;
+      signed_url_expires?: null | number | string;
       url: string;
     };
   };
@@ -178,7 +178,7 @@ export type DBGeneratedSchema = {
     columns: {
       flight_number?: null | string;
       id?: number;
-      last_updated: string;
+      last_updated: number | string;
       x?: null | number;
       y?: null | number;
     };
@@ -297,7 +297,7 @@ export type DBGeneratedSchema = {
   trades: {
     columns: {
       id?: number;
-      price: string;
+      price: number | string;
       symbol: string;
     };
   };
