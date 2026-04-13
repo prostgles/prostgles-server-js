@@ -1,4 +1,4 @@
-import { isDefined, type TableSchema } from "prostgles-types";
+import { isDefined, isEmpty, type TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfig";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
@@ -47,6 +47,8 @@ export const getDBGeneratedSchema = ({
           })
           .filter(isDefined),
       );
+      const referencedByStr =
+        isEmpty(referencedBy) ? "" : `referencedBy: ${JSON.stringify(referencedBy)};`;
       tables.push(`${escapeTSNames(tableOrView.name)}: {
     columns: {${cols
       .map(
@@ -55,7 +57,7 @@ export const getDBGeneratedSchema = ({
       )
       .join("")}
     };
-    referencedBy: ${JSON.stringify(referencedBy)};
+    ${referencedByStr}
   };\n  `);
     });
   return `
