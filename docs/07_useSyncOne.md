@@ -15,6 +15,7 @@ Retrieves the first row matching the filter and keeps it in sync
     
     Example: `{ department: 'd1', name: 'abc' }` would match records where department is 'd1' AND name is 'abc'.
   - **syncOptions** <span style="color: red">required</span> <span style="color: green;">SyncOneOptions</span>
+    - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
     - **onChange** <span style="color: grey">optional</span> <span style="color: green;">MultiChangeListener</span>
 
       Data change listener.
@@ -22,7 +23,6 @@ Retrieves the first row matching the filter and keeps it in sync
     - **skipFirstTrigger** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       If true then the first onChange trigger is skipped
-    - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
     - **storageType** <span style="color: grey">optional</span> <span style="color: green;">"map" | "localStorage" | undefined</span>
 
       Default is "object".

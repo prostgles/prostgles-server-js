@@ -255,7 +255,10 @@ export class QueryStreamer {
     };
     const stop = async (opts: { terminate?: boolean } | undefined, cb: BasicCallback) => {
       const { client: queryClient } = this.socketQueries.get(socketId)?.get(id) ?? {};
-      if (!queryClient) return;
+      if (!queryClient) {
+        cb(null, "No active query client found");
+        return;
+      }
       if (opts?.terminate) {
         setTimeout(() => {
           void queryClient.end();

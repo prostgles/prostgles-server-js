@@ -5,6 +5,7 @@ export type DBGeneratedSchema = {
     columns: {
       id?: null | number;
     };
+    referencedBy: {};
   };
   "\"\"\"*\"\"\"": {
     columns: {
@@ -12,6 +13,7 @@ export type DBGeneratedSchema = {
       id?: number;
       qq?: null | string;
     };
+    referencedBy: {};
   };
   "\"\"\"quoted0\"\"\"": {
     columns: {
@@ -19,6 +21,7 @@ export type DBGeneratedSchema = {
       "\"quoted1_id\""?: null | number;
       "\"text_col0\""?: null | string;
     };
+    referencedBy: {};
   };
   "\"\"\"quoted1\"\"\"": {
     columns: {
@@ -26,24 +29,28 @@ export type DBGeneratedSchema = {
       "\"quoted2_id\""?: null | number;
       "\"text_col1\""?: null | string;
     };
+    referencedBy: {"\"\"\"quoted0\"\"\"":["\"quoted1_id\""]};
   };
   "\"\"\"quoted2\"\"\"": {
     columns: {
       "\"id2\""?: number;
       "\"text_col2\""?: null | string;
     };
+    referencedBy: {"\"\"\"quoted1\"\"\"":["\"quoted2_id\""]};
   };
   "\"*\"": {
     columns: {
       "*"?: null | string;
       id?: number;
     };
+    referencedBy: {};
   };
   api_table: {
     columns: {
       col1?: null | string;
       id?: number;
     };
+    referencedBy: {};
   };
   ex_j_ins: {
     columns: {
@@ -52,6 +59,7 @@ export type DBGeneratedSchema = {
       name: string;
       public?: null | string;
     };
+    referencedBy: {};
   };
   files: {
     columns: {
@@ -71,6 +79,7 @@ export type DBGeneratedSchema = {
       signed_url_expires?: null | number | string;
       url: string;
     };
+    referencedBy: {"users_public_info":["avatar"]};
   };
   geography_columns: {
     columns: {
@@ -82,6 +91,7 @@ export type DBGeneratedSchema = {
       srid?: null | number;
       type?: null | string;
     };
+    referencedBy: {};
   };
   geometry_columns: {
     columns: {
@@ -93,6 +103,7 @@ export type DBGeneratedSchema = {
       srid?: null | number;
       type?: null | string;
     };
+    referencedBy: {};
   };
   insert_rules: {
     columns: {
@@ -100,6 +111,7 @@ export type DBGeneratedSchema = {
       id?: number;
       name?: null | string;
     };
+    referencedBy: {};
   };
   items: {
     columns: {
@@ -107,6 +119,7 @@ export type DBGeneratedSchema = {
       id?: number;
       name?: null | string;
     };
+    referencedBy: {"items2":["items_id"],"items4a":["items_id"],"items_multi":["items0_id","items1_id","items2_id","items3_id"]};
   };
   items_multi: {
     columns: {
@@ -117,6 +130,7 @@ export type DBGeneratedSchema = {
       items3_id?: null | number;
       name?: null | string;
     };
+    referencedBy: {};
   };
   items2: {
     columns: {
@@ -125,6 +139,7 @@ export type DBGeneratedSchema = {
       items_id?: null | number;
       name?: null | string;
     };
+    referencedBy: {"items4a":["items2_id"]};
   };
   items3: {
     columns: {
@@ -132,6 +147,7 @@ export type DBGeneratedSchema = {
       id?: number;
       name?: null | string;
     };
+    referencedBy: {};
   };
   items4: {
     columns: {
@@ -140,6 +156,7 @@ export type DBGeneratedSchema = {
       name: string;
       public?: null | string;
     };
+    referencedBy: {};
   };
   items4_pub: {
     columns: {
@@ -148,6 +165,7 @@ export type DBGeneratedSchema = {
       name: string;
       public?: null | string;
     };
+    referencedBy: {};
   };
   items4a: {
     columns: {
@@ -156,18 +174,27 @@ export type DBGeneratedSchema = {
       items2_id?: null | number;
       name?: null | string;
     };
+    referencedBy: {};
   };
   lookup_col1: {
     columns: {
       description?: null | string;
       id: "a" | "b"
     };
+    referencedBy: {"uuid_text":["col1","col2","col3"]};
+  };
+  newly_created_table: {
+    columns: {
+      id?: null | number;
+    };
+    referencedBy: {};
   };
   obj_table: {
     columns: {
       id?: number;
       obj?: null | any;
     };
+    referencedBy: {};
   };
   planes: {
     columns: {
@@ -177,12 +204,14 @@ export type DBGeneratedSchema = {
       x?: null | number;
       y?: null | number;
     };
+    referencedBy: {};
   };
   "prostgles_test.basic": {
     columns: {
       id?: number;
       txt?: null | string;
     };
+    referencedBy: {"prostgles_test.basic1":["id_basic"]};
   };
   "prostgles_test.basic1": {
     columns: {
@@ -190,6 +219,7 @@ export type DBGeneratedSchema = {
       id_basic?: null | number;
       txt?: null | string;
     };
+    referencedBy: {"prostgles_test.mv_basic1":["id"]};
   };
   "prostgles_test.mv_basic1": {
     columns: {
@@ -197,6 +227,7 @@ export type DBGeneratedSchema = {
       id_basic: number;
       txt: string;
     };
+    referencedBy: {};
   };
   rec: {
     columns: {
@@ -204,11 +235,13 @@ export type DBGeneratedSchema = {
       parent_id?: null | number;
       recf?: null | number;
     };
+    referencedBy: {"rec":["parent_id"]};
   };
   rec_ref: {
     columns: {
       id?: number;
     };
+    referencedBy: {"rec":["recf"]};
   };
   self_join: {
     columns: {
@@ -217,6 +250,7 @@ export type DBGeneratedSchema = {
       my_id1?: null | number;
       name?: null | string;
     };
+    referencedBy: {"self_join":["my_id","my_id1"]};
   };
   shapes: {
     columns: {
@@ -224,6 +258,7 @@ export type DBGeneratedSchema = {
       geom?: null | string;
       id?: string;
     };
+    referencedBy: {};
   };
   spatial_ref_sys: {
     columns: {
@@ -233,22 +268,26 @@ export type DBGeneratedSchema = {
       srid: number;
       srtext?: null | string;
     };
+    referencedBy: {};
   };
   symbols: {
     columns: {
       id: string;
     };
+    referencedBy: {"trades":["symbol"]};
   };
   table_name3434: {
     columns: {
       id: number;
     };
+    referencedBy: {"table_name3434cccc":["id","id2"]};
   };
   table_name3434cccc: {
     columns: {
       id?: null | number;
       id2?: null | number;
     };
+    referencedBy: {};
   };
   tjson: {
     columns: {
@@ -267,12 +306,14 @@ export type DBGeneratedSchema = {
        |  {  loading: {  loaded: number;  total: number; }; }
       table_config?: null | {    referencedTables?: (  {  name: string;  minFiles: number; } )[];   recType?: null | Record<"a" | "b",  {  bools: boolean[]; }>;  };
     };
+    referencedBy: {};
   };
   tr1: {
     columns: {
       id?: number;
       t1?: null | string;
     };
+    referencedBy: {"tr2":["tr1_id"]};
   };
   tr2: {
     columns: {
@@ -281,6 +322,7 @@ export type DBGeneratedSchema = {
       t2?: null | string;
       tr1_id?: null | number;
     };
+    referencedBy: {"tr3":["tr2_id"]};
   };
   tr3: {
     columns: {
@@ -288,6 +330,7 @@ export type DBGeneratedSchema = {
       t2?: null | string;
       tr2_id?: null | number;
     };
+    referencedBy: {};
   };
   trades: {
     columns: {
@@ -295,6 +338,7 @@ export type DBGeneratedSchema = {
       price: number | string;
       symbol: string;
     };
+    referencedBy: {};
   };
   users: {
     columns: {
@@ -303,6 +347,7 @@ export type DBGeneratedSchema = {
       preferences: {    showIntro?: boolean;   theme?: "light" | "dark" | "auto";   others: any[];  };
       status: "active" | "disabled" | "pending"
     };
+    referencedBy: {};
   };
   users_public_info: {
     columns: {
@@ -311,6 +356,7 @@ export type DBGeneratedSchema = {
       name?: null | string;
       sid?: null | string;
     };
+    referencedBy: {};
   };
   uuid_text: {
     columns: {
@@ -319,12 +365,14 @@ export type DBGeneratedSchema = {
       col3?: null | "a" | "b"
       id?: null | string;
     };
+    referencedBy: {};
   };
   v_items: {
     columns: {
       id?: null | number;
       name?: null | string;
     };
+    referencedBy: {};
   };
   various: {
     columns: {
@@ -335,6 +383,7 @@ export type DBGeneratedSchema = {
       name?: null | string;
       tsv?: null | string;
     };
+    referencedBy: {};
   };
   
 }

@@ -19,5 +19,5 @@
 #### Return type
 #### <span style="color: green;">SyncHandler</span>
   - **$unsync** <span style="color: red">required</span> <span style="color: green;">() =&gt; void</span>
-  - **$upsert** <span style="color: red">required</span> <span style="color: green;">(newData: T[]) =&gt; void | Promise&lt;void&gt;</span>
-  - **getItems** <span style="color: red">required</span> <span style="color: green;">() =&gt; T[]</span>
+  - **$upsert** <span style="color: red">required</span> <span style="color: green;">(newData: TD[]) =&gt; void | Promise&lt;void&gt;</span>
+  - **getItems** <span style="color: red">required</span> <span style="color: green;">() =&gt; TD[]</span>

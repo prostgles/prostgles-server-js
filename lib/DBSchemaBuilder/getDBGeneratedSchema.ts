@@ -1,4 +1,4 @@
-import type { TableSchema } from "prostgles-types";
+import { isDefined, type TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfig";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
@@ -21,12 +21,32 @@ export const getDBGeneratedSchema = ({
       const { columns } = tableOrView;
       const cols = columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
 
-      // const referencedBy: Record<string, string[]> = fromEntries(
-      //   tablesOrViews.map((tov) => [
-      //     tov.name,
-      //     tov.columns.filter((col) => col.udt_name === tableOrView.name).map((col) => col.name),
-      //   ]),
-      // );
+      /**
+       * E.g.: A "users" will have referencedBy: { user_posts: ["user_id"] }
+       */
+      const referencedBy: Record<string, string[]> = fromEntries(
+        tablesOrViews
+          .map((refTable) => {
+            const referencedCols = refTable.columns
+              .map((refCol) => {
+                const refCols = refCol.references
+                  ?.filter((r) => r.ftable === tableOrView.name)
+                  .map((r) => r.cols)
+                  .flat();
+
+                return refCols;
+              })
+              .filter(isDefined)
+              .flat();
+            const uniqueReferencedCols = Array.from(new Set(referencedCols));
+
+            if (referencedCols.length) {
+              return [refTable.name, uniqueReferencedCols] as const;
+            }
+            return;
+          })
+          .filter(isDefined),
+      );
       tables.push(`${escapeTSNames(tableOrView.name)}: {
     columns: {${cols
       .map(
@@ -35,6 +55,7 @@ export const getDBGeneratedSchema = ({
       )
       .join("")}
     };
+    referencedBy: ${JSON.stringify(referencedBy)};
   };\n  `);
     });
   return `

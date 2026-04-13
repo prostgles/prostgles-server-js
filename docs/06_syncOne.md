@@ -8,6 +8,7 @@
 
     Make all properties in T optional
   - **options** <span style="color: red">required</span> <span style="color: green;">SyncOneOptions</span>
+    - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
     - **onChange** <span style="color: grey">optional</span> <span style="color: green;">MultiChangeListener</span>
 
       Data change listener.
@@ -15,7 +16,6 @@
     - **skipFirstTrigger** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       If true then the first onChange trigger is skipped
-    - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
     - **storageType** <span style="color: grey">optional</span> <span style="color: green;">"map" | "localStorage" | undefined</span>
 
       Default is "object".
@@ -33,10 +33,10 @@
 #### <span style="color: green;">SingleSyncHandles</span>
 
   CRUD handles added if initialised with handlesOnData = true
-  - **$get** <span style="color: red">required</span> <span style="color: green;">() =&gt; Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt; | undefined</span>
-  - **$find** <span style="color: red">required</span> <span style="color: green;">(idObj: Partial&lt;Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt;&gt;) =&gt; Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt; | undefined</span>
+  - **$get** <span style="color: red">required</span> <span style="color: green;">() =&gt; Required&lt;{ [K in keyof TD]: CollapseNumberIfStringPresent&lt;TD[K]&gt;; }&gt; | undefined</span>
+  - **$find** <span style="color: red">required</span> <span style="color: green;">(idObj: Partial&lt;Required&lt;{ [K in keyof TD]: CollapseNumberIfStringPresent&lt;TD[K]&gt;; }&gt;&gt;) =&gt; Required&lt;{ [K in keyof TD]: CollapseNumberIfStringPresent&lt;TD[K]&gt;; }&gt; | undefined</span>
   - **$unsync** <span style="color: red">required</span> <span style="color: green;">() =&gt; any</span>
   - **$delete** <span style="color: red">required</span> <span style="color: green;">() =&gt; void</span>
-  - **$update** <span style="color: red">required</span> <span style="color: green;">&lt;OPTS extends $UpdateOpts&gt;(newData: OPTS extends { deepMerge: true; } ? DeepPartial&lt;T&gt; : Partial&lt;T&gt;, opts?: OPTS | undefined) =&gt; any</span>
+  - **$update** <span style="color: red">required</span> <span style="color: green;">&lt;OPTS extends $UpdateOpts&gt;(newData: OPTS extends { deepMerge: true; } ? DeepPartial&lt;TD&gt; : Partial&lt;TD&gt;, opts?: OPTS | undefined) =&gt; any</span>
   - **$cloneSync** <span style="color: red">required</span> <span style="color: green;">CloneSync</span>
   - **$cloneMultiSync** <span style="color: red">required</span> <span style="color: green;">CloneMultiSync</span>
