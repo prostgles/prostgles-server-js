@@ -1,9 +1,9 @@
 import { describe, test } from "node:test";
-import type { ViewHandler } from "prostgles-types";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerServer } from "../DboBuilder/DboBuilder";
 import type { Publish } from "../PublishParser/PublishParser";
 import type { DBGeneratedSchema } from "./DBoGenerated";
+import type { TableHandler } from "prostgles-types";
 
 type DBSchema2 = {
   tr2: {
@@ -38,6 +38,7 @@ void describe("DBOFullyTyped test", async () => {
       });
       txRes satisfies "test";
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       db.items2.find;
 
       const r = await db.items2.find(
@@ -55,7 +56,7 @@ void describe("DBOFullyTyped test", async () => {
       //@ts-expect-error
       r[0]?.bad_col;
 
-      const tr2 = {} as ViewHandler<DBSchema2["tr2"]["columns"], DBSchema2>;
+      const tr2 = {} as TableHandler<DBSchema2["tr2"]["columns"], DBSchema2>;
       void tr2.find(
         {},
         {

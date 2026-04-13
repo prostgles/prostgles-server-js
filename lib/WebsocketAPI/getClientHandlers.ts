@@ -5,15 +5,14 @@ import {
   type SQLHandler,
   type SQLOptions,
   type TableHandler,
-  type ViewHandler,
 } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
+import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
+import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
 import { getClientSchema } from "./getClientSchema";
-import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
-import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 
 export type ClientHandlers<S = void> = {
   clientSql: SQLHandler;
@@ -36,7 +35,7 @@ export const getClientHandlers = async <S = void>(
   ) => runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
   const tableHandlers = Object.fromEntries(
     prostgles.dboBuilder.tablesOrViews!.map((table) => {
-      const methods = [...viewMethods, ...tableMethods];
+      const methods = [...tableMethods];
       const handlers = Object.fromEntries(
         methods.map((command) => {
           const method = (param1: unknown, param2: unknown, param3: unknown) =>
@@ -84,7 +83,7 @@ export const getClientHandlers = async <S = void>(
   return { clientDb, clientSql, clientMethods, clientSchema };
 };
 
-const viewMethods = getKeys({
+const tableMethods = getKeys({
   count: 1,
   find: 1,
   findOne: 1,
@@ -93,13 +92,10 @@ const viewMethods = getKeys({
   size: 1,
   subscribe: 1,
   subscribeOne: 1,
-} satisfies Record<keyof ViewHandler, 1>);
-
-const tableMethods = getKeys({
   delete: 1,
   insert: 1,
   update: 1,
   upsert: 1,
   updateBatch: 1,
   insertMany: 1,
-} satisfies Record<Exclude<keyof TableHandler, keyof ViewHandler>, 1>);
+} satisfies Record<keyof TableHandler, 1>);

@@ -2,6 +2,7 @@ import type { TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfig";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
+import { fromEntries } from "../PublishParser/applyScopeToTableRules";
 
 export const getDBGeneratedSchema = ({
   config,
@@ -19,6 +20,13 @@ export const getDBGeneratedSchema = ({
     .forEach((tableOrView) => {
       const { columns } = tableOrView;
       const cols = columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
+
+      // const referencedBy: Record<string, string[]> = fromEntries(
+      //   tablesOrViews.map((tov) => [
+      //     tov.name,
+      //     tov.columns.filter((col) => col.udt_name === tableOrView.name).map((col) => col.name),
+      //   ]),
+      // );
       tables.push(`${escapeTSNames(tableOrView.name)}: {
     columns: {${cols
       .map(

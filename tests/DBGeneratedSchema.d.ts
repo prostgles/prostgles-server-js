@@ -163,11 +163,6 @@ export type DBGeneratedSchema = {
       id: "a" | "b"
     };
   };
-  newly_created_table: {
-    columns: {
-      id?: null | number;
-    };
-  };
   obj_table: {
     columns: {
       id?: number;

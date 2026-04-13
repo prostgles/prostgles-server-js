@@ -1,12 +1,8 @@
-import type { AnyObject, DBSchema, TableHandler, ViewHandler } from "prostgles-types";
+import type { AnyObject, DBSchema, TableHandler } from "prostgles-types";
 import type { TX } from "../DboBuilder/DboBuilderTypes";
 import type { PublishAllOrNothing, PublishTableRule } from "../PublishParser/PublishParser";
 import { type PublishObject } from "../PublishParser/PublishParser";
 
-export type ServerViewHandler<
-  T extends AnyObject = AnyObject,
-  Schema extends DBSchema | void = void,
-> = ViewHandler<T, Schema> & { is_view: true };
 export type ServerTableHandler<
   T extends AnyObject = AnyObject,
   Schema extends DBSchema | void = void,
@@ -15,9 +11,7 @@ export type ServerTableHandler<
 export type DBTableHandlersFromSchema<Schema = void> =
   Schema extends DBSchema ?
     {
-      [tov_name in keyof Schema]: Schema[tov_name]["is_view"] extends true ?
-        ServerViewHandler<Schema[tov_name]["columns"], Schema>
-      : ServerTableHandler<Schema[tov_name]["columns"], Schema>;
+      [tov_name in keyof Schema]: ServerTableHandler<Schema[tov_name]["columns"], Schema>;
     }
   : Record<string, Partial<ServerTableHandler>>;
 

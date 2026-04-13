@@ -33,8 +33,8 @@
 #### <span style="color: green;">SingleSyncHandles</span>
 
   CRUD handles added if initialised with handlesOnData = true
-  - **$get** <span style="color: red">required</span> <span style="color: green;">() =&gt; T | undefined</span>
-  - **$find** <span style="color: red">required</span> <span style="color: green;">(idObj: Partial&lt;T&gt;) =&gt; T | undefined</span>
+  - **$get** <span style="color: red">required</span> <span style="color: green;">() =&gt; Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt; | undefined</span>
+  - **$find** <span style="color: red">required</span> <span style="color: green;">(idObj: Partial&lt;Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt;&gt;) =&gt; Required&lt;{ [K in keyof T]: CollapseNumberIfStringPresent&lt;T[K]&gt;; }&gt; | undefined</span>
   - **$unsync** <span style="color: red">required</span> <span style="color: green;">() =&gt; any</span>
   - **$delete** <span style="color: red">required</span> <span style="color: green;">() =&gt; void</span>
   - **$update** <span style="color: red">required</span> <span style="color: green;">&lt;OPTS extends $UpdateOpts&gt;(newData: OPTS extends { deepMerge: true; } ? DeepPartial&lt;T&gt; : Partial&lt;T&gt;, opts?: OPTS | undefined) =&gt; any</span>
