@@ -608,8 +608,8 @@ export async function syncData(
    */
   if (clientData) {
     if (clientData.data && Array.isArray(clientData.data) && clientData.data.length) {
-      sync.wal.addData(clientData.data.map((d) => ({ current: d })));
-      return;
+      return sync.wal.addData(clientData.data.map((d) => ({ current: d })));
+
       // await upsertData(clientData.data, true);
 
       /* Not expecting this anymore. use normal db.table.delete channel */

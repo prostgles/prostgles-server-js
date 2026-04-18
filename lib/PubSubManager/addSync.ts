@@ -1,4 +1,5 @@
-import { find, tryCatchV2 } from "prostgles-types";
+import { find, getSerialisableError, tryCatchV2 } from "prostgles-types";
+import type { onSyncRequestResponse } from "../SyncReplication";
 import type { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
 
@@ -82,7 +83,7 @@ export async function addSync(
         });
 
         socket.removeAllListeners(channelName);
-        socket.on(channelName, (data: any, cb: BasicCallback) => {
+        socket.on(channelName, (data: onSyncRequestResponse | undefined, cb: BasicCallback) => {
           if (!data) {
             cb({ err: "Unexpected request. Need data or onSyncRequest" });
             return;
@@ -101,8 +102,11 @@ export async function addSync(
               4. Upsert data.data | deleted     on(data.data | data.deleted)
           */
 
-          if (data.onSyncRequest) {
-            void this.syncData(newSync, data.onSyncRequest, "client");
+          if ("onSyncRequest" in data && data.onSyncRequest) {
+            this.syncData(newSync, data.onSyncRequest, "client").catch((err) => {
+              console.error("Error syncing data with client: ", err);
+              cb({ err: getSerialisableError(err) });
+            });
           } else {
             console.error("Unexpected sync request data from client: ", data);
           }
