@@ -64,6 +64,12 @@ export class QueryStreamer {
     void this.adminClient.connect();
   }
 
+  destroy() {
+    return this.adminClient.end().catch((err) => {
+      console.error("Error ending admin client connection", err);
+    });
+  }
+
   getConnection = (onError: ((err: any) => void) | undefined, extraOptions?: pg.ClientConfig) => {
     const connectionInfo =
       typeof this.db.$cn === "string" ? { connectionString: this.db.$cn } : (this.db.$cn as any);

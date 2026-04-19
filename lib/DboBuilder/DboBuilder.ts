@@ -134,7 +134,7 @@ export class DboBuilder {
     this.prostgles = prostgles;
     if (!this.prostgles.db) throw "db missing";
     this.db = this.prostgles.db;
-    this.dbo = {} as unknown as DBHandlerServer;
+    this.dbo = {} as DBHandlerServer;
     this.dboMap = new Map();
     this.queryStreamer = new QueryStreamer(this);
   }
@@ -154,9 +154,10 @@ export class DboBuilder {
     return await res.init();
   };
 
-  destroy() {
+  destroy = async () => {
+    await this.queryStreamer.destroy().catch(console.error);
     return this._pubSubManager?.destroy();
-  }
+  };
 
   _joins?: Join[];
   get joins(): Join[] {
