@@ -116,7 +116,7 @@ export async function getNewQuery(
       allowedFields: allowedSelectFields,
       allowedOrderByFields,
       computedFields: COMPUTED_FIELDS,
-      isView: _this.is_view,
+      isView: _this.isView,
       functions: FUNCTIONS,
       allFields: _this.column_names.slice(0),
       columns,

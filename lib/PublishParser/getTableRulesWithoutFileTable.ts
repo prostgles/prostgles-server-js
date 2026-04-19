@@ -33,7 +33,7 @@ export async function getTableRulesWithoutFileTable(
     };
   }
 
-  const is_view = tableHandler.is_view;
+  const is_view = tableHandler.isView;
 
   /**
    * Allow subscribing to a view if it has primary key columns from other tables

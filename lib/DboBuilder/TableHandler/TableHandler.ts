@@ -61,7 +61,6 @@ export class TableHandler extends ViewHandler {
     this.remove = this.delete;
 
     this.dataValidator = new DataValidator(this);
-    this.is_view = false;
     this.is_media = dboBuilder.prostgles.isMedia(this.name);
   }
 
@@ -157,7 +156,7 @@ export class TableHandler extends ViewHandler {
         allowedOrderByFields: allowedFields,
         computedFields: COMPUTED_FIELDS,
         functions: FUNCTIONS.filter((f) => f.type === "function" && f.singleColArg),
-        isView: this.is_view,
+        isView: this.isView,
         columns: this.columns,
       });
       await sBuilder.parseUserSelect(returning);

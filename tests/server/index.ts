@@ -71,7 +71,7 @@ process.on("unhandledRejection", (reason, p) => {
  */
 const dbConnection = {
   host: process.env.POSTGRES_HOST || "localhost",
-  port: +process.env.POSTGRES_PORT || 5432,
+  port: +(process.env.POSTGRES_PORT || 5432),
   database: process.env.POSTGRES_DB || "prostgles_server_tests",
   user: process.env.POSTGRES_USER || "api",
   password: process.env.POSTGRES_PASSWORD || "api",

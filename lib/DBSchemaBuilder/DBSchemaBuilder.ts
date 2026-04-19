@@ -6,7 +6,7 @@ import { type PublishObject } from "../PublishParser/PublishParser";
 export type ServerTableHandler<
   T extends AnyObject = AnyObject,
   Schema extends DBSchema | void = void,
-> = TableHandler<T, Schema> & { is_view: false };
+> = TableHandler<T, Schema>;
 
 export type DBTableHandlersFromSchema<Schema = void> =
   Schema extends DBSchema ?

@@ -37,7 +37,7 @@ export async function getInfo(
           allowedNestedInserts,
         }
       ),
-    isView: this.is_view,
+    isView: this.isView,
     hasFiles: Boolean(
       !this.is_media &&
       fileTableName &&

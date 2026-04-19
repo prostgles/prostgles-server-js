@@ -60,7 +60,9 @@ export class ViewHandler {
     return this.tx?.t ?? this.db;
   }
 
-  is_view = true;
+  get isView() {
+    return this.tableOrViewInfo.is_view;
+  }
   filterDef = "";
   is_media = false;
   constructor({

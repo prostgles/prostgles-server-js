@@ -26,7 +26,7 @@ export async function getSubscribeRelatedTables(
   { filter, localParams, newQuery }: Args,
 ) {
   let viewOptions: ViewSubscriptionOptions | undefined = undefined;
-  if (this.is_view) {
+  if (this.isView) {
     viewOptions = await getViewRelatedTables(this, localParams, newQuery);
     /** Any joined table used within select or filter must also be added a trigger for this recordset */
   } else {
@@ -47,7 +47,7 @@ export async function getSubscribeRelatedTables(
         throw `Table ${relatedTableName} not found`;
       }
 
-      if (relatedTableOrViewHandler.is_view) {
+      if (relatedTableOrViewHandler.isView) {
         return;
       }
 
