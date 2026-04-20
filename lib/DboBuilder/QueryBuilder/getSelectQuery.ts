@@ -47,36 +47,35 @@ export function getSelectQuery(
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
   const hasOrJoins = parsedJoins.some((j) => j.isOrJoin);
 
-  let joinCtes =
-    !parsedJoins.length ?
-      []
-    : [
-        ...parsedJoins.flatMap((j, joinIndex) => {
-          if (joinIndex > 0 && j.cteLines.length) {
-            return [",", ...j.cteLines];
-          }
-          return j.cteLines;
-        }),
-      ];
+  const joinCtes: string[][] = parsedJoins
+    .map((j) => {
+      return j.cteLines.length ? j.cteLines : undefined;
+    })
+    .filter(isDefined);
 
   if (hasOrJoins) {
     const pkey = viewHandler.columns.find((c) => c.is_pkey);
-    joinCtes = [
+    joinCtes.unshift([
       `${q.table.escaped} AS (`,
       `  SELECT *, ${pkey ? asName(pkey.name) : "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
       `  FROM ${q.table.escaped}`,
       `)`,
-      joinCtes.length ? "," : "",
-      ...joinCtes,
-    ];
+    ]);
   }
 
-  if (joinCtes.length) {
-    joinCtes.unshift(`WITH `);
-  }
+  const withCtesStatementLines =
+    joinCtes.length ?
+      [
+        `WITH`,
+        ...joinCtes.flatMap((cte, idx) => {
+          const lastIdx = joinCtes.length - 1;
+          return cte.concat(idx < lastIdx ? [` ,`] : []);
+        }),
+      ]
+    : [];
 
   const query = [
-    ...joinCtes,
+    ...withCtesStatementLines,
     `SELECT`,
     ...indentLines(selectItems, { appendCommas: true }),
     `FROM ( `,
