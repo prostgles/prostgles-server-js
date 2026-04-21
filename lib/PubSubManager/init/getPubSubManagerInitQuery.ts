@@ -271,6 +271,7 @@ BEGIN
                             concat_ws('_', 'prostgles_triggers', table_name, 'delete')
                           )
                         )
+                        ORDER BY table_name
                     LOOP
 
                         FOREACH op IN ARRAY operations
@@ -302,15 +303,7 @@ BEGIN
                             WHERE t.table_name = nt.table_name
                             AND   t.inserted   < nt.inserted    -- exclude current record (this is an after trigger). Turn into before trigger?
                         )
-
-                        /* Table is valid 
-                        AND  EXISTS (
-                            SELECT 1 
-                            FROM information_schema.tables 
-                            WHERE  table_schema = 'public'
-                            AND    table_name   = nt.table_name
-                        )
-                        */
+                        ORDER BY table_name
                     LOOP
 
                         IF (
