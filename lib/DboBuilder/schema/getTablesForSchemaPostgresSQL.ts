@@ -30,10 +30,11 @@ export async function getTablesForSchemaPostgresSQL(
     schemaFilter,
     ddlWithRollback,
   }: { schemaFilter: ProstglesInitOptions["schemaFilter"]; ddlWithRollback?: string },
-): Promise<{
-  result: TableSchema[];
-  durations: Record<string, number>;
-}> {
+) {
+  // : Promise<{
+  //   result: TableSchema[];
+  //   durations: Record<string, number>;
+  // }>
   const { sql, schemaNames } = getSchemaFilter(schemaFilter);
 
   return db.tx(async (t) => {
@@ -217,7 +218,8 @@ export async function getTablesForSchemaPostgresSQL(
           , obj_description(t.oid::regclass) as comment
         FROM ( 
           SELECT table_name
-          , table_schema, table_type = 'VIEW' as is_view
+          , table_schema
+          , table_type = 'VIEW' as is_view
           , format('%I.%I', table_schema, table_name)::REGCLASS::oid as oid
           FROM information_schema.tables 
           WHERE table_schema ${sql}
@@ -225,16 +227,21 @@ export async function getTablesForSchemaPostgresSQL(
         --GROUP BY t.table_schema, t.table_name, t.is_view, t.view_definition, t.oid
         ORDER BY schema, name
         `;
-      const tablesAndViews = (await t.any(query, { schemaNames })).map((table: TableSchema) => {
-        table.columns = clone(getTVColumns.data!.columns)
+      const tablesAndViews = (
+        await t.any<Omit<TableSchema, "columns" | "parent_tables">>(query, { schemaNames })
+      ).map((table) => {
+        const columns = clone(getTVColumns.data!.columns)
           .filter((c) => c.table_oid === table.oid)
           .map((c) => omitKeys(c, ["table_oid"]));
 
-        table.parent_tables =
+        const parent_tables =
           getViewParentTables.data?.parent_tables.find((vr) => vr.oid === table.oid)?.table_names ??
           [];
-
-        return table;
+        const qualifiedNameParts = {
+          schema: table.schema,
+          name: table.name,
+        };
+        return { ...table, qualifiedNameParts, columns, parent_tables };
       });
       return { tablesAndViews };
     });

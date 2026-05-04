@@ -152,6 +152,10 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(tableInfo, {
         comment: null,
         label: "items",
+        qualifiedNameParts: {
+          name: "items",
+          schema: "public",
+        },
         isView: false,
         hasFiles: false,
         fileTableName: "files",

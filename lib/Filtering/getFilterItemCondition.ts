@@ -91,7 +91,11 @@ export const getFilterItemCondition = ({
        * - inacurrate results at large envelopes due to the curvature of the earth
        * https://gis.stackexchange.com/questions/78816/maximum-size-on-the-bounding-box-with-st-makeenvelope-and-and-geography-colum
        */
-      if (funcName.toLowerCase() === "st_makeenvelope") {
+      if (
+        funcName.toLowerCase() === "st_makeenvelope" &&
+        selItem.column_udt_type === "geography" &&
+        funcArgs?.[4] !== 4326
+      ) {
         leftQ += "::geometry";
       }
 

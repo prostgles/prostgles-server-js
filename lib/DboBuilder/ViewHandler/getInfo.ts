@@ -30,6 +30,7 @@ export async function getInfo(
   return {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
+    qualifiedNameParts: this.tableOrViewInfo.qualifiedNameParts,
     label,
     isFileTable:
       !this.is_media ? undefined : (

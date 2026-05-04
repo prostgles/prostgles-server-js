@@ -35,7 +35,7 @@ export type PGIdentifier = {
   escaped: string;
 };
 
-export type TableSchema = Pick<TableInfo, "uniqueColumnGroups"> & {
+export type TableSchema = Pick<TableInfo, "uniqueColumnGroups" | "qualifiedNameParts"> & {
   schema: string;
   name: string;
   escaped_identifier: string;
