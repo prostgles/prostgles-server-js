@@ -22,7 +22,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     const getUser = async (): Promise<AuthResultWithSID<SessionUser>> => {
       const res = await this.authHandler.getSidAndUserFromRequest({ socket });
       if (res === "new-session-redirect") {
-        socket.emit(CHANNELS.AUTHGUARD, {
+        socket.emit(CHANNELS.AUTH_GUARD, {
           shouldReload: true,
           error: res,
         });
@@ -61,7 +61,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       const errorInfo = await onUseOrSocketConnected(
         authHandler.getValidatedSid({ socket }),
         getClientRequestIPsInfo({ socket }),
-        { socket }
+        { socket },
       );
       if (errorInfo) {
         socket.emit(CHANNELS.CONNECTION, {
@@ -98,7 +98,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         args: SocketRequestParams,
         cb = (..._callback: any[]) => {
           /* Empty */
-        }
+        },
       ) => {
         runClientRequest
           .bind(this)(args, { socket }, undefined)
@@ -108,7 +108,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           .catch((err) => {
             cb(err);
           });
-      }
+      },
     );
 
     socket.removeAllListeners(CHANNELS.METHOD);
@@ -118,7 +118,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         { name, input }: SocketFunctionCall,
         cb = (..._callback: any) => {
           /* Empty */
-        }
+        },
       ) => {
         runClientMethod
           .bind(this)(
@@ -128,7 +128,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
             },
             {
               socket,
-            }
+            },
           )
           .then((res) => {
             cb(null, res);
@@ -136,7 +136,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
           .catch((err) => {
             makeSocketError(cb, err);
           });
-      }
+      },
     );
 
     await this.pushSocketSchema(socket);

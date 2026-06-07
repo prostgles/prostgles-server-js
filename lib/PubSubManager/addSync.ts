@@ -1,4 +1,4 @@
-import { find, getSerialisableError, tryCatchV2 } from "prostgles-types";
+import { find, getSerialisableError, getSyncChannelName, tryCatchV2 } from "prostgles-types";
 import type { onSyncRequestResponse } from "../SyncReplication";
 import type { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
@@ -26,7 +26,11 @@ export async function addSync(
     if (!socket || !table_info) throw "socket or table_info missing";
 
     const { name: table_name } = table_info;
-    const channelName = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.sync`;
+    const channelName = getSyncChannelName({
+      tableName: table_name,
+      filter,
+      select: params.select,
+    });
 
     if (!synced_field) throw "synced_field missing from table_rules";
 

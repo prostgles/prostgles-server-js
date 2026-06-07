@@ -238,7 +238,7 @@ export class AuthHandler {
       const error = "Session has expired";
       if (hasExpired) {
         if (session?.onExpiration === "redirect")
-          socket.emit(CHANNELS.AUTHGUARD, {
+          socket.emit(CHANNELS.AUTH_GUARD, {
             shouldReload: true,
             error,
           });

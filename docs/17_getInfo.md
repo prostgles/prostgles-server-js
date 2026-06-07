@@ -11,6 +11,9 @@ Retrieves the table/view info
 
     OID from the postgres database
     Useful in handling renamed tables
+  - **qualifiedNameParts** <span style="color: red">required</span> <span style="color: green;">{ schema: string; name: string; }</span>
+    - **schema** <span style="color: red">required</span> <span style="color: green;">string</span>
+    - **name** <span style="color: red">required</span> <span style="color: green;">string</span>
   - **comment** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     Comment from the postgres database

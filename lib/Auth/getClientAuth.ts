@@ -36,9 +36,9 @@ export async function getClientAuth(
         }
       };
       const { socket } = clientReq;
-      socket.removeAllListeners(CHANNELS.AUTHGUARD);
+      socket.removeAllListeners(CHANNELS.AUTH_GUARD);
       socket.on(
-        CHANNELS.AUTHGUARD,
+        CHANNELS.AUTH_GUARD,
         async (
           params: AuthGuardLocation,
           cb = (_err: any, _res?: AuthGuardLocationResponse) => {
