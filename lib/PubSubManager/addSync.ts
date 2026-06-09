@@ -52,8 +52,6 @@ export async function addSync(
       /* Only a sync per socket per table/condition/select allowed */
       const existing = find(this.syncs, { socket_id: socket.id, channel_name: channelName });
       if (!existing) {
-        this.syncs.push(newSync);
-
         const unsyncChn = channelName + "unsync";
         socket.removeAllListeners(unsyncChn);
         socket.once(unsyncChn, (_data: any, cb: BasicCallback) => {
@@ -123,6 +121,7 @@ export async function addSync(
       socket,
     );
 
+    this.syncs.push(newSync);
     return { channelName, newSync };
   });
 

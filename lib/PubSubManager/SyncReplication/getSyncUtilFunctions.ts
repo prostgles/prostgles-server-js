@@ -86,18 +86,20 @@ export const getSyncUtilFunctions = ({
       const { from_synced = null, to_synced = null, end_offset = null } = args;
       const res = new Promise<ClientSyncInfo>((resolve, reject) => {
         const onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
-        socket.emit(channel_name, { onSyncRequest }, (resp?: onSyncRequestResponse) => {
-          if (resp && "onSyncRequest" in resp && resp.onSyncRequest) {
-            const c_fr = resp.onSyncRequest.c_fr,
-              c_lr = resp.onSyncRequest.c_lr,
-              c_count = resp.onSyncRequest.c_count;
+        socket
+          .timeout(5000)
+          .emit(channel_name, { onSyncRequest }, (resp?: onSyncRequestResponse) => {
+            if (resp && "onSyncRequest" in resp && resp.onSyncRequest) {
+              const c_fr = resp.onSyncRequest.c_fr,
+                c_lr = resp.onSyncRequest.c_lr,
+                c_count = resp.onSyncRequest.c_count;
 
-            // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
-            return resolve({ c_fr, c_lr, c_count });
-          } else if (resp && "err" in resp && resp.err) {
-            reject(resp.err);
-          }
-        });
+              // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
+              return resolve({ c_fr, c_lr, c_count });
+            } else if (resp && "err" in resp && resp.err) {
+              reject(resp.err);
+            }
+          });
       });
 
       return res;

@@ -176,13 +176,13 @@ export class AuthHandler {
     const { sidKeyName } = this;
     if (maybeClientReq.socket) {
       const { handshake } = maybeClientReq.socket;
-      const querySid = (handshake.auth?.[sidKeyName] ||
-        handshake.query?.[sidKeyName] ||
-        handshake.auth?.token ||
-        handshake.query?.token) as string | undefined;
+      const querySid = (handshake.auth[sidKeyName] ||
+        handshake.query[sidKeyName] ||
+        handshake.auth.token ||
+        handshake.query.token) as string | undefined;
       let rawSid = querySid;
       if (!rawSid) {
-        const cookie_str = maybeClientReq.socket.handshake.headers?.cookie;
+        const cookie_str = maybeClientReq.socket.handshake.headers.cookie;
         const cookie = parseCookieStr(cookie_str);
         rawSid = cookie[sidKeyName];
       }

@@ -127,12 +127,10 @@ export async function syncData(
 
   /* Debounce sync requests */
   if (!sync.wal.isSending() && sync.is_syncing) {
-    if (!this.syncTimeout) {
-      this.syncTimeout = setTimeout(() => {
-        this.syncTimeout = undefined;
-        void this.syncData(sync, undefined, source);
-      }, throttle);
-    }
+    this.syncTimeout ??= setTimeout(() => {
+      this.syncTimeout = undefined;
+      void this.syncData(sync, undefined, source);
+    }, throttle);
     return;
   }
 

@@ -23,6 +23,7 @@ import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
 import pg = require("pg-promise/typescript/pg-subset");
 import type { SyncTableInfo } from "prostgles-types/dist/WAL";
+import type { Socket } from "socket.io";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -159,7 +160,7 @@ export type CachedSession = {
   __prglCache?: Map<string, CachedSessionData>;
 };
 
-export type PRGLIOSocket = {
+export type PRGLIOSocket = Socket & {
   readonly id: string;
 
   readonly handshake: {
