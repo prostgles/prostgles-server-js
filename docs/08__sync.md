@@ -1,12 +1,14 @@
 > Available on client only
 
-## _sync<span style="opacity: 0.6;">(filter: undefined | EqualityFilter, selectParams: { select: AnyObject | "*"; }, triggers: ClientSyncHandles): Promise&lt;DbTableSync&gt;</span>
+## _sync<span style="opacity: 0.6;">(filter: undefined | EqualityFilter, selectParams: { select: FieldFilter; }, triggers: ClientSyncHandles): Promise&lt;DbTableSync&gt;</span>
 Used internally to setup sync
 #### Parameters
 
   - **filter** <span style="color: red">required</span> <span style="color: green;">EqualityFilter&lt;AnyObject&gt; | undefined</span>
-  - **selectParams** <span style="color: red">required</span> <span style="color: green;">{ select: AnyObject | "*"; }</span>
-    - **select** <span style="color: red">required</span> <span style="color: green;">AnyObject | "*"</span>
+  - **selectParams** <span style="color: red">required</span> <span style="color: green;">{ select: FieldFilter; }</span>
+    - **select** <span style="color: red">required</span> <span style="color: green;">FieldFilter</span>
+
+      List of fields to include or exclude
   - **triggers** <span style="color: red">required</span> <span style="color: green;">ClientSyncHandles</span>
     - **onSyncRequest** <span style="color: red">required</span> <span style="color: green;">(params: SyncBatchParams) =&gt; ClientSyncInfo | ClientExpressData | Promise&lt;ClientSyncInfo | ClientExpressData&gt;</span>
 

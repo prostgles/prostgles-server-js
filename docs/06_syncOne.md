@@ -1,6 +1,6 @@
 > Available on client only
 
-## syncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, options: SyncOptions, onChange: OnchangeOne, onError?: OnErrorHandler): Promise&lt;SingleSyncHandles&gt;</span>
+## syncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, options: SyncOptions, onChange: OnChangeOne, onError?: OnErrorHandler): Promise&lt;SingleSyncHandles&gt;</span>
 
 #### Parameters
 
@@ -12,7 +12,7 @@
     
     Example: `{ department: 'd1', name: 'abc' }` would match records where department is 'd1' AND name is 'abc'.
   - **options** <span style="color: red">required</span> <span style="color: green;">SyncOptions</span>
-  - **onChange** <span style="color: red">required</span> <span style="color: green;">OnchangeOne</span>
+  - **onChange** <span style="color: red">required</span> <span style="color: green;">OnChangeOne</span>
   - **onError** <span style="color: grey">optional</span> <span style="color: green;">OnErrorHandler</span>
 #### Return type
 #### <span style="color: green;">SingleSyncHandles</span>
