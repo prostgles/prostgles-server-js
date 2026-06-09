@@ -39,6 +39,7 @@ export namespace EventTypes {
           lr: string;
           state:
             | "start"
+            | "sync.wal.addData"
             | "sync.wal.isSending()"
             | "initial"
             | "socket?.connected"

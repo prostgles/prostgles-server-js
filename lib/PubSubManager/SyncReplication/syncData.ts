@@ -142,6 +142,7 @@ export async function syncData(
    */
   if (clientData) {
     if (clientData.data && Array.isArray(clientData.data) && clientData.data.length) {
+      await logSyncData("sync.wal.addData");
       return sync.wal.addData(clientData.data.map((d) => ({ current: d })));
       /* Not expecting this anymore. use normal db.table.delete channel */
     } else if (
