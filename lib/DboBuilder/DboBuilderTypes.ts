@@ -6,7 +6,6 @@ import type {
   EXISTS_KEY,
   RawJoinPath,
   SQLHandler,
-  SyncTableInfo,
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
@@ -23,6 +22,7 @@ import type { FieldSpec } from "./QueryBuilder/Functions/Functions";
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ParsedJoinPath } from "./ViewHandler/parseJoinPath";
 import pg = require("pg-promise/typescript/pg-subset");
+import type { SyncTableInfo } from "prostgles-types/dist/WAL";
 
 type PGP = pgPromise.IMain<{}, pg.IClient>;
 
@@ -188,6 +188,7 @@ export type PRGLIOSocket = {
   };
 
   _user?: AnyObject;
+  connected: boolean;
 
   /** Used for publish error caching */
   prostgles?: Map<string, ClientSchema>;

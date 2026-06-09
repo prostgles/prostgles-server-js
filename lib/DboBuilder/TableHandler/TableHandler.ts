@@ -4,12 +4,14 @@ import type {
   DeleteParams,
   FieldFilter,
   InsertParams,
+  ReplicationState,
   Select,
   UpdateParams,
 } from "prostgles-types";
 import { asName, isDefined } from "prostgles-types";
 import type { DB } from "../../Prostgles";
 import type { InsertRule, ParsedTableRule, UpdateRule } from "../../PublishParser/PublishParser";
+import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
 import type TableConfigurator from "../../TableConfig/TableConfig";
 import type { TableDefinition } from "../../TableConfig/TableConfig";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
@@ -198,7 +200,7 @@ export class TableHandler extends ViewHandler {
   async sync(
     filter: Filter,
     params: { select?: FieldFilter },
-    param3_unused: undefined,
+    _param3_unused: undefined,
     table_rules: ParsedTableRule,
     localParams: LocalParams,
   ) {
@@ -223,7 +225,7 @@ export class TableHandler extends ViewHandler {
       const ALLOWED_PARAMS = ["select"];
       const invalidParams = Object.keys(params).filter((k) => !ALLOWED_PARAMS.includes(k));
       if (invalidParams.length) {
-        throw "Invalid or dissallowed params found: " + invalidParams.join(", ");
+        throw "Invalid or disallowed params found: " + invalidParams.join(", ");
       }
 
       const { synced_field } = syncConfig;
@@ -250,13 +252,20 @@ export class TableHandler extends ViewHandler {
       });
 
       /* Step 1: parse command and params */
-      const result = await this.find(
+      const syncOpts = getSyncBatchOptions({
         filter,
-        { select, limit: 0 },
+        params: { select },
+        ...syncConfig,
+        from_synced: undefined,
+        offset: undefined,
+      });
+      const syncResult = await this.find(
+        syncOpts.syncBatchFilter,
+        { select: syncOpts.select, limit: syncOpts.limit, orderBy: syncOpts.orderBy },
         undefined,
         table_rules,
         localParams,
-      ).then(async (_isValid) => {
+      ).then(async (data: AnyObject[]) => {
         const { filterFields, forcedFilter } = table_rules.select || {};
         const condition = (
           await this.prepareWhere({
@@ -281,7 +290,16 @@ export class TableHandler extends ViewHandler {
             filter: { ...filter },
             params: { select },
           })
-          .then(({ channelName }) => ({ channelName, id_fields, synced_field }));
+          .then(
+            ({ channelName }) =>
+              ({
+                channelName,
+                data,
+                id_fields,
+                synced_field,
+                isSynced: data.length < syncOpts.limit,
+              }) satisfies ReplicationState["channels"]["CHANNEL_PREFIX"]["client.emit"]["server.response"]["data"],
+          );
       });
       await this._log({
         command: "sync",
@@ -289,7 +307,7 @@ export class TableHandler extends ViewHandler {
         data: { filter, params },
         duration: Date.now() - start,
       });
-      return result;
+      return syncResult;
     } catch (e) {
       await this._log({
         command: "sync",
@@ -309,7 +327,7 @@ export class TableHandler extends ViewHandler {
     /*
     REPLICATION
 
-        1 Sync proccess (NO DELETES ALLOWED):
+        1 Sync process (NO DELETES ALLOWED):
 
             Client sends:
                 "sync-request"

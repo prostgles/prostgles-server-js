@@ -15,11 +15,10 @@ import { refreshTriggers } from "./refreshTriggers";
 
 import type {
   AnyObject,
+  EqualityFilter,
   FieldFilter,
   SelectParams,
-  SyncTableInfo,
   TableSchema,
-  WAL,
 } from "prostgles-types";
 import { CHANNELS, getSerialisableError, type SubscribeOptions } from "prostgles-types";
 
@@ -28,11 +27,12 @@ import type { OnData } from "../DboBuilder/ViewHandler/subscribe";
 import { matchesLocalFuncs } from "../DboBuilder/ViewHandler/subscribe";
 import type { EventTypes } from "../Logging";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
-import { syncData } from "../SyncReplication";
+import { syncData } from "./SyncReplication/syncData";
 import { addSub } from "./addSub";
 import { notifListener } from "./notifListener";
 import { log } from "./PubSubManagerUtils";
 import { pushSubData } from "./pushSubData";
+import type { SyncTableInfo, WAL } from "prostgles-types/dist/WAL";
 
 export type BasicCallback = (err?: any, res?: any) => void;
 
@@ -41,11 +41,11 @@ export type SyncParams = {
   sid: string | undefined;
   channel_name: string;
   table_name: string;
-  table_rules?: ParsedTableRule;
+  table_rules: ParsedTableRule;
   synced_field: string;
   id_fields: string[];
   batch_size: number;
-  filter: object;
+  filter: EqualityFilter<AnyObject>;
   params: {
     select: FieldFilter;
   };
@@ -361,6 +361,7 @@ export class PubSubManager {
           type: "sync",
           command: "upsertSocket.disconnect",
           tableName: "",
+          channelName: "*",
           duration: 0,
           sid: this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket }),
           socketId: socket.id,
@@ -374,6 +375,7 @@ export class PubSubManager {
           remainingSyncs: JSON.stringify(
             this.syncs.map((s) => pickKeys(s, ["table_name", "condition"])),
           ),
+          syncParams: {} as SyncParams,
         });
 
         return "ok";

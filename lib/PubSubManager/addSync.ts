@@ -1,7 +1,7 @@
 import { find, getSerialisableError, getSyncChannelName, tryCatchV2 } from "prostgles-types";
-import type { onSyncRequestResponse } from "../SyncReplication";
-import type { AddSyncParams, BasicCallback, PubSubManager } from "./PubSubManager";
+import type { AddSyncParams, BasicCallback, PubSubManager, SyncParams } from "./PubSubManager";
 import { parseCondition } from "./PubSubManagerUtils";
+import type { onSyncRequestResponse } from "./SyncReplication/syncData";
 
 /**
  * Returns a sync channel
@@ -13,17 +13,8 @@ export async function addSync(
 ): Promise<{ channelName: string }> {
   const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatchV2(async () => {
-    const {
-      socket = null,
-      table_info = null,
-      table_rules,
-      synced_field = null,
-      filter = {},
-      params,
-      condition = "",
-    } = syncParams;
+    const { socket, table_info, table_rules, filter, params, condition } = syncParams;
     const conditionParsed = parseCondition(condition);
-    if (!socket || !table_info) throw "socket or table_info missing";
 
     const { name: table_name } = table_info;
     const channelName = getSyncChannelName({
@@ -32,12 +23,12 @@ export async function addSync(
       select: params.select,
     });
 
-    if (!synced_field) throw "synced_field missing from table_rules";
-
     this.upsertSocket(socket);
 
     const syncConfig = this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(table_name);
-    if (!syncConfig) throw `Sync not configured for table ${table_name}`;
+    if (!syncConfig) {
+      throw `Sync not configured for table ${table_name}`;
+    }
     const upsertSync = () => {
       const newSync = {
         channel_name: channelName,
@@ -58,7 +49,7 @@ export async function addSync(
         params,
       };
 
-      /* Only a sync per socket per table per condition allowed */
+      /* Only a sync per socket per table/condition/select allowed */
       const existing = find(this.syncs, { socket_id: socket.id, channel_name: channelName });
       if (!existing) {
         this.syncs.push(newSync);
@@ -72,9 +63,11 @@ export async function addSync(
             socketId: socket.id,
             tableName: table_name,
             condition,
+            channelName,
             sid,
             connectedSocketIds: this.connectedSocketIds,
             duration: -1,
+            syncParams: newSync,
           });
           socket.removeAllListeners(channelName);
           socket.removeAllListeners(unsyncChn);
@@ -122,7 +115,7 @@ export async function addSync(
       return newSync;
     };
 
-    upsertSync();
+    const newSync = upsertSync();
 
     await this.addTrigger(
       { table_name, condition: conditionParsed, tracked_columns: undefined },
@@ -130,7 +123,7 @@ export async function addSync(
       socket,
     );
 
-    return { channelName };
+    return { channelName, newSync };
   });
 
   await this._log({
@@ -143,6 +136,8 @@ export async function addSync(
     duration: res.duration,
     error: res.error,
     sid,
+    channelName: res.data?.channelName || "",
+    syncParams: res.data?.newSync ?? ({} as SyncParams),
   });
 
   if (res.hasError) throw res.error;

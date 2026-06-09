@@ -544,40 +544,36 @@ export const clientOnlyQueries = async (
           });
 
           let updt = 0;
-          const sync = await db.planes.sync!(
-            {},
-            { handlesOnData: true, patchText: true },
-            (planes, deltas) => {
-              const x20 = planes.filter((p) => p.x == 20).length;
-              const x10 = planes.filter((p) => p.x == 10);
-              log(Date.now() + `: sync stats: x10 -> ${x10.length}  x20 -> ${x20}`);
+          const sync = await db.planes.sync!({}, { handlesOnData: true }, (planes, deltas) => {
+            const x20 = planes.filter((p) => p.x == 20).length;
+            const x10 = planes.filter((p) => p.x == 10);
+            log(Date.now() + `: sync stats: x10 -> ${x10.length}  x20 -> ${x20}`);
 
-              let update = false;
-              planes.map((p) => {
-                // if(p.y === 1) window.up = p;
-                if (typeof p.x !== "number") log(typeof p.x);
-                if (+p.x < 10) {
-                  updt++;
-                  update = true;
-                  p.$update!({ x: 10 });
-                  log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);
-                }
-              });
-              // if(update) log("$update({ x: 10 })", updt)
-
-              if (x20 === 100) {
-                // log(22)
-                // console.timeEnd("test")
-                log(
-                  Date.now() +
-                    ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " +
-                    (Date.now() - start - CLOCK_DRIFT) +
-                    "ms",
-                );
-                resolveTest(true);
+            let update = false;
+            planes.map((p) => {
+              // if(p.y === 1) window.up = p;
+              if (typeof p.x !== "number") log(typeof p.x);
+              if (+p.x < 10) {
+                updt++;
+                update = true;
+                p.$update!({ x: 10 });
+                log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);
               }
-            },
-          );
+            });
+            // if(update) log("$update({ x: 10 })", updt)
+
+            if (x20 === 100) {
+              // log(22)
+              // console.timeEnd("test")
+              log(
+                Date.now() +
+                  ": sync end: Finished replication test. Inserting 100 rows then updating two times took: " +
+                  (Date.now() - start - CLOCK_DRIFT) +
+                  "ms",
+              );
+              resolveTest(true);
+            }
+          });
 
           const msLimit = 20000;
           setTimeout(async () => {

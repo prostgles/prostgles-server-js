@@ -31,10 +31,6 @@ export async function getTablesForSchemaPostgresSQL(
     ddlWithRollback,
   }: { schemaFilter: ProstglesInitOptions["schemaFilter"]; ddlWithRollback?: string },
 ) {
-  // : Promise<{
-  //   result: TableSchema[];
-  //   durations: Record<string, number>;
-  // }>
   const { sql, schemaNames } = getSchemaFilter(schemaFilter);
 
   return db.tx(async (t) => {

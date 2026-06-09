@@ -1,6 +1,6 @@
 > Available on client only
 
-## useSyncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOneOptions, hookOptions?: HookOptions): AsyncResult</span>
+## useSyncOne<span style="opacity: 0.6;">(basicFilter: EqualityFilter, syncOptions: SyncOptions, hookOptions?: HookOptions): AsyncResult</span>
 Retrieves the first row matching the filter and keeps it in sync
 - use { handlesOnData: true } to get optimistic updates method: $update
 - any changes to the row using the $update method will be reflected instantly
@@ -14,26 +14,7 @@ Retrieves the first row matching the filter and keeps it in sync
     Columns are combined using an AND condition.
     
     Example: `{ department: 'd1', name: 'abc' }` would match records where department is 'd1' AND name is 'abc'.
-  - **syncOptions** <span style="color: red">required</span> <span style="color: green;">SyncOneOptions</span>
-    - **select** <span style="color: grey">optional</span> <span style="color: green;">AnyObject | "*" | undefined</span>
-    - **onChange** <span style="color: grey">optional</span> <span style="color: green;">MultiChangeListener</span>
-
-      Data change listener.
-      Called on first sync and every time the data changes
-    - **skipFirstTrigger** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
-
-      If true then the first onChange trigger is skipped
-    - **storageType** <span style="color: grey">optional</span> <span style="color: green;">"map" | "localStorage" | undefined</span>
-
-      Default is "object".
-      "localStorage" will persist the data
-    - **patchText** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
-
-      If true then only the delta of the text field is sent to server.
-      Full text is sent if an error occurs
-    - **patchJSON** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
-    - **onReady** <span style="color: grey">optional</span> <span style="color: green;">() =&gt; void</span>
-    - **handlesOnData** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
+  - **syncOptions** <span style="color: red">required</span> <span style="color: green;">SyncOptions</span>
   - **hookOptions** <span style="color: grey">optional</span> <span style="color: green;">HookOptions</span>
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 

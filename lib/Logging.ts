@@ -1,6 +1,6 @@
 import type { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
-import type { PubSubManagerTriggers } from "./PubSubManager/PubSubManager";
+import type { PubSubManagerTriggers, SyncParams } from "./PubSubManager/PubSubManager";
 import type { NotifTypeName } from "./PubSubManager/PubSubManagerUtils";
 
 type ClientInfo = {
@@ -30,11 +30,23 @@ export namespace EventTypes {
       tableName: string;
       localParams?: LocalParams;
       connectedSocketIds: string[];
+      channelName: string;
+      syncParams: SyncParams;
     } & (
       | {
           command: "syncData";
           source: "client" | "trigger";
           lr: string;
+          state:
+            | "start"
+            | "sync.wal.isSending()"
+            | "initial"
+            | "socket?.connected"
+            | "sync.last_synced"
+            | "rowsFullyMatch"
+            | "syncBatch.start"
+            | "syncBatch.end"
+            | "getLastSynced(clientData)";
         }
       | {
           command: "upsertData" | "pushData";
