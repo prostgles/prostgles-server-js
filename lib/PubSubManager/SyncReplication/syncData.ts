@@ -97,6 +97,7 @@ export async function syncData(
     socket,
     sync,
     pubSubManager: this,
+    logSyncData,
   });
 
   /* Used to throttle and merge incoming updates */
@@ -185,7 +186,7 @@ export async function syncData(
     await syncBatch(from_synced);
     await logSyncData("syncBatch.end");
   } else {
-    // console.log("from_synced is null")
+    await logSyncData("nothingToSync");
   }
 
   await pushData([], true);

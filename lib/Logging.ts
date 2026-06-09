@@ -44,8 +44,11 @@ export namespace EventTypes {
             | "socket?.connected"
             | "sync.last_synced"
             | "rowsFullyMatch"
+            | "getLastSynced.rowsFullyMatch(lr)"
+            | "getLastSynced.nothingToSync"
             | "syncBatch.start"
             | "syncBatch.end"
+            | "nothingToSync"
             | "getLastSynced(clientData)";
         }
       | {

@@ -17,15 +17,23 @@ import type {
   SyncBatchInfo,
 } from "./syncData";
 import { log } from "../PubSubManagerUtils";
+import type { EventTypes } from "../../Logging";
 
 type Args = {
   socket: PRGLIOSocket;
   tableHandler: TableHandler;
   sync: SyncParams;
   pubSubManager: PubSubManager;
+  logSyncData: (state: Extract<EventTypes.Sync, { command: "syncData" }>["state"]) => void;
 };
 
-export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager }: Args) => {
+export const getSyncUtilFunctions = ({
+  socket,
+  tableHandler,
+  sync,
+  pubSubManager,
+  logSyncData,
+}: Args) => {
   const {
     synced_field,
     socket_id,
@@ -94,16 +102,15 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
 
       return res;
     },
-    getClientData = (from_synced = 0, offset = 0): Promise<AnyObject[]> => {
+    getClientData = (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
       return new Promise((resolve, reject) => {
         const onPullRequest = {
-          from_synced: from_synced || 0,
+          from_synced: from_synced,
           offset: offset || 0,
           limit: batch_size,
         };
         socket.emit(channel_name, { onPullRequest }, (resp?: { data?: AnyObject[] }) => {
           if (resp && resp.data && Array.isArray(resp.data)) {
-            // console.log({ onPullRequest, resp }, socket._user)
             resolve(sortClientData(resp.data));
           } else {
             reject("unexpected onPullRequest response: " + JSON.stringify(resp));
@@ -129,7 +136,7 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
         });
       }
     },
-    getServerData = async (from_synced = 0, offset = 0): Promise<AnyObject[]> => {
+    getServerData = async (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
       return fetchSyncServerData(
         { tableHandler, socket, from_synced, offset },
         { filter, id_fields, params, synced_field, batch_size, table_rules },
@@ -303,20 +310,24 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
 
       // console.log("getLastSynced", clientData, socket._user )
 
-      let result = null;
+      let result: number | null = null;
 
       /* Nothing to sync */
-      if ((!c_fr && !s_fr) || rowsFullyMatch(c_lr, s_lr)) {
-        //  c_count === s_count &&
-        // sync.last_synced = null;
-        result = null;
+      if (!c_fr && !s_fr) {
+        logSyncData("getLastSynced.nothingToSync");
+        return null;
+      }
 
-        /* Sync Everything */
-      } else if (!rowsFullyMatch(c_fr, s_fr)) {
+      if (rowsFullyMatch(c_lr, s_lr)) {
+        logSyncData("getLastSynced.rowsFullyMatch(lr)");
+        return null;
+      }
+
+      if (!rowsFullyMatch(c_fr, s_fr)) {
         if (c_fr && s_fr) {
           result = Math.min(c_fr[synced_field], s_fr[synced_field]);
-        } else if (c_fr || s_fr) {
-          result = (c_fr || s_fr)![synced_field];
+        } else {
+          result = (c_fr ?? s_fr)![synced_field];
         }
 
         /* Sync from last matching synced value */
@@ -337,15 +348,15 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
             to_synced: result,
             end_offset,
           });
-          // console.log("getLastSynced... end_offset > " + end_offset);
-          let server_row;
+
+          let server_rows: AnyObject[] | undefined;
 
           if (c_lr) {
             const _filter: AnyObject = {};
             sync_fields.map((key) => {
               _filter[key] = c_lr[key];
             });
-            server_row = await tableHandler.find(
+            server_rows = await tableHandler.find(
               _filter,
               { select: sync_fields, limit: 1 },
               undefined,
@@ -354,11 +365,9 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
             );
           }
 
-          // if(rowsFullyMatch(c_lr, s_lr)){ //c_count === s_count &&
-          if (server_row && server_row.length) {
-            server_row = server_row[0];
-
-            result = +server_row[synced_field];
+          const first_server_row = server_rows?.[0];
+          if (first_server_row) {
+            result = +first_server_row[synced_field];
             end_offset = min_count;
             // console.log(`getLastSynced found for ${table_name} -> ${result}`);
           } else {
@@ -395,7 +404,7 @@ export const getSyncUtilFunctions = ({ socket, tableHandler, sync, pubSubManager
       let offset = 0,
         canContinue = true;
       const limit = batch_size,
-        min_synced = from_synced || 0;
+        min_synced = from_synced ?? undefined;
 
       let inserted = 0,
         updated = 0,
