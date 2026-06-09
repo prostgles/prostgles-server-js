@@ -13,7 +13,8 @@ export async function addSync(
 ): Promise<{ channelName: string }> {
   const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatchV2(async () => {
-    const { socket, rawSelect, table_info, table_rules, filter, params, condition } = syncParams;
+    const { socket, rawSelect, table_info, table_rules, filter, params, condition, initialData } =
+      syncParams;
     const conditionParsed = parseCondition(condition);
 
     const { name: table_name } = table_info;
@@ -39,9 +40,8 @@ export async function addSync(
         table_rules,
         ...syncConfig,
         socket_id: socket.id,
-        is_sync: true,
-        last_synced: 0,
-        lr: undefined,
+        last_synced: 0, //initialData.isSynced ? Date.now() : 0,
+        lr: undefined, // initialData.data.at(-1),
         table_info,
         is_syncing: false,
         wal: undefined,

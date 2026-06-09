@@ -183,12 +183,6 @@ export type DBGeneratedSchema = {
     };
     referencedBy: {"uuid_text":["col1","col2","col3"]};
   };
-  newly_created_table: {
-    columns: {
-      id?: null | number;
-    };
-    
-  };
   obj_table: {
     columns: {
       id?: number;

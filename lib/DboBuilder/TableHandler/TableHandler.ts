@@ -279,6 +279,11 @@ export class TableHandler extends ViewHandler {
           })
         ).where;
 
+        const initialData = {
+          data,
+          isSynced: data.length < syncOpts.limit,
+        };
+
         const pubSubManager = await this.dboBuilder.getPubSubManager();
         return pubSubManager
           .addSync({
@@ -290,15 +295,15 @@ export class TableHandler extends ViewHandler {
             filter: { ...filter },
             params: { select },
             rawSelect: params.select ?? "*",
+            initialData,
           })
           .then(
             ({ channelName }) =>
               ({
                 channelName,
-                data,
                 id_fields,
                 synced_field,
-                isSynced: data.length < syncOpts.limit,
+                ...initialData,
               }) satisfies ReplicationState["channels"]["CHANNEL_PREFIX"]["client.emit"]["server.response"]["data"],
           );
       });

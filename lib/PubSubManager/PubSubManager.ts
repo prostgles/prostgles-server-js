@@ -67,6 +67,10 @@ export type AddSyncParams = SyncTableInfo & {
     select: FieldFilter;
   };
   rawSelect: FieldFilter;
+  initialData: {
+    data: AnyObject[];
+    isSynced: boolean;
+  };
   condition: string;
   throttle?: number;
 };
