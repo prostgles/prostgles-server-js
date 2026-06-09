@@ -13,14 +13,14 @@ export async function addSync(
 ): Promise<{ channelName: string }> {
   const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError({ socket: syncParams.socket });
   const res = await tryCatchV2(async () => {
-    const { socket, table_info, table_rules, filter, params, condition } = syncParams;
+    const { socket, rawSelect, table_info, table_rules, filter, params, condition } = syncParams;
     const conditionParsed = parseCondition(condition);
 
     const { name: table_name } = table_info;
     const channelName = getSyncChannelName({
       tableName: table_name,
       filter,
-      select: params.select,
+      select: rawSelect,
     });
 
     this.upsertSocket(socket);

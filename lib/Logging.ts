@@ -50,7 +50,8 @@ export namespace EventTypes {
             | "syncBatch.start"
             | "syncBatch.end"
             | "nothingToSync"
-            | "getLastSynced(clientData)";
+            | "getLastSynced(clientData).start"
+            | "getLastSynced(clientData).end";
         }
       | {
           command: "upsertData" | "pushData";

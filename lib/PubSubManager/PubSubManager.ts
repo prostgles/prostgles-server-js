@@ -66,6 +66,7 @@ export type AddSyncParams = SyncTableInfo & {
   params: {
     select: FieldFilter;
   };
+  rawSelect: FieldFilter;
   condition: string;
   throttle?: number;
 };

@@ -176,8 +176,9 @@ export async function syncData(
       await logSyncData("rowsFullyMatch");
     }
   } else {
-    await logSyncData("getLastSynced(clientData)");
+    await logSyncData("getLastSynced(clientData).start");
     from_synced = await getLastSynced(clientData);
+    await logSyncData("getLastSynced(clientData).end");
   }
 
   if (from_synced !== null) {

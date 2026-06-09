@@ -289,6 +289,7 @@ export class TableHandler extends ViewHandler {
             table_rules,
             filter: { ...filter },
             params: { select },
+            rawSelect: params.select ?? "*",
           })
           .then(
             ({ channelName }) =>
