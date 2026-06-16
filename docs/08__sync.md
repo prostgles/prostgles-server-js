@@ -10,14 +10,14 @@ Used internally to setup sync
 
       List of fields to include or exclude
   - **triggers** <span style="color: red">required</span> <span style="color: green;">ClientSyncHandles</span>
-    - **onSyncRequest** <span style="color: red">required</span> <span style="color: green;">(params: SyncBatchParams) =&gt; ClientSyncInfo | ClientExpressData | Promise&lt;ClientSyncInfo | ClientExpressData&gt;</span>
+    - **onSyncRequest** <span style="color: red">required</span> <span style="color: green;">(params: SyncBatchParams) =&gt; ClientSyncInfo | Promise&lt;ClientSyncInfo&gt;</span>
 
       Used by client to notify server that data has changed (and send express data if necessary)
       Also used by server to request client ClientSyncInfo
-    - **onPullRequest** <span style="color: red">required</span> <span style="color: green;">(params: SyncBatchParams) =&gt; ClientSyncPullResponse | Promise&lt;ClientSyncPullResponse&gt;</span>
+    - **onPullRequest** <span style="color: red">required</span> <span style="color: green;">(params: SyncBatchParams) =&gt; MaybePromise&lt;ClientSyncPullResponse&gt;</span>
 
       Used to respond to server with the requested data
-    - **onUpdates** <span style="color: red">required</span> <span style="color: green;">(params: onUpdatesParams) =&gt; Promise&lt;true&gt;</span>
+    - **onUpdates** <span style="color: red">required</span> <span style="color: green;">(params: onUpdatesParams) =&gt; MaybePromise&lt;{ success: true; }&gt;</span>
 
       Used to set the data sent by server.
       Must acknowledge so server can send next batch if necessary
