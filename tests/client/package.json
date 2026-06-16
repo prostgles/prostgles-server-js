@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "start": "tsc-watch --onSuccess \"node dist/client/index.js\"",
-    "dev": "NOSTOP=true npm start",
     "build": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && tsc",
     "testBasicHooks": "node --test dist/client/basicHooks.spec.js"
   },
@@ -13,7 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^20.9.2",
-    "prostgles-client": "^4.0.365",
+    "prostgles-client": "^4.0.368",
     "prostgles-types": "^4.0.51",
     "socket.io-client": "^4.8.1"
   },

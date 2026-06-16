@@ -17,6 +17,7 @@ import type {
   AnyObject,
   EqualityFilter,
   FieldFilter,
+  ReplicationProtocol,
   SelectParams,
   TableSchema,
 } from "prostgles-types";
@@ -55,6 +56,7 @@ export type SyncParams = {
   lr?: AnyObject;
   last_synced: number;
   is_syncing: boolean;
+  handlers: ReturnType<(typeof ReplicationProtocol)["getServerHandlers"]>;
 };
 
 export type AddSyncParams = SyncTableInfo & {

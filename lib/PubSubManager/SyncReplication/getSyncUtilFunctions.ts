@@ -45,6 +45,7 @@ export const getSyncUtilFunctions = ({
     channel_name,
     table_name,
     params,
+    handlers,
   } = sync;
 
   const { orderByAsc, sync_fields } = getSyncOrderByAndFields({ synced_field, id_fields }),
@@ -84,44 +85,36 @@ export const getSyncUtilFunctions = ({
       };
     },
     getClientRowInfo = (args: SyncBatchInfo = {}) => {
-      const { from_synced = null, to_synced = null, end_offset = null } = args;
-      const res = withTimeout(
-        new Promise<ClientSyncInfo>((resolve, reject) => {
-          const onSyncRequest = { from_synced, to_synced, end_offset }; //, forReal: true };
-          socket.emit(channel_name, { onSyncRequest }, (resp?: onSyncRequestResponse) => {
-            if (resp && "onSyncRequest" in resp && resp.onSyncRequest) {
-              const c_fr = resp.onSyncRequest.c_fr,
-                c_lr = resp.onSyncRequest.c_lr,
-                c_count = resp.onSyncRequest.c_count;
-
-              // console.log(onSyncRequest, { c_fr, c_lr, c_count }, socket._user);
-              return resolve({ c_fr, c_lr, c_count });
-            } else if (resp && "err" in resp && resp.err) {
-              reject(resp.err);
-            } else {
-              reject("unexpected onSyncRequest response: " + JSON.stringify(resp));
-            }
-          });
+      const { from_synced = undefined, to_synced = undefined, end_offset = null } = args;
+      const onSyncRequest = { from_synced, to_synced, end_offset };
+      const result = withTimeout(
+        new Promise<ClientSyncInfo>(async (resolve, reject) => {
+          const res = await handlers.ServerSyncRequest(onSyncRequest);
+          if (res.state === "error") {
+            reject(res.err);
+          } else {
+            resolve(res);
+          }
         }),
         5000,
       );
 
-      return res;
+      return result;
     },
     getClientData = (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
-      return new Promise((resolve, reject) => {
+      return new Promise(async (resolve, reject) => {
         const onPullRequest = {
           from_synced: from_synced,
           offset: offset || 0,
           limit: batch_size,
+          to_synced: undefined,
         };
-        socket.emit(channel_name, { onPullRequest }, (resp?: { data?: AnyObject[] }) => {
-          if (resp && resp.data && Array.isArray(resp.data)) {
-            resolve(sortClientData(resp.data));
-          } else {
-            reject("unexpected onPullRequest response: " + JSON.stringify(resp));
-          }
-        });
+        const res = await handlers.PullRequest(onPullRequest);
+        if (!res.success) {
+          reject(res.err);
+        } else {
+          resolve(sortClientData(res.data));
+        }
       });
 
       function sortClientData(data: AnyObject[]) {
@@ -274,19 +267,17 @@ export const getSyncUtilFunctions = ({
       const start = Date.now();
       const result = await new Promise<{
         pushed: number;
-        resp: {
-          ok: boolean;
-        };
-      }>((resolve, reject) => {
-        socket.emit(channel_name, { data, isSynced }, (resp?: { ok: boolean }) => {
-          if (resp && resp.ok) {
-            // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
-            resolve({ pushed: data.length, resp });
-          } else {
-            reject(resp);
-            console.error("Unexpected response");
-          }
-        });
+      }>(async (resolve, reject) => {
+        const resp = await handlers.UpdateRequest(
+          isSynced ? { state: "synced", isSynced: true } : { state: "syncing", data },
+        );
+        if (resp.success) {
+          // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
+          resolve({ pushed: data.length });
+        } else {
+          reject(resp);
+          console.error("Unexpected response");
+        }
       });
 
       await pubSubManager._log({

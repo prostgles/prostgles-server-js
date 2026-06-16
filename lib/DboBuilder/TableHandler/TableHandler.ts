@@ -4,7 +4,7 @@ import type {
   DeleteParams,
   FieldFilter,
   InsertParams,
-  ReplicationState,
+  ReplicationProtocol,
   Select,
   UpdateParams,
 } from "prostgles-types";
@@ -304,7 +304,7 @@ export class TableHandler extends ViewHandler {
                 id_fields,
                 synced_field,
                 ...initialData,
-              }) satisfies ReplicationState["channels"]["CHANNEL_PREFIX"]["client.emit"]["server.response"]["data"],
+              }) satisfies ReplicationProtocol.CreateSchemaResponse,
           );
       });
       await this._log({

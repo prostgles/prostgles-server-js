@@ -24,9 +24,9 @@ export type ServerSyncInfo = Partial<{
 }>;
 
 export type SyncBatchInfo = Partial<{
-  from_synced: number | null;
-  to_synced: number | null;
-  end_offset: number | null;
+  from_synced: number;
+  to_synced: number;
+  end_offset: number;
 }>;
 
 export type onSyncRequestResponse =
