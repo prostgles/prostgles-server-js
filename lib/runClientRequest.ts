@@ -169,7 +169,7 @@ export const clientCanRunSqlRequest = async function (
     const allowedToRunSQL =
       publishParams &&
       (await (
-        this.opts.publishRawSQL as undefined | ((params: PublishParams) => Awaitable<boolean | "*">)
+        this.opts.publishRawSQL
       )?.(publishParams));
     return allowedToRunSQL === true || allowedToRunSQL === "*";
   };

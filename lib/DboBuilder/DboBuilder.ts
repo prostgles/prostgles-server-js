@@ -134,7 +134,7 @@ export class DboBuilder {
     this.prostgles = prostgles;
     if (!this.prostgles.db) throw "db missing";
     this.db = this.prostgles.db;
-    this.dbo = {} as DBHandlerServer;
+    this.dbo = {};
     this.dboMap = new Map();
     this.queryStreamer = new QueryStreamer(this);
   }

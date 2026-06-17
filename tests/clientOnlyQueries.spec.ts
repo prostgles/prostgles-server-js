@@ -543,7 +543,7 @@ export const clientOnlyQueries = async (
             }
           });
 
-          let updt = 0;
+          let updateCount = 0;
           const sync = await db.planes.sync!({}, { handlesOnData: true }, (planes, deltas) => {
             const x20 = planes.filter((p) => p.x == 20).length;
             const x10 = planes.filter((p) => p.x == 10);
@@ -554,7 +554,7 @@ export const clientOnlyQueries = async (
               // if(p.y === 1) window.up = p;
               if (typeof p.x !== "number") log(typeof p.x);
               if (+p.x < 10) {
-                updt++;
+                updateCount++;
                 update = true;
                 p.$update!({ x: 10 });
                 log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);

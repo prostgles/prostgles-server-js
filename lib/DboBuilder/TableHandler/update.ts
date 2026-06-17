@@ -112,7 +112,7 @@ export async function update(
       }
       await Promise.all(
         nestedInserts.map(async (nestedInsert) => {
-          const nesedTableHandler = finalDBtx[nestedInsert.tableName] as TableHandler | undefined;
+          const nesedTableHandler = finalDBtx[nestedInsert.tableName];
           if (!nesedTableHandler)
             throw `nestedInsert Tablehandler not found for ${nestedInsert.tableName}`;
           const refTableRules =

@@ -340,7 +340,7 @@ export const getFileType = async (
     /* Set correct/missing extension */
     const nameExt = fileNameMime.ext;
     if (["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt)) {
-      return fileNameMime as any;
+      return fileNameMime;
     }
 
     throw new Error("Could not get the file type from file buffer");

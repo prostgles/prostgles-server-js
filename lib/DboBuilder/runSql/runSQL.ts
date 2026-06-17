@@ -37,7 +37,7 @@ export async function runSQL(
     throw "Not allowed to run SQL";
   }
 
-  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({} as SQLOptions);
+  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({});
   const { socket } = localParams?.clientReq ?? {};
 
   const db = localParams?.tx?.t || this.db;

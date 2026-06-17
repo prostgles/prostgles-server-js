@@ -104,8 +104,8 @@ export const getSyncUtilFunctions = ({
     getClientData = (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
       return new Promise(async (resolve, reject) => {
         const onPullRequest = {
-          from_synced: from_synced,
-          offset: offset || 0,
+          from_synced,
+          offset,
           limit: batch_size,
           to_synced: undefined,
         };
@@ -169,13 +169,13 @@ export const getSyncUtilFunctions = ({
     /**
      * Upserts the given client data where synced_field is higher than on server
      */
-    upsertData = async (data: AnyObject[]) => {
+    upsertData = async (data: AnyObject[], source: "WAL" | "client") => {
       const start = Date.now();
       const result = await pubSubManager.dboBuilder
         .getTX(async (dbTX) => {
           const tableHandlerTx = dbTX[table_name] as TableHandler;
-          const existingData = await tableHandlerTx.find(
-            { $or: data.map((d) => pickKeys(d, id_fields)) },
+          const existingData = (await tableHandlerTx.find(
+            { $or: data.map((row) => pickKeys(row, id_fields)) },
             {
               select: [synced_field, ...id_fields],
               orderBy: orderByAsc,
@@ -183,11 +183,16 @@ export const getSyncUtilFunctions = ({
             undefined,
             table_rules,
             { clientReq: { socket } },
+          )) as AnyObject[];
+          let rowsToInsert = data.filter(
+            (incomingRow) =>
+              !existingData.find((existingRow) => rowsIdsMatch(existingRow, incomingRow)),
           );
-          let rowsToInsert = data.filter((d) => !existingData.find((ed) => rowsIdsMatch(ed, d)));
-          let rowsToUpdate = data.filter((d) =>
+          let rowsToUpdate = data.filter((incomingRow) =>
             existingData.find(
-              (ed) => rowsIdsMatch(ed, d) && Number(ed[synced_field]) < Number(d[synced_field]),
+              (existingRow) =>
+                rowsIdsMatch(existingRow, incomingRow) &&
+                Number(existingRow[synced_field]) < Number(incomingRow[synced_field]),
             ),
           );
 
@@ -227,7 +232,7 @@ export const getSyncUtilFunctions = ({
         })
         .then(({ inserts, updates }) => {
           log(
-            `upsertData: inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`,
+            `upsertData (from ${source}): inserted( ${inserts.length} )    updated( ${updates.length} )     total( ${data.length} ) \n last insert ${JSON.stringify(inserts.at(-1))} \n last update ${JSON.stringify(updates.at(-1))}`,
           );
           return {
             inserted: inserts.length,
@@ -263,17 +268,22 @@ export const getSyncUtilFunctions = ({
      * Pushes the given data to client
      * @param isSynced = true if
      */
-    pushData = async (data: AnyObject[], isSynced = false) => {
+    pushData = async (
+      request: { state: "syncing-data"; data: AnyObject[] } | { state: "synced" },
+    ) => {
+      const items = request.state === "syncing-data" ? request.data : undefined;
       const start = Date.now();
       const result = await new Promise<{
         pushed: number;
       }>(async (resolve, reject) => {
         const resp = await handlers.UpdateRequest(
-          isSynced ? { state: "synced", isSynced: true } : { state: "syncing", data },
+          request.state === "synced" ?
+            { state: "synced", isSynced: true }
+          : { state: "syncing", data: request.data },
         );
         if (resp.success) {
           // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
-          resolve({ pushed: data.length });
+          resolve({ pushed: items?.length ?? 0 });
         } else {
           reject(resp);
           console.error("Unexpected response");
@@ -284,7 +294,7 @@ export const getSyncUtilFunctions = ({
         type: "sync",
         command: "pushData",
         tableName: sync.table_name,
-        rows: data.length,
+        rows: items?.length ?? 0,
         socketId: socket_id,
         duration: Date.now() - start,
         sid: sync.sid,
@@ -392,7 +402,6 @@ export const getSyncUtilFunctions = ({
         );
       }
       sync.lr = lastRow;
-      sync.last_synced = +sync.lr[synced_field];
     },
     /**
      * Will push pull sync between client and server from a given from_synced value
@@ -415,7 +424,7 @@ export const getSyncUtilFunctions = ({
         const clientData = await getClientData(min_synced, offset);
 
         if (clientData.length) {
-          const res = await upsertData(clientData);
+          const res = await upsertData(clientData, "client");
           inserted += res.inserted;
           updated += res.updated;
         }
@@ -425,7 +434,6 @@ export const getSyncUtilFunctions = ({
           serverData = await getServerData(min_synced, offset);
         } catch (e) {
           console.trace("sync getServerData err", e);
-          // await pushData(undefined, undefined, "Internal error. Check server logs");
           throw " d";
         }
 
@@ -455,9 +463,10 @@ export const getSyncUtilFunctions = ({
           );
         });
         if (forClient.length) {
-          const res = await pushData(
-            forClient.filter((d) => !sync.wal || !sync.wal.isInHistory(d)),
-          );
+          const res = await pushData({
+            state: "syncing-data",
+            data: forClient.filter((d) => !sync.wal || !sync.wal.isInHistory(d)),
+          });
           pushed += res.pushed;
         }
 

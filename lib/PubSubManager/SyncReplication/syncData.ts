@@ -59,7 +59,7 @@ export async function syncData(
       tableName: sync.table_name,
       sid: sync.sid,
       source,
-      ...pickKeys(sync, ["socket_id", "condition", "last_synced", "is_syncing"]),
+      ...pickKeys(sync, ["socket_id", "condition", "lr", "is_syncing"]),
       lr: JSON.stringify(sync.lr),
       connectedSocketIds: this.dboBuilder.prostgles.connectedSockets.map((s) => s.id),
       localParams: undefined,
@@ -111,11 +111,13 @@ export async function syncData(
       sync.is_syncing = true;
     },
     onSend: async (data) => {
-      const res = await upsertData(data);
+      const res = await upsertData(data, "WAL");
       return res;
     },
-    onSendEnd: (batch) => {
-      updateSyncLR(batch);
+    onSendEnd: (batch, _, error) => {
+      if (error === undefined) {
+        updateSyncLR(batch);
+      }
       sync.is_syncing = false;
 
       /**
@@ -126,13 +128,13 @@ export async function syncData(
   });
 
   /* Debounce sync requests */
-  if (!sync.wal.isSending() && sync.is_syncing) {
-    this.syncTimeout ??= setTimeout(() => {
-      this.syncTimeout = undefined;
-      void this.syncData(sync, undefined, source);
-    }, throttle);
-    return;
-  }
+  // if (!sync.wal.isSending() && sync.is_syncing) {
+  //   this.syncTimeout ??= setTimeout(() => {
+  //     this.syncTimeout = undefined;
+  //     void this.syncData(sync, undefined, source);
+  //   }, throttle);
+  //   return;
+  // }
 
   /**
    * Express data sent from a client that has already been synced
@@ -170,8 +172,8 @@ export async function syncData(
 
     /* Make sure trigger is not firing on freshly synced data */
     if (!rowsFullyMatch(sync.lr, s_lr)) {
-      from_synced = sync.last_synced;
-      await logSyncData("sync.last_synced");
+      from_synced = Number(sync.lr[synced_field]);
+      await logSyncData("sync.lr");
     } else {
       await logSyncData("rowsFullyMatch");
     }
@@ -189,7 +191,7 @@ export async function syncData(
     await logSyncData("nothingToSync");
   }
 
-  await pushData([], true);
+  await pushData({ state: "synced" });
 
   sync.is_syncing = false;
 }

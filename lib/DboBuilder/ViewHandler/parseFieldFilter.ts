@@ -50,7 +50,7 @@ export const parseFieldFilter = <AllowedKeys extends string[]>(
           ["field1", "field2", "field3"] 
         */
       } else {
-        colNames = fieldParams.slice(0) as AllowedKeys;
+        colNames = fieldParams.slice(0);
       }
 
       /*

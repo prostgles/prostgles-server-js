@@ -43,7 +43,7 @@ export namespace EventTypes {
             | "sync.wal.isSending()"
             | "initial"
             | "socket?.connected"
-            | "sync.last_synced"
+            | "sync.lr"
             | "rowsFullyMatch"
             | "getLastSynced.rowsFullyMatch(lr)"
             | "getLastSynced.nothingToSync"

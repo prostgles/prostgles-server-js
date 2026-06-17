@@ -537,7 +537,7 @@ export default class TableConfigurator {
   ): Promise<AnyObject> => {
     const tableHook = this.config[tableHandler.name]?.hooks?.getPreInsertRow;
     if (tableHandler.is_media) {
-      return uploadFile.bind(tableHandler)(args) as Promise<AnyObject>;
+      return uploadFile.bind(tableHandler)(args);
     }
     if (tableHook) {
       return tableHook(args);

@@ -21,7 +21,7 @@ export async function getExistsCondition(
   if (Object.keys(targetTableFilter).find((fk) => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
     throw {
       stack: ["prepareExistCondition()"],
-      message: "Nested exists dissallowed",
+      message: "Nested exists disallowed",
     };
   }
 
@@ -35,16 +35,16 @@ export async function getExistsCondition(
   }
   const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
   if (localParams?.clientReq && this.dboBuilder.publishParser) {
-    t2Rules = (await this.dboBuilder.publishParser.getValidatedRequestRuleWusr(
+    t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr(
       {
         tableName: targetTable,
         command: "find",
         clientReq: localParams.clientReq,
       },
       localParams.scope,
-    )) as ParsedTableRule | undefined;
+    );
 
-    if (!t2Rules || !t2Rules.select) throw "Dissallowed";
+    if (!t2Rules.select) throw "Disallowed";
     ({ forcedFilter, filterFields } = t2Rules.select);
   }
 

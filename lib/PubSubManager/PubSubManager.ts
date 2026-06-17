@@ -54,7 +54,6 @@ export type SyncParams = {
   wal?: WAL;
   throttle?: number;
   lr?: AnyObject;
-  last_synced: number;
   is_syncing: boolean;
   handlers: ReturnType<(typeof ReplicationProtocol)["getServerHandlers"]>;
 };
