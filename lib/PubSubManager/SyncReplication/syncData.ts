@@ -127,15 +127,6 @@ export async function syncData(
     },
   });
 
-  /* Debounce sync requests */
-  // if (!sync.wal.isSending() && sync.is_syncing) {
-  //   this.syncTimeout ??= setTimeout(() => {
-  //     this.syncTimeout = undefined;
-  //     void this.syncData(sync, undefined, source);
-  //   }, throttle);
-  //   return;
-  // }
-
   /**
    * Express data sent from a client that has already been synced
    * Add to WAL manager which will sync at the end
