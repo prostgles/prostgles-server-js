@@ -41,13 +41,13 @@ export const getViewRelatedTableJoinCondition = async ({
         };
       });
       const primaryKeyColumns = tableColumns.filter((c) => c.is_pkey);
-      const compareableColumns = tableColumns.filter(
+      const comparableColumns = tableColumns.filter(
         (c) => c.viewColumnName && !["json", "xml"].includes(c.udt_name),
       );
       const allPkeyColumnsInView =
         primaryKeyColumns.length && primaryKeyColumns.every((pk) => isDefined(pk.viewColumnName));
 
-      const joinColumns = allPkeyColumnsInView ? primaryKeyColumns : compareableColumns;
+      const joinColumns = allPkeyColumnsInView ? primaryKeyColumns : comparableColumns;
 
       let condition = "TRUE";
 

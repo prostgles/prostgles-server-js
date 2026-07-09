@@ -12,11 +12,7 @@ import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandl
 import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSql/runSQL";
 import type { Prostgles } from "./Prostgles";
-import type {
-  Awaitable,
-  ParsedTableRule,
-  PublishParams,
-} from "./PublishParser/publishTypesAndUtils";
+import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
 
 const TABLE_METHODS = {
@@ -68,7 +64,7 @@ export const runClientRequest = async function (
 ) {
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if (!this.publishParser || !this.dbo) {
-    throw "socket/httpReq or authhandler missing";
+    throw "socket/httpReq or authHandler missing";
   }
 
   const validation = getJSONBObjectSchemaValidationError(
@@ -145,9 +141,10 @@ export const runClientRequest = async function (
   /**
    * satisfies check is used to ensure rules arguments are correctly passed to each method
    */
-  const _tableCommand = tableHandler[command].bind(tableHandler) satisfies
+  tableHandler[command].bind(tableHandler) satisfies
     | undefined
     | TableMethodFunctionWithRulesAndLocalParams;
+
   return (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
     param1,
     param2,
@@ -166,11 +163,7 @@ export const clientCanRunSqlRequest = async function (
   }
   const canRunSQL = async () => {
     const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
-    const allowedToRunSQL =
-      publishParams &&
-      (await (
-        this.opts.publishRawSQL
-      )?.(publishParams));
+    const allowedToRunSQL = publishParams && (await this.opts.publishRawSQL?.(publishParams));
     return allowedToRunSQL === true || allowedToRunSQL === "*";
   };
 

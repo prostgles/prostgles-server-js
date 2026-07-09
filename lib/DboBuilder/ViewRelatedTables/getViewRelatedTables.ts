@@ -73,14 +73,14 @@ export const getViewRelatedTables = async (
   };
 
   /** Get list of remaining used inner tables (tables whose columns do not appear in fields list but are still used by the view) */
-  const allUsedTables = await getAllViewRelatedTables(dboBuilder.db, viewName);
+  const allUsedTables = await getAllViewRelatedTables(dboBuilder, viewName);
 
   /** Remaining tables will have listeners on all records (condition = "TRUE") */
   allUsedTables.forEach((rt) => {
-    if (!joinedRelatedTables.find((jt) => jt.tableOID === rt.table_oid)) {
+    if (!joinedRelatedTables.find((jt) => jt.tableOID == rt.oid)) {
       viewOptions.relatedTables.push({
-        tableName: rt.table_name,
-        tableNameEscaped: [rt.table_schema, rt.table_name].map((v) => JSON.stringify(v)).join("."),
+        tableName: rt.name,
+        tableNameEscaped: rt.name,
         condition: "TRUE",
         tracked_columns: undefined,
       });

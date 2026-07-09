@@ -1,6 +1,8 @@
-import type { DB } from "../../initProstgles";
+import { isDefined } from "prostgles-types";
+import type { DboBuilder } from "../DboBuilder";
 
-export const getAllViewRelatedTables = async (db: DB, viewName: string) => {
+export const getAllViewRelatedTables = async (dboBuilder: DboBuilder, viewName: string) => {
+  const db = dboBuilder.db;
   const tables = await db.any<{
     table_name: string;
     table_schema: string;
@@ -18,5 +20,10 @@ export const getAllViewRelatedTables = async (db: DB, viewName: string) => {
   `,
     { viewName },
   );
-  return tables;
+  return tables
+    .map((t) => {
+      const tableInfo = dboBuilder.tablesOrViews?.find((tov) => tov.oid === t.table_oid);
+      return tableInfo;
+    })
+    .filter(isDefined);
 };

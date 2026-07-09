@@ -87,8 +87,12 @@ export async function addSub(
 
   if (viewOptions) {
     for (const relatedTable of viewOptions.relatedTables) {
+      const quoteIdentTableName =
+        `"${relatedTable.tableName}"` !== relatedTable.tableNameEscaped ?
+          relatedTable.tableNameEscaped
+        : relatedTable.tableName;
       const relatedTrigger = {
-        table_name: relatedTable.tableName,
+        table_name: quoteIdentTableName,
         condition: parseCondition(relatedTable.condition),
         tracked_columns: relatedTable.tracked_columns,
       } satisfies AddTriggerParams;
