@@ -298,20 +298,20 @@ export class ViewHandler {
 
   intersectColumns(
     allowedFields: FieldFilter,
-    dissallowedFields: FieldFilter,
+    disallowedFields: FieldFilter,
     removeDisallowedFields = false,
   ): string[] {
     let result: string[] = [];
     if (allowedFields) {
       result = this.parseFieldFilter(allowedFields);
     }
-    if (dissallowedFields) {
-      const _dissalowed = this.parseFieldFilter(dissallowedFields);
+    if (disallowedFields) {
+      const excludedFields = this.parseFieldFilter(disallowedFields);
 
       if (!removeDisallowedFields) {
-        throw `dissallowed/invalid field found for ${this.name}: `;
+        throw `disallowed/invalid field found for ${this.name}: `;
       }
-      result = result.filter((key) => !_dissalowed.includes(key));
+      result = result.filter((key) => !excludedFields.includes(key));
     }
 
     return result;

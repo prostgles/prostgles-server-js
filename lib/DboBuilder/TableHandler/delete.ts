@@ -1,11 +1,17 @@
 import type pgPromise from "pg-promise";
-import type { AnyObject, DeleteParams, FieldFilter } from "prostgles-types";
+import { includes, type AnyObject, type DeleteParams, type FieldFilter } from "prostgles-types";
 import type { DeleteRule, ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
-import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
-import { runQueryReturnType } from "../ViewHandler/find";
+import {
+  getErrorAsObject,
+  getSerializedClientErrorFromPGError,
+  rejectWithPGClientError,
+  withUserRLS,
+} from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
+import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
+import { executeHooksCheckAndPostValidation } from "./executeHooksCheckAndPostValidation";
 
 export async function _delete(
   this: TableHandler,
@@ -21,12 +27,26 @@ export async function _delete(
     filter = filter || {};
     this.checkFilter(filter);
 
+    const operation = { name: "delete", rule: tableRules?.delete } as const;
+    const { hasAfterChecks, shouldWrap } = this.shouldWrapInTx(operation, localParams);
+    if (shouldWrap) {
+      return this.dboBuilder.getTX((t) =>
+        (t[this.name] as Partial<typeof this> | undefined)?.delete?.(
+          filter,
+          params,
+          param3_unused,
+          tableRules,
+          localParams,
+        ),
+      );
+    }
+
     let forcedFilter: AnyObject | undefined = {},
       filterFields: FieldFilter | undefined = "*",
       returningFields: FieldFilter | undefined = "*",
       validate: DeleteRule["validate"];
 
-    const { testRule = false, returnQuery = false } = localParams || {};
+    const { testRule = false } = localParams || {};
     if (tableRules) {
       if (!tableRules.delete) throw "delete rules missing";
       forcedFilter = tableRules.delete.forcedFilter;
@@ -78,16 +98,24 @@ export async function _delete(
     queryWithoutRLS += filterOpts.where;
     await validate?.(filterOpts.filter);
 
+    const FULL_ROW_KEY = "_prostgles_full_row" as const;
+    const fullRowReturning =
+      hasAfterChecks ? `to_jsonb(${this.escapedName}) as ${FULL_ROW_KEY}` : undefined;
     let returningQuery = "";
     if (returning !== undefined) {
       queryType = "any";
       if (!returningFields) {
-        throw "Returning dissallowed";
+        throw "Returning disallowed";
       }
       returningQuery = this.makeReturnQuery(
         await this.prepareReturning(returning, this.parseFieldFilter(returningFields)),
       );
+      if (hasAfterChecks) {
+        returningQuery += `, ${fullRowReturning}`;
+      }
       queryWithoutRLS += returningQuery;
+    } else if (hasAfterChecks) {
+      queryWithoutRLS += ` RETURNING ${fullRowReturning}`;
     }
 
     // TODO - delete orphaned files
@@ -99,7 +127,18 @@ export async function _delete(
     // }
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
-    if (returnQuery) return queryWithRLS;
+
+    const queryToReturn = await getReturnTypeQuery({
+      handler: this,
+      localParams,
+      queryWithoutRLS,
+      queryWithRLS,
+      returnType: params?.returnType,
+      newQuery: undefined,
+    });
+    if (queryToReturn) {
+      return queryToReturn as unknown[];
+    }
 
     /**
      * Delete file
@@ -120,21 +159,50 @@ export async function _delete(
       return result;
     }
 
-    const result = await runQueryReturnType({
-      queryWithoutRLS,
-      queryWithRLS,
-      newQuery: undefined,
-      returnType: params?.returnType,
-      handler: this,
-      localParams,
-    });
+    const dbHandler = this.getTransaction(localParams)?.t ?? this.db;
+
+    const isOneOrNone = includes(["row", "value"], params?.returnType);
+    const queryPromise =
+      isOneOrNone ?
+        dbHandler.oneOrNone<AnyObject>(queryWithRLS).then((data) => (data ? [data] : []))
+      : dbHandler.any<AnyObject>(queryWithRLS);
+
+    const deletedRows = await queryPromise.catch((err) =>
+      rejectWithPGClientError(err, {
+        type: "tableMethod",
+        localParams,
+        view: this,
+        prostgles: this.dboBuilder.prostgles,
+      }),
+    );
+
+    if (hasAfterChecks) {
+      const fullRows = deletedRows.map((d) => {
+        const fullRow = d[FULL_ROW_KEY] as AnyObject | undefined;
+        if (!fullRow) throw "Missing full row for after checks";
+        return fullRow;
+      });
+
+      await executeHooksCheckAndPostValidation({
+        tableHandler: this,
+        operation,
+        localParams,
+        rows: fullRows,
+        data: [],
+      });
+    }
+
+    const originalReturnRows = deletedRows.map(
+      ({ [FULL_ROW_KEY]: _, ...originalReturn }) => originalReturn,
+    );
+
     await this._log({
       command: "delete",
       localParams,
       data: { filter, params },
       duration: Date.now() - start,
     });
-    return result;
+    return isOneOrNone ? originalReturnRows[0] : originalReturnRows;
   } catch (e) {
     await this._log({
       command: "delete",

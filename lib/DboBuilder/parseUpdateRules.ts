@@ -171,7 +171,7 @@ export async function parseUpdateRules(
               rows: [data],
               allowedCols,
               dbTx: this.tx?.dbTX || this.dboBuilder.dbo,
-              tx: localParams?.tx?.t || this.tx?.t || this.db,
+              tx: this.getTransaction(localParams)?.t || this.db,
               validationOptions: {
                 validate: updateValidate,
                 localParams,

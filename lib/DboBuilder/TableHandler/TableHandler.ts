@@ -10,7 +10,12 @@ import type {
 } from "prostgles-types";
 import { asName, isDefined } from "prostgles-types";
 import type { DB } from "../../Prostgles";
-import type { InsertRule, ParsedTableRule, UpdateRule } from "../../PublishParser/PublishParser";
+import type {
+  DeleteRule,
+  InsertRule,
+  ParsedTableRule,
+  UpdateRule,
+} from "../../PublishParser/PublishParser";
 import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
 import type TableConfigurator from "../../TableConfig/TableConfig";
 import type { TableDefinition } from "../../TableConfig/TableConfig";
@@ -70,12 +75,21 @@ export class TableHandler extends ViewHandler {
     return localParams?.tx?.dbTX ?? this.tx?.dbTX;
   };
 
+  getTransaction = (localParams: LocalParams | undefined) => {
+    return localParams?.tx || this.tx;
+  };
+
   getHooksAndChecks = (
     command:
+      | { name: "delete"; rule: undefined | DeleteRule }
       | { name: "update"; rule: undefined | UpdateRule }
       | { name: "insert"; rule: undefined | InsertRule },
+    localParams: LocalParams | undefined,
   ) => {
-    const { checkFilter, postValidate } = command.rule ?? {};
+    const { postValidate, checkFilter } = command.name === "delete" ? {} : (command.rule ?? {});
+    if (postValidate && !localParams) {
+      throw new Error("Unexpected: no localParams for postValidate");
+    }
     const afterEachHooks = this.config?.hooks?.afterEach
       ?.map((hook) => {
         const { commands } = hook;
@@ -110,16 +124,17 @@ export class TableHandler extends ViewHandler {
   };
   shouldWrapInTx = (
     command:
+      | { name: "delete"; rule: undefined | DeleteRule }
       | { name: "update"; rule: undefined | UpdateRule }
       | { name: "insert"; rule: undefined | InsertRule },
     localParams: LocalParams | undefined,
   ) => {
-    const finalDBtx = this.getFinalDBtx(localParams);
-    const hasAfterChecks = this.getHooksAndChecks(command).length > 0;
-    return !finalDBtx && hasAfterChecks;
+    const transaction = this.getTransaction(localParams);
+    const hasAfterChecks = this.getHooksAndChecks(command, localParams).length > 0;
+    return { shouldWrap: !transaction && hasAfterChecks, hasAfterChecks };
   };
   getFinalDbo = (localParams: LocalParams | undefined) => {
-    return this.getFinalDBtx(localParams) ?? this.dboBuilder.dbo;
+    return this.getTransaction(localParams)?.dbTX ?? this.dboBuilder.dbo;
   };
 
   parseUpdateRules = parseUpdateRules.bind(this);

@@ -168,38 +168,43 @@ export const clientOnlyQueries = async (
       });
     });
 
-    await test("SQL Stream stop with terminate kills the query", { timeout: 10_000 }, async () => {
-      await tryRunP("", async (resolve, reject) => {
-        const totalRows = 5e6;
-        const query = `SELECT * FROM generate_series(1, ${totalRows})`;
-        const res = await sql!(query, {}, { returnType: "stream" });
-        const rowsReceived: any[] = [];
-        const listener = async (packet: SocketSQLStreamPacket) => {
-          if (packet.type === "error") {
-            const queryState = await sql!(
-              "SELECT * FROM pg_stat_activity WHERE query = $1",
-              [query],
-              { returnType: "rows" },
-            );
-            assert.equal(queryState.length, 0);
-            resolve("ok");
-          } else {
-            try {
-              rowsReceived.push(...packet.rows);
-              console.log(rowsReceived.length);
-              assert.equal(packet.ended, false);
-              assert.equal(rowsReceived.length < totalRows, true);
-            } catch (error) {
-              reject(error);
+    await test(
+      "SQL Stream stop with terminate kills the query (expect flakiness)",
+      { timeout: 10_000 },
+      async () => {
+        await tryRunP("", async (resolve, reject) => {
+          const totalRows = 5e6;
+          const query = `SELECT * FROM generate_series(1, ${totalRows})`;
+          const res = await sql!(query, {}, { returnType: "stream" });
+          const rowsReceived: any[] = [];
+          const listener = async (packet: SocketSQLStreamPacket) => {
+            if (packet.type === "error") {
+              await tout(100);
+              const queryState = await sql!(
+                "SELECT * FROM pg_stat_activity WHERE query = $1",
+                [query],
+                { returnType: "rows" },
+              );
+              assert.deepStrictEqual(queryState, []);
+              resolve("ok");
+            } else {
+              try {
+                rowsReceived.push(...packet.rows);
+                console.log(rowsReceived.length);
+                assert.equal(packet.ended, false);
+                assert.equal(rowsReceived.length < totalRows, true);
+              } catch (error) {
+                reject(error);
+              }
             }
-          }
-        };
-        const startHandler = await res.start(listener);
-        setTimeout(() => {
-          startHandler.stop(true).catch(reject);
-        }, 22);
-      });
-    });
+          };
+          const startHandler = await res.start(listener);
+          setTimeout(() => {
+            startHandler.stop(true).catch(reject);
+          }, 22);
+        });
+      },
+    );
 
     await test("SQL Stream", async () => {
       await Promise.all(

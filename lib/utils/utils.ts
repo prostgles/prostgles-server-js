@@ -25,3 +25,5 @@ const canBeUsedAsIsInTypescript = (str: string): boolean => {
   const startsWithCharOrUnderscore = str[0]?.match(/^[a-z_]+$/i);
   return Boolean(isAlphaNumericOrUnderline && startsWithCharOrUnderscore);
 };
+
+export const isArray = <T>(data: T): data is Extract<T, readonly unknown[]> => Array.isArray(data);

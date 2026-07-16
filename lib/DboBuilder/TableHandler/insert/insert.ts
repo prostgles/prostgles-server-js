@@ -13,6 +13,7 @@ import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
+import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
 
 export async function insert(
   this: TableHandler,
@@ -26,16 +27,16 @@ export async function insert(
   const start = Date.now();
   try {
     const { removeDisallowedFields = false } = insertParams ?? {};
-    const { returnQuery = false, nestedInsert } = localParams ?? {};
+    const { nestedInsert } = localParams ?? {};
 
     const rule = tableRules?.[ACTION];
     const { validate, allowedNestedInserts, requiredNestedInserts } = rule ?? {};
 
-    const finalDBtx = this.getFinalDBtx(localParams);
-    /** Post validate and checkFilter require a transaction dbo handler because they happen after the insert */
-    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams)) {
-      return this.dboBuilder.getTX((_dbtx) =>
-        _dbtx[this.name]?.[ACTION](rowOrRows, insertParams, param3_unused, tableRules, localParams),
+    const finalDBtx = this.getTransaction(localParams);
+    /** Post validate and checkFilter require a transaction dbo handler because they need the action result */
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams).shouldWrap) {
+      return this.dboBuilder.getTX((t) =>
+        t[this.name]?.[ACTION](rowOrRows, insertParams, param3_unused, tableRules, localParams),
       );
     }
 
@@ -114,14 +115,14 @@ export async function insert(
         return row;
       }),
     );
-    const preValidatedrowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
+    const preValidatedRowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
 
     /**
      * If media it will: upload file and continue insert
      * If nested insert it will: make separate inserts and not continue main insert
      */
     const mediaOrNestedInsert = await insertNestedRecords.bind(this)({
-      data: preValidatedrowOrRows,
+      data: preValidatedRowOrRows,
       insertParams,
       tableRules,
       localParams,
@@ -156,7 +157,7 @@ export async function insert(
 
       const validatedRows = validatedData.map((d) => d.validatedRow);
       const allowedCols = Array.from(new Set(validatedData.flatMap((d) => d.allowedCols)));
-      const dbTx = finalDBtx || this.dboBuilder.dbo;
+      const dbTx = finalDBtx?.dbTX || this.dboBuilder.dbo;
       const validationOptions = {
         validate: validate as ValidateRowBasic,
         localParams,
@@ -227,7 +228,18 @@ export async function insert(
 
     const queryWithoutUserRLS = query;
     const queryWithRLS = withUserRLS(localParams, query);
-    if (returnQuery) return queryWithRLS;
+
+    const queryToReturn = await getReturnTypeQuery({
+      handler: this,
+      localParams,
+      queryWithoutRLS: queryWithoutUserRLS,
+      queryWithRLS,
+      returnType: insertParams?.returnType,
+      newQuery: undefined,
+    });
+    if (queryToReturn) {
+      return queryToReturn as unknown[];
+    }
 
     if (this.dboBuilder.prostgles.opts.DEBUG_MODE) {
       console.log(this.tx?.t.ctx.start, "insert in " + this.name, data);
@@ -239,18 +251,20 @@ export async function insert(
       queryWithoutUserRLS,
       tableHandler: this,
       returningFields,
-      data: preValidatedrowOrRows,
+      data: preValidatedRowOrRows,
       fields,
       params: insertParams,
       command: "insert",
       isMultiInsert,
     });
+
     await this._log({
       command: "insert",
       localParams,
       data: { rowOrRows, param2: insertParams },
       duration: Date.now() - start,
     });
+
     return result;
   } catch (e) {
     await this._log({

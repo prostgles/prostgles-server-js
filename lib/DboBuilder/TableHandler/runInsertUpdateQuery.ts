@@ -2,9 +2,10 @@ import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgl
 import { asName } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import type { LocalParams } from "../DboBuilder";
-import { getClientErrorFromPGError, withUserRLS } from "../DboBuilder";
+import { rejectWithPGClientError, withUserRLS } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
+import { executeHooksCheckAndPostValidation } from "./executeHooksCheckAndPostValidation";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
@@ -71,7 +72,12 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       RETURNING *
     )
     SELECT 
-      count(*) as row_count,
+      count(*) as row_count, 
+      EXISTS (
+        SELECT *
+        FROM ${escapedTableName}
+        ${checkCondition} 
+      ) AS failed_check,
       (
         SELECT json_agg(item)
         FROM (
@@ -86,127 +92,47 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
           FROM ${escapedTableName}
           WHERE ${hasReturning ? "TRUE" : "FALSE"}
         ) item
-      ) as modified_returning,
-      ( 
-        SELECT json_agg(item)
-        FROM (
-          SELECT *
-          FROM ${escapedTableName}
-          ${checkCondition}
-          LIMIT 5
-        ) item
-      ) AS failed_check
+      ) as modified_returning
     FROM ${escapedTableName}
   `;
 
   const allowedFieldKeys = tableHandler.parseFieldFilter(fields);
-  let result: {
-    row_count: number | null;
-    modified: AnyObject[] | null;
-    failed_check: AnyObject[] | null;
-    modified_returning: AnyObject[] | null;
-  };
 
   const queryType = "one";
 
-  const tx = localParams?.tx?.t || tableHandler.tx?.t;
-  if (tx) {
-    result = await tx[queryType](query).catch((err: unknown) =>
-      getClientErrorFromPGError(err, {
-        type: "tableMethod",
-        localParams,
-        view: tableHandler,
-        allowedKeys: allowedFieldKeys,
-        prostgles: tableHandler.dboBuilder.prostgles,
-      }),
-    );
-  } else {
-    result = await tableHandler.db
-      .tx((t) => (t as any)[queryType](query))
-      .catch((err) =>
-        getClientErrorFromPGError(err, {
-          type: "tableMethod",
-          localParams,
-          view: tableHandler,
-          allowedKeys: allowedFieldKeys,
-          prostgles: tableHandler.dboBuilder.prostgles,
-        }),
-      );
-  }
+  const tx = tableHandler.getTransaction(localParams)?.t;
+  const queryPromise: Promise<{
+    row_count: number | null;
+    modified: AnyObject[] | null;
+    failed_check: boolean | null;
+    modified_returning: AnyObject[] | null;
+  }> = tx ? tx[queryType](query) : tableHandler.db.tx((t) => t[queryType](query));
 
-  if (checkFilter && result.failed_check?.length) {
+  const result = await queryPromise.catch((err: unknown) =>
+    rejectWithPGClientError(err, {
+      type: "tableMethod",
+      localParams,
+      view: tableHandler,
+      allowedKeys: allowedFieldKeys,
+      prostgles: tableHandler.dboBuilder.prostgles,
+    }),
+  );
+
+  if (checkFilter && result.failed_check) {
     throw new Error(
       `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
     );
   }
 
   const rows = result.modified ?? [];
-  const finalDBtx = tableHandler.getFinalDBtx(localParams);
-  const { postValidate } = rule ?? {};
-  const hooks = tableHandler.getHooksAndChecks(
-    command === "insert" ? { name: command, rule } : { name: command, rule },
-  );
-  let changedFieldsSet = undefined as undefined | Set<string>;
-  const getChangedFieldsSet = () => {
-    changedFieldsSet ??= new Set<string>(
-      (isArray(data) ? data : [data]).map((row) => Object.keys(row)).flat(),
-    );
-    return changedFieldsSet;
-  };
-  const applicableHooks = hooks.filter((hook) => {
-    if (hook.type === "checkFilter") return;
-    if (hook.type === "postValidate") return true;
-    const { commands, changedFields } = hook;
-    return (
-      commands[command] &&
-      (!changedFields || changedFields.some((f) => getChangedFieldsSet().has(f)))
-    );
+
+  await executeHooksCheckAndPostValidation({
+    tableHandler,
+    operation: command === "insert" ? { name: "insert", rule } : { name: "update", rule },
+    localParams,
+    rows,
+    data,
   });
-
-  if (postValidate && !localParams) {
-    throw new Error("Unexpected: no localParams for postValidate");
-  }
-
-  if (applicableHooks.length) {
-    if (!finalDBtx) throw new Error("Unexpected: no dbTX for hooks/postValidate");
-
-    for (const row of rows) {
-      const commonParams = {
-        row: row,
-        tx: tx || tableHandler.db,
-        dbx: finalDBtx,
-        command,
-        data,
-      } as const;
-      for (const hook of applicableHooks) {
-        if (hook.type === "afterEach") {
-          await hook.validate({
-            ...commonParams,
-            localParams,
-          });
-        } else if (hook.type === "postValidate") {
-          if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
-          await hook.validate({
-            ...commonParams,
-            localParams,
-          });
-        }
-      }
-    }
-
-    for (const hook of applicableHooks) {
-      if (hook.type === "afterAll") {
-        await hook.validate({
-          tx: tx || tableHandler.db,
-          dbx: finalDBtx,
-          command,
-          data: Array.isArray(data) ? data : [data],
-          rows,
-          localParams,
-        });
-      }
-    }
-  }
 
   let returnMany = false;
   if (args.command === "update") {
@@ -231,5 +157,3 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   return returnMany ? modified_returning : modified_returning?.[0];
 };
-
-const isArray = <T>(data: T): data is Extract<T, readonly unknown[]> => Array.isArray(data);

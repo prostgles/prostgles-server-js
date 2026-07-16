@@ -1,6 +1,6 @@
-import type { AnyObject} from "prostgles-types";
+import type { AnyObject } from "prostgles-types";
 import { asName, pickKeys } from "prostgles-types";
-import type { LocalParams} from "../DboBuilder";
+import type { LocalParams } from "../DboBuilder";
 import { type Media } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 
@@ -15,12 +15,14 @@ type OnDeleteFromFileTableArgs = {
 };
 export async function onDeleteFromFileTable(
   this: TableHandler,
-  { localParams, queryType, returningQuery, filterOpts }: OnDeleteFromFileTableArgs
+  { localParams, queryType, returningQuery, filterOpts }: OnDeleteFromFileTableArgs,
 ) {
-  if (!this.dboBuilder.prostgles.fileManager) throw new Error("fileManager missing");
+  if (!this.dboBuilder.prostgles.fileManager) {
+    throw new Error("fileManager missing");
+  }
   if (this.dboBuilder.prostgles.opts.fileTable?.delayedDelete) {
     return this.dbHandler[queryType]<void>(
-      `UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery ?? ""};`
+      `UPDATE ${asName(this.name)} SET deleted = now() ${filterOpts.where} ${returningQuery ?? ""};`,
     );
   } else {
     const txDelete = async (tbl: TableHandler) => {

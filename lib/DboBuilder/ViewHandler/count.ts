@@ -7,6 +7,7 @@ import {
   withUserRLS,
 } from "../dboBuilderUtils";
 import type { ViewHandler } from "./ViewHandler";
+import { getReturnTypeQuery } from "./getReturnTypeQuery";
 
 export async function count(
   this: ViewHandler,
@@ -32,15 +33,29 @@ export async function count(
         returnQuery: "noRLS",
         bypassLimit: true,
       })) as unknown as string;
-      const query = [
-        withUserRLS(localParams, ""),
-        "SELECT COUNT(*)",
-        "FROM (",
-        findQuery,
-        ") t",
-      ].join("\n");
+
+      const queryWithoutUserRLS = `
+        SELECT COUNT(*)
+        FROM ( 
+        ${findQuery}
+        ) t 
+      `;
+      const queryWithRLS = withUserRLS(localParams, queryWithoutUserRLS);
+
+      const queryToReturn = await getReturnTypeQuery({
+        handler: this,
+        localParams,
+        queryWithoutRLS: queryWithoutUserRLS,
+        queryWithRLS,
+        returnType: selectParams?.returnType,
+        newQuery: undefined,
+      });
+      if (queryToReturn) {
+        return queryToReturn as unknown[];
+      }
+
       const handler = this.tx?.t ?? this.db;
-      return handler.one(query).then(({ count }) => +count);
+      return handler.one(queryWithRLS).then(({ count }) => +count);
     });
 
     await this._log({
@@ -49,7 +64,7 @@ export async function count(
       data: { filter },
       duration: Date.now() - start,
     });
-    return result;
+    return result as number;
   } catch (e) {
     await this._log({
       command: "count",

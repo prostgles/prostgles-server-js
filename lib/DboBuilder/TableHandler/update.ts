@@ -8,6 +8,7 @@ import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import type { TableHandler } from "./TableHandler";
 import { updateFile } from "./updateFile";
 import { getInsertTableRules } from "./insert/getInsertTableRules";
+import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 
 export async function update(
   this: TableHandler,
@@ -20,11 +21,10 @@ export async function update(
   const ACTION = "update";
   const start = Date.now();
   try {
-    /** postValidate */
-    const finalDBtx = this.getFinalDBtx(localParams);
+    const transaction = this.getTransaction(localParams);
     const wrapInTx = () =>
-      this.dboBuilder.getTX((_dbtx) =>
-        (_dbtx[this.name] as Partial<typeof this> | undefined)?.[ACTION]?.(
+      this.dboBuilder.getTX((th) =>
+        (th[this.name] as Partial<typeof this> | undefined)?.[ACTION]?.(
           filter,
           _newData,
           params,
@@ -33,7 +33,7 @@ export async function update(
         ),
       );
     const rule = tableRules?.[ACTION];
-    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams)) {
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams).shouldWrap) {
       return wrapInTx();
     }
 
@@ -60,7 +60,6 @@ export async function update(
     const { fields, validateRow, forcedData, returningFields, forcedFilter, filterFields } =
       parsedRules;
     const { removeDisallowedFields = false } = params || {};
-    const { returnQuery = false } = localParams ?? {};
 
     if (params) {
       const good_paramsObj: Record<keyof UpdateParams, 1> = {
@@ -107,14 +106,14 @@ export async function update(
       if (+updateCount > 1) {
         throw "Cannot do a nestedInsert from an update that targets more than 1 row";
       }
-      if (!finalDBtx) {
+      if (!transaction) {
         return wrapInTx();
       }
       await Promise.all(
         nestedInserts.map(async (nestedInsert) => {
-          const nesedTableHandler = finalDBtx[nestedInsert.tableName];
-          if (!nesedTableHandler)
-            throw `nestedInsert Tablehandler not found for ${nestedInsert.tableName}`;
+          const nestedTableHandler = transaction.dbTX[nestedInsert.tableName];
+          if (!nestedTableHandler)
+            throw `nestedInsert TableHandler not found for ${nestedInsert.tableName}`;
           const refTableRules =
             !localParams ? undefined : (
               await getInsertTableRules(
@@ -133,7 +132,7 @@ export async function update(
               referencingColumn: nestedInsert.insertedFieldName,
             },
           };
-          const nestedInsertResult = (await nesedTableHandler.insert(
+          const nestedInsertResult = (await nestedTableHandler.insert(
             nestedInsert.data,
             { returning: "*" },
             undefined,
@@ -170,7 +169,17 @@ export async function update(
     const queryWithoutUserRLS = query;
     query = withUserRLS(localParams, query);
 
-    if (returnQuery) return query as unknown as void;
+    const queryToReturn = await getReturnTypeQuery({
+      handler: this,
+      localParams,
+      queryWithoutRLS: queryWithoutUserRLS,
+      queryWithRLS: query,
+      returnType: params?.returnType,
+      newQuery: undefined,
+    });
+    if (queryToReturn) {
+      return queryToReturn;
+    }
 
     const result = await runInsertUpdateQuery({
       tableHandler: this,

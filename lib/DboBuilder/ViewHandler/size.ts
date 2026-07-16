@@ -7,6 +7,7 @@ import {
   withUserRLS,
 } from "../dboBuilderUtils";
 import type { ViewHandler } from "./ViewHandler";
+import { getReturnTypeQuery } from "./getReturnTypeQuery";
 export async function size(
   this: ViewHandler,
   _filter?: Filter,
@@ -25,7 +26,7 @@ export async function size(
       table_rules,
       localParams,
     ).then(async (_allowed) => {
-      const q: string = (await this.find(
+      const selectQueryWithoutRLS = (await this.find(
         filter,
         {
           ...selectParams,
@@ -34,18 +35,31 @@ export async function size(
         undefined,
         table_rules,
         { ...localParams, returnQuery: "noRLS", bypassLimit: true },
-      )) as any;
-      const query = withUserRLS(
-        localParams,
-        `${withUserRLS(localParams, "")}
-            SELECT sum(pg_column_size((prgl_size_query.*))) as size 
-            FROM (
-              ${q}
-            ) prgl_size_query
-          `,
-      );
+      )) as unknown as string;
 
-      return (this.tx?.t || this.db).one(query).then(({ size }) => size || "0");
+      const queryWithoutUserRLS = `
+        SELECT sum(pg_column_size((prgl_size_query.*))) as size 
+        FROM (
+          ${selectQueryWithoutRLS}
+        ) prgl_size_query
+      `;
+      const queryWithRLS = withUserRLS(localParams, queryWithoutUserRLS);
+
+      const queryToReturn = await getReturnTypeQuery({
+        handler: this,
+        localParams,
+        queryWithoutRLS: queryWithoutUserRLS,
+        queryWithRLS,
+        returnType: selectParams?.returnType,
+        newQuery: undefined,
+      });
+      if (queryToReturn) {
+        return queryToReturn as unknown[];
+      }
+
+      return (this.tx?.t || this.db)
+        .one<{ size: string | null }>(queryWithRLS)
+        .then(({ size }) => size || "0");
     });
     await this._log({
       command: "size",
@@ -53,7 +67,7 @@ export async function size(
       data: { filter, selectParams },
       duration: Date.now() - start,
     });
-    return result;
+    return result as string;
   } catch (e) {
     await this._log({
       command: "size",

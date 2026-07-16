@@ -1,18 +1,16 @@
-import type { SelectParams } from "prostgles-types";
+import type { AnyObject, SelectParams } from "prostgles-types";
 import { isObject } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
 import {
-  getClientErrorFromPGError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
+  rejectWithPGClientError,
   withUserRLS,
 } from "../DboBuilder";
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
-import type { NewQuery } from "../QueryBuilder/QueryBuilder";
-import { canRunSQL } from "../runSql/runSQL";
-import type { TableHandler } from "../TableHandler/TableHandler";
+import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import type { ViewHandler } from "./ViewHandler";
 
 export const find = async function (
@@ -111,36 +109,41 @@ export const find = async function (
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
-    // THIS HANGS TESTS
-    // if (testRule) {
-    //   try {
-    //     await this.db.any(withUserRLS(localParams, "EXPLAIN " + queryWithRLS));
-    //     return [];
-    //   } catch (e) {
-    //     console.error(e);
-    //     throw `Internal error: publish config is not valid for publish.${this.name}.select `;
-    //   }
-    // }
-
-    /** Used for subscribe  */
-    if (localParams?.returnNewQuery) return newQuery as unknown as any;
-    if (localParams?.returnQuery) {
-      if (localParams.returnQuery === "where-condition") {
-        return newQuery.whereOpts.condition as any;
-      }
-      return (localParams.returnQuery === "noRLS" ?
-        queryWithoutRLS
-      : queryWithRLS) as unknown as any[];
-    }
-
-    const result = await runQueryReturnType({
+    const queryToReturn = await getReturnTypeQuery({
+      handler: this,
+      localParams,
       queryWithoutRLS,
       queryWithRLS,
       returnType,
-      handler: this,
-      localParams,
       newQuery,
     });
+    if (queryToReturn) {
+      return queryToReturn as unknown[];
+    }
+
+    const query = queryWithRLS;
+    const isOneOrNone = returnType === "row" || returnType === "value";
+    const queryPromise =
+      isOneOrNone ?
+        this.db.oneOrNone<AnyObject>(query).then((data) => (data ? [data] : []))
+      : this.db.any<AnyObject>(query);
+
+    const parsedResult = await queryPromise
+      .then((rows) => {
+        if (returnType === "values" || returnType === "value") {
+          return rows.map((d) => Object.values(d)[0]);
+        }
+
+        return rows;
+      })
+      .catch((err) =>
+        rejectWithPGClientError(err, {
+          type: "tableMethod",
+          localParams,
+          view: this,
+          prostgles: this.dboBuilder.prostgles,
+        }),
+      );
 
     await this._log({
       command,
@@ -148,7 +151,8 @@ export const find = async function (
       data: { filter, selectParams },
       duration: Date.now() - start,
     });
-    return result;
+
+    return isOneOrNone ? parsedResult[0] : parsedResult;
   } catch (e) {
     await this._log({
       command,
@@ -163,70 +167,5 @@ export const find = async function (
       view: this,
       prostgles: this.dboBuilder.prostgles,
     });
-  }
-};
-
-type RunQueryReturnTypeArgs = {
-  queryWithRLS: string;
-  queryWithoutRLS: string;
-  returnType: SelectParams["returnType"];
-  handler: ViewHandler | TableHandler;
-  localParams: LocalParams | undefined;
-  newQuery: NewQuery | undefined;
-};
-
-export const runQueryReturnType = async ({
-  newQuery,
-  handler,
-  localParams,
-  queryWithRLS,
-  queryWithoutRLS,
-  returnType,
-}: RunQueryReturnTypeArgs) => {
-  const query = queryWithRLS;
-  const sqlTypes = ["statement", "statement-no-rls", "statement-where"] as const;
-  if (!returnType || returnType === "values") {
-    return handler.dbHandler
-      .any(query)
-      .then((data) => {
-        if (returnType === "values") {
-          return data.map((d) => Object.values(d)[0]);
-        }
-        return data;
-      })
-      .catch((err) =>
-        getClientErrorFromPGError(err, {
-          type: "tableMethod",
-          localParams,
-          view: handler,
-          prostgles: handler.dboBuilder.prostgles,
-        }),
-      );
-  } else if (sqlTypes.some((v) => v === returnType)) {
-    if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams?.clientReq))) {
-      throw `Not allowed:  { returnType: ${JSON.stringify(returnType)} } requires execute sql privileges `;
-    }
-    if (returnType === "statement-no-rls") {
-      return queryWithoutRLS as unknown;
-    }
-    if (returnType === "statement-where") {
-      if (!newQuery) throw `returnType ${returnType} not possible for this command type`;
-      return newQuery.whereOpts.condition as unknown;
-    }
-    return query as unknown as unknown[];
-  } else if (["row", "value"].includes(returnType)) {
-    return handler.dbHandler
-      .oneOrNone(query)
-      .then((data) => {
-        return data && returnType === "value" ? Object.values(data)[0] : data;
-      })
-      .catch((err) =>
-        getClientErrorFromPGError(err, {
-          type: "tableMethod",
-          localParams,
-          view: handler,
-          prostgles: handler.dboBuilder.prostgles,
-        }),
-      );
   }
 };

@@ -70,8 +70,7 @@ export async function insertNestedRecords(
   /**
    * Make sure nested insert uses a transaction
    */
-  const dbTX = this.getFinalDBtx(localParams);
-  const t = localParams?.tx?.t || this.tx?.t;
+  const { dbTX, t } = this.getTransaction(localParams) ?? {};
   if (hasNestedInserts && (!dbTX || !t)) {
     return {
       insertResult: await this.dboBuilder.getTX((dbTX, _t) =>

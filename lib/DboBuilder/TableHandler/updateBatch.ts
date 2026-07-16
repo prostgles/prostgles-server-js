@@ -2,12 +2,13 @@ import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
 import {
-  getClientErrorFromPGError,
+  rejectWithPGClientError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   withUserRLS,
 } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
+import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 
 export async function updateBatch(
   this: TableHandler,
@@ -38,6 +39,18 @@ export async function updateBatch(
     );
     const queries = [withUserRLS(localParams, ""), ...updateQueries];
 
+    const queryToReturn = await getReturnTypeQuery({
+      handler: this,
+      localParams,
+      queryWithoutRLS: queries.slice(1).join(";\n"),
+      queryWithRLS: queries.join(";\n"),
+      returnType: params?.returnType,
+      newQuery: undefined,
+    });
+    if (queryToReturn) {
+      return queryToReturn as unknown[];
+    }
+
     const t = localParams?.tx?.t ?? this.tx?.t;
     if (t) {
       const result = await t.none(queries.join(";\n"));
@@ -54,7 +67,7 @@ export async function updateBatch(
         return t.none(queries.join(";\n"));
       })
       .catch((err) =>
-        getClientErrorFromPGError(err, {
+        rejectWithPGClientError(err, {
           type: "tableMethod",
           localParams,
           view: this,

@@ -96,7 +96,7 @@ export function getSerializedClientErrorFromPGError(
   }
   return errObject;
 }
-export function getClientErrorFromPGError(
+export function rejectWithPGClientError(
   rawError: any,
   args: GetSerializedClientErrorFromPGErrorArgs,
 ) {

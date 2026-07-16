@@ -113,7 +113,7 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
           /** Records must exist in this transaction */
           const exists = await tx.oneOrNone("SELECT * FROM insert_rules WHERE id = ${id}", row);
           const existsd = await dboTx.insert_rules.findOne({ id: row.id });
-          if (row.id !== exists.id || row.id !== existsd.id) {
+          if (row.id !== exists.id || row.id !== existsd?.id) {
             console.error("postValidate failed");
             // process.exit(1)
           }

@@ -14,6 +14,8 @@ import { uploadFile } from "../DboBuilder/uploadFile";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type {
+  AfterAllTsTrigger,
+  AfterEachTsTrigger,
   InsertRule,
   SyncConfig,
   ValidateRowArgsCommon,
@@ -66,24 +68,8 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
     getPreInsertRow?: (
       args: GetPreInsertRowArgs,
     ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
-    afterEach?: {
-      commands: Partial<Record<"insert" | "update", 1>>;
-      changedFields?: string[];
-      validate: (
-        params: ValidateRowArgsCommon<R, DBX> & {
-          localParams: undefined | LocalParams;
-        },
-      ) => Promise<void>;
-    }[];
-    afterAll?: {
-      commands: Partial<Record<"insert" | "update", 1>>;
-      changedFields?: string[];
-      validate: (
-        params: ValidateRowsArgsCommon<R, DBX> & {
-          localParams: undefined | LocalParams;
-        },
-      ) => Promise<void>;
-    }[];
+    afterEach?: AfterEachTsTrigger<R, DBX>[];
+    afterAll?: AfterAllTsTrigger<R, DBX>[];
   };
   triggers?: {
     [triggerName: string]: {

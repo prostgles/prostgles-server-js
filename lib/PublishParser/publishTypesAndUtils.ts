@@ -61,6 +61,10 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   tx: pgPromise.ITask<{}> | DB;
 } & (
   | {
+      command: "delete";
+      data: unknown;
+    }
+  | {
       command: "insert";
       data: R;
     }
@@ -70,20 +74,56 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
 );
 
+export type AfterEachTsTrigger<R, DBX> = {
+  commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  changedFields?: string[];
+  validate: (
+    params: ValidateRowArgsCommon<R, DBX> & {
+      localParams: undefined | LocalParams;
+    },
+  ) => Promise<void>;
+};
+
 export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+  /**
+   * The rows that were inserted/updated/deleted
+   * For delete the rows are the ones that were deleted (before delete)
+   * For insert the rows are the ones that were inserted (after insert)
+   * For update the rows are the ones that were updated (after update)
+   */
   rows: R[];
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
 } & (
   | {
+      command: "delete";
+      data: unknown;
+    }
+  | {
       command: "insert";
+      /**
+       * The data that was used to insert the rows.
+       */
       data: R[];
     }
   | {
       command: "update";
+      /**
+       * The data that was used to update the rows.
+       */
       data: Partial<R>[];
     }
 );
+
+export type AfterAllTsTrigger<R, DBX> = {
+  commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  changedFields?: string[];
+  validate: (
+    params: ValidateRowsArgsCommon<R, DBX> & {
+      localParams: undefined | LocalParams;
+    },
+  ) => Promise<void>;
+};
 
 export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = ValidateRowArgsCommon<
   R,
@@ -187,7 +227,8 @@ export type InsertRule<
   preValidate?: S extends DBSchema ? ValidateRow<Cols, S> : ValidateRowBasic;
 
   /**
-   * Validation logic to check/update data for each request. Happens after publish rule checks (for fields, forcedData/forcedFilter)
+   * Validation logic to check/update data for each request.
+   * Happens after publish rule checks (for fields, forcedData/forcedFilter) but before insert.
    */
   validate?: S extends DBSchema ? ValidateRow<Cols, S> : ValidateRowBasic;
 
