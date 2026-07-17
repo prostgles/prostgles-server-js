@@ -1,6 +1,6 @@
 import type { Email, SMTPConfig } from "./AuthTypes";
 import * as nodemailer from "nodemailer";
-import * as aws from "@aws-sdk/client-ses";
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import type SESTransport from "nodemailer/lib/ses-transport";
 import { checkDmarc } from "./utils/checkDmarc";
 
@@ -17,8 +17,8 @@ const transporterCache: Map<string, Transporter> = new Map();
  * Allows sending emails using nodemailer default config or AWS SES
  * https://www.nodemailer.com/transports/ses/
  */
-const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
-  const transporter = getOrSetTransporter(smptConfig);
+const sendEmail = (smtpConfig: SMTPConfig, email: Email) => {
+  const transporter = getOrSetTransporter(smtpConfig);
   return send(transporter, email);
 };
 
@@ -26,11 +26,11 @@ const sendEmail = (smptConfig: SMTPConfig, email: Email) => {
  * Verifies DMARC and that the website has a valid DMARC records
  */
 const emailSenderCache: Map<string, boolean> = new Map();
-export const getEmailSender = async (smptConfig: SMTPConfig, websiteUrl: string) => {
+export const getEmailSender = async (smtpConfig: SMTPConfig, websiteUrl: string) => {
   const result = {
-    sendEmail: (email: Email) => sendEmail(smptConfig, email),
+    sendEmail: (email: Email) => sendEmail(smtpConfig, email),
   };
-  const configStr = JSON.stringify({ smptConfig, websiteUrl });
+  const configStr = JSON.stringify({ smtpConfig, websiteUrl });
   if (emailSenderCache.has(configStr)) {
     return result;
   }
@@ -39,12 +39,12 @@ export const getEmailSender = async (smptConfig: SMTPConfig, websiteUrl: string)
   }
   await checkDmarc(websiteUrl);
 
-  await verifySMTPConfig(smptConfig);
+  await verifySMTPConfig(smtpConfig);
 
   /**
    * Setup nodemailer transporters
    */
-  getOrSetTransporter(smptConfig);
+  getOrSetTransporter(smtpConfig);
   emailSenderCache.set(configStr, true);
   return result;
 };
@@ -52,28 +52,20 @@ export const getEmailSender = async (smptConfig: SMTPConfig, websiteUrl: string)
 /**
  * Returns a transporter from cache or creates a new one
  */
-export const getOrSetTransporter = (smptConfig: SMTPConfig) => {
-  const configStr = JSON.stringify(smptConfig);
-  const transporter = transporterCache.get(configStr) ?? getTransporter(smptConfig);
+export const getOrSetTransporter = (smtpConfig: SMTPConfig) => {
+  const configStr = JSON.stringify(smtpConfig);
+  const transporter = transporterCache.get(configStr) ?? getTransporter(smtpConfig);
   if (!transporterCache.has(configStr)) {
     transporterCache.set(configStr, transporter);
   }
   return transporter;
 };
 
-const getTransporter = (smptConfig: SMTPConfig) => {
+const getTransporter = (smtpConfig: SMTPConfig) => {
   let transporter: Transporter | undefined;
-  if (smptConfig.type === "aws-ses") {
-    const {
-      region,
-      accessKeyId,
-      secretAccessKey,
-      /**
-       * max 1 messages/second
-       */
-      sendingRate = 1,
-    } = smptConfig;
-    const ses = new aws.SES({
+  if (smtpConfig.type === "aws-ses") {
+    const { region, accessKeyId, secretAccessKey } = smtpConfig;
+    const sesClient = new SESv2Client({
       apiVersion: "2010-12-01",
       region,
       credentials: {
@@ -83,12 +75,13 @@ const getTransporter = (smptConfig: SMTPConfig) => {
     });
 
     transporter = nodemailer.createTransport({
-      SES: { ses, aws },
-      maxConnections: 1,
-      sendingRate,
+      SES: {
+        sesClient,
+        SendEmailCommand,
+      },
     });
   } else {
-    const { user, pass, host, port, secure, tls } = smptConfig;
+    const { user, pass, host, port, secure, tls } = smtpConfig;
     transporter = nodemailer.createTransport({
       host,
       port,
@@ -126,8 +119,8 @@ const send = (transporter: Transporter, email: Email) => {
   });
 };
 
-export const verifySMTPConfig = async (smptConfig: SMTPConfig) => {
-  const transporter = getOrSetTransporter(smptConfig);
+export const verifySMTPConfig = async (smtpConfig: SMTPConfig) => {
+  const transporter = getOrSetTransporter(smtpConfig);
   return new Promise((resolve, reject) => {
     transporter.verify((err, success) => {
       if (err) {

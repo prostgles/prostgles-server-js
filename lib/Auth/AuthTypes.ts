@@ -98,11 +98,6 @@ export type SMTPConfig =
       region: string;
       accessKeyId: string;
       secretAccessKey: string;
-      /**
-       * Sending rate per second
-       * Defaults to 1
-       */
-      sendingRate?: number;
     };
 
 export type Email = {
@@ -310,7 +305,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   onUseOrSocketConnected?: (
     sid: string | undefined,
     client: LoginClientInfo,
-    reqInfo: AuthClientRequest
+    reqInfo: AuthClientRequest,
   ) => Awaitable<void | { error: string; httpCode: 400 | 401 | 403 } | { session: BasicSession }>;
 
   /**
@@ -326,7 +321,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: LoginClientInfo,
-    reqInfo: AuthClientRequest
+    reqInfo: AuthClientRequest,
   ) => Awaitable<AuthResultOrError<SUser>>;
 
   /**
@@ -381,7 +376,7 @@ export const getMagicLinkUrl = ({
   }
   const { code, email } = data;
   const confirmationUrl = new URL(
-    `${websiteUrl}${GET_AUTH_ROUTE(loginSignupConfig, "magicLinks")}`
+    `${websiteUrl}${GET_AUTH_ROUTE(loginSignupConfig, "magicLinks")}`,
   );
   confirmationUrl.searchParams.set("email", email);
   confirmationUrl.searchParams.set("code", code);
@@ -424,7 +419,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
   onGetRequestOK?: (
     req: ExpressReq,
     res: ExpressRes,
-    params: AuthRequestParams<S, SUser>
+    params: AuthRequestParams<S, SUser>,
   ) => Awaitable<void>;
 
   /**
@@ -439,7 +434,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
     data: MagicLinkOrOTPData,
     dbo: DBOFullyTyped<S>,
     db: DB,
-    client: LoginClientInfo
+    client: LoginClientInfo,
   ) => Awaitable<
     | {
         session: BasicSession | undefined;
@@ -470,7 +465,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: LoginClientInfo,
-    getMagicLinkUrl: (data: MagicLinkOrOTPData, websiteUrl: string) => string
+    getMagicLinkUrl: (data: MagicLinkOrOTPData, websiteUrl: string) => string,
   ) => Awaitable<LoginResponse>;
 
   logout: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<void>;

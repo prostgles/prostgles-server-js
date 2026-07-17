@@ -333,7 +333,7 @@ export const getFileType = async (
   >);
 
   const fileNameMime = getFileTypeFromFilename(fileName);
-  if (!fileNameMime?.ext) throw new Error("File name must contain extenion");
+  if (!fileNameMime?.ext) throw new Error("File name must contain extension");
   const res = await fileTypeFromBuffer(typeof file === "string" ? Buffer.from(file, "utf8") : file);
 
   if (!res) {
