@@ -71,14 +71,6 @@ export class TableHandler extends ViewHandler {
     this.is_media = dboBuilder.prostgles.isMedia(this.name);
   }
 
-  getFinalDBtx = (localParams: LocalParams | undefined) => {
-    return localParams?.tx?.dbTX ?? this.tx?.dbTX;
-  };
-
-  getTransaction = (localParams: LocalParams | undefined) => {
-    return localParams?.tx || this.tx;
-  };
-
   getHooksAndChecks = (
     command:
       | { name: "delete"; rule: undefined | DeleteRule }

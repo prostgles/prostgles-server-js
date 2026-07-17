@@ -123,10 +123,11 @@ export const find = async function (
 
     const query = queryWithRLS;
     const isOneOrNone = returnType === "row" || returnType === "value";
+    const dbHandler = this.getTransaction(localParams)?.t ?? this.db;
     const queryPromise =
       isOneOrNone ?
-        this.db.oneOrNone<AnyObject>(query).then((data) => (data ? [data] : []))
-      : this.db.any<AnyObject>(query);
+        dbHandler.oneOrNone<AnyObject>(query).then((data) => (data ? [data] : []))
+      : dbHandler.any<AnyObject>(query);
 
     const parsedResult = await queryPromise
       .then((rows) => {

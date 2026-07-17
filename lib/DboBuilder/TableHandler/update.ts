@@ -102,7 +102,13 @@ export async function update(
     const nestedInserts = getReferenceColumnInserts(this, nData, true);
     const nestedInsertsResultsObj: Record<string, any> = {};
     if (nestedInserts.length) {
-      const updateCount = await this.count(updateFilter.filter);
+      const updateCount = await this.count(
+        updateFilter.filter,
+        undefined,
+        undefined,
+        tableRules,
+        localParams,
+      );
       if (+updateCount > 1) {
         throw "Cannot do a nestedInsert from an update that targets more than 1 row";
       }

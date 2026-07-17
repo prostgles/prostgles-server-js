@@ -104,6 +104,14 @@ export class ViewHandler {
     });
   }
 
+  getFinalDBtx = (localParams: LocalParams | undefined) => {
+    return localParams?.tx?.dbTX ?? this.tx?.dbTX;
+  };
+
+  getTransaction = (localParams: LocalParams | undefined) => {
+    return localParams?.tx || this.tx;
+  };
+
   _log = ({
     command,
     data,

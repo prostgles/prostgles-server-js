@@ -32,8 +32,8 @@ export const upsert = async function (
         });
     };
 
-    /* Do it within a transaction to ensure consisency */
-    if (!this.tx) {
+    /* Do it within a transaction to ensure consistency */
+    if (!this.getTransaction(localParams)) {
       return this.dboBuilder.getTX((dbTX) => _upsert(dbTX[this.name] as TableHandler));
     }
     const result = await _upsert(this);

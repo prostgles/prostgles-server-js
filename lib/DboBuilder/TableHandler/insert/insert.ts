@@ -85,7 +85,10 @@ export async function insert(
 
     validateInsertParams(insertParams);
 
-    const tx = localParams?.tx?.t || this.tx?.t;
+    // const tx = localParams?.tx?.t || this.tx?.t;
+    const transaction = this.getTransaction(localParams);
+    const tx = transaction?.t || this.db;
+
     const preValidatedRows = await Promise.all(
       rows.map(async (nonValidated) => {
         const { preValidate, validate } = rule ?? {};
@@ -96,16 +99,18 @@ export async function insert(
           validate,
           localParams,
           row: nonValidated,
-          tx: tx || this.db,
+          tx,
           command: "insert",
           data: nonValidated,
         });
         if (preValidate) {
-          if (!localParams) throw "localParams missing for insert preValidate";
+          if (!localParams) {
+            throw "localParams missing for insert preValidate";
+          }
           row = await preValidate({
             row,
-            tx: tx || this.db,
-            dbx: this.tx?.dbTX || this.dboBuilder.dbo,
+            tx,
+            dbx: transaction?.dbTX || this.dboBuilder.dbo,
             localParams,
             command: "insert",
             data: row,
@@ -170,7 +175,7 @@ export async function insert(
           allowedCols,
           dbTx,
           validationOptions,
-          tx: tx || this.db,
+          tx,
         })
       ).getQuery();
       const { onConflict } = insertParams ?? {};

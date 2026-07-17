@@ -25,15 +25,19 @@ export const serverOnlyQueries = async (db: DBHandlerServer) => {
       await db.rec.findOne!({ id: 1 }, { select: { "*": 1, rec_ref: "*" } });
     });
     await test("Transactions", async () => {
+      const rowData = { name: "tx_" };
       await db.tx!(async (t) => {
-        await t.items.insert!({ name: "tx_" });
-        const expect1 = await t.items.count!({ name: "tx_" });
-        const expect0 = await db.items.count!({ name: "tx_" });
-        if (expect0 !== 0 || expect1 !== 1) throw "db.tx failed";
+        await t.items.insert!(rowData);
+        const expect1 = await t.items.count!(rowData);
+        const expect0count = await db.items.count!(rowData);
+        const expect0find = await db.items.findOne!(rowData);
+        if (expect0count !== 0 || expect0find || expect1 !== 1) {
+          throw "db.tx failed: " + JSON.stringify({ expect0count, expect0find, expect1 });
+        }
 
         //throw "err"; // Any errors will revert all data-changing commands using the transaction object ( t )
       });
-      const expect1 = await db.items.count!({ name: "tx_" });
+      const expect1 = await db.items.count!(rowData);
       if (expect1 !== 1) throw "db.tx failed";
     });
 
