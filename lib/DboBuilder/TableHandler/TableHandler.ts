@@ -93,7 +93,6 @@ export class TableHandler extends ViewHandler {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
       const hookResult = await hook.validate({
-        row: newRow,
         command: "insert",
         data: newRow,
         dbx: this.getFinalDbo(localParams),

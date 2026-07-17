@@ -5,6 +5,12 @@ import type { LocalParams } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { isApplicableHook } from "./isApplicableHook";
 
+/**
+ * Prevent same-table same-command after-hook re-entry within the same tx.
+ * Allows cross-table and cross-command writes from hooks.
+ */
+const activeAfterHookKeysByTx = new WeakMap<object, Set<string>>();
+
 export const executeAfterHooksCheckAndPostValidation = async ({
   tableHandler,
   operation,
@@ -32,16 +38,31 @@ export const executeAfterHooksCheckAndPostValidation = async ({
     return isApplicableHook(tableHandler, newRows, hook, command);
   });
 
-  if (applicableHooks.length) {
-    if (!transaction) {
-      throw new Error("Unexpected: hooks/postValidate require a transaction dbo handler");
-    }
+  if (!applicableHooks.length) return;
 
-    const txParams = {
-      tx: transaction.t,
-      dbx: transaction.dbTX,
-    };
+  if (!transaction) {
+    throw new Error("Unexpected: hooks/postValidate require a transaction dbo handler");
+  }
 
+  const txParams = {
+    tx: transaction.t,
+    dbx: transaction.dbTX,
+  };
+
+  const txKey = transaction.t as unknown as object;
+  const commandKey = `${tableHandler.name}:${command}`;
+  const activeKeys = activeAfterHookKeysByTx.get(txKey) ?? new Set<string>();
+
+  if (activeAfterHookKeysByTx.get(txKey) === undefined) {
+    activeAfterHookKeysByTx.set(txKey, activeKeys);
+  }
+
+  // Re-entrant call caused by hook writes on same table+command: skip to prevent infinite recursion.
+  if (activeKeys.has(commandKey)) return;
+
+  activeKeys.add(commandKey);
+
+  try {
     for (const row of rows) {
       const commonParams = {
         row: row,
@@ -49,6 +70,7 @@ export const executeAfterHooksCheckAndPostValidation = async ({
         command,
         data,
       } as const;
+
       for (const hook of applicableHooks) {
         const isApplicable = isApplicableHook(
           tableHandler,
@@ -92,6 +114,11 @@ export const executeAfterHooksCheckAndPostValidation = async ({
           localParams,
         });
       }
+    }
+  } finally {
+    activeKeys.delete(commandKey);
+    if (!activeKeys.size) {
+      activeAfterHookKeysByTx.delete(txKey);
     }
   }
 };

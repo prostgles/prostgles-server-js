@@ -56,19 +56,11 @@ export type UpdateRequestData<R extends AnyObject = AnyObject> =
   | UpdateRequestDataBatch<R>;
 
 export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
-  row: R;
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
-} & (
-  | {
-      command: "insert";
-      data: R;
-    }
-  | {
-      command: "update";
-      data: Partial<R>;
-    }
-);
+  command: "insert" | "update";
+  data: Partial<R>;
+};
 export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   row: R;
   dbx: DBX;
