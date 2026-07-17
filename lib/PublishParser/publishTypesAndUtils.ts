@@ -55,6 +55,20 @@ export type UpdateRequestData<R extends AnyObject = AnyObject> =
   | UpdateRequestDataOne<R>
   | UpdateRequestDataBatch<R>;
 
+export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+  row: R;
+  dbx: DBX;
+  tx: pgPromise.ITask<{}> | DB;
+} & (
+  | {
+      command: "insert";
+      data: R;
+    }
+  | {
+      command: "update";
+      data: Partial<R>;
+    }
+);
 export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   row: R;
   dbx: DBX;
@@ -74,9 +88,25 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
 );
 
+export type BeforeEachTsTrigger<R, DBX> = {
+  commands: Partial<Record<"insert" | "update", 1>>;
+  /**
+   * Will only run this trigger if the insert/update provides non null values for these fields.
+   */
+  changedFields?: (keyof R)[];
+  validate: (
+    params: ValidateBeforeRowArgsCommon<R, DBX> & {
+      localParams: undefined | LocalParams;
+    },
+  ) => Promise<void | { row: R; onInserted?: () => void }>;
+};
+
 export type AfterEachTsTrigger<R, DBX> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
-  changedFields?: string[];
+  /**
+   * Will only run this trigger if the insert/update provides non null values for these fields.
+   */
+  changedFields?: (keyof R)[];
   validate: (
     params: ValidateRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;

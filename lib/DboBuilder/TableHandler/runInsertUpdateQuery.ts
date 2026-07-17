@@ -5,7 +5,7 @@ import type { LocalParams } from "../DboBuilder";
 import { rejectWithPGClientError, withUserRLS } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
-import { executeHooksCheckAndPostValidation } from "./executeHooksCheckAndPostValidation";
+import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
@@ -126,7 +126,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   const rows = result.modified ?? [];
 
-  await executeHooksCheckAndPostValidation({
+  await executeAfterHooksCheckAndPostValidation({
     tableHandler,
     operation: command === "insert" ? { name: "insert", rule } : { name: "update", rule },
     localParams,

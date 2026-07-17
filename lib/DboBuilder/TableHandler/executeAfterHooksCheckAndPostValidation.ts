@@ -3,8 +3,9 @@ import type { DeleteRule, InsertRule, UpdateRule } from "../../PublishParser/Pub
 import { isArray } from "../../utils/utils";
 import type { LocalParams } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
+import { isApplicableHook } from "./isApplicableHook";
 
-export const executeHooksCheckAndPostValidation = async ({
+export const executeAfterHooksCheckAndPostValidation = async ({
   tableHandler,
   operation,
   data,
@@ -22,22 +23,13 @@ export const executeHooksCheckAndPostValidation = async ({
 }) => {
   const command = operation.name;
   const transaction = tableHandler.getTransaction(localParams);
-  const hooks = tableHandler.getHooksAndChecks(operation, localParams);
-  let changedFieldsSet = undefined as undefined | Set<string>;
-  const getChangedFieldsSet = () => {
-    changedFieldsSet ??= new Set<string>(
-      (isArray(data) ? data : [data]).map((row) => Object.keys(row)).flat(),
-    );
-    return changedFieldsSet;
-  };
+  const hooks = tableHandler.getAfterHooksAndChecks(operation, localParams);
+  const newRows = isArray(data) ? data : [data];
+
   const applicableHooks = hooks.filter((hook) => {
     if (hook.type === "checkFilter") return false;
     if (hook.type === "postValidate") return true;
-    const { commands, changedFields } = hook;
-    return (
-      commands[command] &&
-      (!changedFields || changedFields.some((f) => getChangedFieldsSet().has(f)))
-    );
+    return isApplicableHook(tableHandler, newRows, hook, command);
   });
 
   if (applicableHooks.length) {
@@ -58,6 +50,13 @@ export const executeHooksCheckAndPostValidation = async ({
         data,
       } as const;
       for (const hook of applicableHooks) {
+        const isApplicable = isApplicableHook(
+          tableHandler,
+          [row],
+          { commands: { [command]: 1 }, changedFields: hook.changedFields },
+          command,
+        );
+        if (!isApplicable) continue;
         if (hook.type === "afterEach") {
           await hook.validate({
             ...commonParams,
@@ -74,12 +73,22 @@ export const executeHooksCheckAndPostValidation = async ({
     }
 
     for (const hook of applicableHooks) {
+      const applicableRows = newRows.filter((row) => {
+        const isApplicable = isApplicableHook(
+          tableHandler,
+          [row],
+          { commands: { [command]: 1 }, changedFields: hook.changedFields },
+          command,
+        );
+        return isApplicable;
+      });
+      if (!applicableRows.length) continue;
       if (hook.type === "afterAll") {
         await hook.validate({
           ...txParams,
           command,
-          data: Array.isArray(data) ? data : [data],
-          rows,
+          data: newRows,
+          rows: applicableRows,
           localParams,
         });
       }

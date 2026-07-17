@@ -33,7 +33,7 @@ export async function update(
         ),
       );
     const rule = tableRules?.[ACTION];
-    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams).shouldWrap) {
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams, [_newData]).shouldWrap) {
       return wrapInTx();
     }
 
@@ -75,6 +75,9 @@ export async function update(
           "Invalid params: " + bad_params.join(", ") + " \n Expecting: " + good_params.join(", ")
         );
     }
+
+    const beforeResult = await this.beforeEach(newData, localParams, "update");
+    newData = beforeResult.row;
 
     const { data, allowedCols } = prepareNewData({
       row: newData,
@@ -205,6 +208,7 @@ export async function update(
       data: { filter, _newData, params },
       duration: Date.now() - start,
     });
+    beforeResult.successCallbacks.forEach((cb) => cb());
     return result;
   } catch (e) {
     await this._log({

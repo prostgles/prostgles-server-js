@@ -11,7 +11,7 @@ import {
 import type { TableHandler } from "./TableHandler";
 import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
 import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
-import { executeHooksCheckAndPostValidation } from "./executeHooksCheckAndPostValidation";
+import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 
 export async function _delete(
   this: TableHandler,
@@ -28,7 +28,7 @@ export async function _delete(
     this.checkFilter(filter);
 
     const operation = { name: "delete", rule: tableRules?.delete } as const;
-    const { hasAfterChecks, shouldWrap } = this.shouldWrapInTx(operation, localParams);
+    const { hasAfterChecks, shouldWrap } = this.shouldWrapInTx(operation, localParams, []);
     if (shouldWrap) {
       return this.dboBuilder.getTX((t) =>
         (t[this.name] as Partial<typeof this> | undefined)?.delete?.(
@@ -183,7 +183,7 @@ export async function _delete(
         return fullRow;
       });
 
-      await executeHooksCheckAndPostValidation({
+      await executeAfterHooksCheckAndPostValidation({
         tableHandler: this,
         operation,
         localParams,

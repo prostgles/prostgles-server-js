@@ -34,6 +34,7 @@ import { insert } from "./insert/insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
+import { isApplicableHook } from "./isApplicableHook";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -71,7 +72,49 @@ export class TableHandler extends ViewHandler {
     this.is_media = dboBuilder.prostgles.isMedia(this.name);
   }
 
-  getHooksAndChecks = (
+  getBeforeHooks = (command: "update" | "insert", rows: AnyObject[]) => {
+    return (
+      this.config?.hooks?.beforeEach?.filter((hook) =>
+        isApplicableHook(this, rows, hook, command),
+      ) ?? []
+    );
+  };
+
+  beforeEach = async (
+    row: AnyObject,
+    localParams: LocalParams | undefined,
+    command: "insert" | "update",
+  ) => {
+    const transaction = this.getTransaction(localParams);
+    const hooks = this.getBeforeHooks(command, [row]);
+    let newRow = row;
+    const successCallbacks: (() => void)[] = [];
+    for (const hook of hooks) {
+      const isApplicable = isApplicableHook(this, [newRow], hook, command);
+      if (!isApplicable) continue;
+      const hookResult = await hook.validate({
+        row: newRow,
+        command: "insert",
+        data: newRow,
+        dbx: this.getFinalDbo(localParams),
+        localParams,
+        tx: transaction?.t || this.db,
+      });
+      if (hookResult) {
+        newRow = hookResult.row;
+        const { onInserted } = hookResult;
+        if (onInserted) {
+          successCallbacks.push(onInserted);
+        }
+      }
+    }
+    return {
+      row: newRow,
+      successCallbacks,
+    };
+  };
+
+  getAfterHooksAndChecks = (
     command:
       | { name: "delete"; rule: undefined | DeleteRule }
       | { name: "update"; rule: undefined | UpdateRule }
@@ -109,8 +152,12 @@ export class TableHandler extends ViewHandler {
       .filter(isDefined);
     return [
       ...(afterEachHooks ?? []),
-      ...(postValidate ? [{ type: "postValidate", validate: postValidate } as const] : []),
-      ...(checkFilter ? [{ type: "checkFilter", checkFilter } as const] : []),
+      ...(postValidate ?
+        [{ type: "postValidate", validate: postValidate, changedFields: undefined } as const]
+      : []),
+      ...(checkFilter ?
+        [{ type: "checkFilter", checkFilter, changedFields: undefined } as const]
+      : []),
       ...(afterAllHooks ?? []),
     ];
   };
@@ -120,10 +167,17 @@ export class TableHandler extends ViewHandler {
       | { name: "update"; rule: undefined | UpdateRule }
       | { name: "insert"; rule: undefined | InsertRule },
     localParams: LocalParams | undefined,
+    newRows: AnyObject[],
   ) => {
     const transaction = this.getTransaction(localParams);
-    const hasAfterChecks = this.getHooksAndChecks(command, localParams).length > 0;
-    return { shouldWrap: !transaction && hasAfterChecks, hasAfterChecks };
+    const hasAfterChecks = this.getAfterHooksAndChecks(command, localParams).length > 0;
+    const hasBeforeHooks =
+      command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
+    return {
+      shouldWrap: !transaction && (hasAfterChecks || hasBeforeHooks),
+      hasBeforeHooks,
+      hasAfterChecks,
+    };
   };
   getFinalDbo = (localParams: LocalParams | undefined) => {
     return this.getTransaction(localParams)?.dbTX ?? this.dboBuilder.dbo;

@@ -16,10 +16,10 @@ import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type {
   AfterAllTsTrigger,
   AfterEachTsTrigger,
+  BeforeEachTsTrigger,
   InsertRule,
   SyncConfig,
   ValidateRowArgsCommon,
-  ValidateRowsArgsCommon,
 } from "../PublishParser/PublishParser";
 import {
   DEFAULT_SYNC_BATCH_SIZE,
@@ -63,11 +63,12 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
   hooks?: {
     /**
      * Hook used to run custom logic before inserting a row.
-     * The returned row must satisfy the table schema
+     * The returned row must satisfy the table schema.
      */
     getPreInsertRow?: (
       args: GetPreInsertRowArgs,
     ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
+    beforeEach?: BeforeEachTsTrigger<R, DBX>[];
     afterEach?: AfterEachTsTrigger<R, DBX>[];
     afterAll?: AfterAllTsTrigger<R, DBX>[];
   };

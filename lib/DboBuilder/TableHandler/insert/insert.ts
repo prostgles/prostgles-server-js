@@ -14,6 +14,7 @@ import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
 import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
+import { isArray } from "../../../utils/utils";
 
 export async function insert(
   this: TableHandler,
@@ -34,7 +35,13 @@ export async function insert(
 
     const finalDBtx = this.getTransaction(localParams);
     /** Post validate and checkFilter require a transaction dbo handler because they need the action result */
-    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams).shouldWrap) {
+    if (
+      this.shouldWrapInTx(
+        { name: ACTION, rule },
+        localParams,
+        isArray(rowOrRows) ? rowOrRows : [rowOrRows],
+      ).shouldWrap
+    ) {
       return this.dboBuilder.getTX((t) =>
         t[this.name]?.[ACTION](rowOrRows, insertParams, param3_unused, tableRules, localParams),
       );
@@ -59,8 +66,8 @@ export async function insert(
         throw `Direct inserts not allowed. Only nested inserts from these tables: ${JSON.stringify(allowedNestedInserts)} `;
       }
     }
-    const isMultiInsert = Array.isArray(rowOrRows);
-    const rows = isMultiInsert ? (rowOrRows as AnyObject[]) : [rowOrRows];
+    const isMultiInsert = isArray(rowOrRows);
+    const rows = isMultiInsert ? rowOrRows : [rowOrRows];
 
     requiredNestedInserts?.forEach(({ ftable, maxRows, minRows }) => {
       if (this.column_names.includes(ftable))
@@ -69,7 +76,7 @@ export async function insert(
         const nestedInsert = row[ftable] as unknown;
         const nestedInsertRows =
           isObject(nestedInsert) ? [nestedInsert]
-          : Array.isArray(nestedInsert) ? nestedInsert
+          : isArray(nestedInsert) ? nestedInsert
           : [];
         if (!nestedInsertRows.length) {
           throw `Missing required nested insert on rowId ${rowId} for ftable: ${ftable}`;
@@ -85,15 +92,17 @@ export async function insert(
 
     validateInsertParams(insertParams);
 
-    // const tx = localParams?.tx?.t || this.tx?.t;
     const transaction = this.getTransaction(localParams);
     const tx = transaction?.t || this.db;
 
+    const successCallbacks: (() => void)[] = [];
     const preValidatedRows = await Promise.all(
       rows.map(async (nonValidated) => {
         const { preValidate, validate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
-        if (!tableConfigurator) throw "tableConfigurator missing";
+        if (!tableConfigurator) {
+          throw "tableConfigurator missing";
+        }
         let row = await tableConfigurator.getPreInsertRow(this, {
           dbx: this.getFinalDbo(localParams),
           validate,
@@ -103,6 +112,11 @@ export async function insert(
           command: "insert",
           data: nonValidated,
         });
+
+        const beforeResult = await this.beforeEach(row, localParams, "insert");
+        row = beforeResult.row;
+        beforeResult.successCallbacks.forEach((cb) => successCallbacks.push(cb));
+
         if (preValidate) {
           if (!localParams) {
             throw "localParams missing for insert preValidate";
@@ -269,7 +283,7 @@ export async function insert(
       data: { rowOrRows, param2: insertParams },
       duration: Date.now() - start,
     });
-
+    successCallbacks.forEach((cb) => cb());
     return result;
   } catch (e) {
     await this._log({
