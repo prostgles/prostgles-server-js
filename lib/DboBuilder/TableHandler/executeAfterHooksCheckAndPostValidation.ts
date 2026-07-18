@@ -95,7 +95,7 @@ export const executeAfterHooksCheckAndPostValidation = async ({
     }
 
     for (const hook of applicableHooks) {
-      const applicableRows = newRows.filter((row) => {
+      const applicableRows = rows.filter((row) => {
         const isApplicable = isApplicableHook(
           tableHandler,
           [row],
@@ -104,12 +104,21 @@ export const executeAfterHooksCheckAndPostValidation = async ({
         );
         return isApplicable;
       });
-      if (!applicableRows.length) continue;
+      const applicableData = newRows.filter((row) => {
+        const isApplicable = isApplicableHook(
+          tableHandler,
+          [row],
+          { commands: { [command]: 1 }, changedFields: hook.changedFields },
+          command,
+        );
+        return isApplicable;
+      });
+      if (!applicableRows.length && !applicableData.length) continue;
       if (hook.type === "afterAll") {
         await hook.validate({
           ...txParams,
           command,
-          data: newRows,
+          data: applicableData,
           rows: applicableRows,
           localParams,
         });

@@ -18,6 +18,7 @@ import type {
   DBSchema,
   FieldFilter,
   FullFilter,
+  MaybePromise,
   RequiredNestedInsert,
   SelectParams,
   SQLHandler,
@@ -52,8 +53,7 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
   data: UpdateReq<R>[];
 };
 export type UpdateRequestData<R extends AnyObject = AnyObject> =
-  | UpdateRequestDataOne<R>
-  | UpdateRequestDataBatch<R>;
+  UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 
 export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   dbx: DBX;
@@ -90,7 +90,7 @@ export type BeforeEachTsTrigger<R, DBX> = {
     params: ValidateBeforeRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
     },
-  ) => Promise<void | { row: R; onInserted?: () => void }>;
+  ) => MaybePromise<void | { row: Partial<R>; onInserted?: () => void }>;
 };
 
 export type AfterEachTsTrigger<R, DBX> = {
