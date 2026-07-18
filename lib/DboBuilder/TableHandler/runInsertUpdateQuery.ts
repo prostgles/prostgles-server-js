@@ -27,7 +27,7 @@ type RunInsertUpdateQueryArgs = {
       nestedInsertsResultsObj: Record<string, any>;
       params: UpdateParams | undefined;
       rule: UpdateRule | undefined;
-      data: Record<string, any>;
+      data: AnyObject;
     }
 );
 

@@ -44,6 +44,7 @@ export type ValidatedParams = {
   removeDisallowedFields: boolean;
   tableConfigurator: TableConfigurator | undefined;
   tableHandler: TableHandler;
+  columnsAddedFromBeforeHooks: string[];
 };
 
 export class TableHandler extends ViewHandler {
@@ -107,9 +108,12 @@ export class TableHandler extends ViewHandler {
         }
       }
     }
+
+    const initialKeys = Object.keys(row);
     return {
       row: newRow,
       successCallbacks,
+      columnsAdded: Object.keys(newRow).filter((col) => !initialKeys.includes(col)),
     };
   };
 

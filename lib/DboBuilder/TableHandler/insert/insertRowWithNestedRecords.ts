@@ -36,9 +36,9 @@ export async function insertRowWithNestedRecords(
   /* Ensure we're using the same transaction */
   const tableHandler = this.tx ? this : (dbTX[this.name] as TableHandler);
 
-  const omitedKeys = extraKeys.concat(colInserts.map((c) => c.insertedFieldName));
+  const omittedKeys = extraKeys.concat(colInserts.map((c) => c.insertedFieldName));
 
-  const rootData: AnyObject = omitKeys(row, omitedKeys);
+  const rootData: AnyObject = omitKeys(row, omittedKeys);
 
   let insertedChildren: AnyObject[];
   let targetTableRules: ParsedTableRule;
@@ -193,12 +193,10 @@ export async function insertRowWithNestedRecords(
       }
 
       /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
-      if (
-        !(
-          cols2.filter((c) => c.references?.[0]?.ftable === fileTable).length === 1 &&
-          cols2.filter((c) => c.references?.[0]?.ftable === tableHandler.name).length === 1
-        )
-      ) {
+      if (!(
+        cols2.filter((c) => c.references?.[0]?.ftable === fileTable).length === 1 &&
+        cols2.filter((c) => c.references?.[0]?.ftable === tableHandler.name).length === 1
+      )) {
         console.log({
           tbl1,
           tbl2,

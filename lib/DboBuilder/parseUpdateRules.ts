@@ -153,6 +153,7 @@ export async function parseUpdateRules(
             removeDisallowedFields: false,
             tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
             tableHandler: this,
+            columnsAddedFromBeforeHooks: [],
           });
           let updateValidate: ValidateRowBasic | undefined;
           if (validate) {

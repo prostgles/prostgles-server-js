@@ -5,9 +5,13 @@ import type { LocalParams } from "../../DboBuilder";
 import type { TableHandler } from "../TableHandler";
 import { getReferenceColumnInserts } from "./getReferenceColumnInserts";
 import { insertRowWithNestedRecords } from "./insertRowWithNestedRecords";
+import { isArray } from "../../../utils/utils";
+import type { InsertedRowWithInfo } from "./insert";
+
+type MaybeArray<T> = T | T[];
 
 type InsertNestedRecordsArgs = {
-  data: AnyObject | AnyObject[];
+  data: MaybeArray<InsertedRowWithInfo>;
   insertParams?: InsertParams;
   tableRules: ParsedTableRule | undefined;
   localParams: LocalParams | undefined;
@@ -19,10 +23,7 @@ type InsertNestedRecordsArgs = {
 export async function insertNestedRecords(
   this: TableHandler,
   { data, insertParams, tableRules, localParams }: InsertNestedRecordsArgs,
-): Promise<{
-  data?: AnyObject | AnyObject[];
-  insertResult?: AnyObject | AnyObject[];
-}> {
+) {
   const MEDIA_COL_NAMES = ["data", "name"];
 
   const getExtraKeys = (row: AnyObject) =>
@@ -36,7 +37,7 @@ export async function insertNestedRecords(
           !Array.isArray(row[fieldName]) &&
           row[fieldName] !== undefined
         ) {
-          throw new Error("Invalid/Dissalowed field in data: " + fieldName);
+          throw new Error("Invalid/Disallowed field in data: " + fieldName);
         } else if (!this.dboBuilder.dbo[fieldName]) {
           return false;
         }
@@ -53,13 +54,14 @@ export async function insertNestedRecords(
    * If true then will do the full insert within this function
    * Nested insert is not allowed for the file table
    * */
-  const isMultiInsert = Array.isArray(data);
-  const insertedRows = (isMultiInsert ? data : [data]) as AnyObject[];
-  const insertedRowsWithNestedData = insertedRows.map((row) => {
+  const isMultiInsert = isArray(data);
+  const insertedRows = isMultiInsert ? data : [data];
+  const insertedRowsWithNestedData = insertedRows.map((rowWithInfo) => {
+    const row = { ...rowWithInfo.row };
     const extraKeys = this.is_media ? [] : getExtraKeys(row);
     const colInserts = this.is_media ? [] : getReferenceColumnInserts(this, row);
     return {
-      row,
+      ...rowWithInfo,
       hasNestedData: !!(extraKeys.length || colInserts.length),
       extraKeys,
       colInserts,
@@ -67,29 +69,35 @@ export async function insertNestedRecords(
   });
   const hasNestedInserts = insertedRowsWithNestedData.some((d) => d.hasNestedData);
 
+  const rowOrRows =
+    isMultiInsert ?
+      insertedRowsWithNestedData.map((d) => d.row)
+    : insertedRowsWithNestedData[0]!.row;
   /**
    * Make sure nested insert uses a transaction
    */
-  const { dbTX, t } = this.getTransaction(localParams) ?? {};
-  if (hasNestedInserts && (!dbTX || !t)) {
+  const transaction = this.getTransaction(localParams);
+  if (hasNestedInserts && !transaction) {
     return {
-      insertResult: await this.dboBuilder.getTX((dbTX, _t) =>
-        (dbTX[this.name] as TableHandler).insert(data, insertParams, undefined, tableRules, {
+      type: "nestedInserts" as const,
+      insertResult: (await this.dboBuilder.getTX((dbTX, _t) =>
+        (dbTX[this.name] as TableHandler).insert(rowOrRows, insertParams, undefined, tableRules, {
           tx: { dbTX, t: _t },
           ...localParams,
         }),
-      ),
+      )) as MaybeArray<AnyObject>,
     };
   }
+  const { dbTX } = transaction ?? {};
   const { onConflict } = insertParams || {};
   const rootOnConflict = isObject(onConflict) ? onConflict.action : onConflict;
 
-  const _data: (AnyObject | undefined)[] = [];
-  for (const { row, colInserts, extraKeys } of insertedRowsWithNestedData) {
-    if (hasNestedInserts) {
-      if (!dbTX) {
-        throw new Error("dbTX missing for nested insert");
-      }
+  if (hasNestedInserts) {
+    if (!dbTX) {
+      throw new Error("dbTX missing for nested insert");
+    }
+    const insertResult: (AnyObject | undefined)[] = [];
+    for (const { row, colInserts, extraKeys } of insertedRowsWithNestedData) {
       const nestedInsertResult = await insertRowWithNestedRecords.bind(this)(
         {
           row,
@@ -104,14 +112,21 @@ export async function insertNestedRecords(
           insertParams,
         },
       );
-      _data.push(nestedInsertResult);
-    } else {
-      _data.push(row);
+      insertResult.push(nestedInsertResult);
     }
+
+    return {
+      type: "nestedInserts" as const,
+      insertResult: isMultiInsert ? insertResult : insertResult[0],
+    };
   }
 
-  const result = isMultiInsert ? _data : _data[0];
-  const res = hasNestedInserts ? { insertResult: result } : { data: result };
+  const _data = insertedRowsWithNestedData.map(({ row, columnsAddedFromBeforeHooks }) => ({
+    row,
+    columnsAddedFromBeforeHooks,
+  }));
 
-  return res;
+  const result = isMultiInsert ? _data : _data[0];
+
+  return { type: "normal" as const, data: result };
 }

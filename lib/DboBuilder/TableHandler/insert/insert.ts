@@ -1,20 +1,17 @@
 import type { AnyObject, InsertParams } from "prostgles-types";
-import {
-  asName,
-  getJSONBSchemaValidationError,
-  getSerialisableError,
-  isObject,
-} from "prostgles-types";
-import type { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
+import { getJSONBSchemaValidationError, getSerialisableError, isObject } from "prostgles-types";
+import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
+import { isArray } from "../../../utils/utils";
 import type { LocalParams } from "../../DboBuilder";
 import { getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
-import { prepareNewData } from "../DataValidator";
+import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
+import { getInsertQuery } from "./getInsertQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
-import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
-import { isArray } from "../../../utils/utils";
+
+export type InsertedRowWithInfo = { row: AnyObject; columnsAddedFromBeforeHooks: string[] };
 
 export async function insert(
   this: TableHandler,
@@ -27,13 +24,11 @@ export async function insert(
   const ACTION = "insert";
   const start = Date.now();
   try {
-    const { removeDisallowedFields = false } = insertParams ?? {};
     const { nestedInsert } = localParams ?? {};
 
     const rule = tableRules?.[ACTION];
-    const { validate, allowedNestedInserts, requiredNestedInserts } = rule ?? {};
+    const { allowedNestedInserts, requiredNestedInserts, validate } = rule ?? {};
 
-    const finalDBtx = this.getTransaction(localParams);
     /** Post validate and checkFilter require a transaction dbo handler because they need the action result */
     if (
       this.shouldWrapInTx(
@@ -96,7 +91,7 @@ export async function insert(
     const tx = transaction?.t || this.db;
 
     const successCallbacks: (() => void)[] = [];
-    const preValidatedRows = await Promise.all(
+    const preValidatedRows: InsertedRowWithInfo[] = await Promise.all(
       rows.map(async (nonValidated) => {
         const { preValidate, validate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
@@ -131,7 +126,7 @@ export async function insert(
           });
         }
 
-        return row;
+        return { row, columnsAddedFromBeforeHooks: beforeResult.columnsAdded };
       }),
     );
     const preValidatedRowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
@@ -146,103 +141,35 @@ export async function insert(
       tableRules,
       localParams,
     });
-    const { data, insertResult } = mediaOrNestedInsert;
-    if ("insertResult" in mediaOrNestedInsert) {
-      return insertResult;
+    if (mediaOrNestedInsert.type === "nestedInserts") {
+      return mediaOrNestedInsert.insertResult;
     }
-
-    const getInsertQuery = async (_rows: AnyObject[]) => {
-      const validatedData = _rows.map((_row) => {
-        const row = { ..._row };
-
-        if (!isObject(row)) {
-          throw (
-            "\nInvalid insert data provided. Expected an object but received: " +
-            JSON.stringify(row)
-          );
-        }
-
-        const { data: validatedRow, allowedCols } = prepareNewData({
-          row,
-          forcedData,
-          allowedFields: fields,
-          tableRules,
-          removeDisallowedFields,
-          tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
-          tableHandler: this,
-        });
-        return { validatedRow, allowedCols };
-      });
-
-      const validatedRows = validatedData.map((d) => d.validatedRow);
-      const allowedCols = Array.from(new Set(validatedData.flatMap((d) => d.allowedCols)));
-      const dbTx = finalDBtx?.dbTX || this.dboBuilder.dbo;
-      const validationOptions = {
-        validate: validate as ValidateRowBasic,
-        localParams,
-      };
-
-      const query = (
-        await this.dataValidator.parse({
-          command: "insert",
-          rows: validatedRows,
-          allowedCols,
-          dbTx,
-          validationOptions,
-          tx,
-        })
-      ).getQuery();
-      const { onConflict } = insertParams ?? {};
-      let conflict_query = "";
-      if (onConflict) {
-        const onConflictAction = typeof onConflict === "string" ? onConflict : onConflict.action;
-        const onConflictColumns =
-          typeof onConflict === "string" ? undefined : onConflict.conflictColumns;
-        if (onConflictAction === "DoNothing") {
-          conflict_query = " ON CONFLICT DO NOTHING ";
-        } else {
-          const firstRowKeys = Object.keys(validatedData[0]?.validatedRow ?? {});
-          const pkeyNames = this.columns.filter((c) => c.is_pkey).map((c) => c.name);
-          const conflictColumns =
-            onConflictColumns ??
-            this.tableOrViewInfo.uniqueColumnGroups?.find((colGroup) => {
-              if (!firstRowKeys.length)
-                throw "Cannot determine conflict columns for onConflict DoUpdate";
-              return colGroup.some((col) => {
-                return firstRowKeys.includes(col);
-              });
-            }) ??
-            pkeyNames;
-
-          /**
-           * Table might have multiple constraint types in which case it is mandatory to specify the conflict columns.
-           * */
-          if (!conflictColumns.length) {
-            throw "Cannot on conflict DoUpdate. No conflict columns could be determined. Please specify conflictColumns in onConflict param.";
-          }
-
-          const nonConflictColumns = allowedCols
-            .filter((c) => !conflictColumns.includes(c))
-            .map((v) => asName(v));
-
-          if (nonConflictColumns.length === 0) {
-            throw "No non conflict columns to update for onConflict=DoUpdate";
-          }
-          conflict_query = ` ON CONFLICT (${conflictColumns.join(", ")}) DO UPDATE SET ${nonConflictColumns.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`;
-        }
-      }
-      return query + conflict_query;
-    };
+    const { data } = mediaOrNestedInsert;
 
     let query = "";
-    if (Array.isArray(data)) {
+    const commonArgs = {
+      fields,
+      forcedData,
+      tableHandler: this,
+      insertParams,
+      localParams,
+      tableRules,
+      validate,
+    };
+    if (isArray(data)) {
       if (!data.length) {
         throw "Empty insert. Provide data";
       }
 
-      query = await getInsertQuery(data);
+      query = await getInsertQuery({
+        ...commonArgs,
+        rows: data,
+      });
     } else {
-      query = await getInsertQuery([data ?? {}]);
+      query = await getInsertQuery({
+        ...commonArgs,
+        rows: [data],
+      });
     }
 
     const queryWithoutUserRLS = query;
@@ -270,7 +197,10 @@ export async function insert(
       queryWithoutUserRLS,
       tableHandler: this,
       returningFields,
-      data: preValidatedRowOrRows,
+      data:
+        isArray(preValidatedRowOrRows) ?
+          preValidatedRowOrRows.map((d) => d.row)
+        : preValidatedRowOrRows.row,
       fields,
       params: insertParams,
       command: "insert",

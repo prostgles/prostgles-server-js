@@ -337,13 +337,12 @@ export class ViewHandler {
 /**
  * Throw error if illegal keys found in object
  */
-export const validateObj = <T extends Record<string, any>>(obj: T, allowedKeys: string[]): T => {
-  if (Object.keys(obj).length) {
-    const invalid_keys = Object.keys(obj).filter((k) => !allowedKeys.includes(k));
-    if (invalid_keys.length) {
-      throw "Invalid/Illegal fields found: " + invalid_keys.join(", ");
+export const validateKeys = <T extends Record<string, any>>(obj: T, allowedKeys: string[]) => {
+  const keys = Object.keys(obj);
+  if (keys.length) {
+    const invalidKeys = keys.filter((k) => !allowedKeys.includes(k));
+    if (invalidKeys.length) {
+      throw "Invalid/Illegal fields found: " + invalidKeys.join(", ");
     }
   }
-
-  return obj;
 };

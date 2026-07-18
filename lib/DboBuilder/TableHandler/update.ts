@@ -87,6 +87,7 @@ export async function update(
       removeDisallowedFields,
       tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
       tableHandler: this,
+      columnsAddedFromBeforeHooks: beforeResult.columnsAdded,
     });
 
     const updateFilter = await this.prepareWhere({

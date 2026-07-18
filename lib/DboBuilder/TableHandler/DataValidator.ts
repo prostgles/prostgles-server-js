@@ -6,7 +6,7 @@ import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import type { LocalParams, TableSchemaColumn } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
-import { validateObj } from "../ViewHandler/ViewHandler";
+import { validateKeys } from "../ViewHandler/ViewHandler";
 import type { TableHandler, ValidatedParams } from "./TableHandler";
 
 type RowFieldDataPlain = {
@@ -102,6 +102,7 @@ type PrepareFieldValuesArgs = {
   row: AnyObject | undefined;
   forcedData: AnyObject | undefined;
   allowedCols: FieldFilter | undefined;
+  columnsAddedFromBeforeHooks: string[];
   removeDisallowedFields?: boolean;
   tableHandler: TableHandler;
 };
@@ -120,12 +121,14 @@ const getValidatedRow = ({
   allowedCols,
   removeDisallowedFields = false,
   tableHandler,
+  columnsAddedFromBeforeHooks,
 }: PrepareFieldValuesArgs): AnyObject => {
   const column_names = tableHandler.column_names.slice(0);
   if (!column_names.length) {
-    throw "table column_names mising";
+    throw "column_names is empty. Cannot validate row";
   }
-  const validatedAllowedColumns = tableHandler.parseFieldFilter(allowedCols, false);
+  const allowedColumns = tableHandler.parseFieldFilter(allowedCols, false);
+  const validatedAllowedColumns = [...new Set([...allowedColumns, ...columnsAddedFromBeforeHooks])];
 
   let finalRow = { ...row };
   if (removeDisallowedFields && !isEmpty(finalRow)) {
@@ -133,7 +136,7 @@ const getValidatedRow = ({
   }
 
   /* If has keys check against allowed_cols */
-  validateObj(finalRow, validatedAllowedColumns);
+  validateKeys(finalRow, validatedAllowedColumns);
 
   /** Apply forcedData */
   if (!isEmpty(forcedData)) {
@@ -141,7 +144,7 @@ const getValidatedRow = ({
   }
 
   /** Validate forcedData */
-  validateObj(finalRow, column_names.slice(0));
+  validateKeys(finalRow, column_names.slice(0));
   return finalRow;
 };
 
@@ -154,10 +157,10 @@ export const prepareNewData = ({
   row,
   forcedData,
   allowedFields,
-  tableRules,
   removeDisallowedFields = false,
   tableConfigurator,
   tableHandler,
+  columnsAddedFromBeforeHooks,
 }: ValidatedParams) => {
   const synced_field = tableHandler.config?.syncConfig?.synced_field;
 
@@ -172,6 +175,7 @@ export const prepareNewData = ({
     forcedData,
     allowedCols: allowedFields,
     removeDisallowedFields,
+    columnsAddedFromBeforeHooks,
   });
   const dataKeys = getKeys(data);
 
