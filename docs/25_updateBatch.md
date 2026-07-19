@@ -1,4 +1,4 @@
-## updateBatch<span style="opacity: 0.6;">(data: [FullFilter<T, S>, Partial<UpsertDataToPGCast<T>>][], params?: SelectParams): Promise&lt;void | UpdateReturnType&lt;P, T, S&gt;&gt;</span>
+## updateBatch<span style="opacity: 0.6;">(data: [FullFilter<T, S>, Partial<UpsertDataToPGCast<T>>][], params?: SelectParams): Promise&lt;null&gt;</span>
 Updates multiple records in the table in a batch operation.
 - Each item in the `data` array contains a filter and the corresponding data to update.
 #### Parameters
@@ -42,4 +42,4 @@ Updates multiple records in the table in a batch operation.
 
       Filter applied after any aggregations (group by)
 #### Return type
-#### <span style="color: green;">void | UpdateReturnType&lt;P, T, S&gt;</span>
+#### <span style="color: green;">null</span>

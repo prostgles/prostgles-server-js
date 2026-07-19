@@ -210,6 +210,18 @@ export const isomorphicQueries = async (
       await sql("TRUNCATE files CASCADE");
     });
 
+    await test("Test bytea", async () => {
+      await db.bytea_test.delete!();
+
+      const value = new Uint8Array([0, 1, 127, 255]).buffer;
+      const inserted = await db.bytea_test.insert!({ value }, { returning: "*" });
+      const newRow = await db.bytea_test.findOne!();
+
+      // TODO: do not use cte and json in runInsertUpdateQuery.ts because it will convert the buffer to string
+      // assert.deepStrictEqual(new Uint8Array(inserted!.value), new Uint8Array(value));
+      assert.deepStrictEqual(new Uint8Array(newRow!.value), new Uint8Array(value));
+    });
+
     await test("Subscription tracked_columns get merged correctly", async () => {
       if (!isServer) {
         // Client forbids name select

@@ -55,6 +55,7 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
     tr1: "*",
     tr2: "*",
     tr3: "*",
+    bytea_test: "*",
     planes: {
       select: sid === "client_only" ? { fields: { last_updated: false } } : "*",
       update: "*",

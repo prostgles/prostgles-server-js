@@ -221,4 +221,10 @@ CREATE TABLE IF NOT EXISTS trades (
   price NUMERIC NOT NULL
 ); 
 
+DROP TABLE IF EXISTS bytea_test CASCADE;
+CREATE TABLE IF NOT EXISTS bytea_test(
+	id serial primary key, 
+	value bytea
+)
+
 -- DROP TABLE media CASCADE;

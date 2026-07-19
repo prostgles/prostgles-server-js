@@ -217,8 +217,8 @@ const getValidatedRowFieldData = async (
     throw "allowedColumns cannot be empty";
   }
   const rowFieldData = await Promise.all(
-    rows.map(async (nonvalidatedRow) => {
-      let row = pickKeys(nonvalidatedRow, allowedCols);
+    rows.map(async (nonValidatedRow) => {
+      let row = pickKeys(nonValidatedRow, allowedCols);
       const initialRowKeys = Object.keys(row);
       if (validationOptions.validate) {
         if (!validationOptions.localParams) {
@@ -239,7 +239,7 @@ const getValidatedRowFieldData = async (
 
       const getColumn = (fieldName: string) => {
         if (!allowedCols.concat(keysAddedDuringValidate).includes(fieldName)) {
-          throw `Unexpected/Dissallowed column name: ${fieldName}`;
+          throw `Unexpected/Disallowed column name: ${fieldName}`;
         }
         const column = tableHandler.columns.find((c) => c.name === fieldName);
         if (!column) {
@@ -260,10 +260,10 @@ const getValidatedRowFieldData = async (
           //   } satisfies RowFieldData;
           // }
 
-          const [firstKey, ...otherkeys] = Object.keys(fieldValue);
+          const [firstKey, ...remainingKeys] = Object.keys(fieldValue);
           const func =
-            firstKey && !otherkeys.length ?
-              convertionFuncs.some((f) => `$${f.name}` === firstKey)
+            firstKey && !remainingKeys.length ?
+              conversionFunctions.some((f) => `$${f.name}` === firstKey)
             : undefined;
           if (func) {
             const { funcName, args } = parseFunctionObject(fieldValue);
@@ -328,9 +328,9 @@ const getValidatedRowFieldData = async (
 // };
 
 const getParsedRowFieldDataFunction = (rowPart: RowFieldDataFunction, args: ParseDataArgs) => {
-  const func = convertionFuncs.find((f) => `$${f.name}` === rowPart.funcName);
+  const func = conversionFunctions.find((f) => `$${f.name}` === rowPart.funcName);
   if (!func) {
-    throw `Unknown function: ${rowPart.funcName}. Expecting one of: ${convertionFuncs.map((f) => f.name).join(", ")}`;
+    throw `Unknown function: ${rowPart.funcName}. Expecting one of: ${conversionFunctions.map((f) => f.name).join(", ")}`;
   }
   if (func.onlyAllowedFor && func.onlyAllowedFor !== args.command) {
     throw `Function ${rowPart.funcName} is only allowed for ${func.onlyAllowedFor} but not ${args.command}`;
@@ -345,9 +345,14 @@ const getParsedRowFieldData = (rowFieldData: RowFieldData[][], args: ParseDataAr
       if (rowPart.type === "function") {
         escapedVal = getParsedRowFieldDataFunction(rowPart, args);
       } else {
-        /** Prevent pg-promise formatting jsonb */
-        const colIsJSON = ["json", "jsonb"].includes(rowPart.column.data_type);
-        escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [rowPart.fieldValue]);
+        /** Convert ArrayBuffer to node Buffer */
+        if (rowPart.column.udt_name === "bytea" && rowPart.fieldValue instanceof ArrayBuffer) {
+          escapedVal = pgp.as.format("$1", [Buffer.from(rowPart.fieldValue)]);
+        } else {
+          /** Prevent pg-promise formatting jsonb */
+          const colIsJSON = ["json", "jsonb"].includes(rowPart.column.data_type);
+          escapedVal = pgp.as.format(colIsJSON ? "$1:json" : "$1", [rowPart.fieldValue]);
+        }
       }
 
       /**
@@ -365,14 +370,14 @@ const getParsedRowFieldData = (rowFieldData: RowFieldData[][], args: ParseDataAr
   return parsedRowFieldData;
 };
 
-type ConvertionFunc = {
+type ConversionFunction = {
   name: string;
   description?: string;
   onlyAllowedFor?: "insert" | "update";
   getQuery: (fieldPart: RowFieldDataFunction) => string;
 };
 
-const convertionFuncs: ConvertionFunc[] = [
+const conversionFunctions: ConversionFunction[] = [
   ...[
     "ST_GeomFromText",
     "ST_Point",
@@ -389,7 +394,7 @@ const convertionFuncs: ConvertionFunc[] = [
           const argList = args.map((arg) => asValue(arg)).join(", ");
           return `${name}(${argList})`;
         },
-      }) satisfies ConvertionFunc,
+      }) satisfies ConversionFunction,
   ),
   {
     name: "to_timestamp",

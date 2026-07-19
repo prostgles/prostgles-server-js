@@ -52,6 +52,13 @@ export type DBGeneratedSchema = {
     };
     
   };
+  bytea_test: {
+    columns: {
+      id?: number;
+      value?: null | ArrayBuffer;
+    };
+    
+  };
   ex_j_ins: {
     columns: {
       added?: null | string;
