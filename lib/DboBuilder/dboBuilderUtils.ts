@@ -176,6 +176,8 @@ export const getCanExecute = async (db: DB) => {
   return false;
 };
 
+export const QUERY_ID_PREFIX = "-- prostgles query id: ";
+
 export const withUserRLS = (localParams: LocalParams | undefined, query: string) => {
   const user = localParams?.isRemoteRequest?.user;
   const queryPrefix = `SET SESSION "prostgles.user" \nTO`;
@@ -184,5 +186,6 @@ export const withUserRLS = (localParams: LocalParams | undefined, query: string)
     firstQuery = pgp.as.format(`${queryPrefix} \${user};`, { user });
   }
 
-  return [firstQuery, query].join("\n");
+  const queryId = crypto.randomUUID();
+  return [QUERY_ID_PREFIX + queryId, firstQuery, query].filter(Boolean).join("\n");
 };

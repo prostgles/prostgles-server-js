@@ -126,7 +126,7 @@ export type DBGeneratedSchema = {
       id?: number;
       name?: null | string;
     };
-    referencedBy: {"items2":["items_id"],"items4a":["items_id"],"items_multi":["items0_id","items1_id","items2_id","items3_id"]};
+    referencedBy: {"items2":["items_id"],"items4a":["items_id"],"items_multi":["items0_id","items1_id","items2_id","items3_id"],"slow_items":["id"],"very_slow_items":["id"]};
   };
   items_multi: {
     columns: {
@@ -267,6 +267,14 @@ export type DBGeneratedSchema = {
     };
     
   };
+  slow_items: {
+    columns: {
+      h?: null | string[];
+      id?: null | number;
+      name?: null | string;
+    };
+    
+  };
   spatial_ref_sys: {
     columns: {
       auth_name?: null | string;
@@ -389,6 +397,14 @@ export type DBGeneratedSchema = {
       jsn?: null | any;
       name?: null | string;
       tsv?: null | string;
+    };
+    
+  };
+  very_slow_items: {
+    columns: {
+      h?: null | string[];
+      id?: null | number;
+      name?: null | string;
     };
     
   };

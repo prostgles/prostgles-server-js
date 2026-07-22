@@ -13,19 +13,23 @@ import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import type { ViewHandler } from "./ViewHandler";
 
+export type Param3 = {
+  abortSignalId?: string;
+};
+
 export const find = async function (
   this: ViewHandler,
-  filter?: Filter,
+  filter: Filter = {},
   selectParams?: SelectParams,
-  _?: undefined,
+  param3?: Param3,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
 ): Promise<any[]> {
   const start = Date.now();
-  const command =
-    selectParams?.limit === 1 && selectParams.returnType === "row" ? "findOne" : "find";
+  const { limit, returnType, abortSignal } = selectParams ?? {};
+
+  const command = limit === 1 && returnType === "row" ? "findOne" : "find";
   try {
-    filter = filter || {};
     const allowedReturnTypes = Object.keys({
       row: 1,
       statement: 1,
@@ -52,6 +56,7 @@ export const find = async function (
         returnType: 1,
         groupBy: 1,
         having: 1,
+        abortSignal: 1,
       } satisfies Record<keyof SelectParams, 1>);
 
       const invalidParams = Object.keys(selectParams).filter((k) => !validParamNames.includes(k));
@@ -96,7 +101,7 @@ export const find = async function (
       this,
       filter,
       selectParamsLimitCheck,
-      _,
+      undefined,
       tableRules,
       localParams,
     );
@@ -109,6 +114,7 @@ export const find = async function (
     );
 
     const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
+
     const queryToReturn = await getReturnTypeQuery({
       handler: this,
       localParams,
@@ -123,7 +129,10 @@ export const find = async function (
 
     const query = queryWithRLS;
     const isOneOrNone = returnType === "row" || returnType === "value";
-    const dbHandler = this.getTransaction(localParams)?.t ?? this.db;
+    const dbHandler = this.getDbHandlerWithAbort(localParams, {
+      abortSignal,
+      abortSignalId: param3?.abortSignalId,
+    });
     const queryPromise =
       isOneOrNone ?
         dbHandler.oneOrNone<AnyObject>(query).then((data) => (data ? [data] : []))

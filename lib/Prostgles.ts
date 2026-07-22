@@ -60,6 +60,7 @@ const DEFAULT_KEYWORDS = {
 import { randomUUID } from "crypto";
 import * as fs from "fs";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
+import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 
 export class Prostgles {
   /**
@@ -81,6 +82,7 @@ export class Prostgles {
   };
 
   db?: DB;
+  adminClient?: Awaited<ReturnType<typeof getAdminClient>>;
   pgp?: PGP;
   dbo?: DBHandlerServer;
   _dboBuilder?: DboBuilder;
@@ -173,8 +175,9 @@ export class Prostgles {
       !this.db ||
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       !this.db.connect
-    )
+    ) {
       throw "something went wrong getting a db connection";
+    }
   }
 
   getTSFileName() {

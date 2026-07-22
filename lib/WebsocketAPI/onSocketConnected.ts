@@ -32,20 +32,28 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
     };
 
     socket.on("disconnect", () => {
-      this.dbEventsManager?.removeNotice(socket);
-      this.dbEventsManager?.removeNotify(undefined, socket);
-      this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
-      this.dboBuilder.queryStreamer.onDisconnect(socket.id);
       void this.opts.onLog?.({
         type: "disconnect",
         sid: this.authHandler.getValidatedSid({ socket }),
         socketId: socket.id,
         connectedSocketIds: this.connectedSockets.map((s) => s.id),
       });
-
-      if (this.opts.onSocketDisconnect) {
-        void this.opts.onSocketDisconnect({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
+      this.dbEventsManager?.removeNotice(socket);
+      this.dbEventsManager?.removeNotify(undefined, socket);
+      this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
+      this.dboBuilder.queryStreamer.onDisconnect(socket.id);
+      const sid = this.authHandler.getSIDNoError({ socket });
+      if (sid) {
+        this.dboBuilder.dboMap.forEach((tableHandler) => {
+          tableHandler.activeQueries.forEach((activeQuery) => {
+            if (activeQuery.sid === sid) {
+              activeQuery.abort();
+            }
+          });
+        });
       }
+
+      void this.opts.onSocketDisconnect?.({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
     });
 
     await this.opts.onLog?.({

@@ -20,7 +20,7 @@ import type {
   TableSchema,
   TxCB,
 } from "./DboBuilderTypes";
-import { QueryStreamer } from "./QueryStreamer";
+import { QueryStreamer } from "./runSql/QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import type { JoinPaths } from "./ViewHandler/ViewHandler";
 import { parseJoinPath } from "./ViewHandler/parseJoinPath";
@@ -69,18 +69,27 @@ export class DboBuilder {
 
   queryStreamer: QueryStreamer;
 
+  private constructor(prostgles: Prostgles) {
+    this.prostgles = prostgles;
+    if (!this.prostgles.db) throw "db missing";
+    this.db = this.prostgles.db;
+    this.dbo = {};
+    this.dboMap = new Map();
+    this.queryStreamer = new QueryStreamer(this);
+  }
+
+  private init = async () => {
+    await this.build();
+    /* If watchSchema is enabled then PubSubManager must be created (if possible) because it creates the event trigger */
+    if (this.prostgles.schemaWatch?.type.watchType === "DDL_trigger") {
+      await this.getPubSubManager();
+    }
+
+    return this;
+  };
+
   get tables(): TableSchema[] {
     return this.tablesOrViews ?? [];
-    // .map(({ name, columns }) => {
-    //   const info = this.dboMap.get(name)?.tableOrViewInfo;
-    //   if (!info) return undefined;
-    //   return {
-    //     name,
-    //     info,
-    //     columns,
-    //   } satisfies DbTableInfo;
-    // })
-    // .filter(isDefined);
   }
 
   getDetailedFieldInfo = async (fields: pg.IColumn[]) => {
@@ -130,32 +139,12 @@ export class DboBuilder {
 
   onSchemaChange?: (event: { command: string; query: string }) => void;
 
-  private constructor(prostgles: Prostgles) {
-    this.prostgles = prostgles;
-    if (!this.prostgles.db) throw "db missing";
-    this.db = this.prostgles.db;
-    this.dbo = {};
-    this.dboMap = new Map();
-    this.queryStreamer = new QueryStreamer(this);
-  }
-
-  private init = async () => {
-    await this.build();
-    /* If watchSchema is enabled then PubSubManager must be created (if possible) because it creates the event trigger */
-    if (this.prostgles.schemaWatch?.type.watchType === "DDL_trigger") {
-      await this.getPubSubManager();
-    }
-
-    return this;
-  };
-
   public static create = async (prostgles: Prostgles): Promise<DboBuilder> => {
     const res = new DboBuilder(prostgles);
     return await res.init();
   };
 
   destroy = async () => {
-    await this.queryStreamer.destroy().catch(console.error);
     return this._pubSubManager?.destroy();
   };
 

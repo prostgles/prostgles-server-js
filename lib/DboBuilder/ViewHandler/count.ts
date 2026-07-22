@@ -8,12 +8,13 @@ import {
 } from "../dboBuilderUtils";
 import type { ViewHandler } from "./ViewHandler";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
+import type { Param3 } from "./find";
 
 export async function count(
   this: ViewHandler,
   _filter?: Filter,
   selectParams?: SelectParams,
-  _param3_unused?: undefined,
+  param3?: Param3,
   table_rules?: ParsedTableRule,
   localParams?: LocalParams,
 ): Promise<number> {
@@ -54,7 +55,10 @@ export async function count(
         return queryToReturn as unknown[];
       }
 
-      const handler = this.tx?.t ?? this.db;
+      const handler = this.getDbHandlerWithAbort(localParams, {
+        abortSignal: selectParams?.abortSignal,
+        abortSignalId: param3?.abortSignalId,
+      });
       return handler.one(queryWithRLS).then(({ count }) => +count);
     });
 

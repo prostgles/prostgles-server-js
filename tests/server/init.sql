@@ -225,6 +225,19 @@ DROP TABLE IF EXISTS bytea_test CASCADE;
 CREATE TABLE IF NOT EXISTS bytea_test(
 	id serial primary key, 
 	value bytea
-)
+);
+
+DROP VIEW IF EXISTS slow_items;
+CREATE VIEW slow_items AS
+SELECT i.*
+FROM items i
+CROSS JOIN LATERAL pg_sleep(5);
+
+
+DROP VIEW IF EXISTS very_slow_items;
+CREATE VIEW very_slow_items AS
+SELECT i.*
+FROM items i
+CROSS JOIN LATERAL pg_sleep(15);
 
 -- DROP TABLE media CASCADE;

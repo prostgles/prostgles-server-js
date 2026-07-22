@@ -8,11 +8,12 @@ import {
 } from "../dboBuilderUtils";
 import type { ViewHandler } from "./ViewHandler";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
+import type { Param3 } from "./find";
 export async function size(
   this: ViewHandler,
   _filter?: Filter,
   selectParams?: SelectParams,
-  param3_unused?: undefined,
+  param3?: Param3,
   table_rules?: ParsedTableRule,
   localParams?: LocalParams,
 ): Promise<string> {
@@ -22,7 +23,7 @@ export async function size(
     const result = await this.find(
       filter,
       { ...selectParams, limit: 2 },
-      undefined,
+      param3,
       table_rules,
       localParams,
     ).then(async (_allowed) => {
@@ -57,9 +58,11 @@ export async function size(
         return queryToReturn as unknown[];
       }
 
-      return (this.tx?.t || this.db)
-        .one<{ size: string | null }>(queryWithRLS)
-        .then(({ size }) => size || "0");
+      const handler = this.getDbHandlerWithAbort(localParams, {
+        abortSignal: selectParams?.abortSignal,
+        abortSignalId: param3?.abortSignalId,
+      });
+      return handler.one<{ size: string | null }>(queryWithRLS).then(({ size }) => size || "0");
     });
     await this._log({
       command: "size",

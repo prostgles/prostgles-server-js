@@ -16,6 +16,7 @@ import { runSQLFile } from "./TableConfig/runSQLFile";
 import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
 import { sleep } from "./utils/utils";
 import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
+import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 
 /**
  * Database connection details
@@ -158,6 +159,8 @@ export const initProstgles = async function (
         }
       },
     });
+
+    this.adminClient = await getAdminClient(db);
 
     /** Drop stale triggers */
     await db

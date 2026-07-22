@@ -1,5 +1,6 @@
 import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
+  ABORTABLE_METHODS,
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationError,
   getKeys,
@@ -31,13 +32,16 @@ const TABLE_METHODS = {
   getInfo: 1,
   sync: 1,
   insertMany: 1,
-} as const satisfies Record<keyof (TableHandler & Pick<TableHandlerServer, "sync">), 1>;
+  abort: 1,
+} as const satisfies Record<keyof (TableHandler & Pick<TableHandlerServer, "sync">), 1> &
+  Record<"abort", 1>;
 
 const TABLE_METHODS_KEYS = getKeys(TABLE_METHODS);
 const SOCKET_ONLY_COMMANDS = [
   "subscribe",
   "subscribeOne",
   "sync",
+  "abort",
 ] as const satisfies typeof TABLE_METHODS_KEYS;
 
 type Args = {
@@ -73,7 +77,15 @@ export const runClientRequest = async function (
       command: { enum: TABLE_METHODS_KEYS },
       param1: { type: "any", optional: true },
       param2: { type: "any", optional: true },
-      param3: { type: "any", optional: true },
+      param3: {
+        type: {
+          abortSignalId: { type: "string", optional: true },
+          returning: { type: "any", optional: true },
+          returnQuery: { type: "boolean", optional: true },
+          returnType: { type: "string", optional: true },
+        },
+        optional: true,
+      },
     },
     nonValidatedArgs,
     "tableName",
@@ -105,12 +117,6 @@ export const runClientRequest = async function (
     clientInfo,
     scope,
   );
-  this.publishParser.validateRequestRule({ tableName, command, clientReq }, parsedTableRule, scope);
-
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!parsedTableRule) {
-    throw `Invalid OR disallowed request: ${tableName}.${command} `;
-  }
 
   const sessionUser: UserLike | undefined =
     !clientInfo.user ? undefined : (
@@ -129,6 +135,40 @@ export const runClientRequest = async function (
     isRemoteRequest: { user: sessionUser },
     scope,
   };
+
+  if (command === "abort") {
+    const validation = getJSONBObjectSchemaValidationError(
+      {
+        tableName: { type: "string" },
+        command: { enum: ["abort"] },
+        param1: {
+          type: { command: { enum: ABORTABLE_METHODS }, abortSignalId: "string" },
+        },
+      },
+      nonValidatedArgs,
+      "tableName",
+      undefined,
+      { allowExtraProperties: true },
+    );
+    if (validation.error !== undefined) {
+      throw validation.error;
+    }
+
+    this.publishParser.validateRequestRule(
+      { tableName, command: validation.data.param1.command, clientReq },
+      parsedTableRule,
+      scope,
+    );
+
+    return tableHandler.abortRemoteQuery(validation.data.param1.abortSignalId, localParams);
+  } else {
+    this.publishParser.validateRequestRule(
+      { tableName, command, clientReq },
+      parsedTableRule,
+      scope,
+    );
+  }
+
   if (param3 && (param3 as LocalParams).returnQuery) {
     const isAllowed = await canRunSQL(this, clientReq);
     if (isAllowed) {
@@ -142,8 +182,7 @@ export const runClientRequest = async function (
    * satisfies check is used to ensure rules arguments are correctly passed to each method
    */
   tableHandler[command].bind(tableHandler) satisfies
-    | undefined
-    | TableMethodFunctionWithRulesAndLocalParams;
+    undefined | TableMethodFunctionWithRulesAndLocalParams;
 
   return (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
     param1,

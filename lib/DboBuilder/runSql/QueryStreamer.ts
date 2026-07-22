@@ -2,13 +2,14 @@ import * as pg from "pg";
 import type CursorType from "pg-cursor";
 import type { SQLOptions, SocketSQLStreamPacket, SocketSQLStreamServer } from "prostgles-types";
 import { CHANNELS, omitKeys, pickKeys } from "prostgles-types";
-import type { BasicCallback } from "../PubSubManager/PubSubManager";
-import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
-import type { DB } from "../initProstgles";
-import type { DboBuilder } from "./DboBuilder";
-import type { PRGLIOSocket } from "./DboBuilderTypes";
-import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./dboBuilderUtils";
-import { getDetailedFieldInfo } from "./runSql/runSqlUtils";
+import type { BasicCallback } from "../../PubSubManager/PubSubManager";
+import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
+import type { DB } from "../../initProstgles";
+import type { DboBuilder } from "../DboBuilder";
+import type { PRGLIOSocket } from "../DboBuilderTypes";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
+import { getDetailedFieldInfo } from "./runSqlUtils";
+import { getConnectionDetails } from "./getAdminClient";
 const Cursor = require("pg-cursor") as typeof CursorType;
 
 type ClientStreamedRequest = {
@@ -44,36 +45,13 @@ export class QueryStreamer {
   db: DB;
   dboBuilder: DboBuilder;
   socketQueries: Map<string, Map<number, StreamedQuery>> = new Map();
-  adminClient: pg.Client;
   constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
     this.db = dboBuilder.db;
-    const setAdminClient = () => {
-      this.adminClient = this.getConnection(undefined, { keepAlive: true });
-      return this.adminClient.connect();
-    };
-    this.adminClient = this.getConnection(
-      (error) => {
-        if (error.message?.includes("database") && error.message?.includes("does not exist"))
-          return;
-        console.log("Admin client error. Reconnecting...", error);
-        void setAdminClient();
-      },
-      { keepAlive: true },
-    );
-    void this.adminClient.connect();
-  }
-
-  destroy() {
-    return this.adminClient.end().catch((err) => {
-      console.error("Error ending admin client connection", err);
-    });
   }
 
   getConnection = (onError: ((err: any) => void) | undefined, extraOptions?: pg.ClientConfig) => {
-    const connectionInfo =
-      typeof this.db.$cn === "string" ? { connectionString: this.db.$cn } : (this.db.$cn as any);
-    const client = new pg.Client({ ...connectionInfo, ...extraOptions });
+    const client = new pg.Client({ ...getConnectionDetails(this.db), ...extraOptions });
     client.on("error", (err) => {
       onError?.(err);
     });
@@ -272,7 +250,7 @@ export class QueryStreamer {
       }
       try {
         const stopFunction = opts?.terminate ? "pg_terminate_backend" : "pg_cancel_backend";
-        const rows = await this.adminClient.query(
+        const rows = await this.dboBuilder.prostgles.adminClient!.query(
           `SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`,
           [processID],
         );

@@ -160,7 +160,9 @@ export class PublishParser {
     tableRule: ParsedTableRule,
     scope: PermissionScope | undefined,
   ) {
-    if (!command || !tableName) throw "command OR tableName are missing";
+    if (!command || !tableName) {
+      throw "command OR tableName are missing";
+    }
 
     const [rule] =
       getObjectEntries(SQL_COMMAND_TABLE_METHODS).find(([_, methods]) =>

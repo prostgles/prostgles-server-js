@@ -6,6 +6,7 @@ import {
   test,
 } from "node:test";
 import {
+  ABORTABLE_METHODS,
   SubscriptionHandler,
   getSerialisableError,
   innerJoin,
@@ -71,7 +72,7 @@ export const isomorphicQueries = async (
       await sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
     });
 
-    await test("Error structure", async () => {
+    await test("Error structure malformed array literal", async () => {
       const errFind = await db.items.find?.({ h: "a" }).catch((err) => err);
       const errCount = await db.items.count?.({ h: "a" }).catch((err) => err);
       const errSize = await db.items.size?.({ h: "a" }).catch((err) => err);
@@ -220,6 +221,55 @@ export const isomorphicQueries = async (
       // TODO: do not use cte and json in runInsertUpdateQuery.ts because it will convert the buffer to string
       // assert.deepStrictEqual(new Uint8Array(inserted!.value), new Uint8Array(value));
       assert.deepStrictEqual(new Uint8Array(newRow!.value), new Uint8Array(value));
+    });
+
+    await test("abortSignal terminates a running query", async () => {
+      const tableHandler = db.slow_items;
+      const firstStart = Date.now();
+      await tableHandler.find?.();
+      assert(Date.now() - firstStart > 4_000, "slow_items.find should take more than 4 second");
+
+      for (const method of ABORTABLE_METHODS) {
+        const start = Date.now();
+
+        await assert.rejects(tableHandler[method]!({}, { abortSignal: AbortSignal.timeout(100) }));
+
+        assert(
+          Date.now() - start < 2_000,
+          method + " did not abort before the slow query completed",
+        );
+      }
+
+      const abortError = await tableHandler
+        .find?.({}, { abortSignal: AbortSignal.timeout(100) })
+        .catch((err) => err);
+      assert.deepStrictEqual(
+        { message: abortError.message },
+        {
+          message: "terminating connection due to administrator command",
+        },
+        "abortSignal error message is not as expected",
+      );
+    });
+
+    await test("Client queries are aborted no more than after n seconds", async () => {
+      if (isServer) {
+        return;
+      }
+      const tableHandler = db.very_slow_items;
+      const start1 = Date.now();
+      await assert.rejects(tableHandler.find!({}, { abortSignal: AbortSignal.timeout(12_000) }));
+      assert(
+        Date.now() - start1 < 9_000,
+        "very_slow_items.find should abort before the slow query completed",
+      );
+
+      const start2 = Date.now();
+      await assert.rejects(tableHandler.find!());
+      assert(
+        Date.now() - start2 < 9_000,
+        "very_slow_items.find should abort before the slow query completed",
+      );
     });
 
     await test("Subscription tracked_columns get merged correctly", async () => {

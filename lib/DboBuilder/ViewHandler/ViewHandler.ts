@@ -20,7 +20,7 @@ import type { TableSchema } from "../DboBuilderTypes";
 import { getValidatedTableRules } from "../TableRules/getValidatedTableRules";
 import { getColumns } from "../getColumns";
 import { count } from "./count";
-import { find } from "./find";
+import { find, type Param3 } from "./find";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { prepareWhere } from "./prepareWhere";
@@ -30,6 +30,8 @@ import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
 import { escapeTSNames } from "../../utils/utils";
 import type { TableDefinition } from "../../TableConfig/TableConfig";
+import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
+import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
 
 export type JoinPaths = {
   t1: string;
@@ -112,6 +114,28 @@ export class ViewHandler {
     return localParams?.tx || this.tx;
   };
 
+  abortRemoteQuery = (abortSignalId: string, localParams: LocalParams) => {
+    const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError(localParams.clientReq);
+    if (!sid) {
+      throw new Error(
+        "Cannot get SID from client request. Ensure that the client is authenticated before using abortable queries.",
+      );
+    }
+    const abortableQuery = this.activeQueries.get(abortSignalId);
+    if (!abortableQuery || abortableQuery.sid !== sid) {
+      throw new Error(
+        `No active query found with abortSignalId ${abortSignalId}. Ensure that the query was initiated with the correct abortSignalId.`,
+      );
+    }
+    abortableQuery.abort();
+  };
+
+  activeQueries = new Map<
+    string,
+    { abort: VoidFunction; query: string; start: number; sid: string | undefined }
+  >();
+  getDbHandlerWithAbort = getDbHandlerWithAbort.bind(this);
+
   _log = ({
     command,
     data,
@@ -178,7 +202,7 @@ export class ViewHandler {
   async findOne(
     filter?: Filter,
     selectParams?: SelectParams,
-    _param3_unused?: undefined,
+    param3?: Param3,
     table_rules?: ParsedTableRule,
     localParams?: LocalParams,
   ): Promise<any> {
@@ -191,7 +215,7 @@ export class ViewHandler {
       const result = await this.find(
         filter,
         { ...params, limit: 1, returnType: "row" },
-        undefined,
+        param3,
         table_rules,
         localParams,
       );
