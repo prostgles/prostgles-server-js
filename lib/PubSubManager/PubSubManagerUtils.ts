@@ -1,4 +1,4 @@
-import * as pgPromise from "pg-promise";
+import pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
 
 export const NOTIF_TYPE = {

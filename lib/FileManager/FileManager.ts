@@ -329,7 +329,7 @@ export const getFileType = async (
 ): Promise<{ mime: ALLOWED_CONTENT_TYPE; ext: ALLOWED_EXTENSION }> => {
   const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<
     // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-    typeof import("file-type")
+    typeof import("file-type", { with: { "resolution-mode": "import" } })
   >);
 
   const fileNameMime = getFileTypeFromFilename(fileName);

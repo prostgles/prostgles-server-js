@@ -1,4 +1,4 @@
-import * as pgPromise from "pg-promise";
+import pgPromise from "pg-promise";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import type { DB, PGP } from "./initProstgles";
 import type pg from "pg-promise/typescript/pg-subset";
@@ -15,8 +15,7 @@ export const getDbConnection = function ({
   onNotice,
 }: GetDbConnectionArgs): { db: DB; pgp: PGP } {
   const onQueryOrError:
-    | undefined
-    | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
+    undefined | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
     !onQuery && !DEBUG_MODE ?
       undefined
     : (error, ctx) => {
@@ -48,7 +47,7 @@ export const getDbConnection = function ({
           client.on("notice", function (msg) {
             if (onNotice) {
               onNotice(msg, msg?.message);
-            } else {
+            } else if (DEBUG_MODE) {
               console.log("notice: %j", msg?.message);
             }
           });

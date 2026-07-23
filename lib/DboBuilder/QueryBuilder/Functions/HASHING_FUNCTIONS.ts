@@ -1,4 +1,4 @@
-import * as pgPromise from "pg-promise";
+import pgPromise from "pg-promise";
 import { asNameAlias } from "../../../utils/asNameAlias";
 import type { FunctionSpec } from "./Functions";
 

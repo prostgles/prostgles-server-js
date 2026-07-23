@@ -1,23 +1,22 @@
 import type e from "express";
-import * as passport from "passport";
+import passport from "passport";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
+import OAuth2Strategy from "passport-oauth2";
 import { getObjectEntries, isEmpty } from "prostgles-types";
 import { getErrorAsObject } from "../../DboBuilder/dboBuilderUtils";
-import type { DBOFullyTyped } from "../../DBSchemaBuilder/DBSchemaBuilder";
 import type { AuthHandler } from "../AuthHandler";
 import { HTTP_FAIL_CODES } from "../AuthHandler";
 import type { AuthProviderUserData, LoginWithOAuthConfig } from "../AuthTypes";
 import { getClientRequestIPsInfo } from "../utils/getClientRequestIPsInfo";
 import { upsertNamedExpressMiddleware } from "../utils/upsertNamedExpressMiddleware";
 import type { LoginResponseHandler } from "./setLoginRequestHandler";
-import OAuth2Strategy from "passport-oauth2";
 export function setOAuthRequestHandlers(
   this: AuthHandler,
   app: e.Express,
-  loginWithOAuthConfig: LoginWithOAuthConfig<void>
+  loginWithOAuthConfig: LoginWithOAuthConfig<void>,
 ) {
   const { onProviderLoginFail, onProviderLoginStart, websiteUrl, OAuthProviders } =
     loginWithOAuthConfig;
@@ -50,8 +49,8 @@ export function setOAuthRequestHandlers(
         (accessToken, refreshToken, profile, done) => {
           // This callback is where you would normally store or retrieve user info from the database
           return done(null, profile, { accessToken, refreshToken, profile });
-        }
-      )
+        },
+      ),
     );
 
     const authPath = `${this.authRoutes.loginWithProvider}/${providerName}`;
@@ -91,11 +90,11 @@ export function setOAuthRequestHandlers(
               }).catch((e: any) => {
                 res.status(HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR).json(
                   //@ts-ignore
-                  getErrorAsObject(e)
+                  getErrorAsObject(e),
                 );
               });
             }
-          }
+          },
         )(req, res);
       } catch (_e) {
         res

@@ -1,4 +1,4 @@
-import type * as pgPromise from "pg-promise";
+import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import { FileManager } from "./FileManager/FileManager";
 import type { OnInitReason } from "./initProstgles";

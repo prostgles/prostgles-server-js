@@ -281,6 +281,8 @@ export const initProstgles = async function (
         this.dbo = undefined;
         this.db = undefined;
         await db.$pool.end();
+        await this.adminClient?.end().catch(() => {});
+        this.adminClient = undefined;
         await sleep(1000);
         return true;
       },

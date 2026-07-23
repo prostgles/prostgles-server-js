@@ -1,4 +1,4 @@
-import type * as pgPromise from "pg-promise";
+import type pgPromise from "pg-promise";
 import type {
   AnyObject,
   ColumnInfo,

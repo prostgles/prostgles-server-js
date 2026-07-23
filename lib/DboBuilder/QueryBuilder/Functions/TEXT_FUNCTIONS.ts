@@ -3,7 +3,7 @@ import { asValue } from "../../../PubSubManager/PubSubManagerUtils";
 import { parseFieldFilter } from "../../ViewHandler/parseFieldFilter";
 import { asFunction } from "./utils";
 import type { FunctionSpec } from "./Functions";
-import * as pgPromise from "pg-promise";
+import pgPromise from "pg-promise";
 import { asNameAlias } from "../../../utils/asNameAlias";
 const pgp = pgPromise();
 

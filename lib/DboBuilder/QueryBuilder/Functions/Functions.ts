@@ -1,4 +1,4 @@
-import * as pgPromise from "pg-promise";
+import pgPromise from "pg-promise";
 import type { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
 import { asName, includes, isObject, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
 import { asNameAlias } from "../../../utils/asNameAlias";

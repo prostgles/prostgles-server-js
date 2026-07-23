@@ -1,7 +1,7 @@
 import type { DB } from "../../initProstgles";
 import { QUERY_ID_PREFIX, type LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
-import type * as pgPromise from "pg-promise";
+import type pgPromise from "pg-promise";
 
 export function getDbHandlerWithAbort(
   this: ViewHandler,

@@ -6,11 +6,11 @@
       "es2022"
     ],
     "strict": true,
-    "module": "commonjs",
+    "module": "node16",
     "sourceMap": true,
     "rootDir": "./lib",
     "outDir": "dist",
-    "moduleResolution": "Node10",
+    "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
@@ -18,7 +18,8 @@
     "declaration": true,
     "skipLibCheck": true,
     "declarationMap": true, 
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "esModuleInterop": true
   },
   "include": [
     "lib/**/*.spec.ts"
