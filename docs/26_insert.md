@@ -42,5 +42,40 @@ Inserts a new record into the table.
     - **having** <span style="color: grey">optional</span> <span style="color: green;">FullFilter</span>
 
       Filter applied after any aggregations (group by)
+    - **abortSignal** <span style="color: grey">optional</span> <span style="color: green;">AbortSignal</span>
+      - **aborted** <span style="color: red">required</span> <span style="color: green;">boolean</span>
+
+        The **`aborted`** read-only property returns a value that indicates whether the asynchronous operations the signal is communicating with are aborted (`true`) or not (`false`).
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortSignal/aborted) 
+         Returns true if this AbortSignal's AbortController has signaled to abort, and false otherwise.
+      - **onabort** <span style="color: red">required</span> <span style="color: green;">((this: AbortSignal, ev: Event) =&gt; any) | null</span>
+
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortSignal/abort_event)
+      - **reason** <span style="color: red">required</span> <span style="color: green;">any</span>
+
+        The **`reason`** read-only property returns a JavaScript value that indicates the abort reason.
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortSignal/reason)
+      - **throwIfAborted** <span style="color: red">required</span> <span style="color: green;">{ (): void; (): void; }</span>
+
+        The **`throwIfAborted()`** method throws the signal's abort AbortSignal.reason if the signal has been aborted; otherwise it does nothing.
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/AbortSignal/throwIfAborted)
+      - **addEventListener** <span style="color: red">required</span> <span style="color: green;">{ &lt;K extends keyof AbortSignalEventMap&gt;(type: K, listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) =&gt; any, options?: boolean | AddEventListenerOptions | undefined): void; (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | ... 1 more ... | undefined): void; }</span>
+
+        The **`addEventListener()`** method of the EventTarget interface sets up a function that will be called whenever the specified event is delivered to the target.
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/addEventListener)
+      - **removeEventListener** <span style="color: red">required</span> <span style="color: green;">{ &lt;K extends keyof AbortSignalEventMap&gt;(type: K, listener: (this: AbortSignal, ev: AbortSignalEventMap[K]) =&gt; any, options?: boolean | EventListenerOptions | undefined): void; (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | ... 1 more ... | undefined): void; }</span>
+
+        The **`removeEventListener()`** method of the EventTarget interface removes an event listener previously registered with EventTarget.addEventListener() from the target.
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/removeEventListener)
+      - **dispatchEvent** <span style="color: red">required</span> <span style="color: green;">(event: Event) =&gt; boolean</span>
+
+        The **`dispatchEvent()`** method of the EventTarget sends an Event to the object, (synchronously) invoking the affected event listeners in the appropriate order.
+        
+        [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 #### Return type
 #### <span style="color: green;">GetReturningReturnType</span>

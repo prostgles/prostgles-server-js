@@ -160,6 +160,7 @@ export const runClientRequest = async function (
       scope,
     );
 
+    tableHandler.abortRequests.add(validation.data.param1.abortSignalId);
     return tableHandler.abortRemoteQuery(validation.data.param1.abortSignalId, localParams);
   } else {
     this.publishParser.validateRequestRule(

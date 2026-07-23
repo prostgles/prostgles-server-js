@@ -246,7 +246,7 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(
         { message: abortError.message },
         {
-          message: "terminating connection due to administrator command",
+          message: "canceling statement due to user request",
         },
         "abortSignal error message is not as expected",
       );

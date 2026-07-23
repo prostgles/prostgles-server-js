@@ -52,37 +52,47 @@ export function getDbHandlerWithAbort(
       }
 
       const abort = () => {
+        void this._log({
+          data: { query, abortSignalId },
+          command: "abort",
+          localParams,
+          duration: Date.now() - (this.activeQueries.get(abortSignalId)?.start ?? Date.now()),
+          error: new Error("Query aborted"),
+        });
         /** Only terminate if there is exactly one matching query with a query id prefix */
 
+        this.abortRequests.delete(abortSignalId);
         void adminClient
           .query(
             `
-            SELECT pg_terminate_backend(pid), * 
+            SELECT pg_cancel_backend(pid), * 
             FROM pg_stat_activity 
             WHERE query LIKE $1 AND pid <> pg_backend_pid()
             `,
             [`${queryIdPrefix}%`],
           )
-          .then((res) => {
-            // if (params.abortSignalId) {
-            //   console.log(JSON.stringify(res.rows));
-            //   process.exit(1);
-            // }
-          })
           .catch((err) => {
             // ignore error
           });
       };
+
+      if (this.abortRequests.has(abortSignalId)) {
+        this.abortRequests.delete(abortSignalId);
+        throw new Error(`Abort requested`);
+      }
+
       this.activeQueries.set(abortSignalId, {
         query,
         start: Date.now(),
         sid,
         abort,
+        socketId: localParams?.clientReq?.socket?.id,
       });
       abortSignal.addEventListener("abort", abort);
       return func(query, ...args).finally(() => {
         abortSignal.removeEventListener("abort", abort);
         this.activeQueries.delete(abortSignalId);
+        this.abortRequests.delete(abortSignalId);
       });
     };
   };

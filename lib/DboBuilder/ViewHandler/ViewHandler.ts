@@ -128,12 +128,20 @@ export class ViewHandler {
       );
     }
     abortableQuery.abort();
+    this.abortRequests.delete(abortSignalId);
   };
 
   activeQueries = new Map<
     string,
-    { abort: VoidFunction; query: string; start: number; sid: string | undefined }
+    {
+      abort: VoidFunction;
+      query: string;
+      start: number;
+      sid: string | undefined;
+      socketId: string | undefined;
+    }
   >();
+  abortRequests = new Set<string>();
   getDbHandlerWithAbort = getDbHandlerWithAbort.bind(this);
 
   _log = ({

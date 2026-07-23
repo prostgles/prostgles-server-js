@@ -42,16 +42,13 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       this.dbEventsManager?.removeNotify(undefined, socket);
       this.connectedSockets = this.connectedSockets.filter((s) => s.id !== socket.id);
       this.dboBuilder.queryStreamer.onDisconnect(socket.id);
-      const sid = this.authHandler.getSIDNoError({ socket });
-      if (sid) {
-        this.dboBuilder.dboMap.forEach((tableHandler) => {
-          tableHandler.activeQueries.forEach((activeQuery) => {
-            if (activeQuery.sid === sid) {
-              activeQuery.abort();
-            }
-          });
+      this.dboBuilder.dboMap.forEach((tableHandler) => {
+        tableHandler.activeQueries.forEach((activeQuery) => {
+          if (activeQuery.socketId === socket.id) {
+            activeQuery.abort();
+          }
         });
-      }
+      });
 
       void this.opts.onSocketDisconnect?.({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
     });

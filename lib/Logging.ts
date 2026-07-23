@@ -1,4 +1,4 @@
-import type { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
+import type { ABORTABLE_METHODS, AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
 import type { PubSubManagerTriggers, SyncParams } from "./PubSubManager/PubSubManager";
 import type { NotifTypeName } from "./PubSubManager/PubSubManagerUtils";
@@ -14,15 +14,25 @@ export namespace EventTypes {
     error?: any;
   };
 
-  export type Table = ClientInfo &
-    DebugInfo & {
-      type: "table";
-      tableName: string;
-      command: keyof TableHandler | "sync";
-      txInfo: AnyObject | undefined;
-      data: AnyObject;
-      localParams: LocalParams | undefined;
-    };
+  export type Table =
+    | (ClientInfo &
+        DebugInfo & {
+          type: "table";
+          tableName: string;
+          command: keyof TableHandler | "sync";
+          txInfo: AnyObject | undefined;
+          data: AnyObject;
+          localParams: LocalParams | undefined;
+        })
+    | (ClientInfo &
+        DebugInfo & {
+          type: "table";
+          tableName: string;
+          command: "abort";
+          txInfo: AnyObject | undefined;
+          data: AnyObject;
+          localParams: LocalParams | undefined;
+        });
 
   export type Sync = ClientInfo &
     DebugInfo & {
