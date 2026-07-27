@@ -329,7 +329,46 @@ BEGIN
     END LOOP;
 
     ${raiseException(`E'No oneOf schemas matching:\n  % ), %', v_one_of_errors, path`)}  
+    
+  /* tuple: [FieldType, FieldType, ...] */
+  ELSIF schema ? 'tuple' THEN
 
+    IF jsonb_typeof(schema->'tuple') != 'array' THEN
+      ${raiseException(`'Invalid tuple schema. Expected tuple to be an array, got: %. %', jsonb_typeof(schema->'tuple'), path`)}
+    END IF;
+
+    IF jsonb_typeof(data) != 'array' THEN
+      ${raiseException(`'Tuple data is not an array. %', path`)}
+    END IF;
+
+    IF jsonb_array_length(data) != jsonb_array_length(schema->'tuple') THEN
+      ${raiseException(`'Tuple length does not match schema. Expected %, got %. %',
+        jsonb_array_length(schema->'tuple'),
+        jsonb_array_length(data),
+        path`)}
+    END IF;
+
+    FOR array_element IN
+      SELECT
+        data_item.value AS data_value,
+        tuple_item.value AS schema_value,
+        data_item.ordinality - 1 AS idx
+      FROM jsonb_array_elements(data) WITH ORDINALITY AS data_item(value, ordinality)
+      INNER JOIN jsonb_array_elements(schema->'tuple') WITH ORDINALITY AS tuple_item(value, ordinality)
+        ON data_item.ordinality = tuple_item.ordinality
+    LOOP
+      IF NOT ${VALIDATE_SCHEMA_FUNCNAME}(
+        array_element.schema_value::TEXT,
+        array_element.data_value,
+        context,
+        checked_path || array_element.idx::TEXT
+      ) THEN
+        RETURN FALSE;
+      END IF;
+    END LOOP;
+
+    RETURN TRUE;
+ 
   /* arrayOfType: { key_name: { type: "string" } } */
   ELSIF (schema ? 'arrayOf' OR schema ? 'arrayOfType') THEN
 
