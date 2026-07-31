@@ -1,10 +1,10 @@
+import type e from "express";
 import * as fs from "fs";
 import { join } from "path";
 import { HTTP_FAIL_CODES, removeExpressRoute } from "../Auth/AuthHandler";
 import type { DB } from "../initProstgles";
 import type { Prostgles } from "../Prostgles";
 import type { FileTableConfig } from "../ProstglesTypes";
-import type { ExpressApp } from "../RestApi";
 import { runClientRequest } from "../runClientRequest";
 import type { StorageClient } from "./FileManager";
 import { HOUR } from "./FileManager";
@@ -14,7 +14,7 @@ export const setupFileServeHandler = (
   db: DB,
   config: FileTableConfig,
   storageClient: StorageClient,
-  app: ExpressApp,
+  app: e.Express,
   prg: Prostgles,
 ) => {
   const fileTableName = config.tableName;

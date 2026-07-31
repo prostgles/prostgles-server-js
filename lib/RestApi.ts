@@ -6,6 +6,7 @@ import type { Prostgles } from "./Prostgles";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "./runClientRequest";
 import type { VoidFunction } from "./SchemaWatch/SchemaWatch";
 import { isDefined } from "prostgles-types";
+import type e from "express";
 
 type ExpressInternalRouter = {
   stack?: {
@@ -31,6 +32,8 @@ export type ExpressApp = {
 } & Omit<Express, "_router" | "router">;
 
 export type RestApiConfig = {
+  expressApp: e.Express;
+
   /**
    * Defaults to "/api"
    */
@@ -45,9 +48,9 @@ export class RestApi {
     methods: string;
     schema: string;
   };
-  expressApp: ExpressApp;
+  expressApp: e.Express;
   path = "/api";
-  constructor({ path, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
+  constructor({ path, prostgles, expressApp }: RestApiConfig & { prostgles: Prostgles }) {
     if (isDefined(path) && !path.trim()) {
       throw new Error("path cannot be empty");
     }
@@ -59,10 +62,7 @@ export class RestApi {
       methods: `${path}/methods/:name`,
       schema: `${path}/schema`,
     };
-    const { expressApp } = prostgles.opts;
-    if (!expressApp) {
-      throw new Error("RestApi requires an expressApp to be provided in prostgles.opts");
-    }
+
     this.expressApp = expressApp;
     /** Must check if json parser is loaded */
 

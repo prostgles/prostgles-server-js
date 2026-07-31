@@ -111,7 +111,10 @@ export const initProstgles = async function (
   reason: OnInitReason,
 ): Promise<InitResult> {
   this.loaded = false;
-  const expressApp = this.opts.expressApp ?? this.opts.auth?.loginSignupConfig?.app;
+  const expressApp =
+    this.opts.fileTable?.expressApp ??
+    this.opts.restApi?.expressApp ??
+    this.opts.auth?.loginSignupConfig?.app;
 
   /** Crucial in ensuring the runtime version of express works as expected */
   if (expressApp) {

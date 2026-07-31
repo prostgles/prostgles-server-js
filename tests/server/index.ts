@@ -117,10 +117,10 @@ function dd() {
     },
     tableConfig: testTableConfig,
     testRulesOnConnect: true,
-    expressApp: app as ExpressApp,
     fileTable: {
       tableName: "files",
       storageClient: getLocalStorageClient({ localFolderPath: path.join(__dirname + "/media") }),
+      expressApp: app,
       referencedTables: {
         users_public_info: {
           type: "column",
@@ -134,6 +134,7 @@ function dd() {
     },
     // DEBUG_MODE: true,
     restApi: {
+      expressApp: app,
       path: "/api",
     },
 

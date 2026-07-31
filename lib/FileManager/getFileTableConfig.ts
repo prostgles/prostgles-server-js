@@ -36,14 +36,12 @@ export type FileTableRow = {
 };
 
 export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
-  const { fileTable, tableConfig, expressApp } = prg.opts;
+  const { fileTable, tableConfig } = prg.opts;
   if (!fileTable) {
     return tableConfig;
   }
 
-  if (!expressApp) {
-    throw new Error(`FileManager requires an expressApp to be provided in prostgles.opts.`);
-  }
+  const { expressApp } = fileTable;
 
   const { tableName: fileTableName, storageClient } = fileTable;
 

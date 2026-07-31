@@ -151,7 +151,6 @@ export class Prostgles {
       restApi: 1,
       testRulesOnConnect: 1,
       modifyClientSchema: 1,
-      expressApp: 1,
     };
     const unknownParams = Object.keys(params).filter(
       (key: string) => !Object.keys(config).includes(key),

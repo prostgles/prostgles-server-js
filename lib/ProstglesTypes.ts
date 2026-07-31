@@ -9,13 +9,14 @@ import type { EventTriggerTagFilter } from "./Event_Trigger_Tags";
 import type { StorageClient } from "./FileManager/FileManager";
 import type { DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
-import type { ExpressApp, RestApiConfig } from "./RestApi";
+import type { RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
+import type e from "express";
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
 import type { AnyObject } from "prostgles-types";
@@ -48,6 +49,8 @@ export type FileTableConfig = {
    * GET path used in serving media. defaults to /${tableName}
    */
   fileServePath?: string;
+
+  expressApp: e.Express;
 
   /**
    * If defined the the files will not be deleted immediately
@@ -125,14 +128,6 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Socket.IO server instance object required to allow clients to connect through websockets
    */
   io?: Server;
-
-  /**
-   * Express server instance used for:
-   * - Auth
-   * - REST API
-   * - Serving files through the file manager
-   */
-  expressApp?: ExpressApp;
 
   /**
    * Rest API configuration.
