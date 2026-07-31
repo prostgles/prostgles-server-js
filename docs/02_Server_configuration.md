@@ -19,6 +19,12 @@
 - **io** <span style="color: grey">optional</span> <span style="color: green;">Server&lt;DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any&gt; | undefined</span>
 
   Socket.IO server instance object required to allow clients to connect through websockets
+- **expressApp** <span style="color: grey">optional</span> <span style="color: green;">ExpressApp</span>
+
+  Express server instance used for:
+  - Auth
+  - REST API
+  - Serving files through the file manager
 - **restApi** <span style="color: grey">optional</span> <span style="color: green;">RestApiConfig</span>
 
   Rest API configuration.
@@ -68,7 +74,7 @@
 - **joins** <span style="color: grey">optional</span> <span style="color: green;">Joins</span>
 
   Allows defining table relationships that can then be used in filters and data inserts:
-   - `infered` - uses the foreign keys to infer the joins
+   - `inferred` - uses the foreign keys to infer the joins
    - `Join[]` - specifies the joins manually
 - **schemaFilter** <span style="color: grey">optional</span> <span style="color: green;">Record&lt;string, 1&gt; | Record&lt;string, 0&gt; | undefined</span>
 
@@ -167,4 +173,8 @@
     Any data conflicting with the new schema changes should be resolved here.
 - **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; void | Promise&lt;void&gt;</span>
 
-  Usefull for logging or debugging
+  Useful for logging or debugging
+- **modifyClientSchema** <span style="color: grey">optional</span> <span style="color: green;">ModifyClientSchema</span>
+
+  Used to add custom metadata to the table and column schemas.
+  This metadata is then available in the client schema and can be used for custom logic on the client side.
