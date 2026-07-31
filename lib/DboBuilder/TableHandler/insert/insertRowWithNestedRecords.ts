@@ -187,7 +187,7 @@ export async function insertRowWithNestedRecords(
       if (!colsRefT1.length || !colsRefT3.length)
         throw "Incorrectly referenced or missing columns for nested insert";
 
-      const fileTable = this.dboBuilder.prostgles.fileManager?.tableName;
+      const fileTable = this.dboBuilder.prostgles.opts.fileTable?.tableName;
       if (targetTable !== fileTable) {
         throw "Only media allowed to have nested inserts more than 2 tables apart";
       }

@@ -93,23 +93,14 @@ export async function insert(
     const successCallbacks: (() => void)[] = [];
     const preValidatedRows: InsertedRowWithInfo[] = await Promise.all(
       rows.map(async (nonValidated) => {
-        const { preValidate, validate } = rule ?? {};
+        const { preValidate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) {
           throw "tableConfigurator missing";
         }
-        let row = await tableConfigurator.getPreInsertRow(this, {
-          dbx: this.getFinalDbo(localParams),
-          validate,
-          localParams,
-          row: nonValidated,
-          tx,
-          command: "insert",
-          data: nonValidated,
-        });
 
-        const beforeResult = await this.beforeEach(row, localParams, "insert");
-        row = beforeResult.row;
+        const beforeResult = await this.beforeEach(nonValidated, localParams, "insert", undefined);
+        let row = beforeResult.row;
         beforeResult.successCallbacks.forEach((cb) => successCallbacks.push(cb));
 
         if (preValidate) {

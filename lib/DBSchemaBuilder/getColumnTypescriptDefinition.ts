@@ -10,7 +10,7 @@ import {
 } from "prostgles-types";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilder";
 import { escapeTSNames } from "../utils/utils";
-import type { TableConfig } from "../TableConfig/TableConfig";
+import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { getColumnConfig } from "../TableConfig/getColumnConfig";
 
 export const getColumnTypescriptDefinition = ({

@@ -1,6 +1,33 @@
-import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfig";
+import type { TableConfig } from "prostgles-server";
 
 export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
+  /** Allow extending the files table */
+  files: {
+    columns: {
+      metadata: {
+        nullable: true,
+        jsonbSchemaType: {
+          description: { type: "string" },
+        },
+      },
+    },
+    hooks: {
+      afterEach: [
+        {
+          commands: {
+            insert: 1,
+          },
+          validate: async ({ data, row, tx }) => {
+            // throw new Error(JSON.stringify({ message: "afterEach hook error", data, row }));
+            await tx.any("UPDATE files SET metadata = $1 WHERE id = $2", [
+              { description: "Updated by afterEach hook" },
+              row.id,
+            ]);
+          },
+        },
+      ],
+    },
+  },
   planes: {
     syncConfig: {
       id_fields: ["id"],
@@ -41,8 +68,8 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
     columns: {
       id: "SERIAL PRIMARY KEY",
       name: "TEXT",
-      // avatar: `UUID REFERENCES media ON DELETE CASCADE`
-      avatar: `UUID`,
+      avatar: `UUID REFERENCES files ON DELETE CASCADE`,
+      // avatar: `UUID`,
       sid: `TEXT`,
     },
   },

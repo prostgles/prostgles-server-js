@@ -1,8 +1,10 @@
+import { randomUUID } from "crypto";
 import type { AnyObject } from "prostgles-types";
 import { getKeys, isObject } from "prostgles-types";
-import type { LocalParams, Media } from "./DboBuilder";
-import type { ValidateRowBasic } from "../PublishParser/PublishParser";
-import type { TableHandler } from "./TableHandler/TableHandler";
+import type { FileTableRow } from "../FileManager/getFileTableConfig";
+import { getValidatedFileType } from "../FileManager/getValidatedFileType";
+import type { FileTableConfig } from "../ProstglesTypes";
+import type { LocalParams } from "./DboBuilder";
 
 export const isFile = (row: any): row is { data: Buffer; name: string } => {
   return Boolean(
@@ -17,41 +19,39 @@ export const isFile = (row: any): row is { data: Buffer; name: string } => {
 
 type UploadFileArgs = {
   row: AnyObject;
-  validate: ValidateRowBasic | undefined;
   localParams: LocalParams | undefined;
   /**
    * Used to update an existing file
    */
-  mediaId?: string;
+  mediaId: string | undefined;
 };
 
-export async function uploadFile(
-  this: TableHandler,
-  { row, localParams, validate, mediaId }: UploadFileArgs,
-): Promise<Media> {
-  if (!this.dboBuilder.prostgles.fileManager) throw "fileManager not set up";
-
-  if (!isFile(row))
+export const uploadFile = async (
+  config: FileTableConfig,
+  { row, localParams, mediaId }: UploadFileArgs,
+): Promise<FileTableRow> => {
+  if (!isFile(row)) {
     throw (
       "Expecting only two properties for file upload: { name: string; data: File | string | Buffer }; but got: " +
       Object.entries(row)
         .map(([k, v]) => `${k}: ${typeof v}`)
         .join(", ")
     );
+  }
+  const storageClient = config.storageClient;
   const { data, name } = row;
 
-  const media_id =
-    mediaId ?? (await this.db.one<{ name: string }>("SELECT gen_random_uuid() as name")).name;
+  const media_id = mediaId ?? randomUUID();
   const nestedInsert = localParams?.nestedInsert;
-  const type = await this.dboBuilder.prostgles.fileManager.getValidatedFileType({
+  const type = await getValidatedFileType(config, {
     file: data,
     fileName: name,
     tableName: nestedInsert?.previousTable,
     colName: nestedInsert?.referencingColumn,
   });
   const media_name = `${media_id}.${type.ext}`;
-  const parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const;
-  const media: Required<Pick<Media, (typeof parsedMediaKeys)[number]>> = {
+  const _parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const;
+  const coreInfo: Required<Pick<FileTableRow, (typeof _parsedMediaKeys)[number]>> = {
     id: media_id,
     name: media_name,
     original_name: name,
@@ -59,41 +59,25 @@ export async function uploadFile(
     content_type: type.mime,
   };
 
-  if (validate) {
-    if (!localParams) throw "localParams missing";
-    const parsedMedia = await validate({
-      tx: localParams.tx?.t || this.tx?.t || this.db,
-      row: media,
-      dbx: this.getFinalDbo(localParams),
-      localParams,
-      command: "insert",
-      data: media,
-    });
-    const missingKeys = parsedMediaKeys.filter((k) => !parsedMedia[k]);
-    if (missingKeys.length) {
-      throw `Some keys are missing from file insert validation: ${missingKeys.join(", ")}`;
-    }
-  }
-
-  const _media: Media = await this.dboBuilder.prostgles.fileManager.uploadAsMedia({
-    item: {
-      data,
-      name: media.name,
-      content_type: media.content_type,
-      extension: media.extension,
-    },
-    // imageCompression: {
-    //     inside: {
-    //         width: 1100,
-    //         height: 630
-    //     }
-    // }
+  const uploadedInfo = await storageClient.upload({
+    file: data,
+    fileName: coreInfo.name,
+    contentType: coreInfo.content_type,
   });
 
-  const mediaRow = {
-    ...media,
-    ..._media,
+  const mediaRow: FileTableRow = {
+    signed_url: null,
+    signed_url_expires: null,
+    added: new Date().toISOString(),
+    deleted: null,
+    deleted_from_storage: null,
+    description: "",
+    ...coreInfo,
+    ...uploadedInfo,
+    extension: type.ext,
+    url: uploadedInfo.cloud_url,
+    content_length: String(uploadedInfo.content_length),
   };
 
   return mediaRow;
-}
+};

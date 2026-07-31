@@ -32,11 +32,6 @@ export type ExpressApp = {
 
 export type RestApiConfig = {
   /**
-   * Express server instance
-   */
-  expressApp: Express;
-
-  /**
    * Defaults to "/api"
    */
   path?: string;
@@ -52,7 +47,7 @@ export class RestApi {
   };
   expressApp: ExpressApp;
   path = "/api";
-  constructor({ expressApp, path, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
+  constructor({ path, prostgles }: RestApiConfig & { prostgles: Prostgles }) {
     if (isDefined(path) && !path.trim()) {
       throw new Error("path cannot be empty");
     }
@@ -64,19 +59,24 @@ export class RestApi {
       methods: `${path}/methods/:name`,
       schema: `${path}/schema`,
     };
-    this.expressApp = expressApp as ExpressApp;
+    const { expressApp } = prostgles.opts;
+    if (!expressApp) {
+      throw new Error("RestApi requires an expressApp to be provided in prostgles.opts");
+    }
+    this.expressApp = expressApp;
     /** Must check if json parser is loaded */
 
-    expressApp.post(this.routes.db, this.onPostTableCommand);
-    expressApp.post(this.routes.sql, this.onPostSql);
-    expressApp.post(this.routes.methods, this.onPostMethod);
-    expressApp.post(this.routes.schema, this.onPostSchema);
+    this.expressApp.post(this.routes.db, this.onPostTableCommand);
+    this.expressApp.post(this.routes.sql, this.onPostSql);
+    this.expressApp.post(this.routes.methods, this.onPostMethod);
+    this.expressApp.post(this.routes.schema, this.onPostSchema);
   }
 
   destroy = () => {
     this.expressApp.removeListener(this.routes.db, this.onPostTableCommand);
     this.expressApp.removeListener(this.routes.sql, this.onPostSql);
     this.expressApp.removeListener(this.routes.methods, this.onPostMethod);
+    this.expressApp.removeListener(this.routes.schema, this.onPostSchema);
     removeExpressRoute(this.expressApp, [this.path]);
   };
   onPostMethod = async (req: ExpressReq, res: ExpressRes) => {
@@ -120,7 +120,7 @@ export class RestApi {
   onPostSql = async (req: ExpressReq, res: ExpressRes) => {
     const [query, params, options] = req.body || [];
     try {
-      const data = await runClientSqlRequest.bind(this.prostgles)(
+      const data: unknown = await runClientSqlRequest.bind(this.prostgles)(
         {
           query,
           params,

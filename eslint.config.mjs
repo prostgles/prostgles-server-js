@@ -1,4 +1,3 @@
-import pluginSecurity from "eslint-plugin-security";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
@@ -6,8 +5,6 @@ export default tseslint.config(
   {
     ignores: ["node_modules", "dist", "examples", "**/*.d.ts", "tests", "docs"],
   },
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-  pluginSecurity.configs.recommended,
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {

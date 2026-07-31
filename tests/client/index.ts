@@ -53,7 +53,7 @@ type ClientTestSpecV2 = (args: {
 const tests: Record<string, ClientTestSpecV2> = {
   main: async ({ db, sql, methods, tableSchema, auth }) => {
     await sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
-    await isomorphicQueries(db, sql, log);
+    await isomorphicQueries(db, sql, log, TEST_NAME);
     await isomorphicQueriesTyped(
       //@ts-ignore
       db,

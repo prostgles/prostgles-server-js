@@ -1,32 +1,31 @@
 import { as } from "pg-promise";
 import { isDefined } from "prostgles-types";
-import { getFileManagerSchema } from "../FileManager/initFileManager";
 import type { DB } from "../initProstgles";
 import { getColumnSQLDefinitionQuery } from "./getColumnSQLDefinitionQuery";
 import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { tableConfigWithMigrations, type SchemaRelatedOptions } from "./getCreateSchemaQueries";
-import type { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfigTypes";
 import type { getSchemaUtils } from "./tableConfigSchemaUtils";
 
 export const getTableConfigSchemaQueries = async (
   opts: SchemaRelatedOptions,
-  { asName, db }: Pick<Awaited<ReturnType<typeof getSchemaUtils>>, "asName" | "db">
+  { asName, db }: Pick<Awaited<ReturnType<typeof getSchemaUtils>>, "asName" | "db">,
 ) => {
-  const fileTableSchema = getFileManagerSchema(opts);
-  const fileTableSchemaQuery = fileTableSchema?.queries.join("\n") ?? "";
-  const migrations = await tableConfigWithMigrations(db, opts, fileTableSchemaQuery);
+  // const fileTableSchema = getFileTableConfig(opts);
+  // const fileTableSchemaQuery = fileTableSchema?.queries.join("\n") ?? "";
+  const migrations = await tableConfigWithMigrations(db, opts, "");
 
   const config: TableConfig = migrations.config ?? {};
 
   const uniqueColumnAndTableNames = Array.from(
     new Set(
-      Object.entries(config).flatMap(([tname, tableConf]) => {
+      Object.entries(config).flatMap(([tableName, tableConf]) => {
         if ("columns" in tableConf && tableConf.columns) {
-          return [tname, ...Object.keys(tableConf.columns)];
+          return [tableName, ...Object.keys(tableConf.columns)];
         }
-        return [tname];
-      })
-    )
+        return [tableName];
+      }),
+    ),
   );
 
   /** Avoid using double quotes when not required to ensure the jsonb validation checks do not include unnecessary quotes */
@@ -34,10 +33,10 @@ export const getTableConfigSchemaQueries = async (
     escapedTableNameMapObj: Record<string, string>;
   }>(
     `
-    SELECT jsonb_object_agg(tblname, quote_ident(tblname)) as "escapedTableNameMapObj"
-    FROM unnest(ARRAY[\${keys:csv}]) as tblname
+    SELECT jsonb_object_agg(table_name, quote_ident(table_name)) as "escapedTableNameMapObj"
+    FROM unnest(ARRAY[\${keys:csv}]) as table_name
     `,
-    { keys: uniqueColumnAndTableNames.concat("prevent_empty_array_error") }
+    { keys: uniqueColumnAndTableNames.concat("prevent_empty_array_error") },
   );
 
   let triggerQueries: string[] = [];
@@ -55,7 +54,7 @@ export const getTableConfigSchemaQueries = async (
       tableConf,
       asName,
       escapedTableNameMapObj,
-      db
+      db,
     );
     if (_tableQueries) {
       tableQueries = [...tableQueries, ..._tableQueries.queries];
@@ -77,7 +76,6 @@ export const getTableConfigSchemaQueries = async (
 
   return {
     dropTableQueries,
-    fileTableSchemaQuery,
     tableQueries,
     constraintQueries,
     indexQueries,
@@ -91,7 +89,7 @@ const getTableQueries = async (
   tableConf: TableConfig[string],
   asName: (v: string) => string,
   escapedTableNameMapObj: Record<string, string>,
-  db: DB
+  db: DB,
 ) => {
   if ("isLookupTable" in tableConf && Object.keys(tableConf.isLookupTable.values).length) {
     const { isLookupTable } = tableConf;
@@ -100,7 +98,7 @@ const getTableQueries = async (
       ([id, otherColumns]) => ({
         id,
         ...otherColumns,
-      })
+      }),
     );
 
     const allColumns = Object.keys(rows[0]!);
@@ -122,7 +120,7 @@ const getTableQueries = async (
       return as.format(
         `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
           " VALUES (${values:csv}) ON CONFLICT DO NOTHING;",
-        { values }
+        { values },
       );
     });
     const queries = [createQuery, ...dataQuerys];
@@ -169,7 +167,7 @@ const getConstraintQueries = (tableName: string, tableConf: TableConfig[string])
 const getIndexQueries = (
   tableName: string,
   tableConf: TableConfig[string],
-  asName: (v: string) => string
+  asName: (v: string) => string,
 ) => {
   if ("indexes" in tableConf && tableConf.indexes) {
     /*
@@ -199,7 +197,7 @@ const getIndexQueries = (
           return [`DROP INDEX IF EXISTS ${asName(indexName)};`, query];
         }
         return [query];
-      }
+      },
     );
   }
   return [];
@@ -207,7 +205,7 @@ const getIndexQueries = (
 const getTriggerQueries = (
   tableName: string,
   tableConfig: TableConfig[string],
-  asName: (v: string) => string
+  asName: (v: string) => string,
 ) => {
   const { triggers } = tableConfig;
   if (!triggers) return [];

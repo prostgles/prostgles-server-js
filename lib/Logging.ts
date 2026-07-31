@@ -164,7 +164,6 @@ export namespace EventTypes {
           type: "debug";
           command:
             | "applyTableConfig"
-            | "initFileTable"
             | "initTableConfig"
             | "runSQLFile"
             | "schemaChangeNotif"
@@ -174,8 +173,6 @@ export namespace EventTypes {
             | "refreshDBO.end"
             | "tableConfigurator.init.start"
             | "tableConfigurator.init.end"
-            | "initFileTable.start"
-            | "initFileTable.end"
             | "initFileManager.runQuery"
             | "DboBuilder.getTablesForSchemaPostgresSQL"
             | "PubSubManager.create";

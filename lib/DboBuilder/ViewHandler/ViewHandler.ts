@@ -29,7 +29,7 @@ import type { OnData } from "./subscribe";
 import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
 import { escapeTSNames } from "../../utils/utils";
-import type { TableDefinition } from "../../TableConfig/TableConfig";
+import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
 

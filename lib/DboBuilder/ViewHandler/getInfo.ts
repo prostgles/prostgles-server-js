@@ -1,4 +1,4 @@
-import type { TableInfo as TInfo } from "prostgles-types/dist";
+import { type TableInfo as TInfo } from "prostgles-types/dist";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
@@ -27,7 +27,7 @@ export async function getInfo(
     tableName: this.name,
     lang,
   });
-  return {
+  const tableInfo: TInfo = {
     oid: this.tableOrViewInfo.oid,
     comment: this.tableOrViewInfo.comment,
     qualifiedNameParts: this.tableOrViewInfo.qualifiedNameParts,
@@ -69,4 +69,21 @@ export async function getInfo(
       delete: validatedTableRules.delete && {},
     },
   };
+
+  const modifyClientSchema = this.dboBuilder.prostgles.opts.modifyClientSchema;
+  if (!modifyClientSchema) {
+    return tableInfo;
+  }
+
+  const modifiedTableSchema = await modifyClientSchema(
+    {
+      name: this.name,
+      ...tableInfo,
+      columns: [],
+    },
+    localParams?.isRemoteRequest?.clientInfo,
+  );
+
+  const { columns, name, ...rest } = modifiedTableSchema;
+  return rest;
 }

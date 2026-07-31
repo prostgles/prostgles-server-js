@@ -60,6 +60,7 @@ export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = 
   tx: pgPromise.ITask<{}> | DB;
   command: "insert" | "update";
   data: Partial<R>;
+  filter: AnyObject | undefined;
 };
 export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   row: R;

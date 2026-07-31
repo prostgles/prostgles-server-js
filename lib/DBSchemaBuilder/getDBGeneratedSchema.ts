@@ -1,5 +1,5 @@
 import { isDefined, isEmpty, type TableSchema } from "prostgles-types";
-import type { TableConfig } from "../TableConfig/TableConfig";
+import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
 import { fromEntries } from "../PublishParser/applyScopeToTableRules";

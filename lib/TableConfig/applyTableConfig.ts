@@ -36,7 +36,7 @@ export const applyTableConfig = async (prostgles: Prostgles, commit = false) => 
   const { fileTable, tableConfig, tableConfigMigrations, onLog, sqlFilePath } = prostgles.opts;
   const createSchemaQ = await getTableConfigSchemaQueries(
     { fileTable, tableConfig, tableConfigMigrations, sqlFilePath, onLog },
-    utils
+    utils,
   );
 
   /**
@@ -72,11 +72,10 @@ export const applyTableConfig = async (prostgles: Prostgles, commit = false) => 
         [
           dropTablesQ,
           ...createSchemaQ.tableQueries,
-          ...createSchemaQ.fileTableSchemaQuery,
           ...createSchemaQ.indexQueries,
           ...createSchemaQ.constraintQueries,
           ...createSchemaQ.triggerQueries,
-        ].join("\n")
+        ].join("\n"),
       )
       .catch((err) => {
         console.error(getQueryErrorPositionInfo(err as ProstglesError));

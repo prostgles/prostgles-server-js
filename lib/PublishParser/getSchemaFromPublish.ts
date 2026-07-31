@@ -45,7 +45,7 @@ export async function getSchemaFromPublish(
      * Add file table to the list of published tables if it's referenced by other published tables.
      * Access to the file table is controlled through the publish rules of the tables referencing it.
      */
-    const fileTableName = this.prostgles.fileManager?.tableName;
+    const fileTableName = this.prostgles.opts.fileTable?.tableName;
     if (fileTableName && this.dbo[fileTableName]?.is_media && !tableNames.includes(fileTableName)) {
       const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
         t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
@@ -83,6 +83,7 @@ export async function getSchemaFromPublish(
           tableHandler,
           parsedTableRule,
           clientReq,
+          clientInfo,
           scope,
         );
         tables.push(tableSchema);

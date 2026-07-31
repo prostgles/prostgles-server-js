@@ -3,7 +3,7 @@ import { asName } from "prostgles-types";
 import type { DB } from "../initProstgles";
 import type { ProstglesInitOptions, TableConfigMigrations } from "../ProstglesTypes";
 import { fetchTableConstraints } from "./fetchTableConstraints";
-import type { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfigTypes";
 export type RequiredUndefined<T> = {
   [K in keyof Required<T>]: T[K];
 };

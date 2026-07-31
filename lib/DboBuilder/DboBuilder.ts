@@ -242,7 +242,7 @@ export class DboBuilder {
         tableOrViewInfo: tov,
         dboBuilder: this,
         tx: undefined,
-        config: this.prostgles.opts.tableConfig?.[tov.name],
+        config: this.prostgles.mergedTableConfig?.[tov.name],
         joinPaths: this.shortestJoinPaths,
       });
       this.dbo[tov.name] = tableHandler;
@@ -270,7 +270,7 @@ export class DboBuilder {
     }
 
     this.tableTsDefinitions = getDBGeneratedSchema({
-      config: this.prostgles.opts.tableConfig,
+      config: this.prostgles.mergedTableConfig,
       tablesOrViews,
     });
     this.functionTsDefinitions = getFunctionsTypescriptSchema(
@@ -306,7 +306,7 @@ export class DboBuilder {
   : { tsSchema: string; tablesOrViews: TableSchema[] } => {
     const getSchema = (tablesOrViews: TableSchema[]) => {
       const tableTsDefinitions = getDBGeneratedSchema({
-        config: this.prostgles.opts.tableConfig,
+        config: this.prostgles.mergedTableConfig,
         tablesOrViews: [
           ...tablesOrViews,
           ...extraTables.filter(
@@ -379,7 +379,7 @@ export class DboBuilder {
           tableOrViewInfo: tov,
           dboBuilder: this,
           tx: { t, dbTX },
-          config: this.prostgles.opts.tableConfig?.[tov.name],
+          config: this.prostgles.mergedTableConfig?.[tov.name],
           joinPaths: this.shortestJoinPaths,
         });
       });

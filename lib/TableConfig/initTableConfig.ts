@@ -5,15 +5,13 @@ import {
   log,
 } from "../PubSubManager/PubSubManagerUtils";
 import type { OnReadyCallbackBasic } from "../initProstgles";
-import type TableConfigurator from "./TableConfig";
-import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { fetchTableConstraints } from "./fetchTableConstraints";
+import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
-import { getPGIndexes } from "./getPGIndexes";
 import { getTableColumnQueries } from "./getTableColumnQueries";
-import { runMigrations } from "./runMigrations";
-import { md5 } from "prostgles-types/dist/md5";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
+import { runMigrations } from "./runMigrations";
+import type { TableConfigurator } from "./TableConfigurator";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -86,8 +84,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
   const MAX_IDENTIFIER_LENGTH = +(
     await this.db.one<{ max_identifier_length: number }>("SHOW max_identifier_length;")
   ).max_identifier_length;
-  if (!Number.isFinite(MAX_IDENTIFIER_LENGTH))
+  if (!Number.isFinite(MAX_IDENTIFIER_LENGTH)) {
     throw `Could not obtain a valid max_identifier_length`;
+  }
   const asName = (v: string) => {
     if (v.length > MAX_IDENTIFIER_LENGTH) {
       throw `The identifier name provided (${v}) is longer than the allowed limit (max_identifier_length = ${MAX_IDENTIFIER_LENGTH} characters )\n Longest allowed: ${_asName(v.slice(0, MAX_IDENTIFIER_LENGTH))} `;
@@ -351,4 +350,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
   await this.prostgles.refreshDBO();
   await this.setTableOnMounts();
+  /** Needed in case some onMounts change schema */
+  await this.prostgles.refreshDBO();
 };

@@ -9,7 +9,12 @@ import type {
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
-import type { AuthClientRequest, BasicSession, SessionUser } from "../Auth/AuthTypes";
+import type {
+  AuthClientRequest,
+  AuthResultWithSID,
+  BasicSession,
+  SessionUser,
+} from "../Auth/AuthTypes";
 import type { BasicCallback } from "../PubSubManager/PubSubManager";
 import type {
   DeleteRule,
@@ -87,25 +92,6 @@ export type SortItem = {
       fieldPosition: number;
     }
 );
-
-export type Media = {
-  id?: string;
-  title?: string;
-  extension?: string;
-  content_type?: string;
-  content_length?: number;
-  url?: string;
-  added?: Date;
-  signed_url?: string;
-  signed_url_expires?: number;
-  name?: string;
-  original_name?: string;
-  etag?: string;
-  deleted?: string | null;
-  deleted_from_storage?: string | null;
-};
-
-export type ParsedMedia = Required<Pick<Media, "extension" | "content_type">>;
 
 export type TxCB<R = any, TH = DbTxTableHandlers> = {
   (t: TH, _t: pgPromise.ITask<{}>): R;
@@ -199,6 +185,7 @@ export type LocalParams = {
   clientReq?: AuthClientRequest | undefined;
   isRemoteRequest?: {
     user?: UserLike | undefined;
+    clientInfo: AuthResultWithSID | undefined;
   };
   scope?: PermissionScope | undefined;
   func?: () => any;

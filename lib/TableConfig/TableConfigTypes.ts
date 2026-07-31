@@ -1,18 +1,16 @@
+import type pgPromise from "pg-promise";
 import type {
   ALLOWED_CONTENT_TYPE,
   ALLOWED_EXTENSION,
   AnyObject,
-  ColumnInfo,
   DBSchema,
   JSONB,
+  MaybePromise,
   StrictUnion,
 } from "prostgles-types";
-import { isObject } from "prostgles-types";
 import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
-import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
-import { uploadFile } from "../DboBuilder/uploadFile";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { DB, DBHandlerServer } from "../Prostgles";
 import type {
   AfterAllTsTrigger,
   AfterEachTsTrigger,
@@ -21,37 +19,14 @@ import type {
   SyncConfig,
   ValidateRowArgsCommon,
 } from "../PublishParser/PublishParser";
-import {
-  DEFAULT_SYNC_BATCH_SIZE,
-  DEFAULT_SYNC_THROTTLE,
-} from "../PubSubManager/PubSubManagerUtils";
-import { initTableConfig } from "./initTableConfig";
 
-type ColExtraInfo = {
+export type ColExtraInfo = {
   min?: string | number;
   max?: string | number;
   hint?: string;
 };
 
-type LangToTranslation = Record<string, string>;
-
-export const parseI18N = <Config extends LangToTranslation>(params: {
-  config?: Config | string;
-  lang?: string;
-  defaultLang: string;
-  defaultValue: string | undefined;
-}): undefined | string => {
-  const { config, lang, defaultLang, defaultValue } = params;
-  if (config) {
-    if (isObject(config)) {
-      return config[lang ?? defaultLang] ?? config[defaultLang];
-    } else if (typeof config === "string") {
-      return config;
-    }
-  }
-
-  return defaultValue;
-};
+export type LangToTranslation = Record<string, string>;
 
 type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
   info?: {
@@ -71,6 +46,17 @@ type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
     beforeEach?: BeforeEachTsTrigger<R, DBX>[];
     afterEach?: AfterEachTsTrigger<R, DBX>[];
     afterAll?: AfterAllTsTrigger<R, DBX>[];
+    onInsteadOfDelete?: (args: {
+      dbx: DBX;
+      tx: pgPromise.ITask<{}>;
+      returningQuery: string;
+      isOneOrNone: boolean;
+      queryType: "any" | "none";
+      filterOpts: {
+        where: string;
+        filter: AnyObject;
+      };
+    }) => Promise<AnyObject[]>;
   };
   triggers?: {
     [triggerName: string]: {
@@ -254,7 +240,7 @@ export type TableDefinition<
   onMount?: (params: {
     dbo: DBHandlerServer;
     _db: DB;
-  }) => Promise<void | { onUnmount: () => void }>;
+  }) => MaybePromise<void | { onUnmount: () => void }>;
   columns?: {
     [column_name: string]: ColumnConfig<LANG_IDS>;
   };
@@ -268,7 +254,7 @@ export type TableDefinition<
               dropIfExists?: boolean;
               /**
                * E.g.:
-               * colname
+               * columnName
                * col1, col2
                * col1 > col3
                */
@@ -352,188 +338,3 @@ export type TableConfig<LANG_IDS = { en: 1 }, S = void> =
   : {
       [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
     };
-
-/**
- * Will be run between initSQL and fileTable
- */
-export default class TableConfigurator {
-  instanceId = Date.now() + Math.random();
-
-  get config() {
-    return this.prostgles.opts.tableConfig ?? {};
-  }
-  get dbo(): DBHandlerServer {
-    if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";
-    return this.prostgles.dbo;
-  }
-  get db(): DB {
-    if (!this.prostgles.db) throw "this.prostgles.db missing";
-    return this.prostgles.db;
-  }
-  prostgles: Prostgles;
-
-  constructor(prostgles: Prostgles) {
-    this.prostgles = prostgles;
-  }
-
-  destroy = async () => {
-    for (const { onUnmount } of Object.values(this.tableOnMounts)) {
-      try {
-        await onUnmount();
-      } catch (error) {
-        console.error(error);
-      }
-    }
-  };
-
-  tableOnMounts: Record<string, { onUnmount: () => void | Promise<void> }> = {};
-  setTableOnMounts = async () => {
-    this.tableOnMounts = {};
-    for (const [tableName, tableConfig] of Object.entries(this.config)) {
-      if ("onMount" in tableConfig && tableConfig.onMount) {
-        const cleanup = await tableConfig.onMount({
-          dbo: this.dbo,
-          _db: this.db,
-        });
-        if (cleanup) {
-          this.tableOnMounts[tableName] = cleanup;
-        }
-      }
-    }
-  };
-
-  getColumnConfig = (tableName: string, colName: string): ColumnConfig | undefined => {
-    const tconf = this.config[tableName];
-    if (tconf && "columns" in tconf) {
-      return tconf.columns?.[colName];
-    }
-    return undefined;
-  };
-
-  getTableSyncConfig = (tableName: string) => {
-    const syncConfig = this.config[tableName]?.syncConfig;
-    return (
-      syncConfig && {
-        ...syncConfig,
-        batch_size: syncConfig.batch_size ?? DEFAULT_SYNC_BATCH_SIZE,
-        throttle: syncConfig.throttle ?? DEFAULT_SYNC_THROTTLE,
-      }
-    );
-  };
-
-  getTableLabel = (params: { tableName: string; lang?: string }) => {
-    const tconf = this.config[params.tableName];
-
-    return parseI18N({
-      config: tconf?.info?.label,
-      lang: params.lang,
-      defaultLang: "en",
-      defaultValue: params.tableName,
-    });
-  };
-
-  getColInfo = (params: {
-    col: string;
-    table: string;
-    lang?: string;
-  }): (ColExtraInfo & { label?: string } & Pick<ColumnInfo, "jsonbSchema">) | undefined => {
-    const colConf = this.getColumnConfig(params.table, params.col);
-    let result: Partial<ReturnType<typeof this.getColInfo>> = undefined;
-    if (colConf) {
-      if (isObject(colConf)) {
-        const { jsonbSchema, jsonbSchemaType, info } = colConf;
-        result = {
-          ...info,
-          ...((jsonbSchema || jsonbSchemaType) && {
-            jsonbSchema: {
-              nullable: colConf.nullable,
-              ...(jsonbSchema || { type: jsonbSchemaType }),
-            },
-          }),
-        };
-
-        /**
-         * Get labels from TableConfig if specified
-         */
-        if (colConf.label) {
-          const { lang } = params;
-          const lbl = colConf.label;
-          if (["string", "object"].includes(typeof lbl)) {
-            if (typeof lbl === "string") {
-              result ??= {};
-              result.label = lbl;
-            } else if (lang && (lbl[lang as "en"] || lbl.en)) {
-              result ??= {};
-              result.label = lbl[lang as "en"] || lbl.en;
-            }
-          }
-        }
-      }
-    }
-
-    return result;
-  };
-
-  checkColVal = (params: { col: string; table: string; value?: number | string }): void => {
-    const conf = this.getColInfo(params);
-    if (conf) {
-      const { value } = params;
-      const { min, max } = conf;
-      if (min !== undefined && value !== undefined && value < min)
-        throw `${params.col} must be greater than ${min}`;
-      if (max !== undefined && value !== undefined && value > max)
-        throw `${params.col} must be less than ${max}`;
-    }
-  };
-
-  getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
-    if (
-      sourceTable in this.config &&
-      this.config[sourceTable] &&
-      "columns" in this.config[sourceTable]
-    ) {
-      const td = this.config[sourceTable];
-      if ("columns" in td && td.columns?.[targetTable]) {
-        const cd = td.columns[targetTable];
-        if (isObject(cd) && "joinDef" in cd) {
-          if (!cd.joinDef) throw "cd.joinDef missing";
-          const { joinDef } = cd;
-          const res: JoinInfo = {
-            expectOne: false,
-            paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
-              source: sourceTable,
-              target: targetTable,
-              table,
-              on,
-            })),
-          };
-
-          return res;
-        }
-      }
-    }
-    return undefined;
-  };
-
-  getPreInsertRow = async (
-    tableHandler: TableHandler,
-    args: Pick<
-      GetPreInsertRowArgs,
-      "localParams" | "row" | "validate" | "dbx" | "tx" | "command" | "data"
-    >,
-  ): Promise<AnyObject> => {
-    const tableHook = this.config[tableHandler.name]?.hooks?.getPreInsertRow;
-    if (tableHandler.is_media) {
-      return uploadFile.bind(tableHandler)(args);
-    }
-    if (tableHook) {
-      return tableHook(args);
-    }
-
-    return args.row;
-  };
-
-  prevInitQueryHistory?: string[];
-  initialising = false;
-  init = initTableConfig.bind(this);
-}

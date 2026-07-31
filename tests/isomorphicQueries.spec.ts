@@ -21,6 +21,7 @@ export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
   sql: SQLHandler | undefined,
   log: (msg: string, extra?: any) => void,
+  token?: string,
 ) => {
   log("Starting isomorphic queries");
 
@@ -70,6 +71,7 @@ export const isomorphicQueries = async (
         await db.items.delete!({});
       }
       await sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
+      await sql!(`TRUNCATE users_public_info RESTART IDENTITY CASCADE;`);
     });
 
     await test("Error structure malformed array literal", async () => {
@@ -151,6 +153,10 @@ export const isomorphicQueries = async (
         ...tableInfo
       } = (await db.items.getInfo?.()) ?? {};
       assert.deepStrictEqual(tableInfo, {
+        clientSchemaTest: {
+          sid: token,
+          tableIndex: 0,
+        },
         comment: null,
         label: "items",
         qualifiedNameParts: {
@@ -337,10 +343,12 @@ export const isomorphicQueries = async (
       const file = await db.files.insert!(mediaFile, { returning: "*" });
       const _data = fs.readFileSync(fileFolder + file.name);
       assert.equal(str, _data.toString("utf8"));
-
+      assert.deepStrictEqual((await db.files.findOne!())!.metadata, {
+        description: "Updated by afterEach hook",
+      });
       await tryRun("Nested insert", async () => {
         const nestedInsert = await db.users_public_info.insert!(
-          { name: "somename.txt", avatar: mediaFile },
+          { name: "some_user", avatar: mediaFile },
           { returning: "*" },
         );
         const { name, avatar } = nestedInsert;
@@ -354,7 +362,7 @@ export const isomorphicQueries = async (
           },
         );
 
-        assert.equal(name, "somename.txt");
+        assert.equal(name, "some_user");
       });
     });
 

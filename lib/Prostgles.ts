@@ -1,6 +1,5 @@
 import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
-import { FileManager } from "./FileManager/FileManager";
 import type { OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
@@ -10,7 +9,7 @@ import pg = require("pg-promise/typescript/pg-subset");
 
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import { RestApi } from "./RestApi";
-import TableConfigurator from "./TableConfig/TableConfig";
+import { TableConfigurator } from "./TableConfig/TableConfigurator";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 import { DBHandlerServer, DboBuilder } from "./DboBuilder/DboBuilder";
@@ -59,8 +58,9 @@ const DEFAULT_KEYWORDS = {
 
 import { randomUUID } from "crypto";
 import * as fs from "fs";
-import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
+import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
+import { getFileTableConfig } from "./FileManager/getFileTableConfig";
 
 export class Prostgles {
   /**
@@ -108,10 +108,13 @@ export class Prostgles {
   dbEventsManager?: DBEventsManager;
   schemaAge = "0";
 
-  fileManager?: FileManager;
   restApi?: RestApi;
 
   tableConfigurator?: TableConfigurator;
+
+  get mergedTableConfig() {
+    return getFileTableConfig(this);
+  }
 
   isMedia(tableName: string) {
     return this.opts.fileTable?.tableName === tableName;
@@ -147,6 +150,8 @@ export class Prostgles {
       onLog: 1,
       restApi: 1,
       testRulesOnConnect: 1,
+      modifyClientSchema: 1,
+      expressApp: 1,
     };
     const unknownParams = Object.keys(params).filter(
       (key: string) => !Object.keys(config).includes(key),
@@ -157,10 +162,6 @@ export class Prostgles {
 
     this.opts = { ...this.opts, ...params };
 
-    /* set defaults */
-    if (this.opts.fileTable) {
-      this.opts.fileTable.tableName ??= "media";
-    }
     this.opts.schemaFilter ??= { public: 1 };
 
     this.keywords = {
@@ -195,10 +196,8 @@ export class Prostgles {
     if (this.opts.tsGeneratedTypesDir) {
       const { fullPath, fileName } = this.getTSFileName();
       const { tsSchema: fileContent } = this.dboBuilder.getTsDefinitions();
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.readFile(fullPath, "utf8", function (err, data) {
         if (err || force || data !== fileContent) {
-          // eslint-disable-next-line security/detect-non-literal-fs-filename
           fs.writeFileSync(fullPath, fileContent);
           console.log("Prostgles: Created typescript schema definition file: \n " + fileName);
         }
@@ -285,39 +284,6 @@ export class Prostgles {
     return res.data;
   };
 
-  /* Create media table if required */
-  initFileTable = async () => {
-    const res = await tryCatchV2(async () => {
-      if (this.opts.fileTable) {
-        const { cloudClient, localConfig, imageOptions } = this.opts.fileTable;
-        await this.refreshDBO();
-        if (!cloudClient && !localConfig)
-          throw "fileTable missing param: Must provide awsS3Config OR localConfig";
-
-        this.fileManager = new FileManager(cloudClient || localConfig!, imageOptions);
-
-        try {
-          await this.fileManager.init(this);
-        } catch (e) {
-          console.error("FileManager: ", e);
-          this.fileManager = undefined;
-        }
-      } else {
-        this.fileManager?.destroy();
-        this.fileManager = undefined;
-      }
-      await this.refreshDBO();
-      return { data: {} };
-    });
-    await this.opts.onLog?.({
-      type: "debug",
-      command: "initFileTable",
-      ...res,
-    });
-    if (res.error !== undefined) throw res.error;
-    return res.data;
-  };
-
   isSuperUser = false;
 
   init = initProstgles.bind(this);
@@ -365,7 +331,6 @@ export async function getIsSuperUser(db: DBorTx): Promise<boolean> {
 
 export const getFileText = (fullPath: string, _format = "utf8"): Promise<string> => {
   return new Promise((resolve, reject) => {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.readFile(fullPath, "utf8", function (err, data) {
       if (err) reject(err);
       else resolve(data);

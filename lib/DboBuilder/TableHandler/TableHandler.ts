@@ -17,8 +17,7 @@ import type {
   UpdateRule,
 } from "../../PublishParser/PublishParser";
 import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
-import type TableConfigurator from "../../TableConfig/TableConfig";
-import type { TableDefinition } from "../../TableConfig/TableConfig";
+import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
@@ -35,6 +34,7 @@ import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
 import { isApplicableHook } from "./isApplicableHook";
+import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -85,6 +85,7 @@ export class TableHandler extends ViewHandler {
     row: AnyObject,
     localParams: LocalParams | undefined,
     command: "insert" | "update",
+    filter: AnyObject | undefined,
   ) => {
     const transaction = this.getTransaction(localParams);
     const hooks = this.getBeforeHooks(command, [row]);
@@ -94,11 +95,12 @@ export class TableHandler extends ViewHandler {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
       const hookResult = await hook.validate({
-        command: "insert",
+        command,
         data: newRow,
         dbx: this.getFinalDbo(localParams),
         localParams,
         tx: transaction?.t || this.db,
+        filter,
       });
       if (hookResult) {
         newRow = hookResult.row;
@@ -177,7 +179,8 @@ export class TableHandler extends ViewHandler {
     const hasBeforeHooks =
       command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
     return {
-      shouldWrap: !transaction && (hasAfterChecks || hasBeforeHooks),
+      shouldWrap:
+        !transaction && (hasAfterChecks || hasBeforeHooks || this.config?.hooks?.onInsteadOfDelete),
       hasBeforeHooks,
       hasAfterChecks,
     };

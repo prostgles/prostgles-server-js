@@ -21,6 +21,24 @@ export const clientOnlyQueries = async (
   token: string,
 ) => {
   await describe("Client only queries", async (t) => {
+    await test("modifyClientSchema adds custom table and column metadata", async () => {
+      const planesTable = tableSchema.find((table) => table.name === "planes") as
+        | (DBSchemaTable & {
+            clientSchemaTest?: { sid?: string; tableIndex: number };
+          })
+        | undefined;
+      assert.equal(planesTable?.clientSchemaTest?.sid, token);
+      assert.equal(typeof planesTable?.clientSchemaTest?.tableIndex, "number");
+
+      const idColumn = planesTable?.columns.find((column) => column.name === "id") as
+        | (DBSchemaTable["columns"][number] & {
+            clientSchemaTest?: { sid?: string; columnIndex: number };
+          })
+        | undefined;
+      assert.equal(idColumn?.clientSchemaTest?.sid, token);
+      assert.equal(typeof idColumn?.clientSchemaTest?.columnIndex, "number");
+    });
+
     // await test("Social auth redirect routes work", async ( ) => {
     //   assert.equal(!!auth.login.withProvider.github, true);
     //   const response = await fetch("http://localhost:3001/auth/github");

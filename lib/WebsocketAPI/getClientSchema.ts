@@ -42,7 +42,13 @@ export async function getClientSchema(
     const tablesWithSelectRules = new Set(
       fullSchema?.tables.filter((t) => t.publishInfo.select).map((t) => t.name) ?? [],
     );
-    const { tables = [], tableSchemaErrors = {} } = fullSchema ?? {};
+    const { tables: rawTables = [] } = fullSchema ?? {};
+    const { tableSchemaErrors = {} } = fullSchema ?? {};
+    const { modifyClientSchema } = this.opts;
+    const tables =
+      modifyClientSchema ?
+        await Promise.all(rawTables.map(async (t) => modifyClientSchema(t, userData)))
+      : rawTables;
     const joinTables2: string[][] = [];
     if (this.opts.joins) {
       const _joinTables2 = this.dboBuilder

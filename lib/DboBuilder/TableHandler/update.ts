@@ -2,18 +2,17 @@ import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
+import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import { prepareNewData } from "./DataValidator";
+import { getInsertTableRules } from "./insert/getInsertTableRules";
 import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import type { TableHandler } from "./TableHandler";
-import { updateFile } from "./updateFile";
-import { getInsertTableRules } from "./insert/getInsertTableRules";
-import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 
 export async function update(
   this: TableHandler,
   filter: Filter,
-  _newData: AnyObject,
+  newData: AnyObject,
   params?: UpdateParams,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
@@ -26,25 +25,15 @@ export async function update(
       this.dboBuilder.getTX((th) =>
         (th[this.name] as Partial<typeof this> | undefined)?.[ACTION]?.(
           filter,
-          _newData,
+          newData,
           params,
           tableRules,
           localParams,
         ),
       );
     const rule = tableRules?.[ACTION];
-    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams, [_newData]).shouldWrap) {
+    if (this.shouldWrapInTx({ name: ACTION, rule }, localParams, [newData]).shouldWrap) {
       return wrapInTx();
-    }
-
-    let newData = _newData;
-    if (this.is_media) {
-      ({ newData } = await updateFile.bind(this)({
-        newData,
-        filter,
-        localParams,
-        tableRules,
-      }));
     }
 
     const parsedRules = await this.parseUpdateRules(filter, params, tableRules, localParams);
@@ -76,7 +65,7 @@ export async function update(
         );
     }
 
-    const beforeResult = await this.beforeEach(newData, localParams, "update");
+    const beforeResult = await this.beforeEach(newData, localParams, "update", filter);
     newData = beforeResult.row;
 
     const { data, allowedCols } = prepareNewData({
@@ -206,7 +195,7 @@ export async function update(
     await this._log({
       command: "update",
       localParams,
-      data: { filter, _newData, params },
+      data: { filter, newData, params },
       duration: Date.now() - start,
     });
     beforeResult.successCallbacks.forEach((cb) => cb());
@@ -215,7 +204,7 @@ export async function update(
     await this._log({
       command: "update",
       localParams,
-      data: { filter, _newData, params },
+      data: { filter, newData, params },
       duration: Date.now() - start,
       error: getErrorAsObject(e),
     });

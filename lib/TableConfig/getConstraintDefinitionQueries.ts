@@ -1,5 +1,5 @@
 import { asName } from "prostgles-types";
-import type { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfigTypes";
 
 type Args = {
   tableName: string;

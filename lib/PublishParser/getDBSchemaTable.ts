@@ -1,5 +1,5 @@
 import { getObjectEntries, includes, type DBSchemaTable } from "prostgles-types";
-import type { AuthClientRequest } from "../Auth/AuthTypes";
+import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { TABLE_METHODS } from "../Prostgles";
@@ -11,6 +11,7 @@ export const getDBSchemaTable = async (
   tableHandler: TableHandler,
   parsedTableRule: ParsedTableRule,
   clientReq: AuthClientRequest,
+  clientInfo: AuthResultWithSID | undefined,
   scope: PermissionScope | undefined,
 ): Promise<DBSchemaTable> => {
   const tableName = tableHandler.name;
@@ -20,11 +21,13 @@ export const getDBSchemaTable = async (
   }
   const info = await tableHandler.getInfo(undefined, undefined, undefined, parsedTableRule, {
     ...clientReq,
-    isRemoteRequest: {},
+    isRemoteRequest: {
+      clientInfo,
+    },
   });
   const columns = await tableHandler.getColumns(undefined, undefined, undefined, parsedTableRule, {
     ...clientReq,
-    isRemoteRequest: {},
+    isRemoteRequest: { clientInfo },
   });
   const allowedCommands = getAllowedTableMethods(info);
   for (const method of allowedCommands) {

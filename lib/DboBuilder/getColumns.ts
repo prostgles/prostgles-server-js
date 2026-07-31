@@ -44,7 +44,7 @@ export async function getColumns(
       }
     }
 
-    const columns: ValidatedColumnInfo[] = this.columns
+    const rawColumns: ValidatedColumnInfo[] = this.columns
       .filter((c) => {
         const { insert, select, update } = rules;
 
@@ -64,13 +64,13 @@ export async function getColumns(
         let update = !!c.privileges.UPDATE;
 
         const prostgles = this.dboBuilder.prostgles;
-        const fileConfig = prostgles.fileManager?.getColInfo({
+        const fileConfig = getFileColumnInfo({
           colName: c.name,
-          tableName: this.name,
+          tableHandler: this,
         });
 
         /** Do not allow updates to file table unless it's to delete fields */
-        if (prostgles.fileManager?.config && prostgles.fileManager.tableName === this.name) {
+        if (prostgles.opts.fileTable?.tableName === this.name) {
           update = false;
         }
 
@@ -110,6 +110,17 @@ export async function getColumns(
       })
       .filter((c) => c.select || c.update || c.delete || c.insert);
 
+    const modifiedTableSchema = await this.dboBuilder.prostgles.opts.modifyClientSchema?.(
+      {
+        name: this.name,
+        ...(await this.getInfo()),
+        columns: rawColumns,
+      },
+      localParams?.isRemoteRequest?.clientInfo,
+    );
+
+    const columns = modifiedTableSchema?.columns ?? rawColumns;
+
     await this._log({
       command: "getColumns",
       localParams,
@@ -141,3 +152,28 @@ function capitalizeFirstLetter(string: string, nonalpha_replacement?: string): s
   const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+const getFileColumnInfo = (args: {
+  tableHandler: ViewHandler;
+  colName: string;
+}): ValidatedColumnInfo["file"] | undefined => {
+  const fileTableConfig = args.tableHandler.dboBuilder.prostgles.opts.fileTable;
+  if (!fileTableConfig) return undefined;
+  const { colName, tableHandler } = args;
+  const tableName = tableHandler.name;
+  const tableConfig = fileTableConfig.referencedTables?.[tableName];
+  const isReferencingFileTable = tableHandler.columns.some(
+    (c) =>
+      c.name === colName &&
+      c.references &&
+      c.references.some(({ ftable }) => ftable === fileTableConfig.tableName),
+  );
+  const allowAllFiles = { acceptedContent: "*" } as const;
+  if (isReferencingFileTable) {
+    if (tableConfig && typeof tableConfig !== "string") {
+      return tableConfig.referenceColumns[colName] ?? allowAllFiles;
+    }
+    return allowAllFiles;
+  }
+  return undefined;
+};

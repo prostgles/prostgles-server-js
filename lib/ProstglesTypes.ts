@@ -1,14 +1,18 @@
-import type { FileColumnConfig } from "prostgles-types";
-import type { AuthConfig, AuthRequestParams, SessionUser } from "./Auth/AuthTypes";
+import type { DBSchemaTable, FileColumnConfig, MaybePromise } from "prostgles-types";
+import type {
+  AuthConfig,
+  AuthRequestParams,
+  AuthResultWithSID,
+  SessionUser,
+} from "./Auth/AuthTypes";
 import type { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-import type { CloudClient, ImageOptions, LocalConfig } from "./FileManager/FileManager";
+import type { StorageClient } from "./FileManager/FileManager";
 import type { DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
 import type { ExpressApp, RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
-import type { TableConfig } from "./TableConfig/TableConfig";
-import type { Express } from "express";
+import type { TableConfig } from "./TableConfig/TableConfigTypes";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
@@ -16,8 +20,8 @@ import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
 import type { AnyObject } from "prostgles-types";
 import type { Server } from "socket.io";
-import type { Awaitable, Publish, PublishParams } from "./PublishParser/PublishParser";
 import type { ServerFunctionDefinitions } from "./PublishParser/defineServerFunction";
+import type { Awaitable, Publish, PublishParams } from "./PublishParser/PublishParser";
 
 /**
  * Allows uploading and downloading files.
@@ -37,9 +41,8 @@ import type { ServerFunctionDefinitions } from "./PublishParser/defineServerFunc
 export type FileTableConfig = {
   /**
    * Name of the table that will contain the file metadata.
-   * Defaults to "files"
    */
-  tableName?: string;
+  tableName: string;
 
   /**
    * GET path used in serving media. defaults to /${tableName}
@@ -57,15 +60,10 @@ export type FileTableConfig = {
      */
     deleteAfterNDays: number;
     /**
-     * How freuquently the files will be checked for deletion delay
+     * How frequently the files will be checked for deletion delay
      */
     checkIntervalHours?: number;
   };
-
-  /**
-   * Express server instance
-   */
-  expressApp: ExpressApp | Express;
 
   /**
    * Specifying referencedTables with referenceColumns allows restricting the
@@ -78,18 +76,12 @@ export type FileTableConfig = {
      * */
     { type: "column"; referenceColumns: Record<string, FileColumnConfig> };
   };
-  imageOptions?: ImageOptions;
 
   /**
    * Callbacks for file upload and download.
    * Used for custom file handling.
    */
-  cloudClient?: CloudClient;
-
-  /**
-   * Local file storage configuration.
-   */
-  localConfig?: LocalConfig;
+  storageClient: StorageClient;
 };
 
 export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
@@ -99,6 +91,11 @@ export type Join = {
   type: (typeof JOIN_TYPES)[number];
 };
 type Joins = Join[] | "inferred";
+
+type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (
+  tables: DBSchemaTable,
+  userData: AuthResultWithSID<SUser> | undefined,
+) => MaybePromise<DBSchemaTable>;
 
 export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
   /**
@@ -128,6 +125,14 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Socket.IO server instance object required to allow clients to connect through websockets
    */
   io?: Server;
+
+  /**
+   * Express server instance used for:
+   * - Auth
+   * - REST API
+   * - Serving files through the file manager
+   */
+  expressApp?: ExpressApp;
 
   /**
    * Rest API configuration.
@@ -189,7 +194,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
 
   /**
    * Allows defining table relationships that can then be used in filters and data inserts:
-   *  - `infered` - uses the foreign keys to infer the joins
+   *  - `inferred` - uses the foreign keys to infer the joins
    *  - `Join[]` - specifies the joins manually
    */
   joins?: Joins;
@@ -307,9 +312,15 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   tableConfigMigrations?: TableConfigMigrations;
 
   /**
-   * Usefull for logging or debugging
+   * Useful for logging or debugging
    */
   onLog?: (evt: EventInfo) => Promise<void> | void;
+
+  /**
+   * Used to add custom metadata to the table and column schemas.
+   * This metadata is then available in the client schema and can be used for custom logic on the client side.
+   */
+  modifyClientSchema?: ModifyClientSchema<SUser>;
 };
 
 export type TableConfigMigrations = {

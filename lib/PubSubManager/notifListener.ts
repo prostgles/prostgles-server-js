@@ -15,8 +15,6 @@ export async function notifListener(this: PubSubManager, data: { payload: string
   const dataArr = str.split(DELIMITER);
   const notifType = dataArr[0] as NotifTypeName;
 
-  log(str);
-
   const commonLog = {
     triggers: this._triggers,
     sid: undefined,

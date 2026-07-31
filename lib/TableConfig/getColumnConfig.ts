@@ -1,9 +1,9 @@
-import type { ColumnConfig, TableConfig } from "../TableConfig/TableConfig";
+import type { ColumnConfig, TableConfig } from "./TableConfigTypes";
 
 export const getColumnConfig = (
   config: TableConfig,
   tableName: string,
-  colName: string
+  colName: string,
 ): ColumnConfig | undefined => {
   const tconf = config[tableName];
   if (tconf && "columns" in tconf) {

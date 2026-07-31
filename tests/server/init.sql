@@ -240,4 +240,6 @@ SELECT i.*
 FROM items i
 CROSS JOIN LATERAL pg_sleep(15);
 
--- DROP TABLE media CASCADE;
+
+DROP TABLE users_public_info CASCADE;
+DROP TABLE files CASCADE;

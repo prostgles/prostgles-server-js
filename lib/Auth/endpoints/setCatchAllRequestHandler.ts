@@ -10,10 +10,14 @@ import { matchesRoute } from "../utils/matchesRoute";
 export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
     const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
-    const { restApi, fileManager, authHandler } = this.prostgles;
+    const {
+      restApi,
+      opts: { fileTable },
+      authHandler,
+    } = this.prostgles;
     const pathsHandledByProstgles = [
       restApi?.path,
-      fileManager?.path,
+      fileTable && (fileTable.fileServePath ?? `/${fileTable.tableName}`),
       authHandler.opts.loginSignupConfig?.loginWithOAuth && this.authRoutes.loginWithProvider,
     ].filter(isDefined);
     if (pathsHandledByProstgles.some((path) => matchesRoute(path, req.path))) {

@@ -132,7 +132,7 @@ export const runClientRequest = async function (
     );
   const localParams: LocalParams = {
     clientReq,
-    isRemoteRequest: { user: sessionUser },
+    isRemoteRequest: { user: sessionUser, clientInfo },
     scope,
   };
 

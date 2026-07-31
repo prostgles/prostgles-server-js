@@ -55,6 +55,19 @@ export const clientRestApi = async (
 
       const restTableSchema = await post({ path: "schema", token });
       assert.deepStrictEqual(tableSchema, restTableSchema.tableSchema);
+      const planesTable = restTableSchema.tableSchema.find((table) => table.name === "planes") as
+        | (DBSchemaTable & {
+            clientSchemaTest?: { sid?: string; tableIndex: number };
+          })
+        | undefined;
+      assert.equal(planesTable?.clientSchemaTest?.sid, token);
+
+      const idColumn = planesTable?.columns.find((column) => column.name === "id") as
+        | (DBSchemaTable["columns"][number] & {
+            clientSchemaTest?: { sid?: string; columnIndex: number };
+          })
+        | undefined;
+      assert.equal(idColumn?.clientSchemaTest?.sid, token);
       await Promise.all(
         tableSchema.map(async ({ name, columns, ...otherInfo }) => {
           const cols = await db[name]?.getColumns?.();

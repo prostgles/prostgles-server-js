@@ -140,16 +140,31 @@ export async function _delete(
       return queryToReturn as unknown[];
     }
 
-    /**
-     * Delete file
-     */
-    if (this.is_media) {
-      const result = await onDeleteFromFileTable.bind(this)({
-        localParams,
+    const transaction = this.getTransaction(localParams);
+    const dbHandler = transaction?.t ?? this.db;
+
+    const isOneOrNone = includes(["row", "value"], params?.returnType);
+    const queryPromise = () =>
+      isOneOrNone ?
+        dbHandler.oneOrNone<AnyObject>(queryWithRLS).then((data) => (data ? [data] : []))
+      : dbHandler.any<AnyObject>(queryWithRLS);
+
+    const onInsteadOfDelete = this.config?.hooks?.onInsteadOfDelete;
+    if (onInsteadOfDelete) {
+      if (!transaction) {
+        throw new Error(
+          "onInsteadOfDelete requires a transaction. Please wrap the delete call in a transaction.",
+        );
+      }
+      const result = await onInsteadOfDelete({
         queryType,
-        returningQuery: undefined,
+        isOneOrNone,
+        dbx: transaction.dbTX,
+        tx: transaction.t,
+        returningQuery,
         filterOpts,
       });
+
       await this._log({
         command: "delete",
         localParams,
@@ -158,16 +173,7 @@ export async function _delete(
       });
       return result;
     }
-
-    const dbHandler = this.getTransaction(localParams)?.t ?? this.db;
-
-    const isOneOrNone = includes(["row", "value"], params?.returnType);
-    const queryPromise =
-      isOneOrNone ?
-        dbHandler.oneOrNone<AnyObject>(queryWithRLS).then((data) => (data ? [data] : []))
-      : dbHandler.any<AnyObject>(queryWithRLS);
-
-    const deletedRows = await queryPromise.catch((err) =>
+    const deletedRows = await queryPromise().catch((err) =>
       rejectWithPGClientError(err, {
         type: "tableMethod",
         localParams,

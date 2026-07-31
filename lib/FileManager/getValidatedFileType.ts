@@ -1,13 +1,7 @@
-import type {
-  ALLOWED_CONTENT_TYPE} from "prostgles-types";
-import {
-  ALLOWED_EXTENSION,
-  CONTENT_TYPE_TO_EXT,
-  getKeys,
-  isObject,
-} from "prostgles-types";
+import type { ALLOWED_CONTENT_TYPE } from "prostgles-types";
+import { CONTENT_TYPE_TO_EXT, getKeys, isObject } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
-import type { FileManager} from "./FileManager";
+import type { FileTableConfig } from "../ProstglesTypes";
 import { getFileType, getFileTypeFromFilename } from "./FileManager";
 
 type Args = {
@@ -16,19 +10,17 @@ type Args = {
   colName?: string;
   tableName?: string;
 };
-export async function getValidatedFileType(
-  this: FileManager,
-  args: Args
+export const getValidatedFileType = async (
+  config: FileTableConfig,
+  args: Args,
 ): Promise<{
   mime: ALLOWED_CONTENT_TYPE;
-  ext: string; //| ALLOWED_EXTENSION;
+  ext: string;
 
   /** File name is not returned because we fail if the extensions do not match */
   // fileName: string;
-}> {
+}> => {
   const { file, fileName, tableName, colName } = args;
-  const config = this.prostgles?.opts.fileTable;
-  if (!config) throw new Error("File table config missing");
 
   const buffer = typeof file === "string" ? Buffer.from(file, "utf8") : file;
 
@@ -55,7 +47,7 @@ export async function getValidatedFileType(
         const allowedContent = parseFieldFilter(colConfig.acceptedContent, false, CONTENTS);
         if (!allowedContent.some((c) => mime.mime.startsWith(c))) {
           throw new Error(
-            `Dissallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `
+            `Disallowed content type provided: ${mime.mime.split("/")[0]}. Allowed content types: ${allowedContent} `,
           );
         }
       } else if (
@@ -67,12 +59,12 @@ export async function getValidatedFileType(
         const allowedContentTypes = parseFieldFilter(
           colConfig.acceptedContentType,
           false,
-          getKeys(CONTENT_TYPE_TO_EXT)
+          getKeys(CONTENT_TYPE_TO_EXT),
         );
 
         if (!allowedContentTypes.some((c) => c === mime.mime)) {
           throw new Error(
-            `Dissallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `
+            `Disallowed MIME provided: ${mime.mime}. Allowed MIME values: ${allowedContentTypes} `,
           );
         }
       } else if (
@@ -84,12 +76,12 @@ export async function getValidatedFileType(
         const allowedExtensions = parseFieldFilter(
           colConfig.acceptedFileTypes,
           false,
-          Object.values(CONTENT_TYPE_TO_EXT).flat()
+          Object.values(CONTENT_TYPE_TO_EXT).flat(),
         );
 
         if (!allowedExtensions.some((c) => c === mime.ext)) {
           throw new Error(
-            `Dissallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `
+            `Disallowed extension provided: ${mime.ext}. Allowed extension values: ${allowedExtensions} `,
           );
         }
       }
@@ -97,4 +89,4 @@ export async function getValidatedFileType(
   }
   if (!result?.mime) throw `File MIME type not found for the provided extension: ${result?.ext}`;
   return result;
-}
+};

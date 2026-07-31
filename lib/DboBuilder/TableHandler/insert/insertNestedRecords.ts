@@ -24,26 +24,22 @@ export async function insertNestedRecords(
   this: TableHandler,
   { data, insertParams, tableRules, localParams }: InsertNestedRecordsArgs,
 ) {
-  const MEDIA_COL_NAMES = ["data", "name"];
-
   const getExtraKeys = (row: AnyObject) =>
     getKeys(row).filter((fieldName) => {
-      /* If media then use file insert columns */
-      if (this.is_media) {
-        return !this.column_names.concat(MEDIA_COL_NAMES).includes(fieldName);
-      } else if (!this.columns.find((c) => c.name === fieldName)) {
-        if (
-          !isObject(row[fieldName]) &&
-          !Array.isArray(row[fieldName]) &&
-          row[fieldName] !== undefined
-        ) {
-          throw new Error("Invalid/Disallowed field in data: " + fieldName);
-        } else if (!this.dboBuilder.dbo[fieldName]) {
-          return false;
-        }
-        return true;
+      const matchingColumn = this.columns.find((c) => c.name === fieldName);
+      if (matchingColumn) return false;
+      if (
+        !isObject(row[fieldName]) &&
+        !Array.isArray(row[fieldName]) &&
+        row[fieldName] !== undefined
+      ) {
+        throw new Error(
+          `Invalid/Disallowed field in data: ${fieldName}. If inserting nested records, the field must be an object or array.`,
+        );
+      } else if (!this.dboBuilder.dboMap.get(fieldName)) {
+        return false;
       }
-      return false;
+      return true;
     });
 
   /**

@@ -41,7 +41,7 @@ export type LoginClientInfo = {
 };
 
 export type BasicSession = {
-  /** Must be hard to bruteforce */
+  /** Must be hard to brute-force */
   sid: string;
 
   /** UNIX millisecond timestamp */
@@ -110,8 +110,7 @@ export type Email = {
 };
 
 type PasswordRegisterResponse =
-  | AuthResponse.PasswordRegisterFailure
-  | AuthResponse.PasswordRegisterSuccess;
+  AuthResponse.PasswordRegisterFailure | AuthResponse.PasswordRegisterSuccess;
 
 /**
  * Users have to provide an email and optionally a password.
@@ -233,7 +232,7 @@ export type SessionUser<
   ClientUser extends UserLike = UserLike,
 > = {
   /**
-   * This user will be available in all serverside prostgles options
+   * This user will be available in all server-side prostgles options
    * id and type values will be available in the prostgles.user session variable in postgres
    * */
   user: ServerUser;
@@ -292,7 +291,7 @@ export type AuthRequestParams<S, SUser extends SessionUser> = {
 
 export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   /**
-   * Name of the cookie or socket hadnshake query param that represents the session id.
+   * Name of the cookie or socket handshake query param that represents the session id.
    * Defaults to "session_id"
    */
   sidKeyName?: string;
@@ -314,7 +313,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    * - publish - userData and/or sid (in testing) are passed to the publish function
    * - auth.expressConfig.use - express middleware to get user data and
    *    undefined sid is allowed to enable public users
-   * - websocket authguard - when session expires tells the client to reload to be redirected to login
+   * - websocket auth guard - when session expires tells the client to reload to be redirected to login
    */
   getUser: (
     sid: string | undefined,
@@ -426,7 +425,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    * If defined, will enable:
    * - GET /magic-link/:id route.
    * - POST /magic-link { email, code } route.
-   * Successfull requests that return a session will be logged in
+   * Successful requests that return a session will be logged in
    * and redirected to the returnUrl if set.
    * Otherwise just the response will be sent
    */

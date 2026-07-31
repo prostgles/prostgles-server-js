@@ -80,6 +80,7 @@ export type DBGeneratedSchema = {
       etag?: null | string;
       extension: string;
       id?: string;
+      metadata?: null | {    description: string;  };
       name: string;
       original_name: string;
       signed_url?: null | string;

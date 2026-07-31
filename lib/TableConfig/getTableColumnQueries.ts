@@ -3,7 +3,7 @@ import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../JSONBSchemaValidation/va
 import type { DB, DBHandlerServer } from "../Prostgles";
 import { getColumnSQLDefinitionQuery, getTableColumns } from "./getColumnSQLDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
-import type { TableConfig } from "./TableConfig";
+import type { TableConfig } from "./TableConfigTypes";
 
 type Args = {
   db: DB;
@@ -30,7 +30,7 @@ export const getTableColumnQueries = async ({
       isCreate: boolean;
     }
 > => {
-  let newColumnDefs: string[] = [];
+  const newColumnDefinitions: string[] = [];
   const droppedColNames: string[] = [];
   const alteredColQueries: string[] = [];
   let fullQuery = "";
@@ -62,7 +62,7 @@ export const getTableColumnQueries = async ({
     return typeof colDef === "string" || !("joinDef" in colDef);
   });
 
-  const colDefs: { name: string; def: string }[] = [];
+  const columnDefinitions: { name: string; def: string }[] = [];
 
   for (const [colName, colConf] of columns) {
     /* Get column definition */
@@ -73,25 +73,25 @@ export const getTableColumnQueries = async ({
       table: tableName,
     });
     if (colDef) {
-      colDefs.push({ name: colName.toString(), def: colDef });
+      columnDefinitions.push({ name: colName.toString(), def: colDef });
     }
   }
-  const columnDefs = colDefs.map((c) => c.def);
+  const columnDefs = columnDefinitions.map((c) => c.def);
 
-  if (!colDefs.length) {
+  if (!columnDefinitions.length) {
     return undefined;
   }
 
-  const ALTERQ = `ALTER TABLE ${asName(tableName)}`;
+  const alterTableQuery = `ALTER TABLE ${asName(tableName)}`;
   if (!tableHandler) {
-    newColumnDefs.push(...colDefs.map((c) => c.def));
+    columnDefinitions.map((c) => newColumnDefinitions.push(c.def));
   } else {
     const currCols = await getTableColumns({ db, table: tableName });
 
     /** Add new columns */
-    newColumnDefs = colDefs
+    columnDefinitions
       .filter((nc) => !tableHandler.columns.some((c) => nc.name === c.name))
-      .map((c) => c.def);
+      .forEach((c) => newColumnDefinitions.push(c.def));
 
     /** Altered/Dropped columns */
     const { cols: futureCols } = await getFutureTableSchema({
@@ -106,14 +106,14 @@ export const getTableColumnQueries = async ({
         droppedColNames.push(c.column_name);
       } else if (newCol.nullable !== c.nullable) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
+          `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
         );
       } else if (newCol.udt_name !== c.udt_name) {
         alteredColQueries.push(
-          `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
+          `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
         );
       } else if (newCol.column_default !== c.column_default) {
-        const colConfig = colDefs.find((cd) => cd.name === c.column_name);
+        const colConfig = columnDefinitions.find((cd) => cd.name === c.column_name);
         if (
           ["serial", "bigserial"].some((t) => colConfig?.def.toLowerCase().includes(` ${t}`)) &&
           c.column_default?.toLowerCase().includes("nextval")
@@ -121,7 +121,7 @@ export const getTableColumnQueries = async ({
           /** Ignore SERIAL/BIGSERIAL <> nextval mismatch */
         } else {
           alteredColQueries.push(
-            `${ALTERQ} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`,
+            `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`,
           );
         }
       }
@@ -130,10 +130,10 @@ export const getTableColumnQueries = async ({
 
   if (!tableHandler || tableConf.dropIfExists || tableConf.dropIfExistsCascade) {
     isCreate = true;
-    const DROPQ = `DROP TABLE IF EXISTS ${asName(tableName)}`;
+    const dropTableQuery = `DROP TABLE IF EXISTS ${asName(tableName)}`;
     fullQuery = [
-      ...(tableConf.dropIfExists ? [`${DROPQ};`]
-      : tableConf.dropIfExistsCascade ? [`${DROPQ} CASCADE;`]
+      ...(tableConf.dropIfExists ? [`${dropTableQuery};`]
+      : tableConf.dropIfExistsCascade ? [`${dropTableQuery} CASCADE;`]
       : []),
       `CREATE TABLE ${asName(tableName)} (`,
       columnDefs.join(", \n"),
@@ -141,8 +141,10 @@ export const getTableColumnQueries = async ({
     ].join("\n");
   } else {
     fullQuery = [
-      ...droppedColNames.map((c) => `${ALTERQ} DROP COLUMN ${asName(c)};`),
-      ...newColumnDefs.map((c) => `${ALTERQ} ADD COLUMN ${c};`),
+      // ...droppedColNames.map((c) => `${alterTableQuery} DROP COLUMN ${asName(c)};`),
+      ...newColumnDefinitions.map(
+        (columnDefinition) => `${alterTableQuery} ADD COLUMN ${columnDefinition};`,
+      ),
       ...alteredColQueries,
     ].join("\n");
   }
@@ -151,6 +153,6 @@ export const getTableColumnQueries = async ({
     fullQuery,
     columnDefs,
     isCreate,
-    newColumnDefs,
+    newColumnDefs: newColumnDefinitions,
   };
 };

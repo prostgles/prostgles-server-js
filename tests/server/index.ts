@@ -3,6 +3,7 @@ import path from "path";
 import prostgles, {
   createServerFunctionBlockWithContext,
   createServerFunctionWithContext,
+  getLocalStorageClient,
 } from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
@@ -29,6 +30,7 @@ import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
 import type { DBOFullyTyped } from "prostgles-server";
+import type { ExpressApp } from "../../dist/RestApi";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs = [];
@@ -115,7 +117,10 @@ function dd() {
     },
     tableConfig: testTableConfig,
     testRulesOnConnect: true,
+    expressApp: app as ExpressApp,
     fileTable: {
+      tableName: "files",
+      storageClient: getLocalStorageClient({ localFolderPath: path.join(__dirname + "/media") }),
       referencedTables: {
         users_public_info: {
           type: "column",
@@ -126,15 +131,9 @@ function dd() {
           },
         },
       },
-      localConfig: {
-        localFolderPath: path.join(__dirname + "/media"),
-      },
-      expressApp: app,
-      tableName: "files",
     },
     // DEBUG_MODE: true,
     restApi: {
-      expressApp: app,
       path: "/api",
     },
 
@@ -300,6 +299,25 @@ function dd() {
     publish: testPublish,
     publishRawSQL: async (params) => {
       return true; // Boolean(user && user.type === "admin")
+    },
+    modifyClientSchema: (table, userData) => {
+      return {
+        ...table,
+        clientSchemaTest: {
+          sid: userData?.sid,
+          tableIndex: 0,
+        },
+        columns:
+          table.name === "tr2" ?
+            table.columns
+          : table.columns.map((column, columnIndex) => ({
+              ...column,
+              clientSchemaTest: {
+                sid: userData?.sid,
+                columnIndex,
+              },
+            })),
+      };
     },
     joins: [
       {

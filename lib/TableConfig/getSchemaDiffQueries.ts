@@ -29,7 +29,7 @@ export const getSchemaDiffQueries = ({
   const droppedTableQueries =
     droppedTableIdents.length ? [`DROP TABLE ${droppedTableIdents.join(", ")} CASCADE;`] : [];
 
-  const droppedColumns: { table_ident: string; column_name: string }[] = [];
+  // const droppedColumns: { table_ident: string; column_name: string }[] = [];
 
   const tableAndColQueries = newSchema
     .flatMap(({ table_ident, table_name, columns }) => {
@@ -42,7 +42,7 @@ export const getSchemaDiffQueries = ({
               (c) =>
                 c.column_name_escaped +
                 " " +
-                newSchemaTableDefinitions[table_name]![c.column_name_escaped]
+                newSchemaTableDefinitions[table_name]![c.column_name_escaped],
             )
             .join(",\n"),
           `);`,
@@ -52,13 +52,13 @@ export const getSchemaDiffQueries = ({
 
       if (!isEqual(columns, oldTable.columns)) return;
 
-      const droppedColumnQueries =
-        oldTable.columns
-          ?.filter((oc) => !columns?.some((c) => c.column_name === oc.column_name))
-          .map((dc) => {
-            droppedColumns.push({ table_ident, column_name: dc.column_name });
-            return `ALTER TABLE ${table_ident} DROP COLUMN ${dc.column_name};`;
-          }) ?? [];
+      // const droppedColumnQueries =
+      //   oldTable.columns
+      //     ?.filter((oc) => !columns?.some((c) => c.column_name === oc.column_name))
+      //     .map((dc) => {
+      //       droppedColumns.push({ table_ident, column_name: dc.column_name });
+      //       return `ALTER TABLE ${table_ident} DROP COLUMN ${dc.column_name};`;
+      //     }) ?? [];
 
       const alteredAndNewColumns =
         columns?.flatMap((c) => {
@@ -76,7 +76,7 @@ export const getSchemaDiffQueries = ({
               `${alterTableQuery} ` +
                 (c.column_default !== null ?
                   `SET DEFAULT ${asValue(c.column_default)};`
-                : `DROP DEFAULT;`)
+                : `DROP DEFAULT;`),
             );
           }
           if (c.udt_name !== oldCol.udt_name) {
@@ -89,7 +89,10 @@ export const getSchemaDiffQueries = ({
           return queries;
         }) ?? [];
 
-      return [...droppedColumnQueries, ...alteredAndNewColumns];
+      return [
+        // ...droppedColumnQueries,
+        ...alteredAndNewColumns,
+      ];
     })
     .filter(isDefined);
 

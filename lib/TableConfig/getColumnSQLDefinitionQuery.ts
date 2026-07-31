@@ -4,7 +4,7 @@ import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONB
 import type { DB } from "../Prostgles";
 import { fromEntries } from "../PublishParser/applyScopeToTableRules";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
-import type { BaseColumnTypes, ColumnConfig } from "./TableConfig";
+import type { BaseColumnTypes, ColumnConfig } from "./TableConfigTypes";
 
 type Args = {
   column: string;
@@ -30,7 +30,7 @@ export const getColumnSQLDefinitionQuery = async ({
   const colNameEsc = escapedColumnName ?? asName(column);
   const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
     const { nullable, defaultValue } = colConf;
-    return `${pgType} ${!nullable ? " NOT NULL " : ""} ${defaultValue ? ` DEFAULT ${asValue(defaultValue)} ` : ""}`;
+    return `${pgType} ${!nullable ? "NOT NULL" : ""} ${defaultValue ? `DEFAULT ${asValue(defaultValue)}` : ""} `;
   };
 
   const getDefinition = async () => {

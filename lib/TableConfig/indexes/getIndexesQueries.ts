@@ -4,7 +4,7 @@ import type { DB } from "../../initProstgles";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { executeSqlWithRollback } from "../getFutureTableSchema";
 import { getPGIndexes } from "../getPGIndexes";
-import type { TableConfig } from "../TableConfig";
+import type { TableConfig } from "../TableConfigTypes";
 
 /**
  * Keep Postgres indexes in sync with table configuration

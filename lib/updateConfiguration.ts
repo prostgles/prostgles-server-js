@@ -24,9 +24,6 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
     return;
   }
 
-  if (includes(optionsThatChanged, "fileTable")) {
-    await prgl.initFileTable();
-  }
   if (includes(optionsThatChanged, "restApi")) {
     prgl.initRestApi();
   }

@@ -111,10 +111,7 @@ export const initProstgles = async function (
   reason: OnInitReason,
 ): Promise<InitResult> {
   this.loaded = false;
-  const expressApp =
-    this.opts.fileTable?.expressApp ??
-    this.opts.restApi?.expressApp ??
-    this.opts.auth?.loginSignupConfig?.app;
+  const expressApp = this.opts.expressApp ?? this.opts.auth?.loginSignupConfig?.app;
 
   /** Crucial in ensuring the runtime version of express works as expected */
   if (expressApp) {
@@ -193,7 +190,7 @@ export const initProstgles = async function (
     await runSQLFile(this);
     await this.refreshDBO();
     await this.initTableConfig(reason);
-    await this.initFileTable();
+    await this.refreshDBO();
     this.initRestApi();
 
     this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
@@ -274,7 +271,6 @@ export const initProstgles = async function (
             this.opts.io.engine.close();
           }
         }
-        this.fileManager?.destroy();
         await this.dboBuilder.destroy();
         this.authHandler.destroy();
         await this.tableConfigurator?.destroy();
