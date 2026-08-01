@@ -91,6 +91,7 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
       hooks: {
         ...userFileTableConfig?.hooks,
         beforeEach: [
+          ...(userFileTableConfig?.hooks?.beforeEach || []),
           {
             commands: {
               insert: 1,
@@ -122,7 +123,6 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
               };
             },
           } satisfies BeforeEachTsTrigger<FileTableRow, {}>,
-          ...(userFileTableConfig?.hooks?.beforeEach || []),
         ],
         onInsteadOfDelete: async ({ dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
           return onDeleteFromFileTable(fileTable, {

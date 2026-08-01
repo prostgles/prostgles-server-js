@@ -23,3 +23,4 @@ export type * from "./TableConfig/TableConfigTypes";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;
+export type { FileTableRow } from "./StorageClient/getFileTableConfig";
