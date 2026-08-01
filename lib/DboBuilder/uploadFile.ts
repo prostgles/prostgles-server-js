@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
 import type { AnyObject } from "prostgles-types";
 import { getKeys, isObject } from "prostgles-types";
-import type { FileTableRow } from "../FileManager/getFileTableConfig";
-import { getValidatedFileType } from "../FileManager/getValidatedFileType";
+import type { FileTableRow } from "../StorageClient/getFileTableConfig";
+import { getValidatedFileType } from "../StorageClient/getValidatedFileType";
 import type { FileTableConfig } from "../ProstglesTypes";
 import type { LocalParams } from "./DboBuilder";
+import { getFileServeRoute } from "../StorageClient/setupFileServeHandler";
 
 export const isFile = (row: any): row is { data: Buffer; name: string } => {
   return Boolean(
@@ -65,6 +66,11 @@ export const uploadFile = async (
     contentType: coreInfo.content_type,
   });
 
+  const { contentLength, contentHash } = uploadedInfo;
+  const { filePath } = uploadedInfo.type === "local" ? uploadedInfo : {};
+  const { url } = uploadedInfo.type === "cloud" ? uploadedInfo : {};
+
+  const fileServeRoute = getFileServeRoute(config);
   const mediaRow: FileTableRow = {
     signed_url: null,
     signed_url_expires: null,
@@ -73,10 +79,11 @@ export const uploadFile = async (
     deleted_from_storage: null,
     description: "",
     ...coreInfo,
-    ...uploadedInfo,
+    cloud_url: url ?? "",
+    etag: contentHash,
     extension: type.ext,
-    url: uploadedInfo.cloud_url,
-    content_length: String(uploadedInfo.content_length),
+    url: [fileServeRoute, coreInfo.name].join("/"),
+    content_length: String(contentLength),
   };
 
   return mediaRow;

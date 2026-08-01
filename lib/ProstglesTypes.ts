@@ -6,7 +6,7 @@ import type {
   SessionUser,
 } from "./Auth/AuthTypes";
 import type { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-import type { StorageClient } from "./FileManager/FileManager";
+import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
 import type { RestApiConfig } from "./RestApi";

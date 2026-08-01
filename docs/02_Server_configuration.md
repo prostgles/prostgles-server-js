@@ -19,12 +19,6 @@
 - **io** <span style="color: grey">optional</span> <span style="color: green;">Server&lt;DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any&gt; | undefined</span>
 
   Socket.IO server instance object required to allow clients to connect through websockets
-- **expressApp** <span style="color: grey">optional</span> <span style="color: green;">ExpressApp</span>
-
-  Express server instance used for:
-  - Auth
-  - REST API
-  - Serving files through the file manager
 - **restApi** <span style="color: grey">optional</span> <span style="color: green;">RestApiConfig</span>
 
   Rest API configuration.

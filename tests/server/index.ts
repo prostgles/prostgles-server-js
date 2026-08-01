@@ -30,7 +30,6 @@ import { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
 import type { DBOFullyTyped } from "prostgles-server";
-import type { ExpressApp } from "../../dist/RestApi";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs = [];

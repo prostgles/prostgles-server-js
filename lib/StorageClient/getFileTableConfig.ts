@@ -20,7 +20,7 @@ const FILE_TABLE_COLUMN_DEFINITIONS = {
   cloud_url: `TEXT`,
   signed_url: `TEXT`,
   signed_url_expires: `BIGINT`,
-  etag: `TEXT`,
+  etag: `TEXT NOT NULL`,
   deleted: `BIGINT`,
   deleted_from_storage: `BIGINT`,
 } as const;
@@ -98,7 +98,7 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
             },
             validate: async ({ data, localParams, command, filter }) => {
               const tableHandler = prg.dboBuilder.dboMap.get(fileTableName);
-              if (!tableHandler) throw "FileManager tableHandler not found";
+              if (!tableHandler) throw "Storage tableHandler not found";
 
               if (command === "update") {
                 const { newData } = await updateFile(tableHandler, fileTable, {

@@ -3,7 +3,7 @@ import type { AnyObject } from "prostgles-types";
 import { asName, pickKeys } from "prostgles-types";
 import type { FileTableConfig } from "../../ProstglesTypes";
 import type { TableHandlers } from "../DboBuilder";
-import type { FileTableRow } from "../../FileManager/getFileTableConfig";
+import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 
 type OnDeleteFromFileTableArgs = {
   returningQuery: undefined | string;

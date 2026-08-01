@@ -1,6 +1,6 @@
 import type { AnyObject } from "prostgles-types";
 import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
-import type { FileTableRow } from "../../FileManager/getFileTableConfig";
+import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import type { FileTableConfig } from "../../ProstglesTypes";
 import type { LocalParams } from "../DboBuilder";
 import { isFile, uploadFile } from "../uploadFile";

@@ -3,11 +3,24 @@ import fs from "fs";
 import path from "path";
 import stream from "stream";
 import type {
-  FileUploadArgs,
-  LocalConfig,
+  UploadFileOptions,
   LocalStorageClient,
-  UploadedCloudFile,
-} from "./FileManager";
+  LocalUploadedFileDetails,
+} from "./StorageClientTypes";
+
+export type LocalConfig = {
+  /**
+   * example: path.join(__dirname+'/media')
+   * note that this location will be relative to the compiled file location
+   */
+  localFolderPath: string;
+
+  /**
+   * Minimum amount of free bytes available to allow saving files
+   * Defaults to 100MB
+   */
+  minFreeBytes?: number;
+};
 
 export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageClient => {
   const { localFolderPath, minFreeBytes = 100 * 1024 * 1024 } = localConfig; // Default 100MB
@@ -34,8 +47,7 @@ export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageCli
   return {
     type: "local",
     localFolderPath: localConfig.localFolderPath,
-    upload: async (args: FileUploadArgs): Promise<UploadedCloudFile> => {
-      // Ensure the target directory exists
+    upload: async (args: UploadFileOptions): Promise<LocalUploadedFileDetails> => {
       await fs.promises.mkdir(localFolderPath, { recursive: true });
       await checkFreeSpace();
 
@@ -49,13 +61,13 @@ export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageCli
         writeStream.on("error", reject);
         writeStream.on("finish", () => {
           resolve({
-            cloud_url: filePath,
-            etag: hash.digest("hex"),
-            content_length: contentLength,
+            type: "local",
+            filePath,
+            contentHash: hash.digest("hex"),
+            contentLength: contentLength,
           });
         });
 
-        // Handle raw string or Buffer
         if (typeof args.file === "string" || Buffer.isBuffer(args.file)) {
           const buffer = Buffer.isBuffer(args.file) ? args.file : Buffer.from(args.file);
 

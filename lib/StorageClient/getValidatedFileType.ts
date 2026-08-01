@@ -2,7 +2,7 @@ import type { ALLOWED_CONTENT_TYPE } from "prostgles-types";
 import { CONTENT_TYPE_TO_EXT, getKeys, isObject } from "prostgles-types";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { FileTableConfig } from "../ProstglesTypes";
-import { getFileType, getFileTypeFromFilename } from "./FileManager";
+import { getFileType, getFileTypeFromFilename } from "./getFileType";
 
 type Args = {
   file: Buffer | string;

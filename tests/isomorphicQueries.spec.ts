@@ -399,6 +399,17 @@ export const isomorphicQueries = async (
       const [original] = originals;
       const initialFileStr = fs.readFileSync(fileFolder + original.name).toString("utf8");
       assert.equal(initialStr, initialFileStr);
+      assert.equal(original.url, ["/files", original.name].join("/"));
+
+      if (token) {
+        const headers = new Headers({
+          Authorization: `Bearer ${Buffer.from(token, "utf-8").toString("base64")}`,
+        });
+        const fileText = await fetch("http://localhost:3001" + original.url, { headers }).then(
+          (r) => r.text(),
+        );
+        assert.equal(initialStr, fileText);
+      }
 
       await db.files.update!({ id: original.id }, newFile);
 

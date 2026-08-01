@@ -77,7 +77,7 @@ export type DBGeneratedSchema = {
       deleted?: null | number | string;
       deleted_from_storage?: null | number | string;
       description?: null | string;
-      etag?: null | string;
+      etag: string;
       extension: string;
       id?: string;
       metadata?: null | {    description: string;  };

@@ -1,4 +1,4 @@
-import type { ABORTABLE_METHODS, AnyObject, ClientSchema, TableHandler } from "prostgles-types";
+import type { AnyObject, ClientSchema, TableHandler } from "prostgles-types";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
 import type { PubSubManagerTriggers, SyncParams } from "./PubSubManager/PubSubManager";
 import type { NotifTypeName } from "./PubSubManager/PubSubManagerUtils";

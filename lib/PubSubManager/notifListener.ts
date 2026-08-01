@@ -117,11 +117,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
        */
       const changedColumns =
         !changedColumnsByTriggerId ? "*" : (changedColumnsByTriggerId[table_condition_id] ?? "*");
-      log(
-        "notifListener",
-        subs.map((s) => s.channel_name),
-        syncs.map((s) => s.channel_name),
-      );
+      // log(
+      //   "notifListener",
+      //   subs.map((s) => s.channel_name),
+      //   syncs.map((s) => s.channel_name),
+      // );
 
       syncs.map((s) => {
         void this.syncData(s, undefined, "trigger");

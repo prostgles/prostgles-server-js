@@ -60,7 +60,7 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
-import { getFileTableConfig } from "./FileManager/getFileTableConfig";
+import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
 
 export class Prostgles {
   /**
@@ -232,12 +232,8 @@ export class Prostgles {
   };
 
   initRestApi = () => {
-    if (this.opts.restApi) {
-      this.restApi = new RestApi({ prostgles: this, ...this.opts.restApi });
-    } else {
-      this.restApi?.destroy();
-      this.restApi = undefined;
-    }
+    this.restApi?.destroy();
+    this.restApi = this.opts.restApi && new RestApi({ prostgles: this, ...this.opts.restApi });
   };
 
   initAuthHandler = () => {

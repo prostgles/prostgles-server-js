@@ -241,5 +241,5 @@ FROM items i
 CROSS JOIN LATERAL pg_sleep(15);
 
 
-DROP TABLE users_public_info CASCADE;
-DROP TABLE files CASCADE;
+DROP TABLE IF EXISTS users_public_info CASCADE;
+DROP TABLE IF EXISTS files CASCADE;

@@ -6,9 +6,18 @@ import type { DB } from "../initProstgles";
 import type { Prostgles } from "../Prostgles";
 import type { FileTableConfig } from "../ProstglesTypes";
 import { runClientRequest } from "../runClientRequest";
-import type { StorageClient } from "./FileManager";
-import { HOUR } from "./FileManager";
+import type { StorageClient } from "./StorageClientTypes";
+import { HOUR } from "./StorageClientTypes";
 import type { FileTableRow } from "./getFileTableConfig";
+
+export const getFileServeRoute = (config: FileTableConfig) => {
+  const fileTableName = config.tableName;
+  const fileServeRoute = config.fileServePath ?? `/${fileTableName}`;
+  if (fileServeRoute.endsWith("/")) {
+    throw `fileServeRoute must not end with a '/'`;
+  }
+  return fileServeRoute;
+};
 
 export const setupFileServeHandler = (
   db: DB,
@@ -18,10 +27,7 @@ export const setupFileServeHandler = (
   prg: Prostgles,
 ) => {
   const fileTableName = config.tableName;
-  const fileServeRoute = config.fileServePath ?? `/${fileTableName}`;
-  if (fileServeRoute.endsWith("/")) {
-    throw `fileServeRoute must not end with a '/'`;
-  }
+  const fileServeRoute = getFileServeRoute(config);
   const fileRouteExpress = fileServeRoute + "/:name";
 
   app.get(fileRouteExpress, async (req, res) => {
