@@ -123,8 +123,15 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       //   syncs.map((s) => s.channel_name),
       // );
 
-      syncs.map((s) => {
-        void this.syncData(s, undefined, "trigger");
+      syncs.forEach((sync) => {
+        void this.syncData(sync, undefined, "trigger").catch((error) => {
+          console.error("Triggered replication failed", {
+            tableName: sync.table_name,
+            channelName: sync.channel_name,
+            socketId: sync.socket_id,
+            error,
+          });
+        });
       });
 
       const operation = (op_name?.toLowerCase() || "insert") as "insert" | "delete" | "update";

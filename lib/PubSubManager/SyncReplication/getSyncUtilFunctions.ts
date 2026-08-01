@@ -84,38 +84,29 @@ export const getSyncUtilFunctions = ({
         s_count: count,
       };
     },
-    getClientRowInfo = (args: SyncBatchInfo = {}) => {
+    getClientRowInfo = async (args: SyncBatchInfo = {}) => {
       const { from_synced = undefined, to_synced = undefined, end_offset = null } = args;
       const onSyncRequest = { from_synced, to_synced, end_offset };
-      const result = withTimeout(
-        new Promise<ClientSyncInfo>(async (resolve, reject) => {
-          const res = await handlers.ServerSyncRequest(onSyncRequest);
-          if (res.state === "error") {
-            reject(res.err);
-          } else {
-            resolve(res);
-          }
-        }),
-        5000,
-      );
 
-      return result;
+      const res = await withTimeout(handlers.ServerSyncRequest(onSyncRequest), 5000);
+      if (res.state === "error") {
+        throw res.err;
+      }
+      return res;
     },
-    getClientData = (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
-      return new Promise(async (resolve, reject) => {
-        const onPullRequest = {
-          from_synced,
-          offset,
-          limit: batch_size,
-          to_synced: undefined,
-        };
-        const res = await handlers.PullRequest(onPullRequest);
-        if (!res.success) {
-          reject(res.err);
-        } else {
-          resolve(sortClientData(res.data));
-        }
-      });
+    getClientData = async (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
+      const onPullRequest = {
+        from_synced,
+        offset,
+        limit: batch_size,
+        to_synced: undefined,
+      };
+      const res = await handlers.PullRequest(onPullRequest);
+      if (!res.success) {
+        throw res.err;
+      } else {
+        return sortClientData(res.data);
+      }
 
       function sortClientData(data: AnyObject[]) {
         return data.sort((a, b) => {
@@ -273,22 +264,18 @@ export const getSyncUtilFunctions = ({
     ) => {
       const items = request.state === "syncing-data" ? request.data : undefined;
       const start = Date.now();
-      const result = await new Promise<{
-        pushed: number;
-      }>(async (resolve, reject) => {
-        const resp = await handlers.UpdateRequest(
-          request.state === "synced" ?
-            { state: "synced", isSynced: true }
-          : { state: "syncing", data: request.data },
-        );
-        if (resp.success) {
-          // console.log("PUSHED to client: fr/lr", data[0], data[data.length - 1]);
-          resolve({ pushed: items?.length ?? 0 });
-        } else {
-          reject(resp);
-          console.error("Unexpected response");
-        }
-      });
+
+      const resp = await handlers.UpdateRequest(
+        request.state === "synced" ?
+          { state: "synced", isSynced: true }
+        : { state: "syncing", data: request.data },
+      );
+      if (!resp.success) {
+        console.error("Unexpected response");
+        throw resp;
+      }
+
+      const result = { pushed: items?.length ?? 0 };
 
       await pubSubManager._log({
         type: "sync",

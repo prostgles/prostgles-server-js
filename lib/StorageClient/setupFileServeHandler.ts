@@ -7,7 +7,6 @@ import type { Prostgles } from "../Prostgles";
 import type { FileTableConfig } from "../ProstglesTypes";
 import { runClientRequest } from "../runClientRequest";
 import type { StorageClient } from "./StorageClientTypes";
-import { HOUR } from "./StorageClientTypes";
 import type { FileTableRow } from "./getFileTableConfig";
 
 export const getFileServeRoute = (config: FileTableConfig) => {
@@ -70,6 +69,7 @@ export const setupFileServeHandler = (
         let url = file.signed_url;
         const expires = +(file.signed_url_expires || 0);
 
+        const HOUR = 3600 * 1000;
         const EXPIRES = Date.now() + HOUR;
         if (!url || expires < EXPIRES) {
           url = await storageClient.getSignedUrlForDownload(file.name, 60 * 60);

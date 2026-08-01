@@ -1,7 +1,5 @@
 import type * as stream from "stream";
 
-export const HOUR = 3600 * 1000;
-
 export type LocalUploadedFileDetails = {
   type: "local";
   filePath: string;

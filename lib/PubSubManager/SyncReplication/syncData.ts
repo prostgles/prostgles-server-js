@@ -123,7 +123,14 @@ export async function syncData(
       /**
        * After all data was inserted request SyncInfo from client and sync again if necessary
        */
-      void this.syncData(sync, undefined, source);
+      void this.syncData(sync, undefined, source).catch((error) => {
+        console.error("Follow-up replication failed", {
+          tableName: sync.table_name,
+          channelName: sync.channel_name,
+          socketId: sync.socket_id,
+          error,
+        });
+      });
     },
   });
 
