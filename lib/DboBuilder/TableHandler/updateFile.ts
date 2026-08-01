@@ -1,35 +1,31 @@
 import type { AnyObject } from "prostgles-types";
 import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
-import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import type { FileTableConfig } from "../../ProstglesTypes";
+import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import type { LocalParams } from "../DboBuilder";
-import { isFile, uploadFile } from "../uploadFile";
+import { uploadFile } from "../uploadFile";
 import type { TableHandler } from "./TableHandler";
 
 type Args = {
-  newData: AnyObject;
+  data: Buffer<ArrayBufferLike>;
+  name: string;
   filter: AnyObject;
   localParams: LocalParams | undefined;
 };
 export const updateFile = async (
   tableHandler: TableHandler,
   config: FileTableConfig,
-  { filter, newData, localParams }: Args,
-): Promise<{ newData: AnyObject }> => {
-  const { data } = getJSONBObjectSchemaValidationError(
+  { filter, data, name, localParams }: Args,
+) => {
+  const { data: validFilter } = getJSONBObjectSchemaValidationError(
     { id: { optional: true, type: "string" } },
     filter,
     "filter",
   );
-  const existingMediaId = data?.id;
+  const existingMediaId = validFilter?.id;
   if (!existingMediaId) {
     throw new Error(
       `Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `,
-    );
-  }
-  if (!isFile(newData)) {
-    throw new Error(
-      "Expecting { data: Buffer, name: string } but received " + JSON.stringify(newData),
     );
   }
 
@@ -43,7 +39,8 @@ export const updateFile = async (
 
   await config.storageClient.delete(existingFile.name);
   const newFile = await uploadFile(config, {
-    row: newData,
+    name: name,
+    data,
     localParams,
     mediaId: existingFile.id,
   });

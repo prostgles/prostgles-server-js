@@ -90,8 +90,9 @@ export type BeforeEachTsTrigger<R, DBX> = {
   validate: (
     params: ValidateBeforeRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
+      hookContext: AnyObject | undefined;
     },
-  ) => MaybePromise<void | { row: Partial<R>; onInserted?: () => void }>;
+  ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject; onInserted?: () => void }>;
 };
 
 export type AfterEachTsTrigger<R, DBX> = {

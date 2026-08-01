@@ -1,6 +1,6 @@
 import { omitKeys } from "prostgles-types";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
-import { uploadFile } from "../DboBuilder/uploadFile";
+import { assertFileObjectValid, uploadFile } from "../DboBuilder/uploadFile";
 import type { Prostgles } from "../Prostgles";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { setupFileServeHandler } from "./setupFileServeHandler";
@@ -91,38 +91,49 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
       hooks: {
         ...userFileTableConfig?.hooks,
         beforeEach: [
-          ...(userFileTableConfig?.hooks?.beforeEach || []),
           {
             commands: {
               insert: 1,
               update: 1,
             },
-            validate: async ({ data, localParams, command, filter }) => {
+            validate: async ({ data: insertData, localParams, command, filter }) => {
               const tableHandler = prg.dboBuilder.dboMap.get(fileTableName);
               if (!tableHandler) throw "Storage tableHandler not found";
+              assertFileObjectValid(insertData);
 
+              const { data: dataBlob, name, id } = insertData;
+              const data = dataBlob as unknown as Buffer;
               if (command === "update") {
                 const { newData } = await updateFile(tableHandler, fileTable, {
                   filter: filter ?? {},
                   localParams,
-                  newData: data,
+                  data,
+                  name,
                 });
                 return {
                   row: newData,
+                  hookContext: {
+                    data,
+                  },
                 };
               }
 
               const media = await uploadFile(fileTable, {
-                row: data,
+                data,
+                name,
                 localParams,
-                mediaId: data.id,
+                mediaId: id,
               });
 
               return {
                 row: media,
+                hookContext: {
+                  data,
+                },
               };
             },
           } satisfies BeforeEachTsTrigger<FileTableRow, {}>,
+          ...(userFileTableConfig?.hooks?.beforeEach || []),
         ],
         onInsteadOfDelete: async ({ dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
           return onDeleteFromFileTable(fileTable, {

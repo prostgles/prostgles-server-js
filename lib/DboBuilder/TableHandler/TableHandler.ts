@@ -90,6 +90,7 @@ export class TableHandler extends ViewHandler {
     const transaction = this.getTransaction(localParams);
     const hooks = this.getBeforeHooks(command, [row]);
     let newRow = row;
+    let newHookContext: AnyObject | undefined = undefined;
     const successCallbacks: (() => void)[] = [];
     for (const hook of hooks) {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
@@ -101,9 +102,11 @@ export class TableHandler extends ViewHandler {
         localParams,
         tx: transaction?.t || this.db,
         filter,
+        hookContext: newHookContext,
       });
       if (hookResult) {
         newRow = hookResult.row;
+        newHookContext = hookResult.hookContext;
         const { onInserted } = hookResult;
         if (onInserted) {
           successCallbacks.push(onInserted);
