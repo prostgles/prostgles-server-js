@@ -73,4 +73,5 @@ export const clientOnlyUpdateKeys = [
   "publish",
   "functions",
   "publishRawSQL",
+  "modifyClientSchema",
 ] as const satisfies (keyof UpdatableOptions)[];
