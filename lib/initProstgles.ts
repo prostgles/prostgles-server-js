@@ -31,7 +31,7 @@ export type DbConnectionOpts = pg.IDefaults;
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
-export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
+export type UpdatableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
   ProstglesInitOptions<S, SUser>,
   | "io"
   | "fileTable"
@@ -44,6 +44,7 @@ export type UpdateableOptions<S = void, SUser extends SessionUser = SessionUser>
   | "publishRawSQL"
   | "tsGeneratedTypesDir"
   | "tsGeneratedTypesFunctionsPath"
+  | "modifyClientSchema"
 >;
 export type OnInitReason =
   | {
@@ -53,7 +54,7 @@ export type OnInitReason =
     }
   | {
       type: "prgl.update";
-      newOpts: Omit<UpdateableOptions, (typeof clientOnlyUpdateKeys)[number]>;
+      newOpts: Omit<UpdatableOptions, (typeof clientOnlyUpdateKeys)[number]>;
     }
   | {
       type: "init" | "prgl.restart" | "TableConfig";
@@ -74,11 +75,11 @@ export type OnReadyParams<S> = OnReadyParamsCommon & {
 
 export type OnReadyCallback<S, SUser extends SessionUser> = (
   params: OnReadyParams<S>,
-  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>,
+  update: (newOpts: UpdatableOptions<S, SUser>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
-  update: (newOpts: UpdateableOptions<void, SessionUser>, force?: true) => Promise<void>,
+  update: (newOpts: UpdatableOptions<void, SessionUser>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 
 export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
@@ -94,7 +95,7 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   getTSSchema: typeof DboBuilder.prototype.getTsDefinitions;
   getSchema: typeof DboBuilder.prototype.getSchema;
   reWriteDBSchema: () => void;
-  update: (newOpts: UpdateableOptions<S, SUser>, force?: true) => Promise<void>;
+  update: (newOpts: UpdatableOptions<S, SUser>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser>>;
   options: ProstglesInitOptions<S, SUser>;
   getClientDBHandlers: (

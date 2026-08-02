@@ -1,12 +1,12 @@
 import { getKeys, includes, isDefined, isEmpty, isEqual } from "prostgles-types";
 import type { SessionUser } from "./Auth/AuthTypes";
-import type { OnReadyCallbackBasic, UpdateableOptions } from "./initProstgles";
+import type { OnReadyCallbackBasic, UpdatableOptions } from "./initProstgles";
 import type { Prostgles } from "./Prostgles";
 
 export const updateConfiguration = async <DBSchema, UserSchema extends SessionUser>(
   prgl: Prostgles,
   onReady: OnReadyCallbackBasic,
-  newOpts: UpdateableOptions<DBSchema, UserSchema>,
+  newOpts: UpdatableOptions<DBSchema, UserSchema>,
   force?: true,
 ) => {
   const optionsThatChanged = getKeys(newOpts)
@@ -73,4 +73,4 @@ export const clientOnlyUpdateKeys = [
   "publish",
   "functions",
   "publishRawSQL",
-] as const satisfies (keyof UpdateableOptions)[];
+] as const satisfies (keyof UpdatableOptions)[];
