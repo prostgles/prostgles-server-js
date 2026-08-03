@@ -31,7 +31,7 @@ export const onDeleteFromFileTable = async (
     return (isOneOrNone ? result[0] : result) as undefined | AnyObject[];
   }
 
-  let files: { id: string; name: string }[] = [];
+  let files: { id: string }[] = [];
   const totalFiles = await tableHandler.count(filterOpts.filter);
   do {
     const batch = (await tableHandler.find(filterOpts.filter, {
@@ -46,11 +46,11 @@ export const onDeleteFromFileTable = async (
   }
   /** If any table delete fails then do not delete files */
   for (const file of files) {
-    await storageClient.delete(file.name);
+    await storageClient.delete(file.id);
   }
 
   if (returningQuery) {
-    return files.map((f) => pickKeys(f, ["id", "name"]));
+    return files.map((f) => pickKeys(f, ["id"]));
   }
 
   return undefined;

@@ -46,6 +46,7 @@ export class ViewHandler {
   columns: TableSchema["columns"];
   columnsForTypes: ColumnInfo[];
   column_names: string[];
+  columnSet: Set<string>;
   tableOrViewInfo: TableSchema;
   tsColumnDefs: string[] = [];
   joins: Join[];
@@ -96,6 +97,7 @@ export class ViewHandler {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     this.column_names = tableOrViewInfo.columns.map((c) => c.name);
+    this.columnSet = new Set(this.column_names);
 
     this.dboBuilder = dboBuilder;
     this.joins = this.dboBuilder.joins;

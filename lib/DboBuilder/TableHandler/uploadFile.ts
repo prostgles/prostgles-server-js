@@ -1,26 +1,39 @@
 import { randomUUID } from "crypto";
-import { assertJSONBObjectAgainstSchema, type JSONB } from "prostgles-types";
-import type { FileTableConfig } from "../ProstglesTypes";
-import type { FileTableRow } from "../StorageClient/getFileTableConfig";
-import { getValidatedFileType } from "../StorageClient/getValidatedFileType";
-import { getFileServeRoute } from "../StorageClient/setupFileServeHandler";
-import type { LocalParams } from "./DboBuilder";
+import { getJSONBObjectSchemaValidationError, type JSONB } from "prostgles-types";
+import type { FileTableConfig } from "../../ProstglesTypes";
+import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
+import { getValidatedFileType } from "../../StorageClient/getValidatedFileType";
+import { getFileServeRoute } from "../../StorageClient/setupFileServeHandler";
+import type { LocalParams } from "../DboBuilder";
 
 const FILE_SCHEMA = {
   id: { type: "string", optional: true },
-  name: "string",
+  original_name: "string",
+  original_last_modified: { type: "string", optional: true },
   data: "Blob",
 } as const;
 
 type AssertFileObjectValid = (row: any) => asserts row is JSONB.GetObjectType<typeof FILE_SCHEMA>;
 
 export const assertFileObjectValid: AssertFileObjectValid = (row) => {
-  assertJSONBObjectAgainstSchema(FILE_SCHEMA, row, "file insert");
+  const validation = getJSONBObjectSchemaValidationError(
+    FILE_SCHEMA,
+    row,
+    "file insert",
+    undefined,
+    {
+      allowExtraProperties: false,
+    },
+  );
+  if (validation.error) {
+    throw new Error(validation.error);
+  }
 };
 
-type UploadFileArgs = {
+export type UploadFileArgs = {
   data: Buffer<ArrayBufferLike>;
-  name: string;
+  original_name: string;
+  original_last_modified: string | null;
   localParams: LocalParams | undefined;
   /**
    * Used to update an existing file
@@ -30,31 +43,30 @@ type UploadFileArgs = {
 
 export const uploadFile = async (
   config: FileTableConfig,
-  { data, name, localParams, mediaId }: UploadFileArgs,
-): Promise<FileTableRow> => {
+  { data, original_name, original_last_modified, localParams, mediaId }: UploadFileArgs,
+): Promise<Omit<FileTableRow, "added"> & Partial<Pick<FileTableRow, "added">>> => {
   const storageClient = config.storageClient;
 
   const media_id = mediaId ?? randomUUID();
   const nestedInsert = localParams?.nestedInsert;
   const type = await getValidatedFileType(config, {
     file: data,
-    fileName: name,
+    fileName: original_name,
     tableName: nestedInsert?.previousTable,
     colName: nestedInsert?.referencingColumn,
   });
-  const media_name = `${media_id}.${type.ext}`;
-  const _parsedMediaKeys = ["id", "name", "original_name", "extension", "content_type"] as const;
+
+  const _parsedMediaKeys = ["id", "original_name", "extension", "content_type"] as const;
   const coreInfo: Required<Pick<FileTableRow, (typeof _parsedMediaKeys)[number]>> = {
     id: media_id,
-    name: media_name,
-    original_name: name,
+    original_name,
     extension: type.ext,
     content_type: type.mime,
   };
 
   const uploadedInfo = await storageClient.upload({
     file: data,
-    fileName: coreInfo.name,
+    fileName: coreInfo.id,
     contentType: coreInfo.content_type,
   });
 
@@ -63,20 +75,29 @@ export const uploadFile = async (
   const { url } = uploadedInfo.type === "cloud" ? uploadedInfo : {};
 
   const fileServeRoute = getFileServeRoute(config);
-  const mediaRow: FileTableRow = {
+  const mediaRow: Omit<FileTableRow, "added"> = {
     signed_url: null,
     signed_url_expires: null,
-    added: new Date().toISOString(),
+    updated: new Date().toISOString(),
     deleted: null,
     deleted_from_storage: null,
     description: "",
     ...coreInfo,
+    original_last_modified,
     cloud_url: url ?? "",
     etag: contentHash,
     extension: type.ext,
-    url: [fileServeRoute, coreInfo.name].join("/"),
+    url: [fileServeRoute, coreInfo.id].join("/"),
     content_length: String(contentLength),
+    data: Buffer.from([0x01]),
   };
 
-  return mediaRow;
+  const isInsert = !mediaId;
+
+  return isInsert ?
+      {
+        ...mediaRow,
+        added: new Date().toISOString(),
+      }
+    : mediaRow;
 };

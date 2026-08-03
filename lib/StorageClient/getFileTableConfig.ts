@@ -1,6 +1,6 @@
 import { omitKeys } from "prostgles-types";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
-import { assertFileObjectValid, uploadFile } from "../DboBuilder/uploadFile";
+import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/uploadFile";
 import type { Prostgles } from "../Prostgles";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { setupFileServeHandler } from "./setupFileServeHandler";
@@ -8,27 +8,33 @@ import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFi
 import type { BeforeEachTsTrigger } from "../PublishParser/publishTypesAndUtils";
 
 const FILE_TABLE_COLUMN_DEFINITIONS = {
-  name: `TEXT NOT NULL UNIQUE`,
-  extension: `TEXT NOT NULL`,
-  content_type: `TEXT NOT NULL`,
-  content_length: `BIGINT NOT NULL DEFAULT 0`,
-  added: `TIMESTAMP NOT NULL DEFAULT NOW()`,
-  url: `TEXT NOT NULL`,
   id: `UUID PRIMARY KEY DEFAULT gen_random_uuid()`,
+  extension: `TEXT NOT NULL DEFAULT ''`,
+  content_type: `TEXT NOT NULL DEFAULT ''`,
+  content_length: `BIGINT NOT NULL DEFAULT 0`,
+  etag: `TEXT NOT NULL DEFAULT ''`,
   original_name: `TEXT NOT NULL`,
+  original_last_modified: `TIMESTAMPTZ`,
   description: `TEXT`,
+  url: `TEXT NOT NULL DEFAULT ''`,
   cloud_url: `TEXT`,
   signed_url: `TEXT`,
   signed_url_expires: `BIGINT`,
-  etag: `TEXT NOT NULL`,
-  deleted: `BIGINT`,
-  deleted_from_storage: `BIGINT`,
+  added: `TIMESTAMP NOT NULL DEFAULT NOW()`,
+  updated: `TIMESTAMP NOT NULL DEFAULT NOW()`,
+  deleted: `TIMESTAMPTZ`,
+  deleted_from_storage: `TIMESTAMPTZ`,
+  data: `BYTEA NOT NULL CHECK (data = decode('01', 'hex'))`, // Used as a placeholder to ensure insert types are correct. Actual data is uploaded to storageClient and not stored in the DB
 } as const;
 
 type FileTableColumnDefinitions = typeof FILE_TABLE_COLUMN_DEFINITIONS;
 
 export type FileTableRow = {
   [K in keyof FileTableColumnDefinitions as K]: FileTableColumnDefinitions[K] extends (
+    `BYTEA NOT NULL${string}`
+  ) ?
+    Buffer
+  : FileTableColumnDefinitions[K] extends (
     `${string} NOT NULL${string}` | `${string}PRIMARY KEY${string}`
   ) ?
     string
@@ -101,14 +107,20 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
               if (!tableHandler) throw "Storage tableHandler not found";
               assertFileObjectValid(insertData);
 
-              const { data: dataBlob, name, id } = insertData;
+              const {
+                data: dataBlob,
+                original_name,
+                id,
+                original_last_modified = null,
+              } = insertData;
               const data = dataBlob as unknown as Buffer;
               if (command === "update") {
                 const { newData } = await updateFile(tableHandler, fileTable, {
                   filter: filter ?? {},
                   localParams,
                   data,
-                  name,
+                  original_name,
+                  original_last_modified,
                 });
                 return {
                   row: newData,
@@ -120,9 +132,10 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
 
               const media = await uploadFile(fileTable, {
                 data,
-                name,
+                original_name,
                 localParams,
                 mediaId: id,
+                original_last_modified,
               });
 
               return {

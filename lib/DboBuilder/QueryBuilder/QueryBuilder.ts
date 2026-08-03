@@ -307,7 +307,7 @@ export class SelectItemBuilder {
                 /* Join */
               } else {
                 if (!joinParse) {
-                  throw "Joins dissalowed";
+                  throw "Joins disallowed";
                 }
                 await joinParse(key, val as JoinSelect, throwErr);
               }

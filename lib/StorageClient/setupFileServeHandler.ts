@@ -27,19 +27,18 @@ export const setupFileServeHandler = (
 ) => {
   const fileTableName = config.tableName;
   const fileServeRoute = getFileServeRoute(config);
-  const fileRouteExpress = fileServeRoute + "/:name";
+  const fileRouteExpress = fileServeRoute + "/:id";
 
   app.get(fileRouteExpress, async (req, res) => {
     try {
-      const { name } = req.params;
-      if (typeof name !== "string" || !name) {
+      const { id } = req.params;
+      if (typeof id !== "string" || !id) {
         throw "Invalid media name";
       }
-      const id = name.slice(0, 36);
+
       const selectParams = {
         select: {
           id: 1,
-          name: 1,
           signed_url: 1,
           signed_url_expires: 1,
           content_type: 1,
@@ -72,7 +71,7 @@ export const setupFileServeHandler = (
         const HOUR = 3600 * 1000;
         const EXPIRES = Date.now() + HOUR;
         if (!url || expires < EXPIRES) {
-          url = await storageClient.getSignedUrlForDownload(file.name, 60 * 60);
+          url = await storageClient.getSignedUrlForDownload(file.id, 60 * 60);
 
           await db.any(
             "UPDATE ${fileTableName:name} SET signed_url = ${signed_url}, signed_url_expires = ${signed_url_expires} WHERE id = ${id}",
@@ -87,7 +86,7 @@ export const setupFileServeHandler = (
 
         res.redirect(url);
       } else {
-        const localFilePath = join(storageClient.localFolderPath, file.name);
+        const localFilePath = join(storageClient.localFolderPath, file.id);
         if (!fs.existsSync(localFilePath)) {
           throw new Error("File not found");
         }

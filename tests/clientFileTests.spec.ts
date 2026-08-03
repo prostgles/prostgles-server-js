@@ -34,7 +34,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
 
     const file = {
       data: Buffer.from("This is a string", "utf-8"),
-      name: "sample_file.txt",
+      original_name: "sample_file.txt",
     };
     let insertedFile: AnyObject;
     await test("Insert file from nested insert", async () => {
@@ -45,8 +45,8 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       const files = await db.files.find!();
       assert.equal(files.length, 1);
       assert.equal(files[0].id, nestedInsert.avatar.id);
-      assert.equal(files[0].original_name, file.name);
-      const initialFileStr = fs.readFileSync(fileFolder + files[0].name).toString("utf8");
+      assert.equal(files[0].original_name, file.original_name);
+      const initialFileStr = fs.readFileSync(fileFolder + files[0].id).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
       insertedFile = files[0];
     });
@@ -63,17 +63,17 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
     await test("Can update allowed files directly", async () => {
       const newData = {
         data: Buffer.from("aa", "utf-8"),
-        name: "a.txt",
+        original_name: "a.txt",
       };
       await db.files.update!({ id: insertedFile.id }, newData);
       const newFiles = await db.files.find!();
       assert.equal(newFiles.length, 1);
       const [newFile] = newFiles;
-      assert.equal(newFile?.original_name, newData.name);
+      assert.equal(newFile?.original_name, newData.original_name);
       assert.equal(newFile.id, insertedFile.id);
       assert.equal(
         fs
-          .readFileSync(fileFolder + newFile.name)
+          .readFileSync(fileFolder + newFile.id)
           .toString("utf8")
           .toString(),
         newData.data.toString(),
@@ -85,15 +85,16 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       const user = await db.users_public_info.findOne!();
       const newData = {
         data: Buffer.from("nestedupdate", "utf-8"),
-        name: "nestedupdate.txt",
+        original_name: "nestedupdate.txt",
       };
       const d = await db.users_public_info.update!(
         { id: user?.id },
         { avatar: newData },
         { returning: "*" },
       );
-      const avatarFile = await db.files.findOne?.({ id: d?.at(0)?.avatar.id });
-      const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.name).toString("utf8");
+      const avatarRow = d?.at(0)?.avatar;
+      const avatarFile = await db.files.findOne?.({ id: avatarRow.id });
+      const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.id).toString("utf8");
       assert.equal(newData.data.toString(), initialFileStr);
     });
 

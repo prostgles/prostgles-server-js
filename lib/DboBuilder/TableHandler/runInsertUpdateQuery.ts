@@ -1,5 +1,5 @@
 import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
-import { asName } from "prostgles-types";
+import { asName, isDefined } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import type { LocalParams } from "../DboBuilder";
 import { rejectWithPGClientError, withUserRLS } from "../DboBuilder";
@@ -51,7 +51,8 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     tableHandler.parseFieldFilter(returningFields),
   );
   const { checkFilter } = rule ?? {};
-  let checkCondition = "WHERE FALSE";
+  // let checkCondition = "WHERE FALSE";
+  let checkCondition = "FALSE";
   if (checkFilter) {
     const checkCond = await tableHandler.prepareWhere({
       select: undefined,
@@ -60,53 +61,60 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       filter: checkFilter,
       addWhere: false,
     });
-    checkCondition = `WHERE NOT (${checkCond.where})`;
+    // checkCondition = `WHERE NOT (${checkCond.where})`;
+    checkCondition = `NOT (${checkCond.where})`;
   }
   const hasReturning = !!returningSelectItems.length;
   const userRLS = withUserRLS(localParams, "");
-  const escapedTableName = asName(name);
+  const CHECK_CONDITION_ALIAS = "prostgles_check_condition";
+  const RETURNING_ALIAS_PREFIX = "prostgles_returning_";
+  const returningSelectKeyRemap = new Map<string, string>();
   const query = ` 
-    ${userRLS}
-    WITH ${escapedTableName} AS (
-      ${queryWithoutUserRLS}
-      RETURNING *
-    )
-    SELECT 
-      count(*) as row_count, 
-      EXISTS (
-        SELECT *
-        FROM ${escapedTableName}
-        ${checkCondition} 
-      ) AS failed_check,
-      (
-        SELECT json_agg(item)
-        FROM (
-          SELECT *
-          FROM ${escapedTableName}
-        ) item
-      ) as modified,
-      (
-        SELECT json_agg(item)
-        FROM (
-          SELECT ${!hasReturning ? "1" : getSelectItemQuery(returningSelectItems)}
-          FROM ${escapedTableName}
-          WHERE ${hasReturning ? "TRUE" : "FALSE"}
-        ) item
-      ) as modified_returning
-    FROM ${escapedTableName}
+    ${userRLS} 
+    ${queryWithoutUserRLS}
+    RETURNING ${[
+      "*",
+      getSelectItemQuery(
+        returningSelectItems
+          .map((item, index) => {
+            /** Skip if exists in 'returning *'  */
+            if (item.type === "column" && asName(item.alias) === item.getQuery()) {
+              if (!tableHandler.columnSet.has(item.alias)) {
+                throw new Error(`Returning column ${item.alias} does not exist in table ${name}`);
+              }
+              returningSelectKeyRemap.set(item.alias, item.alias);
+              return;
+            }
+            const newAlias = RETURNING_ALIAS_PREFIX + index;
+            if (tableHandler.columnSet.has(newAlias)) {
+              throw new Error(
+                `Internal Returning alias rewrite ${newAlias} collides with actual table column name. Please report this issue.`,
+              );
+            }
+            returningSelectKeyRemap.set(newAlias, item.alias);
+
+            return {
+              ...item,
+              alias: newAlias,
+            };
+          })
+          .filter(isDefined),
+      ),
+      `${checkCondition} as ${CHECK_CONDITION_ALIAS}`,
+    ].filter(Boolean)}
   `;
 
   const allowedFieldKeys = tableHandler.parseFieldFilter(fields);
 
-  const queryType = "one";
+  const queryType = "any";
 
   const tx = tableHandler.getTransaction(localParams)?.t;
-  const queryPromise: Promise<{
-    row_count: number | null;
-    modified: AnyObject[] | null;
-    failed_check: boolean | null;
-    modified_returning: AnyObject[] | null;
-  }> = tx ? tx[queryType](query) : tableHandler.db.tx((t) => t[queryType](query));
+  const queryPromise: Promise<
+    {
+      [CHECK_CONDITION_ALIAS]: boolean;
+      [key: string]: unknown;
+    }[]
+  > = tx ? tx[queryType](query) : tableHandler.db.tx((t) => t[queryType](query));
 
   const result = await queryPromise.catch((err: unknown) =>
     rejectWithPGClientError(err, {
@@ -118,27 +126,44 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     }),
   );
 
-  if (checkFilter && result.failed_check) {
+  if (checkFilter && result.some((row) => row[CHECK_CONDITION_ALIAS])) {
     throw new Error(
       `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
     );
   }
 
-  const rows = result.modified ?? [];
+  const rowCount = Number(result.length);
+  const returningRows = hasReturning ? ([] as AnyObject[]) : undefined;
+
+  const tableRows = result.map((row) => {
+    const { [CHECK_CONDITION_ALIAS]: _checkCondition, ...tableRowWithReturning } = row;
+    if (returningRows) {
+      const returningRow: AnyObject = {};
+      for (const [newAlias, expectedAlias] of returningSelectKeyRemap.entries()) {
+        returningRow[expectedAlias] = tableRowWithReturning[newAlias];
+        if (newAlias.startsWith(RETURNING_ALIAS_PREFIX)) {
+          delete tableRowWithReturning[newAlias];
+        }
+      }
+      returningRows.push(returningRow);
+    }
+
+    return tableRowWithReturning;
+  });
 
   await executeAfterHooksCheckAndPostValidation({
     tableHandler,
     operation: command === "insert" ? { name: "insert", rule } : { name: "update", rule },
     localParams,
-    rows,
+    rows: tableRows,
     data,
   });
 
   let returnMany = false;
   if (args.command === "update") {
     const { multi = true } = args.params || {};
-    if (!multi && result.row_count && +result.row_count > 1) {
-      throw `More than 1 row modified: ${result.row_count} rows affected`;
+    if (!multi && rowCount && rowCount > 1) {
+      throw `More than 1 row modified: ${rowCount} rows affected`;
     }
 
     if (hasReturning) {
@@ -150,10 +175,10 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
 
   if (!hasReturning) return undefined;
 
-  const modified_returning = result.modified_returning?.map((d) => ({
-    ...d,
+  const returningRowsWithNestedInserts = returningRows?.map((returningRow) => ({
+    ...returningRow,
     ...nestedInsertsResultsObj,
   }));
 
-  return returnMany ? modified_returning : modified_returning?.[0];
+  return returnMany ? returningRowsWithNestedInserts : returningRowsWithNestedInserts?.[0];
 };

@@ -2,25 +2,26 @@ import type { AnyObject } from "prostgles-types";
 import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
 import type { FileTableConfig } from "../../ProstglesTypes";
 import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
-import type { LocalParams } from "../DboBuilder";
-import { uploadFile } from "../uploadFile";
 import type { TableHandler } from "./TableHandler";
+import { uploadFile, type UploadFileArgs } from "./uploadFile";
 
-type Args = {
-  data: Buffer<ArrayBufferLike>;
-  name: string;
+type Args = Pick<
+  UploadFileArgs,
+  "localParams" | "data" | "original_name" | "original_last_modified"
+> & {
   filter: AnyObject;
-  localParams: LocalParams | undefined;
 };
 export const updateFile = async (
   tableHandler: TableHandler,
   config: FileTableConfig,
-  { filter, data, name, localParams }: Args,
+  { filter, data, original_name, original_last_modified, localParams }: Args,
 ) => {
   const { data: validFilter } = getJSONBObjectSchemaValidationError(
     { id: { optional: true, type: "string" } },
     filter,
     "filter",
+    undefined,
+    { allowExtraProperties: false },
   );
   const existingMediaId = validFilter?.id;
   if (!existingMediaId) {
@@ -33,16 +34,17 @@ export const updateFile = async (
     id: existingMediaId,
   })) as FileTableRow | undefined;
 
-  if (!existingFile?.name) {
+  if (!existingFile?.id) {
     throw new Error("Existing file record not found");
   }
 
-  await config.storageClient.delete(existingFile.name);
+  await config.storageClient.delete(existingFile.id);
   const newFile = await uploadFile(config, {
-    name: name,
+    original_name,
     data,
     localParams,
     mediaId: existingFile.id,
+    original_last_modified,
   });
   return { newData: omitKeys(newFile, ["id"]) };
 };

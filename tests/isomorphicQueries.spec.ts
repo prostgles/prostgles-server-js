@@ -12,10 +12,13 @@ import {
   innerJoin,
   leftJoin,
   pickKeys,
+  type DBHandler,
   type SQLHandler,
 } from "prostgles-types";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
+import type { DBGeneratedSchema } from "./DBGeneratedSchema";
+import type { DBHandlerServer } from "../dist";
 
 export const isomorphicQueries = async (
   db: DBOFullyTyped | DBHandlerClient,
@@ -225,7 +228,7 @@ export const isomorphicQueries = async (
       const newRow = await db.bytea_test.findOne!();
 
       // TODO: do not use cte and json in runInsertUpdateQuery.ts because it will convert the buffer to string
-      // assert.deepStrictEqual(new Uint8Array(inserted!.value), new Uint8Array(value));
+      assert.deepStrictEqual(new Uint8Array(inserted!.value), new Uint8Array(value));
       assert.deepStrictEqual(new Uint8Array(newRow!.value), new Uint8Array(value));
     });
 
@@ -338,10 +341,13 @@ export const isomorphicQueries = async (
     await test("Local file upload", async () => {
       let str = "This is a string",
         data = Buffer.from(str, "utf-8"),
-        mediaFile = { data, name: fileName };
+        mediaFile = { data, original_name: fileName };
 
-      const file = await db.files.insert!(mediaFile, { returning: "*" });
-      const _data = fs.readFileSync(fileFolder + file.name);
+      /** Ensure the types are ok */
+      const file = await (
+        db as DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>
+      ).files.insert!(mediaFile, { returning: "*" });
+      const _data = fs.readFileSync(fileFolder + file.id);
       assert.equal(str, _data.toString("utf8"));
       assert.deepStrictEqual((await db.files.findOne!())!.metadata, {
         description: "Updated by afterEach hook",
@@ -369,15 +375,15 @@ export const isomorphicQueries = async (
     await test("Local file delete", async () => {
       const file = {
         data: Buffer.from("str", "utf-8"),
-        name: "will delete.txt",
+        original_name: "will delete.txt",
       };
       await db.files.insert!(file);
 
-      const files = await db.files.find!({ original_name: file.name });
+      const files = await db.files.find!({ original_name: file.original_name });
       assert.equal(files.length, 1);
-      const exists0 = fs.existsSync(fileFolder + files[0].name);
+      const exists0 = fs.existsSync(fileFolder + files[0].id);
       assert.equal(exists0, true);
-      await db.files.delete!({ original_name: file.name }, { returning: "*" });
+      await db.files.delete!({ original_name: file.original_name }, { returning: "*" });
       const exists = fs.existsSync(fileFolder + files[0].name);
       assert.equal(exists, false);
     });
@@ -387,19 +393,20 @@ export const isomorphicQueries = async (
       const newStr = "str new";
       const file = {
         data: Buffer.from(initialStr, "utf-8"),
-        name: "will update.txt",
+        original_name: "will update.txt",
       };
       const newFile = {
         data: Buffer.from(newStr, "utf-8"),
-        name: "will update new.txt",
+        original_name: "will update new.txt",
+        original_last_modified: new Date().toISOString(),
       };
       await db.files.insert!(file);
-      const originals = await db.files.find!({ original_name: file.name });
+      const originals = await db.files.find!({ original_name: file.original_name });
       assert.equal(originals.length, 1);
       const [original] = originals;
-      const initialFileStr = fs.readFileSync(fileFolder + original.name).toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + original.id).toString("utf8");
       assert.equal(initialStr, initialFileStr);
-      assert.equal(original.url, ["/files", original.name].join("/"));
+      assert.equal(original.url, ["/files", original.id].join("/"));
 
       if (token) {
         const headers = new Headers({
@@ -413,12 +420,12 @@ export const isomorphicQueries = async (
 
       await db.files.update!({ id: original.id }, newFile);
 
-      const newFileStr = fs.readFileSync(fileFolder + original.name).toString("utf8");
+      const newFileStr = fs.readFileSync(fileFolder + original.id).toString("utf8");
       assert.equal(newStr, newFileStr);
 
       const newF = await db.files.findOne!({ id: original.id });
 
-      assert.equal(newF?.original_name, newFile.name);
+      assert.equal(newF?.original_name, newFile.original_name);
     });
 
     await test("getColumns definition", async () => {

@@ -55,7 +55,7 @@ export type DBGeneratedSchema = {
   bytea_test: {
     columns: {
       id?: number;
-      value?: null | ArrayBuffer;
+      value?: null | ArrayBuffer | Uint8Array;
     };
     
   };
@@ -73,19 +73,21 @@ export type DBGeneratedSchema = {
       added?: string;
       cloud_url?: null | string;
       content_length?: number | string;
-      content_type: string;
-      deleted?: null | number | string;
-      deleted_from_storage?: null | number | string;
+      content_type?: string;
+      data: ArrayBuffer | Uint8Array;
+      deleted?: null | string;
+      deleted_from_storage?: null | string;
       description?: null | string;
-      etag: string;
-      extension: string;
+      etag?: string;
+      extension?: string;
       id?: string;
       metadata?: null | {    description: string;  };
-      name: string;
+      original_last_modified?: null | string;
       original_name: string;
       signed_url?: null | string;
       signed_url_expires?: null | number | string;
-      url: string;
+      updated?: string;
+      url?: string;
     };
     referencedBy: {"users_public_info":["avatar"]};
   };
