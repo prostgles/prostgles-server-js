@@ -91,7 +91,7 @@ export const setupFileServeHandler = (
           throw new Error("File not found");
         }
         res.contentType(file.content_type);
-        res.sendFile(localFilePath);
+        res.sendFile(localFilePath, { dotfiles: "allow" });
       }
     } catch (e) {
       console.log(e);

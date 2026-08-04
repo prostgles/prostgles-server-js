@@ -210,7 +210,7 @@ function dd() {
         logout: async (sid) => {},
         onGetRequestOK(req, res, params) {
           log(req.originalUrl);
-          res.sendFile(path.join(__dirname, "../../index.html"));
+          res.sendFile(path.join(__dirname, "../../index.html"), { dotfiles: "allow" });
         },
         loginWithOAuth: {
           websiteUrl: "http://localhost:3001",
