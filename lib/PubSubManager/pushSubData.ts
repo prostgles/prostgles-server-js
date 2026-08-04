@@ -35,7 +35,7 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
   if (err) {
     onLog("error");
     if (socket_id) {
-      this.sockets[socket_id]?.emit(channel_name, { err });
+      this.sockets.get(socket_id)?.emit(channel_name, { err });
     } else if (onData) {
       onData([], err);
     }
@@ -52,10 +52,11 @@ export async function pushSubData(this: PubSubManager, sub: Subscription, err?: 
     if (subDataError !== undefined) {
       onLog("fetch data error");
     }
-    if (socket_id && this.sockets[socket_id]) {
+    const socket = socket_id ? this.sockets.get(socket_id) : undefined;
+    if (socket) {
       log(`Pushing ${data?.length ?? 0} rows to socket`);
       onLog("Emiting to socket");
-      this.sockets[socket_id].emit(
+      socket.emit(
         channel_name,
         subDataError !== undefined ? { err: subDataError } : { data },
         () => {

@@ -125,6 +125,10 @@ export async function notifListener(this: PubSubManager, data: { payload: string
 
       syncs.forEach((sync) => {
         void this.syncData(sync, undefined, "trigger").catch((error) => {
+          const socket = this.sockets.get(sync.socket_id);
+          if (!socket?.connected) {
+            return;
+          }
           console.error("Triggered replication failed", {
             tableName: sync.table_name,
             channelName: sync.channel_name,
@@ -143,7 +147,7 @@ export async function notifListener(this: PubSubManager, data: { payload: string
         const subIsActive =
           tableHandler &&
           sub.is_ready &&
-          ((sub.socket_id && this.sockets[sub.socket_id]) || sub.onData);
+          ((sub.socket_id && this.sockets.get(sub.socket_id)) || sub.onData);
         if (!subIsActive) return;
 
         const didTrigger = triggers.find((subTrigger) => {

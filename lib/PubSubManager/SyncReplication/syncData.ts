@@ -73,7 +73,7 @@ export async function syncData(
 
   const { socket_id, table_name, synced_field, id_fields = [], batch_size, throttle = 0 } = sync;
 
-  const socket = this.sockets[socket_id];
+  const socket = this.sockets.get(socket_id);
   if (!socket?.connected) {
     await logSyncData("socket?.connected");
     return;
@@ -124,6 +124,10 @@ export async function syncData(
        * After all data was inserted request SyncInfo from client and sync again if necessary
        */
       void this.syncData(sync, undefined, source).catch((error) => {
+        const socket = this.sockets.get(sync.socket_id);
+        if (!socket?.connected) {
+          return;
+        }
         console.error("Follow-up replication failed", {
           tableName: sync.table_name,
           channelName: sync.channel_name,

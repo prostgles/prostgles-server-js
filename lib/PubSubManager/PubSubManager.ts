@@ -187,7 +187,7 @@ export class PubSubManager {
    * Updated through refreshTriggers()
    */
   _triggers: PubSubManagerTriggers = new Map();
-  sockets: Record<string, PRGLIOSocket> = {};
+  sockets: Map<string, PRGLIOSocket> = new Map();
 
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];
@@ -350,8 +350,8 @@ export class PubSubManager {
   pushSubData = pushSubData.bind(this);
 
   upsertSocket(socket: PRGLIOSocket | undefined) {
-    if (socket && !this.sockets[socket.id]) {
-      this.sockets[socket.id] = socket;
+    if (socket && !this.sockets.get(socket.id)) {
+      this.sockets.set(socket.id, socket);
       socket.on("disconnect", () => {
         this.subs = this.subs.filter((s) => {
           return !(s.socket && s.socket.id === socket.id);
@@ -361,7 +361,7 @@ export class PubSubManager {
           return !(s.socket_id && s.socket_id === socket.id);
         });
 
-        delete this.sockets[socket.id];
+        this.sockets.delete(socket.id);
 
         void this._log({
           type: "sync",
