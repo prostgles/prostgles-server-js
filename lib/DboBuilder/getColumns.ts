@@ -56,7 +56,7 @@ export async function getColumns(
       .map((_c) => {
         const c = { ..._c };
 
-        const label = c.comment || capitalizeFirstLetter(c.name, " ");
+        const label = capitalizeFirstLetter(c.name, " ");
 
         const select = !!c.privileges.SELECT;
         const insert = !!c.privileges.INSERT;
@@ -145,13 +145,10 @@ export async function getColumns(
   }
 }
 
-function replaceNonAlphaNumeric(string: string, replacement = "_"): string {
-  return string.replace(/[\W_]+/g, replacement);
-}
-function capitalizeFirstLetter(string: string, nonalpha_replacement?: string): string {
-  const str = replaceNonAlphaNumeric(string, nonalpha_replacement);
+const capitalizeFirstLetter = (string: string, nonAlphaNumericReplacement = " ") => {
+  const str = string.replace(/[\W_]+/g, nonAlphaNumericReplacement);
   return str.charAt(0).toUpperCase() + str.slice(1);
-}
+};
 
 const getFileColumnInfo = (args: {
   tableHandler: ViewHandler;

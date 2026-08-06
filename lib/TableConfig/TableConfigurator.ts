@@ -93,38 +93,26 @@ export class TableConfigurator {
     table: string;
     lang?: string;
   }): (ColExtraInfo & { label?: string } & Pick<ColumnInfo, "jsonbSchema">) | undefined => {
-    const colConf = this.getColumnConfig(params.table, params.col);
+    const columnConfig = this.getColumnConfig(params.table, params.col);
     let result: Partial<ReturnType<typeof this.getColInfo>> = undefined;
-    if (colConf) {
-      if (isObject(colConf)) {
-        const { jsonbSchema, jsonbSchemaType, info } = colConf;
-        result = {
-          ...info,
-          ...((jsonbSchema || jsonbSchemaType) && {
-            jsonbSchema: {
-              nullable: colConf.nullable,
-              ...(jsonbSchema || { type: jsonbSchemaType }),
-            },
-          }),
-        };
-
-        /**
-         * Get labels from TableConfig if specified
-         */
-        if (colConf.label) {
-          const { lang } = params;
-          const lbl = colConf.label;
-          if (["string", "object"].includes(typeof lbl)) {
-            if (typeof lbl === "string") {
-              result ??= {};
-              result.label = lbl;
-            } else if (lang && (lbl[lang as "en"] || lbl.en)) {
-              result ??= {};
-              result.label = lbl[lang as "en"] || lbl.en;
-            }
+    if (isObject(columnConfig)) {
+      const { lang = "en" } = params;
+      const { jsonbSchema, jsonbSchemaType, info, label } = columnConfig;
+      const labelFromConfig = isObject(label) ? (label[lang as "en"] ?? label.en) : label;
+      result = {
+        ...info,
+        ...((jsonbSchema || jsonbSchemaType) && {
+          jsonbSchema: {
+            nullable: columnConfig.nullable,
+            ...(jsonbSchema || { type: jsonbSchemaType }),
+          },
+        }),
+        ...(!labelFromConfig ? undefined : (
+          {
+            label: labelFromConfig,
           }
-        }
-      }
+        )),
+      };
     }
 
     return result;

@@ -181,7 +181,7 @@ export class Prostgles {
   }
 
   getTSFileName() {
-    const fileName = "DBGeneratedSchema.d.ts";
+    const fileName = "DBGeneratedSchema.ts";
     const _dir = this.opts.tsGeneratedTypesDir || "";
     const dir = _dir.endsWith("/") ? _dir : `${_dir}/`;
     const fullPath = dir + fileName;
