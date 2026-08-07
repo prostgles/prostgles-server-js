@@ -6,8 +6,8 @@ import type { ViewHandler } from "./ViewHandler";
 export async function getInfo(
   this: ViewHandler,
   lang?: string,
-  param2?: any,
-  param3?: any,
+  _param2?: any,
+  _param3?: any,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
 ): Promise<TInfo> {
@@ -81,6 +81,7 @@ export async function getInfo(
       ...tableInfo,
       columns: [],
     },
+    this.config,
     localParams?.isRemoteRequest?.clientInfo,
   );
 

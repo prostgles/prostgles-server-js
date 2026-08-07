@@ -300,7 +300,7 @@ function dd() {
     publishRawSQL: async (params) => {
       return true; // Boolean(user && user.type === "admin")
     },
-    modifyClientSchema: (table, userData) => {
+    modifyClientSchema: (table, tableConfig, userData) => {
       return {
         ...table,
         clientSchemaTest: {

@@ -47,7 +47,11 @@ export async function getClientSchema(
     const { modifyClientSchema } = this.opts;
     const tables =
       modifyClientSchema ?
-        await Promise.all(rawTables.map(async (t) => modifyClientSchema(t, userData)))
+        await Promise.all(
+          rawTables.map(async (t) =>
+            modifyClientSchema(t, this.dboBuilder.dboMap.get(t.name)?.config, userData),
+          ),
+        )
       : rawTables;
     const joinTables2: string[][] = [];
     if (this.opts.joins) {

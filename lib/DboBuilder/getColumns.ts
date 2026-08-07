@@ -116,6 +116,7 @@ export async function getColumns(
         ...(await this.getInfo()),
         columns: rawColumns,
       },
+      this.config,
       localParams?.isRemoteRequest?.clientInfo,
     );
 

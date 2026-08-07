@@ -96,7 +96,8 @@ export type Join = {
 type Joins = Join[] | "inferred";
 
 type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (
-  tables: DBSchemaTable,
+  table: DBSchemaTable,
+  tableConfig: TableConfig[string] | undefined,
   userData: AuthResultWithSID<SUser> | undefined,
 ) => MaybePromise<DBSchemaTable>;
 
