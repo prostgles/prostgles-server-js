@@ -11,6 +11,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
 ) => {
   const optionsThatChanged = getKeys(newOpts)
     .map((k) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       if (force || !isEqual(prgl.opts[k], newOpts[k])) {
         //@ts-ignore
         prgl.opts[k] = newOpts[k];

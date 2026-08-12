@@ -1,8 +1,8 @@
 import * as pg from "pg";
 import type { DB } from "../../initProstgles";
 
-export const getAdminClient = async (db: DB, onDbDropped?: () => void): Promise<pg.Client> => {
-  const adminClient = new pg.Client({
+export const getAdminClient = async (db: DB, onDbDropped?: () => void) => {
+  const adminClient = new pg.Pool({
     ...getConnectionDetails(db),
     application_name: "prostgles-admin-client",
     keepAlive: true,
@@ -17,7 +17,11 @@ export const getAdminClient = async (db: DB, onDbDropped?: () => void): Promise<
       }
     });
   }
-  await adminClient.connect();
+
+  /**
+   * validate the connection and let the pool acquire/release its client internally
+   */
+  await adminClient.query("SELECT 1");
   return adminClient;
 };
 
