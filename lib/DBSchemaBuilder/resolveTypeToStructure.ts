@@ -65,6 +65,24 @@ export const resolveTypeToStructure = (
   const symbol = type.getSymbol();
   const typeName = symbol?.getName();
 
+  /** Node Buffers arrive as ArrayBuffers in browsers and remain Uint8Arrays in Node clients. */
+  if (typeName === "Buffer") {
+    return "ArrayBuffer | Uint8Array";
+  }
+
+  /** Do not leak types that are unavailable to browser clients into the generated schema. */
+  if (
+    symbol?.declarations?.length &&
+    symbol.declarations.every((declaration) =>
+      declaration
+        .getSourceFile()
+        .fileName.replaceAll("\\", "/")
+        .includes("/node_modules/@types/node/"),
+    )
+  ) {
+    return "unknown";
+  }
+
   // Handle tuple types
   if (checker.isTupleType(type)) {
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
