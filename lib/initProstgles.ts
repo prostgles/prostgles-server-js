@@ -36,6 +36,7 @@ export type UpdatableOptions<S = void, SUser extends SessionUser = SessionUser> 
   | "io"
   | "fileTable"
   | "restApi"
+  | "tableHooks"
   | "tableConfig"
   | "schemaFilter"
   | "auth"

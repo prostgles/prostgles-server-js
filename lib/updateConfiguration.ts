@@ -1,12 +1,11 @@
 import { getKeys, includes, isDefined, isEmpty, isEqual } from "prostgles-types";
-import type { SessionUser } from "./Auth/AuthTypes";
 import type { OnReadyCallbackBasic, UpdatableOptions } from "./initProstgles";
 import type { Prostgles } from "./Prostgles";
 
-export const updateConfiguration = async <DBSchema, UserSchema extends SessionUser>(
+export const updateConfiguration = async (
   prgl: Prostgles,
   onReady: OnReadyCallbackBasic,
-  newOpts: UpdatableOptions<DBSchema, UserSchema>,
+  newOpts: UpdatableOptions,
   force?: true,
 ) => {
   const optionsThatChanged = getKeys(newOpts)
@@ -31,7 +30,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
   if (includes(optionsThatChanged, "tableConfig")) {
     await prgl.initTableConfig({
       type: "prgl.update",
-      newOpts: newOpts,
+      newOpts,
     });
   }
   if (includes(optionsThatChanged, "schema")) {
@@ -55,6 +54,12 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
 
   if (isEmpty(newOpts)) return;
 
+  if (
+    optionsThatChanged.every((updatedKey) => nonOnReadyUpdateKeys.some((key) => key === updatedKey))
+  ) {
+    return;
+  }
+
   /**
    * Some of these changes require clients to reconnect
    * While others also affect the server and onReady should be called
@@ -66,7 +71,7 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
   } else {
     await prgl.init(onReady, {
       type: "prgl.update",
-      newOpts: newOpts,
+      newOpts,
     });
   }
 };
@@ -82,3 +87,5 @@ export const clientOnlyUpdateKeys = [
   "publishRawSQL",
   "modifyClientSchema",
 ] as const satisfies (keyof UpdatableOptions)[];
+
+const nonOnReadyUpdateKeys = ["tableHooks"] as const satisfies (keyof UpdatableOptions)[];
