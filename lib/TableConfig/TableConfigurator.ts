@@ -16,7 +16,7 @@ export class TableConfigurator {
   instanceId = Date.now() + Math.random();
 
   get config() {
-    return this.prostgles.mergedTableConfig ?? {};
+    return this.prostgles.mergedTableConfig.tableConfig ?? {};
   }
   get dbo(): DBHandlerServer {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";

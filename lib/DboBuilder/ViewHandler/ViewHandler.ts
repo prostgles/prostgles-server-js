@@ -32,6 +32,7 @@ import { escapeTSNames } from "../../utils/utils";
 import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
+import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 
 export type JoinPaths = {
   t1: string;
@@ -54,6 +55,7 @@ export class ViewHandler {
   joinPaths?: JoinPaths;
   dboBuilder: DboBuilder;
   config: TableDefinition<any> | undefined;
+  hooks: TableHooksDefinition | undefined;
 
   tx?: {
     t: pgPromise.ITask<{}>;
@@ -75,15 +77,18 @@ export class ViewHandler {
     tableOrViewInfo,
     tx,
     joinPaths,
+    hooks,
   }: {
     db: DB;
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
     config: TableDefinition<any> | undefined;
+    hooks: TableHooksDefinition | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths?: JoinPaths;
   }) {
     this.config = config;
+    this.hooks = hooks;
     this.db = db;
     this.tx = tx;
     this.joinPaths = joinPaths;

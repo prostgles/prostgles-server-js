@@ -35,6 +35,7 @@ import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
 import { isApplicableHook } from "./isApplicableHook";
 import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
+import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -52,6 +53,7 @@ export class TableHandler extends ViewHandler {
   constructor({
     db,
     config,
+    hooks,
     dboBuilder,
     tableOrViewInfo,
     tx,
@@ -61,10 +63,11 @@ export class TableHandler extends ViewHandler {
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
     config: TableDefinition<any> | undefined;
+    hooks: TableHooksDefinition | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths?: JoinPaths;
   }) {
-    super({ db, tableOrViewInfo, dboBuilder, config, tx, joinPaths });
+    super({ db, tableOrViewInfo, dboBuilder, config, hooks, tx, joinPaths });
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.remove = this.delete;
@@ -75,9 +78,7 @@ export class TableHandler extends ViewHandler {
 
   getBeforeHooks = (command: "update" | "insert", rows: AnyObject[]) => {
     return (
-      this.config?.hooks?.beforeEach?.filter((hook) =>
-        isApplicableHook(this, rows, hook, command),
-      ) ?? []
+      this.hooks?.beforeEach?.filter((hook) => isApplicableHook(this, rows, hook, command)) ?? []
     );
   };
 
@@ -133,7 +134,7 @@ export class TableHandler extends ViewHandler {
     if (postValidate && !localParams) {
       throw new Error("Unexpected: no localParams for postValidate");
     }
-    const afterEachHooks = this.config?.hooks?.afterEach
+    const afterEachHooks = this.hooks?.afterEach
       ?.map((hook) => {
         const { commands } = hook;
         if (!commands[command.name]) {
@@ -146,7 +147,7 @@ export class TableHandler extends ViewHandler {
       })
       .filter(isDefined);
 
-    const afterAllHooks = this.config?.hooks?.afterAll
+    const afterAllHooks = this.hooks?.afterAll
       ?.map((hook) => {
         const { commands } = hook;
         if (!commands[command.name]) {
@@ -183,7 +184,7 @@ export class TableHandler extends ViewHandler {
       command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
     return {
       shouldWrap:
-        !transaction && (hasAfterChecks || hasBeforeHooks || this.config?.hooks?.onInsteadOfDelete),
+        !transaction && (hasAfterChecks || hasBeforeHooks || this.hooks?.onInsteadOfDelete),
       hasBeforeHooks,
       hasAfterChecks,
     };

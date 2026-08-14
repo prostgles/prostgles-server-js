@@ -29,7 +29,10 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
     prgl.initRestApi();
   }
   if (includes(optionsThatChanged, "tableConfig")) {
-    await prgl.initTableConfig({ type: "prgl.update", newOpts });
+    await prgl.initTableConfig({
+      type: "prgl.update",
+      newOpts: newOpts,
+    });
   }
   if (includes(optionsThatChanged, "schema")) {
     await prgl.refreshDBO();
@@ -61,7 +64,10 @@ export const updateConfiguration = async <DBSchema, UserSchema extends SessionUs
   ) {
     prgl.setupSocketIO();
   } else {
-    await prgl.init(onReady, { type: "prgl.update", newOpts });
+    await prgl.init(onReady, {
+      type: "prgl.update",
+      newOpts: newOpts,
+    });
   }
 };
 

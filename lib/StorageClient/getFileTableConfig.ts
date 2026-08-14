@@ -1,11 +1,12 @@
 import { omitKeys } from "prostgles-types";
+import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
 import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/uploadFile";
 import type { Prostgles } from "../Prostgles";
-import type { TableConfig } from "../TableConfig/TableConfigTypes";
-import { setupFileServeHandler } from "./setupFileServeHandler";
-import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import type { BeforeEachTsTrigger } from "../PublishParser/publishTypesAndUtils";
+import type { TableConfig } from "../TableConfig/TableConfigTypes";
+import type { TableHooks } from "../TableHooks/TableHooks";
+import { setupFileServeHandler } from "./setupFileServeHandler";
 
 const FILE_TABLE_COLUMN_DEFINITIONS = {
   id: `UUID PRIMARY KEY DEFAULT gen_random_uuid()`,
@@ -41,10 +42,12 @@ export type FileTableRow = {
   : string | null;
 };
 
-export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
-  const { fileTable, tableConfig } = prg.opts;
+export const getFileTableConfig = (
+  prg: Prostgles,
+): { tableConfig: TableConfig | undefined; tableHooks: TableHooks | undefined } => {
+  const { fileTable, tableConfig, tableHooks } = prg.opts;
   if (!fileTable) {
-    return tableConfig;
+    return { tableConfig, tableHooks };
   }
 
   const { expressApp } = fileTable;
@@ -76,7 +79,7 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
     }
   }
 
-  return {
+  const mergedTableConfig: TableConfig = {
     [fileTableName]: {
       ...userFileTableConfig,
       columns: {
@@ -94,71 +97,75 @@ export const getFileTableConfig = (prg: Prostgles): TableConfig | undefined => {
           onUnmount: destroy,
         };
       },
-      hooks: {
-        ...userFileTableConfig?.hooks,
-        beforeEach: [
-          {
-            commands: {
-              insert: 1,
-              update: 1,
-            },
-            validate: async ({ data: insertData, localParams, command, filter }) => {
-              const tableHandler = prg.dboBuilder.dboMap.get(fileTableName);
-              if (!tableHandler) throw "Storage tableHandler not found";
-              assertFileObjectValid(insertData);
+    },
+    ...omitKeys(tableConfig ?? {}, [fileTableName]),
+  };
 
-              const {
-                data: dataBlob,
-                original_name,
-                id,
-                original_last_modified = null,
-              } = insertData;
-              const data = dataBlob as unknown as Buffer;
-              if (command === "update") {
-                const { newData } = await updateFile(tableHandler, fileTable, {
-                  filter: filter ?? {},
-                  localParams,
-                  data,
-                  original_name,
-                  original_last_modified,
-                });
-                return {
-                  row: newData,
-                  hookContext: {
-                    data,
-                  },
-                };
-              }
+  const userFileTableHooks = tableHooks?.[fileTableName];
+  const mergedTableHooks: TableHooks = {
+    [fileTableName]: {
+      ...userFileTableHooks,
+      beforeEach: [
+        {
+          commands: {
+            insert: 1,
+            update: 1,
+          },
+          validate: async ({ data: insertData, localParams, command, filter }) => {
+            const tableHandler = prg.dboBuilder.dboMap.get(fileTableName);
+            if (!tableHandler) throw "Storage tableHandler not found";
+            assertFileObjectValid(insertData);
 
-              const media = await uploadFile(fileTable, {
+            const { data: dataBlob, original_name, id, original_last_modified = null } = insertData;
+            const data = dataBlob as unknown as Buffer;
+            if (command === "update") {
+              const { newData } = await updateFile(tableHandler, fileTable, {
+                filter: filter ?? {},
+                localParams,
                 data,
                 original_name,
-                localParams,
-                mediaId: id,
                 original_last_modified,
               });
-
               return {
-                row: media,
+                row: newData,
                 hookContext: {
                   data,
                 },
               };
-            },
-          } satisfies BeforeEachTsTrigger<FileTableRow, {}>,
-          ...(userFileTableConfig?.hooks?.beforeEach || []),
-        ],
-        onInsteadOfDelete: async ({ dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
-          return onDeleteFromFileTable(fileTable, {
-            dbTX: dbx,
-            t: tx,
-            returningQuery,
-            isOneOrNone,
-            filterOpts,
-          });
-        },
+            }
+
+            const media = await uploadFile(fileTable, {
+              data,
+              original_name,
+              localParams,
+              mediaId: id,
+              original_last_modified,
+            });
+
+            return {
+              row: media,
+              hookContext: {
+                data,
+              },
+            };
+          },
+        } satisfies BeforeEachTsTrigger<FileTableRow, {}>,
+        ...(userFileTableHooks?.beforeEach || []),
+      ],
+      onInsteadOfDelete: async ({ dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
+        return onDeleteFromFileTable(fileTable, {
+          dbTX: dbx,
+          t: tx,
+          returningQuery,
+          isOneOrNone,
+          filterOpts,
+        });
       },
     },
-    ...omitKeys(tableConfig ?? {}, [fileTableName]),
+  };
+
+  return {
+    tableConfig: mergedTableConfig,
+    tableHooks: mergedTableHooks,
   };
 };

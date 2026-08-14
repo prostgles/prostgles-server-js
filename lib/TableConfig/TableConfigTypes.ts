@@ -28,36 +28,14 @@ export type ColExtraInfo = {
 
 export type LangToTranslation = Record<string, string>;
 
-type BaseTableDefinition<R = AnyObject, DBX = DBHandlerServer> = {
+type BaseTableDefinition = {
   info?: {
     label?: string | LangToTranslation;
   };
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
   syncConfig?: SyncConfig;
-  hooks?: {
-    /**
-     * Hook used to run custom logic before inserting a row.
-     * The returned row must satisfy the table schema.
-     */
-    getPreInsertRow?: (
-      args: GetPreInsertRowArgs,
-    ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
-    beforeEach?: BeforeEachTsTrigger<R, DBX>[];
-    afterEach?: AfterEachTsTrigger<R, DBX>[];
-    afterAll?: AfterAllTsTrigger<R, DBX>[];
-    onInsteadOfDelete?: (args: {
-      dbx: DBX;
-      tx: pgPromise.ITask<{}>;
-      returningQuery: string;
-      isOneOrNone: boolean;
-      queryType: "any" | "none";
-      filterOpts: {
-        where: string;
-        filter: AnyObject;
-      };
-    }) => Promise<AnyObject[]>;
-  };
+
   triggers?: {
     [triggerName: string]: {
       /**
@@ -232,11 +210,7 @@ type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
  * Each column definition cannot reference to tables that appear later in the table definition.
  * These references should be specified in constraints property
  */
-export type TableDefinition<
-  LANG_IDS = { en: 1 },
-  R = AnyObject,
-  DBX = DBHandlerServer,
-> = BaseTableDefinition<R, DBX> & {
+export type TableDefinition<LANG_IDS = { en: 1 }> = BaseTableDefinition & {
   onMount?: (params: {
     dbo: DBHandlerServer;
     _db: DB;
@@ -323,18 +297,6 @@ export type TableDefinition<
   };
 };
 
-type GetPreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
-  validate: InsertRule["validate"];
-  localParams: LocalParams | undefined;
+export type TableConfig<LANG_IDS = { en: 1 }> = {
+  [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
 };
-
-export type TableConfig<LANG_IDS = { en: 1 }, S = void> =
-  S extends DBSchema ?
-    Partial<{
-      [TableName in keyof S]:
-        | TableDefinition<LANG_IDS, S[TableName]["columns"], DBOFullyTyped<S>>
-        | LookupTableDefinition<LANG_IDS>;
-    }>
-  : {
-      [table_name: string]: TableDefinition<LANG_IDS> | LookupTableDefinition<LANG_IDS>;
-    };

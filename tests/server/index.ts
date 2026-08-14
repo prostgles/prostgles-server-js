@@ -7,7 +7,7 @@ import prostgles, {
 } from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
-import { testTableConfig } from "./testTableConfig";
+import { testTableConfig, testTableHooks } from "./testTableConfig";
 import { VALIDATE_SCHEMA_FUNCTION_SQL_TEST } from "./VALIDATE_SCHEMA_FUNCTION_SQL_TEST";
 
 const app = express();
@@ -115,6 +115,7 @@ function dd() {
       }
     },
     tableConfig: testTableConfig,
+    tableHooks: testTableHooks,
     testRulesOnConnect: true,
     fileTable: {
       tableName: "files",

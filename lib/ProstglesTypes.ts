@@ -13,6 +13,7 @@ import type { RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
+import type { TableHooks } from "./TableHooks/TableHooks";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
@@ -306,6 +307,11 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * By default server will fail to start if the tableConfig schema changes cannot be applied without errors
    */
   tableConfigMigrations?: TableConfigMigrations;
+
+  /**
+   * Allows defining hooks for table events such as insert, update, delete and select.
+   */
+  tableHooks?: TableHooks<S>;
 
   /**
    * Useful for logging or debugging

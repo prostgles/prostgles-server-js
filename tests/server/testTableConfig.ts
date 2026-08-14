@@ -1,5 +1,30 @@
-import type { TableConfig } from "prostgles-server";
+import type { TableConfig, TableHooks } from "prostgles-server";
+import type { DBGeneratedSchema } from "../DBGeneratedSchema";
 
+export const testTableHooks: TableHooks<DBGeneratedSchema> = {
+  files: {
+    afterEach: [
+      {
+        commands: {
+          insert: 1,
+        },
+        validate: async ({ command, data, row, tx }) => {
+          row satisfies DBGeneratedSchema["files"]["columns"];
+          if (command === "insert") {
+            data satisfies DBGeneratedSchema["files"]["columns"];
+          }
+          // @ts-expect-error The hook row is typed from DBGeneratedSchema.
+          row.missing_column;
+          // throw new Error(JSON.stringify({ message: "afterEach hook error", data, row }));
+          await tx.any("UPDATE files SET metadata = $1 WHERE id = $2", [
+            { description: "Updated by afterEach hook" },
+            row.id,
+          ]);
+        },
+      },
+    ],
+  },
+};
 export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
   /** Allow extending the files table */
   files: {
@@ -10,22 +35,6 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
           description: { type: "string" },
         },
       },
-    },
-    hooks: {
-      afterEach: [
-        {
-          commands: {
-            insert: 1,
-          },
-          validate: async ({ data, row, tx }) => {
-            // throw new Error(JSON.stringify({ message: "afterEach hook error", data, row }));
-            await tx.any("UPDATE files SET metadata = $1 WHERE id = $2", [
-              { description: "Updated by afterEach hook" },
-              row.id,
-            ]);
-          },
-        },
-      ],
     },
   },
   planes: {

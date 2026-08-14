@@ -20,6 +20,7 @@ export type { StorageClient as CloudClient } from "./StorageClient/StorageClient
 export * from "./StorageClient/getLocalStorageClient";
 export type { DB } from "./initProstgles";
 export type * from "./TableConfig/TableConfigTypes";
+export type * from "./TableHooks/TableHooks";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;

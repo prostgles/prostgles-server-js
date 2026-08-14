@@ -8,9 +8,8 @@ import {
   rejectWithPGClientError,
   withUserRLS,
 } from "../DboBuilder";
-import type { TableHandler } from "./TableHandler";
-import { onDeleteFromFileTable } from "./onDeleteFromFileTable";
 import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
+import type { TableHandler } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 
 export async function _delete(
@@ -149,7 +148,7 @@ export async function _delete(
         dbHandler.oneOrNone<AnyObject>(queryWithRLS).then((data) => (data ? [data] : []))
       : dbHandler.any<AnyObject>(queryWithRLS);
 
-    const onInsteadOfDelete = this.config?.hooks?.onInsteadOfDelete;
+    const onInsteadOfDelete = this.hooks?.onInsteadOfDelete;
     if (onInsteadOfDelete) {
       if (!transaction) {
         throw new Error(

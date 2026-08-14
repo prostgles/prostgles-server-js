@@ -61,6 +61,7 @@ import * as fs from "fs";
 import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
+import { dirname } from "path";
 
 export class Prostgles {
   /**
@@ -145,6 +146,7 @@ export class Prostgles {
       onQuery: 1,
       onConnectionError: 1,
       tableConfig: 1,
+      tableHooks: 1,
       tableConfigMigrations: 1,
       onNotice: 1,
       onLog: 1,
@@ -190,17 +192,20 @@ export class Prostgles {
 
   /**
    * Will write the Schema Typescript definitions to file (tsGeneratedTypesDir)
+   * force is used for hotReloadMode to trigger a restart
    */
   writeDBSchema(force = false) {
     if (this.opts.tsGeneratedTypesDir) {
       const { fullPath, fileName } = this.getTSFileName();
       const { tsSchema: fileContent } = this.dboBuilder.getTsDefinitions();
-      fs.readFile(fullPath, "utf8", function (err, data) {
-        if (err || force || data !== fileContent) {
-          fs.writeFileSync(fullPath, fileContent);
-          console.log("Prostgles: Created typescript schema definition file: \n " + fileName);
-        }
-      });
+      fs.mkdirSync(dirname(fullPath), { recursive: true });
+
+      const existingContent =
+        fs.existsSync(fullPath) ? fs.readFileSync(fullPath, "utf8") : undefined;
+      if (force || existingContent !== fileContent) {
+        fs.writeFileSync(fullPath, fileContent);
+        console.log("Prostgles: Created typescript schema definition file: \n " + fileName);
+      }
     } else if (force) {
       console.error("Schema changed. tsGeneratedTypesDir needs to be set to reload server");
     }
