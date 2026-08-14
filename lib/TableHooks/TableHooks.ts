@@ -14,7 +14,10 @@ import type {
 export type TableHooks<S = void> =
   S extends DBSchema ?
     Partial<{
-      [tableName in keyof S]: TableHooksDefinition<S[tableName]["columns"], DBOFullyTyped<S>>;
+      [tableName in keyof S]: TableHooksDefinition<
+        Required<S[tableName]["columns"]>,
+        DBOFullyTyped<S>
+      >;
     }>
   : Record<string, TableHooksDefinition>;
 

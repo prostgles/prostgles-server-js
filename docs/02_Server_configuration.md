@@ -139,7 +139,7 @@
   
   const fileUrl = file.url;
   ```
-- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">{ [table_name: string]: TableDefinition&lt;{ en: 1; }, AnyObject, DBHandlerServer&gt; | LookupTableDefinition&lt;{ en: 1; }&gt;; }</span>
+- **tableConfig** <span style="color: grey">optional</span> <span style="color: green;">TableConfig</span>
 
   Define tables through a JSON-schema like object.
   Allows adding runtime JSONB validation and type safety.
@@ -165,6 +165,9 @@
 
     Script executed before tableConfig is loaded and IF an older schema_version is present.
     Any data conflicting with the new schema changes should be resolved here.
+- **tableHooks** <span style="color: grey">optional</span> <span style="color: green;">TableHooks</span>
+
+  Allows defining hooks for table events such as insert, update, delete and select.
 - **onLog** <span style="color: grey">optional</span> <span style="color: green;">(evt: EventInfo) =&gt; void | Promise&lt;void&gt;</span>
 
   Useful for logging or debugging
