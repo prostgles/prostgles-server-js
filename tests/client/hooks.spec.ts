@@ -1,10 +1,15 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
 import { pickKeys } from "prostgles-types";
+import React from "react";
 import type { DBHandlerClient } from "./index";
-import { renderReactHook } from "./renderReactHook";
+import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 
-export const clientHooks = async (db: DBHandlerClient) => {
+export const clientHooks = async (
+  db: DBHandlerClient,
+  reconnectSocket: () => Promise<void>,
+) => {
+  let reconnectTestError: unknown;
   const resultLoading = { data: undefined, isLoading: true, error: undefined };
   await describe("React hooks", async (t) => {
     const defaultFilter = { name: "abc" };
@@ -148,7 +153,7 @@ export const clientHooks = async (db: DBHandlerClient) => {
       assert.deepStrictEqual(pickKeys(lastDataItem, Object.keys(plane0)), plane0);
 
       // Update item
-      db.planes.update({ id: 0 }, { x: 230 });
+      await db.planes.update!({ id: 0 }, { x: 230 });
       const { results: deletedResults } = await rerender({
         props,
         expectedRerenders: 3,
@@ -182,7 +187,199 @@ export const clientHooks = async (db: DBHandlerClient) => {
       //   ]
       // );
     });
+
+    await test("useSync updates invalidate useMemo without mutating old data", async () => {
+      await db.planes.update!({ id: 0 }, { x: 20 });
+
+      let memoRun = 0;
+      const useSyncWithMemo = () => {
+        const result = db.planes.useSync!<
+          { id: number; x: number },
+          { handlesOnData: true }
+        >({ id: 0 }, { handlesOnData: true });
+        const { data } = result;
+        const memoized = React.useMemo(
+          () => ({ run: ++memoRun, x: data?.[0]?.x }),
+          [data],
+        );
+        return { ...result, data, memoized };
+      };
+
+      const rendered = await renderReactHookManual({
+        hook: useSyncWithMemo,
+        initialProps: [],
+      });
+
+      try {
+        const getLatest = () => rendered.getResults().at(-1)!;
+        await waitFor(() => getLatest().data?.[0]?.x === 20);
+
+        const initialResult = getLatest();
+        const initialMemoRun = initialResult.memoized.run;
+        assert.equal(initialResult.memoized.x, 20);
+
+        await db.planes.update!({ id: 0 }, { x: 231 });
+        await waitFor(() => getLatest().data?.[0]?.x === 231);
+
+        const serverUpdateResult = getLatest();
+        assert.equal(serverUpdateResult.memoized.x, 231);
+        assert.ok(serverUpdateResult.memoized.run > initialMemoRun);
+        assert.notStrictEqual(serverUpdateResult.data, initialResult.data);
+        assert.notStrictEqual(
+          serverUpdateResult.data[0],
+          initialResult.data[0],
+        );
+        assert.equal(initialResult.data[0].x, 20);
+
+        const serverUpdateMemoRun = serverUpdateResult.memoized.run;
+        await serverUpdateResult.data[0].$update({ x: 232 });
+        await waitFor(() => getLatest().data?.[0]?.x === 232);
+
+        const handleUpdateResult = getLatest();
+        assert.equal(handleUpdateResult.memoized.x, 232);
+        assert.ok(handleUpdateResult.memoized.run > serverUpdateMemoRun);
+        assert.notStrictEqual(handleUpdateResult.data, serverUpdateResult.data);
+        assert.notStrictEqual(
+          handleUpdateResult.data[0],
+          serverUpdateResult.data[0],
+        );
+        assert.equal(serverUpdateResult.data[0].x, 231);
+      } finally {
+        rendered.unmount();
+      }
+    });
+
+    await test("concurrent useSync hooks with matching options all update", async () => {
+      await db.planes.update!({ id: 0 }, { x: 30 });
+
+      const filter = { id: 0 };
+      const syncOptions = { handlesOnData: true } as const;
+      const memoRuns = [0, 0, 0];
+      const usePlaneSync = () =>
+        db.planes.useSync!<
+          { id: number; x: number },
+          { handlesOnData: true }
+        >(filter, syncOptions);
+      const useConcurrentSyncs = () => {
+        const syncs = [usePlaneSync(), usePlaneSync(), usePlaneSync()];
+        const memoized = [
+          React.useMemo(
+            () => ({ run: ++memoRuns[0], x: syncs[0].data?.[0]?.x }),
+            [syncs[0].data],
+          ),
+          React.useMemo(
+            () => ({ run: ++memoRuns[1], x: syncs[1].data?.[0]?.x }),
+            [syncs[1].data],
+          ),
+          React.useMemo(
+            () => ({ run: ++memoRuns[2], x: syncs[2].data?.[0]?.x }),
+            [syncs[2].data],
+          ),
+        ];
+        return { syncs, memoized };
+      };
+
+      const rendered = await renderReactHookManual({
+        hook: useConcurrentSyncs,
+        initialProps: [],
+      });
+
+      try {
+        const getLatest = () => rendered.getResults().at(-1)!;
+        const allSyncsHaveX = (x: number) =>
+          getLatest().syncs.every((sync) => sync.data?.[0]?.x === x);
+        await waitFor(() => allSyncsHaveX(30));
+
+        const initialResult = getLatest();
+        const initialMemoRuns = initialResult.memoized.map(({ run }) => run);
+
+        await db.planes.update!({ id: 0 }, { x: 31 });
+        await waitFor(() => allSyncsHaveX(31));
+
+        const serverUpdateResult = getLatest();
+        serverUpdateResult.syncs.forEach((sync, index) => {
+          assert.equal(serverUpdateResult.memoized[index].x, 31);
+          assert.ok(serverUpdateResult.memoized[index].run > initialMemoRuns[index]);
+          assert.notStrictEqual(sync.data, initialResult.syncs[index].data);
+          assert.equal(initialResult.syncs[index].data![0].x, 30);
+        });
+
+        const serverUpdateMemoRuns = serverUpdateResult.memoized.map(({ run }) => run);
+        await serverUpdateResult.syncs[0].data![0].$update({ x: 32 });
+        await waitFor(() => allSyncsHaveX(32));
+
+        const handleUpdateResult = getLatest();
+        handleUpdateResult.syncs.forEach((sync, index) => {
+          assert.equal(handleUpdateResult.memoized[index].x, 32);
+          assert.ok(handleUpdateResult.memoized[index].run > serverUpdateMemoRuns[index]);
+          assert.notStrictEqual(sync.data, serverUpdateResult.syncs[index].data);
+          assert.equal(serverUpdateResult.syncs[index].data![0].x, 31);
+        });
+      } finally {
+        rendered.unmount();
+      }
+    });
+
+    await test("useSync receives inserts after a socket reconnect", async () => {
+      const y = 999_999;
+      const filter = { y };
+      const options = { handlesOnData: false } as const;
+      const usePlane = () =>
+        db.planes.useSync!<
+          { id: number; x: number; y: number },
+          { handlesOnData: false }
+        >(filter, options);
+
+      await db.planes.delete!(filter);
+      await db.planes.insert!({ id: 999_998, x: 101, y });
+
+      const beforeReconnect = await renderReactHookManual({
+        hook: usePlane,
+        initialProps: [],
+      });
+
+      try {
+        await waitFor(() =>
+          beforeReconnect.getResults().at(-1)?.data?.some(({ x }) => x === 101),
+        );
+        beforeReconnect.unmount();
+
+        await reconnectSocket();
+        await db.planes.insert!({ id: 999_999, x: 102, y });
+
+        const afterReconnect = await renderReactHookManual({
+          hook: usePlane,
+          initialProps: [],
+        });
+        try {
+          await waitFor(
+            () => afterReconnect.getResults().at(-1)?.data?.some(({ x }) => x === 102),
+          );
+        } finally {
+          afterReconnect.unmount();
+        }
+      } catch (error) {
+        reconnectTestError = error;
+        throw error;
+      } finally {
+        beforeReconnect.unmount();
+        await db.planes.delete!(filter);
+      }
+    });
   });
+
+  // node:test records nested failures instead of rejecting describe().
+  if (reconnectTestError) throw reconnectTestError;
 };
 
-const tout = (ms) => new Promise((res) => setTimeout(res, ms));
+const waitFor = async (condition: () => boolean, timeout = 5000) => {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeout) {
+      throw new Error("Timed out waiting for useSync update");
+    }
+    await tout(20);
+  }
+};
+
+const tout = (ms: number) => new Promise((res) => setTimeout(res, ms));

@@ -48,10 +48,16 @@ type ClientTestSpecV2 = (args: {
   tableSchema: DBSchemaTable[];
   isReconnect?: boolean;
   auth: AuthHandler;
+  reconnectSocket: () => Promise<void>;
 }) => Promise<void>;
 
+let reconnectReadyResolve: () => void;
+const reconnectReady = new Promise<void>((resolve) => {
+  reconnectReadyResolve = resolve;
+});
+
 const tests: Record<string, ClientTestSpecV2> = {
-  main: async ({ db, sql, methods, tableSchema, auth }) => {
+  main: async ({ db, sql, methods, tableSchema, auth, reconnectSocket }) => {
     await sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db, sql, log, TEST_NAME);
     await isomorphicQueriesTyped(
@@ -59,7 +65,7 @@ const tests: Record<string, ClientTestSpecV2> = {
       db,
     );
     await clientOnlyQueries(db, sql, auth, log, methods, tableSchema, TEST_NAME);
-    await clientHooks(db);
+    await clientHooks(db, reconnectSocket);
   },
   useProstgles: async ({ db, sql }) => {
     await useProstglesTest(db, sql, getClientOptions);
@@ -110,15 +116,22 @@ try {
   socket.on("connect_failed", (err) => {
     log("connect_failed", err);
   });
-  socket.on("start-test", (data) => {
+  socket.once("start-test", (data) => {
     //@ts-ignore
     prostgles({
       socket,
+      onDisconnect: () => {
+        log("Disconnected");
+      },
       onReconnect: (socket) => {
         log("Reconnected");
       },
       onReady: async ({ db, sql, methods, tableSchema, auth, isReconnect }) => {
         log(`TEST_NAME: ${TEST_NAME} Started`);
+        if (isReconnect) {
+          reconnectReadyResolve();
+          return;
+        }
         try {
           //@ts-ignore
           if (typeof window !== "undefined") {
@@ -136,7 +149,18 @@ try {
             };
             console.log = onLog;
           }
-          await testFileFunc({ db, sql, methods, tableSchema, auth, isReconnect });
+          await testFileFunc({
+            db,
+            sql,
+            methods,
+            tableSchema,
+            auth,
+            isReconnect,
+            reconnectSocket: async () => {
+              socket.io.engine.close();
+              await reconnectReady;
+            },
+          });
 
           stopTest();
         } catch (err) {
