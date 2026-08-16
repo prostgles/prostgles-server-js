@@ -71,7 +71,7 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
 
     items4: {
       select:
-        user ? "*" : (
+        user && user.type !== "public" ? "*" : (
           {
             fields: { name: 0 },
             filterFields: "*",

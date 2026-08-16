@@ -1,8 +1,7 @@
 import express from "express";
 import path from "path";
 import prostgles, {
-  createServerFunctionBlockWithContext,
-  createServerFunctionWithContext,
+  defineFunction,
   getLocalStorageClient,
 } from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
@@ -50,14 +49,20 @@ const stopTest = (err?) => {
   process.exit(err ? 1 : 0);
 };
 
-const sessions: { id: string; user_id: string }[] = [];
+const sessions: { id: string; user_id: string }[] = [
+  { id: "main", user_id: "1" },
+  { id: "rest_api", user_id: "1" },
+];
 type USER = {
   id: string;
   username: string;
   password: string;
   type: string;
 };
-const users: USER[] = [{ id: "1a", username: "john", password: "secret", type: "default" }];
+const users: USER[] = [
+  { id: "1", username: "public", password: "", type: "public" },
+  { id: "2", username: "john", password: "secret", type: "default" },
+];
 
 process.on("unhandledRejection", (reason, p) => {
   console.trace("Unhandled Rejection at:", p, "reason:", reason);
@@ -226,76 +231,75 @@ function dd() {
         },
       },
     },
-    functions: (params) => {
-      const forAllUsers = createServerFunctionWithContext(params);
-      const forAdmins = createServerFunctionWithContext(
-        params?.user?.type === "admin" ? { ...params, type: "admin" as const } : undefined,
-      );
-      const forDefaultUsers = createServerFunctionBlockWithContext(
-        params?.user?.type === "default" ? { ...params, type: "default" as const } : undefined,
-      );
-      const result = {
-        myfunc: forAllUsers({
-          input: { arg1: { type: "number" } },
-          run: (
-            {
-              arg1,
-              //@ts-expect-error
-              dwadwa,
+    functions: {
+      allUsers: {
+        userFilter: {},
+        functions: {
+          myfunc: defineFunction({
+            input: { arg1: { type: "number" } },
+            run: (
+              {
+                arg1,
+                //@ts-expect-error
+                dwadwa,
+              },
+              params,
+            ) => {
+              params.user;
+              return 222;
             },
-            params,
-          ) => {
-            params.user;
-            return 222;
-          },
-        }),
-        myfuncVoid: forAllUsers({
-          run: async () => {
-            await new Promise((res) => setTimeout(res, 100));
-          },
-        }),
-        myAdminFunc: forAdmins({
-          input: { arg1: { type: "number" } },
-          run: ({ arg1 }, { user, type }) => {
-            type === "admin";
-            user.type === "dwadaw";
-            return 222;
-          },
-        }),
-        myfuncWithBadReturn: forAllUsers({
-          input: { arg1: { type: "number" } },
-          run: async () => "222",
-        }),
-        myfuncWithComplexReturn: forAllUsers({
-          input: { arg1: { type: "number" } },
-          run: () => {
-            if (Math.random() > 0.5) {
-              return { a: 1, b: "str", c: { d: true } };
-            } else {
-              return [1, 2, 3];
-            }
-          },
-        }),
-        ...forDefaultUsers({
-          myfuncForDefault: {
+          }),
+          myfuncVoid: defineFunction({
             run: async () => {
               await new Promise((res) => setTimeout(res, 100));
             },
-          },
-          myfuncForDefault2: {
+          }),
+          myfuncWithBadReturn: defineFunction({
+            input: { arg1: { type: "number" } },
+            run: async () => "222",
+          }),
+          myfuncWithComplexReturn: defineFunction({
+            input: { arg1: { type: "number" } },
+            run: () => {
+              if (Math.random() > 0.5) {
+                return { a: 1, b: "str", c: { d: true } };
+              } else {
+                return [1, 2, 3];
+              }
+            },
+          }),
+        },
+      },
+      admins: {
+        userFilter: { email: "admin@example.com" },
+        functions: {
+          myAdminFunc: defineFunction({
+            input: { arg1: { type: "number" } },
+            run: ({ arg1 }, { user }) => {
+              user.type === "dwadaw";
+              return 222;
+            },
+          }),
+        },
+      },
+      defaultUsers: {
+        userFilter: { email: "john@example.com" },
+        functions: {
+          myfuncForDefault: defineFunction({
+            run: async () => {
+              await new Promise((res) => setTimeout(res, 100));
+            },
+          }),
+          myfuncForDefault2: defineFunction({
             input: { name: "string" },
             run: async () => {
               await new Promise((res) => setTimeout(res, 100));
-              if (Math.PI) {
-                return { a: 1 };
-              }
+              if (Math.PI) return { a: 1 };
               return { b: "1" };
             },
-          },
-        }),
-      } as const;
-
-      return result;
+          }),
+        },
+      },
     },
     publish: testPublish,
     publishRawSQL: async (params) => {
@@ -349,6 +353,16 @@ function dd() {
     ],
     onReady: async ({ dbo, sql, db }) => {
       log("prostgles onReady");
+      await dbo.users.upsert({ id: 1 }, {
+        email: "public@example.com",
+        status: "active",
+        preferences: { others: [] },
+      });
+      await dbo.users.upsert({ id: 2 }, {
+        email: "john@example.com",
+        status: "active",
+        preferences: { others: [] },
+      });
       await db.any(VALIDATE_SCHEMA_FUNCTION_SQL_TEST);
       try {
         if (isClientTest) {

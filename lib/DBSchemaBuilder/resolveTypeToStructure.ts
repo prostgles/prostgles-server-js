@@ -43,20 +43,25 @@ export const resolveTypeToStructure = (
     return type.intrinsicName === "true" ? "true" : "false";
   }
 
+  /** Recursive output types cannot be represented in the generated inline schema. */
+  if (parentTypes.includes(type)) return "unknown";
+
   // Handle union types
   if (type.isUnion()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
     );
     // Deduplicate
     const unique = [...new Set(parts)];
+    if (unique.includes("unknown")) return "unknown";
+    if (unique.includes("any")) return "any";
     return unique.length === 1 ? unique[0]! : `(${unique.join(" | ")})`;
   }
 
   // Handle intersection types
   if (type.isIntersection()) {
     const parts = type.types.map((t) =>
-      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
+      resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
     );
     return `(${parts.join(" & ")})`;
   }
@@ -97,7 +102,7 @@ export const resolveTypeToStructure = (
     const typeArgs = checker.getTypeArguments(type as ts.TypeReference);
     if (typeArgs.length > 0) {
       const resolvedArgs = typeArgs.map((t) =>
-        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, parentTypes),
+        resolveTypeToStructure(globalBuiltIns, functionName, checker, t, nextParentTypes),
       );
       return `${typeName}<${resolvedArgs.join(", ")}>`;
     }
@@ -158,7 +163,7 @@ export const resolveTypeToStructure = (
         functionName,
         checker,
         propType,
-        parentTypes,
+        nextParentTypes,
       );
       const isOptional = prop.flags & ts.SymbolFlags.Optional;
       const propName = prop.getName();

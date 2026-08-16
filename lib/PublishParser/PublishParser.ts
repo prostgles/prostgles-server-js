@@ -67,15 +67,55 @@ export class PublishParser {
 
   async getAllowedFunctions(clientReq: AuthClientRequest, userData: AuthResultWithSID | undefined) {
     const publishParams = await this.getPublishParams(clientReq, userData);
-    const allowedFunctions = await this.prostgles.opts.functions?.(publishParams);
-    if (!allowedFunctions) {
+    const functionGroups = this.prostgles.opts.functions;
+    if (!functionGroups || !publishParams.user) {
       return;
     }
-    const allowedFunctionsMap: Map<string, ServerFunctionDefinition> = new Map();
+    const user = publishParams.user;
+    const users = publishParams.dbo.users;
+    if (!users?.findOne) return;
+    const userId = user.id;
+    if (!userId || typeof userId !== "string") {
+      throw "User ID is missing or invalid";
+    }
+    const allowedFunctionsMap = new Map<string, ServerFunctionDefinition>();
 
-    for (const [name, method] of Object.entries(allowedFunctions)) {
-      if (method.run !== undefined) {
-        allowedFunctionsMap.set(name, method);
+    for (const group of Object.values(functionGroups)) {
+      const matchingUser = await users.findOne({
+        $and: [group.userFilter, { id: userId }],
+      });
+      if (!matchingUser) continue;
+
+      for (const [name, method] of Object.entries(group.functions)) {
+        const existingMethod = allowedFunctionsMap.get(name);
+        if (existingMethod) {
+          throw `Duplicate function name detected: ${name}. Function names must be unique across all groups.`;
+        }
+
+        const runWithContext = async (args: Record<string, unknown> | undefined) => {
+          const ctx = await (async () => {
+            if (method.unrestrictedDbAccess) {
+              return {
+                ...publishParams,
+                db: publishParams.dbo,
+                _db: publishParams.db,
+                user,
+              };
+            }
+            const { clientDb, clientSql } = await publishParams.getClientDBHandlers(undefined);
+            const { db: _db, ...safeParams } = publishParams;
+            return {
+              ...safeParams,
+              db: clientDb,
+              dbo: clientDb,
+              sql: clientSql,
+              user,
+            };
+          })();
+
+          return method.run(args, ctx);
+        };
+        allowedFunctionsMap.set(name, { ...method, run: runWithContext });
       }
     }
     return allowedFunctionsMap;

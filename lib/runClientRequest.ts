@@ -280,7 +280,8 @@ export const runClientMethod = async function (
     throw message;
   }
 
-  const res = await functionDefinition.run(input as never);
+  /** Allowed functions are wrapped with their request context by PublishParser. */
+  const res = await functionDefinition.run(input as never, undefined);
 
   return res;
 };

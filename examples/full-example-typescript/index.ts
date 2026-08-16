@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import prostgles from "prostgles-server";
+import prostgles, { defineFunction } from "prostgles-server";
 import http from "http";
 import { Server } from "socket.io";
 const app = express();
@@ -27,13 +27,18 @@ prostgles({
       planes: "*",
     };
   },
-  functions: ({ dbo }) => {
-    return {
-      insertPlanes: async (data) => {
-        let res = await dbo.planes.insert(data);
-        return res;
+  functions: {
+    public: {
+      userFilter: { type: "public" },
+      functions: {
+        insertPlanes: defineFunction({
+          input: { model: "string", manufacturer: "string" },
+          run: async (data, { dbo }) => {
+            return dbo.planes.insert(data);
+          },
+        }),
       },
-    };
+    },
   },
 
   onReady: async ({ dbo }) => {

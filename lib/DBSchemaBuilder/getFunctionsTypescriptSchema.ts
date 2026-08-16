@@ -1,4 +1,4 @@
-import { getJSONBTSTypes, getObjectEntries, type JSONB } from "prostgles-types";
+import { getJSONBTSTypes, type JSONB } from "prostgles-types";
 import type { TableSchema } from "../DboBuilder/DboBuilder";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getServerFunctionReturnTypes } from "./getServerFunctionReturnTypes";
@@ -6,7 +6,7 @@ import { getServerFunctionReturnTypes } from "./getServerFunctionReturnTypes";
 export const getFunctionsTypescriptSchema = (
   { tsGeneratedTypesFunctionsPath }: Pick<ProstglesInitOptions, "tsGeneratedTypesFunctionsPath">,
   tablesOrViews: TableSchema[],
-  resolvedFunctions: Record<
+  resolvedFunctions: Map<
     string,
     {
       input?: Record<string, JSONB.FieldType>;
@@ -18,7 +18,7 @@ export const getFunctionsTypescriptSchema = (
     !tsGeneratedTypesFunctionsPath ? undefined : (
       getServerFunctionReturnTypes(tsGeneratedTypesFunctionsPath)
     );
-  const methodDefinitions = getObjectEntries(resolvedFunctions).map(
+  const methodDefinitions = Array.from(resolvedFunctions.entries()).map(
     ([name, functionDefinition]) => {
       const input = functionDefinition.input;
       const argumentTypes =

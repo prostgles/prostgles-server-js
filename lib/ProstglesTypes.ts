@@ -6,11 +6,11 @@ import type {
   SessionUser,
 } from "./Auth/AuthTypes";
 import type { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
 import type { RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
+import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
 import type { TableHooks } from "./TableHooks/TableHooks";
@@ -181,7 +181,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Server-side functions that can be invoked by the client
    */
-  functions?: ServerFunctionDefinitions<S, SUser>;
+  functions?: ServerFunctionDefinitions<S>;
 
   /**
    * If true then will test all table methods on each socket connect.

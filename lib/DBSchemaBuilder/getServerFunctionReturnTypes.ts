@@ -45,34 +45,37 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
 
       if (!recordType) return;
 
-      for (const prop of checker.getPropertiesOfType(recordType)) {
-        const propType = checker.getTypeOfSymbolAtLocation(
-          prop,
-          prop.valueDeclaration ?? prop.declarations![0]!,
-        );
-        const runReturnType = getRunReturnType(propType);
+      for (const groupProp of checker.getPropertiesOfType(recordType)) {
+        const groupType = getSymbolType(groupProp);
+        const functionsProp = checker.getPropertyOfType(groupType, "functions");
+        if (!functionsProp) continue;
 
-        /** Peel away any wrapping helper functions */
-        let finalRunReturnType = runReturnType;
-        while (
-          finalRunReturnType &&
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          finalRunReturnType.symbol?.valueDeclaration &&
-          ts.isFunctionLike(finalRunReturnType.symbol.valueDeclaration)
-        ) {
-          finalRunReturnType = unwrapMaybePromise(
-            checker.getReturnTypeOfSignature(finalRunReturnType.getCallSignatures()[0]!),
-          );
-        }
+        const functionsType = checker.getApparentType(getSymbolType(functionsProp));
+        for (const prop of checker.getPropertiesOfType(functionsType)) {
+          const runReturnType = getRunReturnType(getSymbolType(prop));
 
-        if (finalRunReturnType) {
-          const resolvedReturnType = resolveTypeToStructure(
-            globalBuiltins,
-            prop.getName(),
-            checker,
-            finalRunReturnType,
-          );
-          result.set(prop.getName(), resolvedReturnType);
+          /** Peel away any wrapping helper functions */
+          let finalRunReturnType = runReturnType;
+          while (
+            finalRunReturnType &&
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            finalRunReturnType.symbol?.valueDeclaration &&
+            ts.isFunctionLike(finalRunReturnType.symbol.valueDeclaration)
+          ) {
+            finalRunReturnType = unwrapMaybePromise(
+              checker.getReturnTypeOfSignature(finalRunReturnType.getCallSignatures()[0]!),
+            );
+          }
+
+          if (finalRunReturnType) {
+            const resolvedReturnType = resolveTypeToStructure(
+              globalBuiltins,
+              prop.getName(),
+              checker,
+              finalRunReturnType,
+            );
+            result.set(prop.getName(), resolvedReturnType);
+          }
         }
       }
     }
@@ -95,6 +98,13 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
     // Strip undefined/null
     t = checker.getNonNullableType(t);
     return checker.getApparentType(t);
+  }
+
+  function getSymbolType(symbol: ts.Symbol) {
+    const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+    return declaration ?
+        checker.getTypeOfSymbolAtLocation(symbol, declaration)
+      : checker.getTypeOfSymbol(symbol);
   }
 
   /** Extract `run` return type from ServerFunctionDefinition */

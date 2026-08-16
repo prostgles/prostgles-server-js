@@ -629,7 +629,7 @@ export const clientOnlyQueries = async (
     log("auth.user:", auth.user);
 
     assert.equal(auth.loginType, "email+password", "auth.login.withPassword should be defined");
-    const isUser = !!auth.user;
+    const isUser = Boolean(auth.user && auth.user.type !== "public");
 
     // Public data
     await test("Security rules example", { skip: isUser }, async () => {

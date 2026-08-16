@@ -260,13 +260,20 @@ export class DboBuilder {
     }
 
     const { functions } = this.prostgles.opts;
-    let resolvedFunctions = {} as { [key: string]: ServerFunctionDefinition };
+    const resolvedFunctions = new Map<string, ServerFunctionDefinition>();
     if (functions) {
-      try {
-        resolvedFunctions = await functions(undefined);
-      } catch (e) {
-        console.error("Invalid functions:", e);
-        throw e;
+      for (const group of Object.values(functions)) {
+        for (const [name, definition] of Object.entries(group.functions)) {
+          if (typeof definition.run !== "function") {
+            throw new Error(`Function ${JSON.stringify(name)} must define run`);
+          }
+          if (resolvedFunctions.has(name)) {
+            throw new Error(
+              `Function ${JSON.stringify(name)} is already defined. Function names must be unique across all groups`,
+            );
+          }
+          resolvedFunctions.set(name, definition);
+        }
       }
     }
 
