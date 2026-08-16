@@ -47,6 +47,11 @@ export type ServerFunctionDefinition = {
   run: (...args: any[]) => MaybePromise<unknown>;
 };
 
+declare const serverFunctionContext: unique symbol;
+type ServerFunctionContextMarker<S, SUser extends SessionUser> = {
+  [serverFunctionContext]?: [S, SUser];
+};
+
 type DefineFunctionArgs<
   TInput extends Record<string, JSONB.FieldType> | undefined,
   Context,
@@ -66,7 +71,7 @@ export function defineFunction<
   args: DefineFunctionArgs<TInput, UnrestrictedFunctionContext<S, SUser>, Return> & {
     unrestrictedDbAccess: true;
   },
-): typeof args;
+): typeof args & ServerFunctionContextMarker<S, SUser>;
 
 export function defineFunction<
   TInput extends Record<string, JSONB.FieldType> | undefined = undefined,
@@ -77,7 +82,7 @@ export function defineFunction<
   args: DefineFunctionArgs<TInput, RestrictedFunctionContext<S, SUser>, Return> & {
     unrestrictedDbAccess?: undefined;
   },
-): typeof args;
+): typeof args & ServerFunctionContextMarker<S, SUser>;
 export function defineFunction(args: unknown) {
   return args;
 }
@@ -91,10 +96,16 @@ type UsersTableRow<S> =
 
 type ValidDbSchema<S> = S extends DBSchema ? S : void;
 
-export type ServerFunctionDefinitions<S = void> = Record<
+export type ServerFunctionDefinitions<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+> = Record<
   string,
   {
     userFilter: FullFilter<UsersTableRow<S>, ValidDbSchema<S>>;
-    functions: Record<string, ServerFunctionDefinition>;
+    functions: Record<
+      string,
+      ServerFunctionDefinition & ServerFunctionContextMarker<S, SUser>
+    >;
   }
 >;

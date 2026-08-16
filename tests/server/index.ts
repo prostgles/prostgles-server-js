@@ -1,9 +1,6 @@
 import express from "express";
 import path from "path";
-import prostgles, {
-  defineFunction,
-  getLocalStorageClient,
-} from "prostgles-server";
+import prostgles, { defineFunction, getLocalStorageClient } from "prostgles-server";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig, testTableHooks } from "./testTableConfig";
@@ -276,6 +273,8 @@ function dd() {
           myAdminFunc: defineFunction({
             input: { arg1: { type: "number" } },
             run: ({ arg1 }, { user }) => {
+              user.email === "dwadaw";
+              //@ts-expect-error
               user.type === "dwadaw";
               return 222;
             },
@@ -353,16 +352,22 @@ function dd() {
     ],
     onReady: async ({ dbo, sql, db }) => {
       log("prostgles onReady");
-      await dbo.users.upsert({ id: 1 }, {
-        email: "public@example.com",
-        status: "active",
-        preferences: { others: [] },
-      });
-      await dbo.users.upsert({ id: 2 }, {
-        email: "john@example.com",
-        status: "active",
-        preferences: { others: [] },
-      });
+      await dbo.users.upsert(
+        { id: 1 },
+        {
+          email: "public@example.com",
+          status: "active",
+          preferences: { others: [] },
+        },
+      );
+      await dbo.users.upsert(
+        { id: 2 },
+        {
+          email: "john@example.com",
+          status: "active",
+          preferences: { others: [] },
+        },
+      );
       await db.any(VALIDATE_SCHEMA_FUNCTION_SQL_TEST);
       try {
         if (isClientTest) {

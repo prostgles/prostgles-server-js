@@ -181,7 +181,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Server-side functions that can be invoked by the client
    */
-  functions?: ServerFunctionDefinitions<S>;
+  functions?: ServerFunctionDefinitions<S, SUser>;
 
   /**
    * If true then will test all table methods on each socket connect.

@@ -23,7 +23,9 @@ void prostgles<FixtureSchema>({
         }),
         scalarResult: defineFunction({
           run: (_args, { dbo }) => {
-            void dbo.orders!.find!();
+            void dbo.orders.find();
+            // @ts-expect-error The surrounding prostgles schema must reach defineFunction.
+            void dbo.missingTable;
             return 42;
           },
         }),
