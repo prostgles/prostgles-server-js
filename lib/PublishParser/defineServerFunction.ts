@@ -35,6 +35,7 @@ export type UnrestrictedFunctionContext<
 > = FunctionContextBase<S, SUser> & {
   db: DB;
   sql: SQLHandler;
+  getClientDBHandlers: PublishParams<S, SUser>["getClientDBHandlers"];
 };
 
 export type ServerFunctionContext = RestrictedFunctionContext | UnrestrictedFunctionContext;
