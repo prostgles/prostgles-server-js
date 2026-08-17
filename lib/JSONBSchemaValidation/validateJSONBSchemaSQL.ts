@@ -1,4 +1,4 @@
-import { DATA_TYPES } from "prostgles-types";
+import { DATA_TYPES, type JSONB } from "prostgles-types";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 
 const raiseException = (err: string) => `
@@ -10,7 +10,17 @@ END IF;
 `;
 
 export const VALIDATE_SCHEMA_FUNCNAME = "prostgles.validate_jsonb_schema";
-export const JSONB_DATA_TYPES = [...DATA_TYPES, "Lookup", "Lookup[]"] as const;
+const JSONB_LOOKUP_TYPES = [
+  "RowLookup",
+  "RowLookup[]",
+  "ValueLookup",
+  "ValueLookup[]",
+  "TableLookup",
+  "TableLookup[]",
+  "ColumnLookup",
+  "ColumnLookup[]",
+] as const satisfies JSONB.Lookup["type"][];
+export const JSONB_DATA_TYPES = [...DATA_TYPES, ...JSONB_LOOKUP_TYPES] as const;
 
 export const CREATE_VALIDATE_SCHEMA_FUNCTION_SQL = `
 /* 
@@ -194,6 +204,24 @@ BEGIN
 
       /** Primitive */
       ELSE 
+
+        IF typeStr = 'TableLookup' THEN
+          typeStr = 'string';
+        ELSIF typeStr = 'ValueLookup' THEN
+          typeStr = 'any';
+        ELSIF typeStr = 'RowLookup' THEN
+          IF jsonb_typeof(data) != 'object' THEN
+            ${raiseException(`'Data type not matching. Expected: object, Actual: %, %', jsonb_typeof(data), path`)}
+          END IF;
+          RETURN TRUE;
+        ELSIF typeStr = 'ColumnLookup' THEN
+          RETURN ${VALIDATE_SCHEMA_FUNCNAME}(
+            '{ "type": { "table": "string", "column": "string" } }',
+            data,
+            context,
+            checked_path
+          );
+        END IF;
 
         IF (
           typeStr = 'number' AND jsonb_typeof(data) != typeStr OR

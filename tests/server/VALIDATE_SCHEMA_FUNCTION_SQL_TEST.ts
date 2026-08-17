@@ -72,12 +72,14 @@ SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": { "a": { "enum": ["a"] } } }', '{ 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "arrayOfType": { "a": { "enum": ["a"] } } }', '[{ "a": "a"}]');
 
 
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "data", "table": "tblName", "column": "colName" } }', '{}');
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "data", "table": "tblName", "column": "colName", "isArray": true } }', '[{}]');
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "table" } }', '"tblName"'::JSONB);
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "table", "isArray": true } }', '["tblName"]');
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column" } }', '{  "table": "tblName", "column": "colName" }');
-SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "lookup": { "type": "schema", "object": "column", "isArray": true } }', '{  "table": "tblName", "column": ["colName"] }');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "RowLookup", "table": "tblName" }', '{}');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "RowLookup[]", "table": "tblName" }', '[{}]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "ValueLookup", "table": "tblName", "column": "colName" }', '1');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "ValueLookup[]", "table": "tblName", "column": "colName" }', '[1, 2]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "TableLookup" }', '"tblName"'::JSONB);
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "TableLookup[]" }', '["tblName"]');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "ColumnLookup" }', '{ "table": "tblName", "column": "colName" }');
+SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "ColumnLookup[]" }', '[{ "table": "tblName", "column": "colName" }]');
 
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "time"}', '"22:22"');
 SELECT ${VALIDATE_SCHEMA_FUNCNAME}('{ "type": "Date"}', '"2222-22-22"');

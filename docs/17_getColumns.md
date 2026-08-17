@@ -20,7 +20,7 @@ Retrieves columns metadata of the table/view
   - **name** <span style="color: red">required</span> <span style="color: green;">string</span>
   - **label** <span style="color: red">required</span> <span style="color: green;">string</span>
 
-    Column display name. Will be first non empty value from i18n data, comment, name
+    Column display name. Will be first non empty value from i18n data, or prettified name
   - **comment** <span style="color: red">required</span> <span style="color: green;">string | undefined</span>
 
     Column description (if provided)
@@ -71,13 +71,13 @@ Retrieves columns metadata of the table/view
   - **jsonbSchema** <span style="color: grey">optional</span> <span style="color: green;">JSONBSchema</span>
 
     JSONB schema (a simplified version of json schema) for the column (if defined in the tableConfig)
-    A check constraint will use this schema for runtime data validation and apropriate TS types will be generated
+    A check constraint will use this schema for runtime data validation and appropriate TS types will be generated
   - **file** <span style="color: grey">optional</span> <span style="color: green;">FileColumnConfig</span>
 
     If defined then this column is referencing the file table
     Extracted from FileTable config
     Used in SmartForm
-  - **tsDataType** <span style="color: red">required</span> <span style="color: green;">"string" | "number" | "boolean" | "any" | "string[]" | "number[]" | "boolean[]" | "any[]" | "ArrayBuffer | Uint8Array"</span>
+  - **tsDataType** <span style="color: red">required</span> <span style="color: green;">"string" | "number" | "boolean" | "any" | "Uint8Array" | "string[]" | "number[]" | "boolean[]" | "any[]"</span>
 
     TypeScript data type
   - **select** <span style="color: red">required</span> <span style="color: green;">boolean</span>
