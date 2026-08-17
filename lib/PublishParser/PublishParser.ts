@@ -6,7 +6,11 @@ import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { applyScopeToTableRules } from "./applyScopeToTableRules";
-import type { ServerFunctionDefinition } from "./defineServerFunction";
+import type {
+  RestrictedFunctionContext,
+  ServerFunctionDefinition,
+  UnrestrictedFunctionContext,
+} from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
@@ -102,22 +106,22 @@ export class PublishParser {
         const runWithContext = async (args: Record<string, unknown> | undefined) => {
           const ctx = await (async () => {
             if (method.unrestrictedDbAccess) {
-              return {
+              const unrestrictedCtx: UnrestrictedFunctionContext = {
                 ...publishParams,
-                db: publishParams.dbo,
-                _db: publishParams.db,
                 user,
               };
+              return unrestrictedCtx;
             }
-            const { clientDb, clientSql } = await publishParams.getClientDBHandlers(undefined);
-            const { db: _db, ...safeParams } = publishParams;
-            return {
-              ...safeParams,
-              db: clientDb,
-              dbo: clientDb,
-              sql: clientSql,
+            const { clientDb } = await publishParams.getClientDBHandlers(undefined);
+            const { clientInfo, clientReq, tables } = publishParams;
+            const restrictedCtx: RestrictedFunctionContext = {
+              dbo: clientDb as unknown as DBOFullyTyped<void>,
               user,
+              clientInfo,
+              clientReq,
+              tables,
             };
+            return restrictedCtx;
           })();
 
           return method.run(args, ctx);
