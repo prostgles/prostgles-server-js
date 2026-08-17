@@ -48,7 +48,10 @@ export type ServerFunctionDefinition = {
 };
 
 declare const serverFunctionContext: unique symbol;
-type ServerFunctionContextMarker<S, SUser extends SessionUser> = {
+export type ServerFunctionContextMarker<
+  S,
+  SUser extends SessionUser,
+> = {
   [serverFunctionContext]?: [S, SUser];
 };
 

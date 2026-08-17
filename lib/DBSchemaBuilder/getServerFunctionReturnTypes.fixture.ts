@@ -1,4 +1,4 @@
-import prostgles, { defineFunction } from "..";
+import prostgles, { defineFunction, type ServerFunctionDefinitions } from "..";
 
 type RecursiveResult = {
   value: string;
@@ -11,25 +11,29 @@ type FixtureSchema = {
   };
 };
 
+export const stateServerFunctions = {
+  public: {
+    userFilter: { type: "public" },
+    functions: {
+      recursiveResult: defineFunction({
+        run: (): RecursiveResult => ({ value: "ok" }),
+      }),
+      scalarResult: defineFunction({
+        input: { value: "number" },
+        run: ({ value }, { dbo }) => {
+          value satisfies number;
+          void dbo.orders.find();
+          // @ts-expect-error The schema must reach a function defined in another object.
+          void dbo.missingTable;
+          return value;
+        },
+      }),
+    },
+  },
+} as const satisfies ServerFunctionDefinitions<FixtureSchema>;
+
 void prostgles<FixtureSchema>({
   dbConnection: "",
   onReady: () => {},
-  functions: {
-    public: {
-      userFilter: { type: "public" },
-      functions: {
-        recursiveResult: defineFunction({
-          run: (): RecursiveResult => ({ value: "ok" }),
-        }),
-        scalarResult: defineFunction({
-          run: (_args, { dbo }) => {
-            void dbo.orders.find();
-            // @ts-expect-error The surrounding prostgles schema must reach defineFunction.
-            void dbo.missingTable;
-            return 42;
-          },
-        }),
-      },
-    },
-  },
+  functions: stateServerFunctions,
 });
