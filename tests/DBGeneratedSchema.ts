@@ -55,7 +55,7 @@ export type DBGeneratedSchema = {
   bytea_test: {
     columns: {
       id?: number;
-      value?: null | ArrayBuffer | Uint8Array;
+      value?: null | Uint8Array;
     };
     
   };
@@ -74,7 +74,7 @@ export type DBGeneratedSchema = {
       cloud_url?: null | string;
       content_length?: number | string;
       content_type?: string;
-      data: ArrayBuffer | Uint8Array;
+      data: Uint8Array;
       deleted?: null | string;
       deleted_from_storage?: null | string;
       description?: null | string;
