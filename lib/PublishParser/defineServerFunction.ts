@@ -48,10 +48,7 @@ export type ServerFunctionDefinition = {
 };
 
 declare const serverFunctionContext: unique symbol;
-export type ServerFunctionContextMarker<
-  S,
-  SUser extends SessionUser,
-> = {
+export type ServerFunctionContextMarker<S, SUser extends SessionUser> = {
   [serverFunctionContext]?: [S, SUser];
 };
 
@@ -99,16 +96,33 @@ type UsersTableRow<S> =
 
 type ValidDbSchema<S> = S extends DBSchema ? S : void;
 
-export type ServerFunctionDefinitions<
+export type ServerFunctionGroupFunctions<
   S = void,
   SUser extends SessionUser = SessionUser,
-> = Record<
+> = Record<string, ServerFunctionDefinition & ServerFunctionContextMarker<S, SUser>>;
+
+export type ServerFunctionGroup<S = void, SUser extends SessionUser = SessionUser> = {
+  userFilter: FullFilter<UsersTableRow<S>, ValidDbSchema<S>>;
+  functions: ServerFunctionGroupFunctions<S, SUser>;
+};
+
+export type ServerFunctionDefinitions<S = void, SUser extends SessionUser = SessionUser> = Record<
   string,
-  {
-    userFilter: FullFilter<UsersTableRow<S>, ValidDbSchema<S>>;
-    functions: Record<
-      string,
-      ServerFunctionDefinition & ServerFunctionContextMarker<S, SUser>
-    >;
-  }
+  ServerFunctionGroup<S, SUser>
 >;
+
+/**
+ * Creates a schema-aware identity helper for defining a server function group
+ * while preserving its inferred function names and return types.
+ */
+export const createFunctionGroupDefiner = <S = void, SUser extends SessionUser = SessionUser>() => {
+  return <const T extends ServerFunctionGroup<S, SUser>>(group: T): T => group;
+};
+
+/**
+ * Creates a schema-aware identity helper for function maps that are composed
+ * into a server function group elsewhere.
+ */
+export const createFunctionsDefiner = <S = void, SUser extends SessionUser = SessionUser>() => {
+  return <const T extends ServerFunctionGroupFunctions<S, SUser>>(functions: T): T => functions;
+};

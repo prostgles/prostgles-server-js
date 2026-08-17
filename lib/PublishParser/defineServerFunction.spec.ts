@@ -1,5 +1,15 @@
 import { describe, test } from "node:test";
-import { defineFunction } from "./defineServerFunction";
+import {
+  defineFunction,
+  createFunctionGroupDefiner,
+  createFunctionsDefiner,
+} from "./defineServerFunction";
+
+type TestSchema = {
+  items: {
+    columns: { id: number };
+  };
+};
 
 void describe("defineFunction type test", async () => {
   await test("Type test", () => {
@@ -25,5 +35,28 @@ void describe("defineFunction type test", async () => {
 
     //@ts-expect-error run is required
     defineFunction({ description: "invalid" });
+
+    const defineTestFunctions = createFunctionsDefiner<TestSchema>();
+    const functions = defineTestFunctions({
+      getItem: defineFunction({
+        run: (_args, { dbo }) => {
+          void dbo.items.find();
+          // @ts-expect-error The schema is retained without a satisfies assertion.
+          void dbo.missingTable;
+          return { id: 1 as const };
+        },
+      }),
+    });
+
+    const defineTestFunctionGroup = createFunctionGroupDefiner<TestSchema>();
+    const group = defineTestFunctionGroup({
+      userFilter: { type: "public" },
+      functions,
+    });
+
+    group.functions.getItem satisfies (typeof functions)["getItem"];
+
+    // @ts-expect-error A group must have a user filter.
+    defineTestFunctionGroup({ functions });
   });
 });

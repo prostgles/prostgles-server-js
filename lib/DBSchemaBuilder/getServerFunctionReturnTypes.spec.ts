@@ -13,6 +13,11 @@ void describe("getServerFunctionReturnTypes", async () => {
     const result = getServerFunctionReturnTypes(fixturePath);
 
     assert.equal(result.get("scalarResult"), "number");
+    assert.equal(result.get("externalScalar"), "string");
     assert.equal(result.get("recursiveResult"), "{ value: string; next?: unknown }");
+    assert.equal(
+      result.get("sampleSchemas"),
+      'Array<(({ name: string; path: string } & { type: "sql"; file: string }) | ({ name: string; path: string } & { type: "dir"; workspaceConfig?: (undefined | { workspaces: Array<{ options?: (undefined | { hideCounts?: (undefined | false | true); tableListEndInfo?: (undefined | "count" | "size" | "none") }) }> }) }))>',
+    );
   });
 });

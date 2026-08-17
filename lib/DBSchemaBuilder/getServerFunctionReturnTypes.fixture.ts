@@ -1,22 +1,46 @@
-import prostgles, { defineFunction, type ServerFunctionDefinitions } from "..";
+import prostgles, { defineFunction, createFunctionGroupDefiner } from "..";
+import { externalFunctions } from "./getServerFunctionReturnTypes.external.fixture";
 
 type RecursiveResult = {
   value: string;
   next?: RecursiveResult;
 };
 
-type FixtureSchema = {
+type SampleSchema = {
+  name: string;
+  path: string;
+} & (
+  | { type: "sql"; file: string }
+  | {
+      type: "dir";
+      workspaceConfig?: {
+        workspaces: {
+          options?: {
+            hideCounts?: boolean;
+            tableListEndInfo?: "count" | "size" | "none";
+          };
+        }[];
+      };
+    }
+);
+
+export type FixtureSchema = {
   orders: {
     columns: { id: string };
   };
 };
 
+const defineFixtureFunctionGroup = createFunctionGroupDefiner<FixtureSchema>();
+
 export const stateServerFunctions = {
-  public: {
+  public: defineFixtureFunctionGroup({
     userFilter: { type: "public" },
     functions: {
       recursiveResult: defineFunction({
         run: (): RecursiveResult => ({ value: "ok" }),
+      }),
+      sampleSchemas: defineFunction({
+        run: (): SampleSchema[] => [],
       }),
       scalarResult: defineFunction({
         input: { value: "number" },
@@ -29,8 +53,12 @@ export const stateServerFunctions = {
         },
       }),
     },
-  },
-} as const satisfies ServerFunctionDefinitions<FixtureSchema>;
+  }),
+  external: defineFixtureFunctionGroup({
+    userFilter: { type: "public" },
+    functions: externalFunctions,
+  }),
+};
 
 void prostgles<FixtureSchema>({
   dbConnection: "",
