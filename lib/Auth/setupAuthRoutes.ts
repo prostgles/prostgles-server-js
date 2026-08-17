@@ -9,9 +9,10 @@ import { setOAuthRequestHandlers } from "./endpoints/setOAuthRequestHandlers";
 import { setRegisterRequestHandler } from "./endpoints/setRegisterRequestHandler";
 import { upsertNamedExpressMiddleware } from "./utils/upsertNamedExpressMiddleware";
 import { setupUserContextMiddleware } from "./middleware/userContextMiddleware";
+import type { AuthConfig } from "./AuthTypes";
 
-export function setupAuthRoutes(this: AuthHandler) {
-  const { loginSignupConfig, onUseOrSocketConnected } = this.opts;
+export function setupAuthRoutes(this: AuthHandler, config: AuthConfig) {
+  const { loginSignupConfig, onUseOrSocketConnected } = config;
 
   if (this.sidKeyName === "sid") {
     throw "sidKeyName cannot be 'sid' due to collision with socket.io";
@@ -62,7 +63,7 @@ export function setupAuthRoutes(this: AuthHandler) {
       }
       next();
     };
-    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesonUseOrSocketConnected");
+    upsertNamedExpressMiddleware(app, prostglesUseMiddleware, "prostglesOnUseOrSocketConnected");
   }
 
   if (onMagicLinkOrOTP) {
@@ -72,7 +73,7 @@ export function setupAuthRoutes(this: AuthHandler) {
   setLoginRequestHandler.bind(this)(app);
 
   /* Redirect if not logged in and requesting non public content */
-  setCatchAllRequestHandler.bind(this)(app);
+  setCatchAllRequestHandler.bind(this)(app, config);
 
-  setLogoutRequestHandler.bind(this)(app);
+  setLogoutRequestHandler.bind(this)(app, config);
 }

@@ -167,26 +167,27 @@ function dd() {
     auth: {
       sidKeyName: "token",
       getUser: async (sid) => {
-        if (sid) {
-          const s = sessions.find((s) => s.id === sid);
-          if (s) {
-            const user = users.find((u) => s && s.user_id === u.id);
-            if (user) {
-              return {
-                sid: s.id,
-                user,
-                clientUser: {
-                  sid: s.id,
-                  uid: user.id,
-                  id: user.id,
-                  type: user.type,
-                },
-              };
-            }
-          }
+        if (!sid) return;
+        const s = sessions.find((s) => s.id === sid);
+        if (!s) {
+          return;
         }
-        return undefined;
+        const user = users.find((u) => s && s.user_id === u.id);
+        if (!user) {
+          return;
+        }
+        return {
+          sid: s.id,
+          user,
+          clientUser: {
+            sid: s.id,
+            uid: user.id,
+            id: user.id,
+            type: user.type,
+          },
+        };
       },
+      findUser: async (userFilter, dbo) => dbo.users.findOne(userFilter) as any,
       cacheSession: {
         getSession: async (sid) => {
           const s = sessions.find((s) => s.id === sid);
@@ -275,7 +276,7 @@ function dd() {
             run: ({ arg1 }, { user }) => {
               user.email === "dwadaw";
               //@ts-expect-error
-              user.type === "dwadaw";
+              user.invalid_field === "dwadaw";
               return 222;
             },
           }),
@@ -357,6 +358,7 @@ function dd() {
         {
           email: "public@example.com",
           status: "active",
+          type: "public",
           preferences: { others: [] },
         },
       );
@@ -365,6 +367,7 @@ function dd() {
         {
           email: "john@example.com",
           status: "active",
+          type: "default",
           preferences: { others: [] },
         },
       );

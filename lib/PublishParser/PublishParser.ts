@@ -71,9 +71,13 @@ export class PublishParser {
     if (!functionGroups || !publishParams.user) {
       return;
     }
+    const { findUser } = this.prostgles.opts.auth ?? {};
+    if (!findUser) {
+      throw new Error(
+        "findUser function is missing in auth config. It is required for functions to work.",
+      );
+    }
     const user = publishParams.user;
-    const users = publishParams.dbo.users;
-    if (!users?.findOne) return;
     const userId = user.id;
     if (!userId || typeof userId !== "string") {
       throw "User ID is missing or invalid";
@@ -81,9 +85,12 @@ export class PublishParser {
     const allowedFunctionsMap = new Map<string, ServerFunctionDefinition>();
 
     for (const group of Object.values(functionGroups)) {
-      const matchingUser = await users.findOne({
-        $and: [group.userFilter, { id: userId }],
-      });
+      const matchingUser = await findUser(
+        {
+          $and: [group.userFilter, { id: userId }],
+        },
+        publishParams.dbo,
+      );
       if (!matchingUser) continue;
 
       for (const [name, method] of Object.entries(group.functions)) {

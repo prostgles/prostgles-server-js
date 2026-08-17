@@ -17,7 +17,7 @@ type RegisterResponseHandler = Response<ReturnType>;
 export function setRegisterRequestHandler(
   this: AuthHandler,
   { onRegister, minPasswordLength = 8, requirePassword }: SignupWithEmail,
-  app: e.Express
+  app: e.Express,
 ) {
   const registerRequestHandler = async (req: Request, res: RegisterResponseHandler) => {
     const [error, data] = parseLoginData(req.body);
@@ -53,7 +53,7 @@ export function setRegisterRequestHandler(
         password,
         getConfirmationUrl: ({ code, websiteUrl }) =>
           getMagicLinkUrl({
-            loginSignupConfig: this.opts.loginSignupConfig,
+            loginSignupConfig: this.config?.loginSignupConfig,
             websiteUrl,
             data: { type: "otp", code, email: username, returnToken: false },
           }),

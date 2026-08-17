@@ -3,22 +3,22 @@ import type { RequestHandler } from "express";
 import { isDefined } from "prostgles-types";
 import type { AuthHandler } from "../AuthHandler";
 import { EXPRESS_CATCH_ALL_ROUTE, HTTP_FAIL_CODES } from "../AuthHandler";
-import type { AuthClientRequest } from "../AuthTypes";
+import type { AuthClientRequest, AuthConfig } from "../AuthTypes";
 import { getSafeReturnUrlFromQuery } from "../utils/getSafeReturnUrlFromQuery";
 import { matchesRoute } from "../utils/matchesRoute";
 
-export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express) {
+export function setCatchAllRequestHandler(this: AuthHandler, app: e.Express, config: AuthConfig) {
   const requestHandlerCatchAll: RequestHandler = async (req, res, next) => {
-    const { onGetRequestOK } = this.opts.loginSignupConfig ?? {};
+    const { onGetRequestOK } = config.loginSignupConfig ?? {};
     const {
       restApi,
       opts: { fileTable },
-      authHandler,
     } = this.prostgles;
+    /** TODO: tidy - this shouldn't be handled here */
     const pathsHandledByProstgles = [
       restApi?.path,
       fileTable && (fileTable.fileServePath ?? `/${fileTable.tableName}`),
-      authHandler.opts.loginSignupConfig?.loginWithOAuth && this.authRoutes.loginWithProvider,
+      config.loginSignupConfig?.loginWithOAuth && this.authRoutes.loginWithProvider,
     ].filter(isDefined);
     if (pathsHandledByProstgles.some((path) => matchesRoute(path, req.path))) {
       next();

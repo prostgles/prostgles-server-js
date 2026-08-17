@@ -36,7 +36,7 @@ export function setMagicLinkOrOTPRequestHandler(
         if (data.returnToken) {
           return res.json({ success: true, token: response.session.sid });
         }
-        this.setCookieAndGoToReturnURLIFSet(response.session, { req, res });
+        this.setCookieAndGoToReturnURLIfSet(response.session, { req, res });
       }
     } catch (_e) {
       res

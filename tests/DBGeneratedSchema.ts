@@ -364,6 +364,7 @@ export type DBGeneratedSchema = {
       id?: number;
       preferences: {    showIntro?: boolean;   theme?: "light" | "dark" | "auto";   others: any[];  };
       status: "active" | "disabled" | "pending"
+      type: string;
     };
     
   };

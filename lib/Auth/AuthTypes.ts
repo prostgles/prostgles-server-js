@@ -18,6 +18,7 @@ import type {
   AuthResponse,
   ClientSchema,
   FieldFilter,
+  FullFilter,
   IdentityProvider,
   LocalLoginMode,
   UserLike,
@@ -322,6 +323,14 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
     client: LoginClientInfo,
     reqInfo: AuthClientRequest,
   ) => Awaitable<AuthResultOrError<SUser>>;
+
+  /**
+   * Used in functions
+   */
+  findUser: (
+    userFilter: FullFilter<void, void>,
+    dbo: DBOFullyTyped<S>,
+  ) => Awaitable<SUser["user"] | undefined>;
 
   /**
    * Will setup auth routes

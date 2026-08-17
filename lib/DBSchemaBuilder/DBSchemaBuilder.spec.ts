@@ -45,6 +45,9 @@ void describe("DBSchemaBuilder type tests", async () => {
           db.dwadaw?.find;
           return {};
         },
+        findUser: (userFilter) => {
+          return { id: "123", name: "John Doe", type: "dwa" };
+        },
       };
 
       type S = {

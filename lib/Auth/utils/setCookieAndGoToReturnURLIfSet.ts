@@ -19,14 +19,17 @@ export function validateSessionAndSetCookie(
       code: sessionErrorCode,
     });
   }
-  return this.setCookieAndGoToReturnURLIFSet(cookie, requestHandler);
+  return this.setCookieAndGoToReturnURLIfSet(cookie, requestHandler);
 }
 
-export function setCookieAndGoToReturnURLIFSet(
+export function setCookieAndGoToReturnURLIfSet(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
   requestHandler: { req: ExpressReq; res: LoginResponseHandler },
 ) {
+  if (!this.config) {
+    throw new Error("AuthHandler config is not set");
+  }
   const { sid, expires } = cookie;
   const { res, req } = requestHandler;
   if (!sid) {
@@ -54,7 +57,7 @@ export function setCookieAndGoToReturnURLIFSet(
     //signed: true
     secure: true,
     sameSite: "strict",
-    ...(this.opts.loginSignupConfig?.cookieOptions ?? {}),
+    ...(this.config.loginSignupConfig?.cookieOptions ?? {}),
   } as const;
   const cookieData = sid;
 

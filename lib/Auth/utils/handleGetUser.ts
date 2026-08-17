@@ -16,13 +16,19 @@ export async function handleGetUserThrottled(
   this: AuthHandler,
   clientReq: AuthClientRequest,
 ): Promise<GetUserOrRedirected> {
-  const getSessionForCaching = this.opts.cacheSession?.getSession;
+  const config = this.config;
+  if (!config) {
+    return {
+      sid: undefined,
+    };
+  }
+  const getSessionForCaching = config.cacheSession?.getSession;
 
   /** Get cached session if available */
   const __prglCache =
-    !this.opts.cacheSession ?
-      undefined
-    : (clientReq.httpReq ?? clientReq.socket).__prglCache?.get(this.prostgles.appId);
+    !config.cacheSession ? undefined : (
+      (clientReq.httpReq ?? clientReq.socket).__prglCache?.get(this.prostgles.appId)
+    );
   if (clientReq.socket && __prglCache) {
     const { userData, session } = __prglCache;
     const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
@@ -38,13 +44,8 @@ export async function handleGetUserThrottled(
   }
 
   const result = await throttledAuthCall(async () => {
-    if (!this.opts.getUser) {
-      return {
-        sid: undefined,
-      };
-    }
     const { db, dbo } = this.dbHandles;
-    const clientInfoOrErr = await this.opts.getUser(
+    const clientInfoOrErr = await config.getUser(
       this.getValidatedSid(clientReq),
       dbo,
       db,

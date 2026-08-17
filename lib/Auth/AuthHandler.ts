@@ -13,9 +13,9 @@ import { handleGetUserThrottled, type GetUserOrRedirected } from "./utils/handle
 import { matchesRoute } from "./utils/matchesRoute";
 import { removeExpressRoute, removeExpressRoutesTest } from "./utils/removeExpressRoute";
 import {
-  setCookieAndGoToReturnURLIFSet,
+  setCookieAndGoToReturnURLIfSet,
   validateSessionAndSetCookie,
-} from "./utils/setCookieAndGoToReturnURLIFSet";
+} from "./utils/setCookieAndGoToReturnURLIfSet";
 
 export { getClientRequestIPsInfo, removeExpressRoute, removeExpressRoutesTest };
 export const HTTP_FAIL_CODES = {
@@ -63,9 +63,7 @@ export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
 
 export class AuthHandler {
   protected readonly prostgles: Prostgles;
-  protected readonly opts: Omit<AuthConfig, "getUser"> & {
-    getUser?: undefined | AuthConfig["getUser"];
-  };
+  protected readonly config: AuthConfig | undefined;
 
   get dbHandles() {
     const { dbo, db } = this.prostgles;
@@ -78,18 +76,19 @@ export class AuthHandler {
   // TODO: tidy
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
-    this.opts = prostgles.opts.auth ?? {};
-    if (prostgles.opts.auth) {
-      this.init();
+    const config = prostgles.opts.auth;
+    this.config = config;
+    if (config) {
+      this.init(config);
     }
   }
 
   get sidKeyName() {
-    return this.opts.sidKeyName ?? SID_KEY_NAME;
+    return this.config?.sidKeyName ?? SID_KEY_NAME;
   }
 
   get authRoutes() {
-    return GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
+    return GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
   }
 
   init = setupAuthRoutes.bind(this);
@@ -106,9 +105,9 @@ export class AuthHandler {
       logout: logoutRoute,
       magicLinks: magicLinksRoute,
       loginWithProvider,
-    } = GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
+    } = GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
     const pubRoutes = [
-      ...(this.opts.loginSignupConfig?.publicRoutes || []),
+      ...(this.config?.loginSignupConfig?.publicRoutes || []),
       login,
       logoutRoute,
       magicLinksRoute,
@@ -120,7 +119,7 @@ export class AuthHandler {
     });
   };
 
-  setCookieAndGoToReturnURLIFSet = setCookieAndGoToReturnURLIFSet.bind(this);
+  setCookieAndGoToReturnURLIfSet = setCookieAndGoToReturnURLIfSet.bind(this);
   validateSessionAndSetCookie = validateSessionAndSetCookie.bind(this);
   handleGetUser = handleGetUserThrottled.bind(this);
 
@@ -141,7 +140,7 @@ export class AuthHandler {
   };
 
   destroy = () => {
-    const app = this.opts.loginSignupConfig?.app;
+    const app = this.config?.loginSignupConfig?.app;
     const {
       login,
       logout,
@@ -149,7 +148,7 @@ export class AuthHandler {
       loginWithProvider,
       emailRegistration,
       magicLinks,
-    } = GET_ALL_AUTH_ROUTES(this.opts.loginSignupConfig);
+    } = GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
 
     removeExpressRoute(app, [
       login,
@@ -232,8 +231,8 @@ export class AuthHandler {
   ): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());
     if (
-      this.opts.loginSignupConfig?.publicRoutes &&
-      !this.opts.loginSignupConfig.disableSocketAuthGuard
+      this.config?.loginSignupConfig?.publicRoutes &&
+      !this.config.loginSignupConfig.disableSocketAuthGuard
     ) {
       const error = "Session has expired";
       if (hasExpired) {

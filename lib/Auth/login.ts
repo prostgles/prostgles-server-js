@@ -11,11 +11,17 @@ export async function login(
   res: LoginResponseHandler,
   loginParams: LoginParams,
 ) {
+  const config = this.config;
+  if (!config) {
+    throw new Error(
+      "AuthHandler config is missing. Make sure to initialize AuthHandler with Prostgles instance that has auth config.",
+    );
+  }
   const start = Date.now();
-  const { responseThrottle = 500 } = this.opts;
+  const { responseThrottle = 500 } = config;
 
   const errCodeOrSession = await throttledAuthCall(async () => {
-    const { login } = this.opts.loginSignupConfig ?? {};
+    const { login } = config.loginSignupConfig ?? {};
     if (!login) {
       console.error("Auth login config missing");
       return "server-error";
@@ -29,7 +35,7 @@ export async function login(
       getClientRequestIPsInfo({ httpReq: req }),
       (data, websiteUrl) =>
         getMagicLinkUrl({
-          loginSignupConfig: this.opts.loginSignupConfig,
+          loginSignupConfig: config.loginSignupConfig,
           websiteUrl,
           data,
         }),
@@ -76,7 +82,7 @@ export async function login(
     }
     return res.json(loginResponse.response);
   }
-  this.setCookieAndGoToReturnURLIFSet(loginResponse.session, { req, res });
+  this.setCookieAndGoToReturnURLIfSet(loginResponse.session, { req, res });
 }
 
 export const getBasicSessionErrorCode = (session: Pick<BasicSession, "expires" | "sid">) => {

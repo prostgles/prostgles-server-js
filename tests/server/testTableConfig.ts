@@ -88,6 +88,7 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
       id: { sqlDefinition: `SERIAL PRIMARY KEY ` },
       email: { sqlDefinition: `TEXT NOT NULL` },
       status: { enum: ["active", "disabled", "pending"] },
+      type: "TEXT NOT NULL",
       preferences: {
         jsonbSchemaType: {
           showIntro: { type: "boolean", optional: true },

@@ -20,7 +20,7 @@ export async function getClientAuth(
     login,
     publicRoutes,
     disableSocketAuthGuard,
-  } = this.opts.loginSignupConfig ?? {};
+  } = this.config?.loginSignupConfig ?? {};
 
   if (publicRoutes && !disableSocketAuthGuard) {
     pathGuard = true;
