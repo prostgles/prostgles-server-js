@@ -1,13 +1,13 @@
 //@ts-ignore
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
-import { getJSONBSchemaValidationErrorAsync } from "prostgles-types";
+import { getJSONBSchemaValidationErrorAsync, type TableHandler } from "prostgles-types";
 import type { DBHandlerServer } from "../dist/Prostgles";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
   await describe("Server Only Queries", async () => {
     await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {
-      const dbMap = new Map(Object.entries(db));
+      const dbMap = new Map(Object.entries(db)) as Map<string, TableHandler>;
 
       assert.deepEqual(
         await getJSONBSchemaValidationErrorAsync({ type: "TableLookup" }, "items", dbMap),

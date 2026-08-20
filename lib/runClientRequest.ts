@@ -2,7 +2,6 @@ import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
 import {
   ABORTABLE_METHODS,
   getJSONBObjectSchemaValidationError,
-  getJSONBSchemaValidationError,
   getJSONBSchemaValidationErrorAsync,
   getKeys,
   pickKeys,
@@ -242,6 +241,7 @@ type ArgsMethod = {
   name: unknown;
   input?: unknown;
 };
+
 export const runClientMethod = async function (
   this: Prostgles,
   unvalidatedArgs: ArgsMethod,
@@ -274,7 +274,11 @@ export const runClientMethod = async function (
 
   const expectedArgsError =
     !inputSchema ? undefined : (
-      await getJSONBSchemaValidationErrorAsync({ type: inputSchema }, input, this.dboBuilder.dboMap)
+      await getJSONBSchemaValidationErrorAsync(
+        { type: inputSchema },
+        input,
+        this.dboBuilder.dboMap as Map<string, TableHandler>,
+      )
     );
 
   if (expectedArgsError?.error !== undefined) {
