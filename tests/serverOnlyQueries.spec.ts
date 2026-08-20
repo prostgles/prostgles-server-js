@@ -1,10 +1,55 @@
 //@ts-ignore
 import { describe, test } from "node:test";
+import { strict as assert } from "node:assert";
+import { getJSONBSchemaValidationErrorAsync } from "prostgles-types";
 import type { DBHandlerServer } from "../dist/Prostgles";
-import { assert } from "console";
 
 export const serverOnlyQueries = async (db: DBHandlerServer) => {
   await describe("Server Only Queries", async () => {
+    await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {
+      const dbMap = new Map(Object.entries(db));
+
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync({ type: "TableLookup" }, "items", dbMap),
+        { data: "items" },
+      );
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync({ type: "TableLookup" }, "missing", dbMap),
+        { error: 'value references an unknown table "missing"' },
+      );
+
+      const column = { table: "items", column: "name" };
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync({ type: "ColumnLookup" }, column, dbMap),
+        { data: column },
+      );
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync(
+          { type: "ColumnLookup" },
+          { table: "items", column: "missing" },
+          dbMap,
+        ),
+        { error: 'value references an unknown or disallowed column "items.missing"' },
+      );
+
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync(
+          { type: "RowLookup", table: "users" },
+          { id: 1 },
+          dbMap,
+        ),
+        { data: { id: 1 } },
+      );
+      assert.deepEqual(
+        await getJSONBSchemaValidationErrorAsync(
+          { type: "ValueLookup", table: "users", column: "id" },
+          -1,
+          dbMap,
+        ),
+        { error: 'value does not reference an existing row in "users"' },
+      );
+    });
+
     await test('Parallel subscription at init causing crash in getPubSubManager: duplicate key value violates unique constraint "apps_pkey"', async () => {
       let results: any[] = [];
       const sub1 = db.rec.subscribe!({}, {}, (res) => {
