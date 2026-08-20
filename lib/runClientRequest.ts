@@ -3,6 +3,7 @@ import {
   ABORTABLE_METHODS,
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationError,
+  getJSONBSchemaValidationErrorAsync,
   getKeys,
   pickKeys,
   type AnyObject,
@@ -272,7 +273,9 @@ export const runClientMethod = async function (
   }
 
   const expectedArgsError =
-    !inputSchema ? undefined : getJSONBSchemaValidationError({ type: inputSchema }, input);
+    !inputSchema ? undefined : (
+      await getJSONBSchemaValidationErrorAsync({ type: inputSchema }, input, this.dboBuilder.dboMap)
+    );
 
   if (expectedArgsError?.error !== undefined) {
     const { error } = expectedArgsError;
