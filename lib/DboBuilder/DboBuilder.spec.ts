@@ -38,7 +38,9 @@ void describe("DboBuilder onCommit", async () => {
     const dboBuilder = createDboBuilder({ events, logs });
 
     const result = await dboBuilder.getTX((_dbTX, transaction) => {
-      dboBuilder.registerOnCommitCallback(transaction, async () => {
+      dboBuilder.registerOnCommitCallback(transaction, async ({ db, dbo }) => {
+        assert.equal(db, dboBuilder.db);
+        assert.equal(dbo, dboBuilder.dbo);
         await Promise.resolve();
         events.push("first callback");
         throw new Error("callback failed");

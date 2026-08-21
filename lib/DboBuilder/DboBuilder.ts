@@ -157,7 +157,7 @@ export class DboBuilder {
     for (const callback of callbacks) {
       const start = Date.now();
       try {
-        await callback();
+        await callback({ db: this.db, dbo: this.dbo });
       } catch (rawError) {
         const error = getSerialisableError(rawError);
         const onLog = this.prostgles.opts.onLog;

@@ -20,7 +20,10 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
             { description: "Updated by afterEach hook" },
             row.id,
           ]);
-          onCommit(() => Promise.resolve());
+          onCommit(({ db, dbo }) => {
+            void db.any("SELECT 1");
+            void dbo.files?.find();
+          });
         },
       },
     ],
