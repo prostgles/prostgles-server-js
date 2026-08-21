@@ -8,6 +8,7 @@ import type { Join } from "../ProstglesTypes";
 import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
 import type { PublishParser } from "../PublishParser/PublishParser";
+import type { OnCommitCallback } from "../PublishParser/publishTypesAndUtils";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "../shortestPath";
@@ -138,6 +139,45 @@ export class DboBuilder {
   publishParser?: PublishParser;
 
   onSchemaChange?: (event: { command: string; query: string }) => void;
+
+  private readonly onCommitCallbacksByTransaction = new WeakMap<
+    object,
+    OnCommitCallback[]
+  >();
+
+  registerOnCommitCallback = (transaction: object, callback: OnCommitCallback) => {
+    const callbacks = this.onCommitCallbacksByTransaction.get(transaction);
+    if (!callbacks) {
+      throw new Error("onCommit can only be called while its transaction is active");
+    }
+    callbacks.push(callback);
+  };
+
+  private runOnCommitCallbacks = async (callbacks: OnCommitCallback[]) => {
+    for (const callback of callbacks) {
+      const start = Date.now();
+      try {
+        await callback();
+      } catch (rawError) {
+        const error = getSerialisableError(rawError);
+        const onLog = this.prostgles.opts.onLog;
+        if (!onLog) {
+          console.error("DboBuilder.onCommit callback failed", error);
+          continue;
+        }
+        try {
+          await onLog({
+            type: "debug",
+            command: "DboBuilder.onCommit",
+            duration: Date.now() - start,
+            error,
+          });
+        } catch (logError) {
+          console.error("DboBuilder.onCommit error logging failed", logError, error);
+        }
+      }
+    }
+  };
 
   public static create = async (prostgles: Prostgles): Promise<DboBuilder> => {
     const res = new DboBuilder(prostgles);
@@ -379,22 +419,37 @@ export class DboBuilder {
   };
 
   getTX = async <R, TH extends DbTxTableHandlers>(cb: TxCB<Promise<R> | R, TH>) => {
-    return this.db.tx((t) => {
-      const dbTX: DbTxTableHandlers = {};
-      this.tablesOrViews?.map((tov) => {
-        dbTX[tov.name] = new TableHandler({
-          db: this.db,
-          tableOrViewInfo: tov,
-          dboBuilder: this,
-          tx: { t, dbTX },
-          config: this.prostgles.mergedTableConfig.tableConfig?.[tov.name],
-          hooks: this.prostgles.mergedTableConfig.tableHooks?.[tov.name],
-          joinPaths: this.shortestJoinPaths,
-        });
-      });
+    const onCommitCallbacks: OnCommitCallback[] = [];
+    let transaction: object | undefined;
+    let result: R;
+    try {
+      result = await this.db.tx((t) => {
+        transaction = t;
+        this.onCommitCallbacksByTransaction.set(transaction, onCommitCallbacks);
 
-      return cb(dbTX as TH, t);
-    });
+        const dbTX: DbTxTableHandlers = {};
+        this.tablesOrViews?.map((tov) => {
+          dbTX[tov.name] = new TableHandler({
+            db: this.db,
+            tableOrViewInfo: tov,
+            dboBuilder: this,
+            tx: { t, dbTX },
+            config: this.prostgles.mergedTableConfig.tableConfig?.[tov.name],
+            hooks: this.prostgles.mergedTableConfig.tableHooks?.[tov.name],
+            joinPaths: this.shortestJoinPaths,
+          });
+        });
+
+        return cb(dbTX as TH, t);
+      });
+    } catch (error) {
+      if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
+      throw error;
+    }
+
+    if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
+    await this.runOnCommitCallbacks(onCommitCallbacks);
+    return result;
   };
 
   cacheDBTypes = cacheDBTypes.bind(this);

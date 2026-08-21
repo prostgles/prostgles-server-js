@@ -96,6 +96,9 @@ export type BeforeEachTsTrigger<R, DBX, Context = undefined> = {
   ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject; onInserted?: () => void }>;
 };
 
+export type OnCommitCallback = () => MaybePromise<unknown>;
+export type OnCommit = (callback: OnCommitCallback) => void;
+
 export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /**
@@ -106,6 +109,7 @@ export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
     params: ValidateRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
       context: Context;
+      onCommit: OnCommit;
     },
   ) => Promise<void>;
 };
@@ -148,6 +152,7 @@ export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
     params: ValidateRowsArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
       context: Context;
+      onCommit: OnCommit;
     },
   ) => Promise<void>;
 };

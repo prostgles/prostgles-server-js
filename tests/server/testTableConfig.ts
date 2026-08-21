@@ -8,7 +8,7 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
         commands: {
           insert: 1,
         },
-        validate: async ({ command, data, row, tx }) => {
+        validate: async ({ command, data, row, tx, onCommit }) => {
           row satisfies DBGeneratedSchema["files"]["columns"];
           if (command === "insert") {
             data satisfies DBGeneratedSchema["files"]["columns"];
@@ -20,6 +20,7 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
             { description: "Updated by afterEach hook" },
             row.id,
           ]);
+          onCommit(() => Promise.resolve());
         },
       },
     ],

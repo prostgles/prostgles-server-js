@@ -47,6 +47,8 @@ export const executeAfterHooksCheckAndPostValidation = async ({
   const txParams = {
     tx: transaction.t,
     dbx: transaction.dbTX,
+    onCommit: (callback: Parameters<typeof tableHandler.dboBuilder.registerOnCommitCallback>[1]) =>
+      tableHandler.dboBuilder.registerOnCommitCallback(transaction.t, callback),
   };
 
   const txKey = transaction.t as unknown as object;

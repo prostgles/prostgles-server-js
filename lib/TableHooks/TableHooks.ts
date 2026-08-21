@@ -35,12 +35,14 @@ export type TableHooksDefinition<
   /**
    * Runs once per affected row after SQL, inside the same transaction.
    * `row` is the inserted/updated row or the deleted row's pre-delete state. Throwing rolls back.
+   * Use `onCommit` for side effects that must only run after the transaction commits.
    */
   afterEach?: AfterEachTsTrigger<RowDataType, DBX, Context>[];
 
   /**
    * Runs once after all applicable `afterEach` hooks, inside the same transaction.
    * Receives all affected `rows`; throwing rolls back the operation.
+   * Use `onCommit` for side effects that must only run after the transaction commits.
    * Same-table, same-command writes from after-hooks do not retrigger after-hooks.
    */
   afterAll?: AfterAllTsTrigger<RowDataType, DBX, Context>[];

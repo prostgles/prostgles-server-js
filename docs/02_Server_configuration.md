@@ -7,6 +7,11 @@
 
   Called when the prostgles server is ready to accept connections.
   It waits for auth, tableConfig and other async configurations to complete before executing
+- **createContext** <span style="color: grey">optional</span> <span style="color: green;">CreateContext</span>
+
+  Creates instance-scoped dependencies after the database object is ready.
+  The returned context is available to onReady, server functions, and table hooks.
+  Registered cleanups run in reverse order before context replacement and destruction.
 - **tsGeneratedTypesDir** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
   Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved.

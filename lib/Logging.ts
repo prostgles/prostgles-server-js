@@ -175,6 +175,7 @@ export namespace EventTypes {
             | "tableConfigurator.init.end"
             | "initFileManager.runQuery"
             | "DboBuilder.getTablesForSchemaPostgresSQL"
+            | "DboBuilder.onCommit"
             | "PubSubManager.create";
           data?: AnyObject;
         }

@@ -142,7 +142,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
             queries.push(
               this.prostgles.pgp!.as.format(
                 `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
-                  " VALUES (${values:csv});",
+                  " VALUES (${values:csv}) ON CONFLICT DO NOTHING;",
                 { values },
               ),
             );
