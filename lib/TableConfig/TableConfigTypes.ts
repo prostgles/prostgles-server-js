@@ -1,24 +1,13 @@
-import type pgPromise from "pg-promise";
 import type {
   ALLOWED_CONTENT_TYPE,
   ALLOWED_EXTENSION,
-  AnyObject,
-  DBSchema,
   JSONB,
   MaybePromise,
   StrictUnion,
 } from "prostgles-types";
-import type { JoinInfo, LocalParams } from "../DboBuilder/DboBuilder";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { JoinInfo } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
-import type {
-  AfterAllTsTrigger,
-  AfterEachTsTrigger,
-  BeforeEachTsTrigger,
-  InsertRule,
-  SyncConfig,
-  ValidateRowArgsCommon,
-} from "../PublishParser/PublishParser";
+import type { SyncConfig } from "../PublishParser/PublishParser";
 
 export type ColExtraInfo = {
   min?: string | number;

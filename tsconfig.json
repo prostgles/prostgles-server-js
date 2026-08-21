@@ -18,8 +18,9 @@
     "declaration": true,
     "skipLibCheck": true,
     "declarationMap": true, 
+    "removeComments": false,
     "noImplicitAny": true,
-    "esModuleInterop": true
+    "esModuleInterop": true 
   },
   "include": [
     "lib/**/*.spec.ts"

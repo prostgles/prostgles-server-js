@@ -156,6 +156,7 @@ export async function _delete(
         );
       }
       const result = await onInsteadOfDelete({
+        context: this.dboBuilder.prostgles.context,
         queryType,
         isOneOrNone,
         dbx: transaction.dbTX,

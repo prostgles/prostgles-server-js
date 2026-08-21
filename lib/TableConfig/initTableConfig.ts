@@ -153,7 +153,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
   if (queries.length) {
     await runQueries(queries);
-    await this.prostgles.refreshDBO();
+    await this.prostgles.rebuildDBO();
   }
 
   /* Create/Alter columns */
@@ -348,8 +348,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
     console.error("Table config failed queries: ", failedQueries);
   }
 
-  await this.prostgles.refreshDBO();
+  await this.prostgles.rebuildDBO();
   await this.setTableOnMounts();
   /** Needed in case some onMounts change schema */
-  await this.prostgles.refreshDBO();
+  await this.prostgles.rebuildDBO();
 };

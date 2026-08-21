@@ -1,6 +1,6 @@
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
-import type { SQLHandler, TableSchema } from "prostgles-types";
+import type { MaybePromise, SQLHandler, TableSchema } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
@@ -31,8 +31,12 @@ export type DbConnectionOpts = pg.IDefaults;
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
 
-export type UpdatableOptions<S = void, SUser extends SessionUser = SessionUser> = Pick<
-  ProstglesInitOptions<S, SUser>,
+export type UpdatableOptions<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  Context = undefined,
+> = Pick<
+  ProstglesInitOptions<S, SUser, Context>,
   | "io"
   | "fileTable"
   | "restApi"
@@ -46,6 +50,7 @@ export type UpdatableOptions<S = void, SUser extends SessionUser = SessionUser> 
   | "tsGeneratedTypesDir"
   | "tsGeneratedTypesFunctionsPath"
   | "modifyClientSchema"
+  | "createContext"
 >;
 export type OnInitReason =
   | {
@@ -55,10 +60,13 @@ export type OnInitReason =
     }
   | {
       type: "prgl.update";
-      newOpts: Omit<UpdatableOptions, (typeof clientOnlyUpdateKeys)[number]>;
+      newOpts: Omit<
+        UpdatableOptions<void, SessionUser, any>,
+        (typeof clientOnlyUpdateKeys)[number]
+      >;
     }
   | {
-      type: "init" | "prgl.restart" | "TableConfig";
+      type: "init" | "prgl.restart" | "TableConfig" | "dbo.refresh";
     };
 
 type OnReadyParamsCommon = {
@@ -69,26 +77,46 @@ type OnReadyParamsCommon = {
 };
 export type OnReadyParamsBasic = OnReadyParamsCommon & {
   dbo: DBHandlerServer;
+  context: any;
 };
-export type OnReadyParams<S> = OnReadyParamsCommon & {
+export type OnReadyParams<S, Context = undefined> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>;
+  context: Context;
 };
 
-export type OnReadyCallback<S, SUser extends SessionUser> = (
-  params: OnReadyParams<S>,
-  update: (newOpts: UpdatableOptions<S, SUser>, force?: true) => Promise<void>,
+export type ContextCleanup = () => MaybePromise<void>;
+export type CreateContextParams<S> = OnReadyParamsCommon & {
+  dbo: DBOFullyTyped<S>;
+  onCleanup: (cleanup: ContextCleanup) => void;
+};
+export type CreateContext<S, Context> = (
+  params: CreateContextParams<S>,
+) => MaybePromise<Context>;
+
+export type OnReadyCallback<
+  S,
+  SUser extends SessionUser,
+  Context = undefined,
+> = (
+  params: OnReadyParams<S, Context>,
+  update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 export type OnReadyCallbackBasic = (
   params: OnReadyParamsBasic,
-  update: (newOpts: UpdatableOptions<void, SessionUser>, force?: true) => Promise<void>,
+  update: (newOpts: UpdatableOptions<void, SessionUser, any>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 
-export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
+export type InitResult<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  Context = undefined,
+> = {
   db: DBOFullyTyped<S>;
+  context: Context;
   sql: SQLHandler;
   _db: DB;
   pgp: PGP;
-  io: ProstglesInitOptions<S, SUser>["io"];
+  io: ProstglesInitOptions<S, SUser, Context>["io"];
   destroy: () => Promise<boolean>;
   /**
    * Generated database public schema TS types for all tables and views
@@ -96,9 +124,9 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser> = {
   getTSSchema: typeof DboBuilder.prototype.getTsDefinitions;
   getSchema: typeof DboBuilder.prototype.getSchema;
   reWriteDBSchema: () => void;
-  update: (newOpts: UpdatableOptions<S, SUser>, force?: true) => Promise<void>;
-  restart: () => Promise<InitResult<S, SUser>>;
-  options: ProstglesInitOptions<S, SUser>;
+  update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>;
+  restart: () => Promise<InitResult<S, SUser, Context>>;
+  options: ProstglesInitOptions<S, SUser, Context>;
   getClientDBHandlers: (
     clientReq: AuthClientRequest,
     scope: PermissionScope | undefined,
@@ -111,7 +139,7 @@ export const initProstgles = async function (
   this: Prostgles,
   onReady: OnReadyCallbackBasic,
   reason: OnInitReason,
-): Promise<InitResult> {
+): Promise<InitResult<void, SessionUser, any>> {
   this.loaded = false;
   const expressApp =
     this.opts.fileTable?.expressApp ??
@@ -191,11 +219,14 @@ export const initProstgles = async function (
   const pgp = this.pgp!;
 
   try {
+    await this.cleanupContext();
+
     /* 2. Execute any SQL file if provided */
     await runSQLFile(this);
-    await this.refreshDBO();
+    await this.rebuildDBO();
     await this.initTableConfig(reason);
-    await this.refreshDBO();
+    await this.rebuildDBO();
+    await this.createContext(reason);
     this.initRestApi();
 
     this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
@@ -233,6 +264,7 @@ export const initProstgles = async function (
           db: this.db,
           tables: this.dboBuilder.tables,
           reason,
+          context: this.context,
         },
         async (...args) => {
           await updateConfiguration(this, onReady, ...args);
@@ -243,8 +275,12 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
-    const initResult: InitResult = {
+    const getContext = () => this.context;
+    const initResult: InitResult<void, SessionUser, any> = {
       db: this.dbo as DBOFullyTyped,
+      get context() {
+        return getContext();
+      },
       sql: this.dboBuilder.sql,
       _db: db,
       pgp,
@@ -276,6 +312,7 @@ export const initProstgles = async function (
             this.opts.io.engine.close();
           }
         }
+        await this.cleanupContext();
         await this.dboBuilder.destroy();
         this.authHandler.destroy();
         await this.tableConfigurator?.destroy();
@@ -293,6 +330,7 @@ export const initProstgles = async function (
 
     return initResult;
   } catch (e: any) {
+    await this.cleanupContext();
     console.trace(e);
     throw "init issues: " + (e as Error).toString();
   }

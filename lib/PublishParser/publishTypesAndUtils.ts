@@ -81,7 +81,7 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
 );
 
-export type BeforeEachTsTrigger<R, DBX> = {
+export type BeforeEachTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update", 1>>;
   /**
    * Will only run this trigger if the insert/update provides non null values for these fields.
@@ -91,11 +91,12 @@ export type BeforeEachTsTrigger<R, DBX> = {
     params: ValidateBeforeRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
       hookContext: AnyObject | undefined;
+      context: Context;
     },
   ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject; onInserted?: () => void }>;
 };
 
-export type AfterEachTsTrigger<R, DBX> = {
+export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /**
    * Will only run this trigger if the insert/update provides non null values for these fields.
@@ -104,6 +105,7 @@ export type AfterEachTsTrigger<R, DBX> = {
   validate: (
     params: ValidateRowArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
+      context: Context;
     },
   ) => Promise<void>;
 };
@@ -139,12 +141,13 @@ export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
 );
 
-export type AfterAllTsTrigger<R, DBX> = {
+export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   changedFields?: string[];
   validate: (
     params: ValidateRowsArgsCommon<R, DBX> & {
       localParams: undefined | LocalParams;
+      context: Context;
     },
   ) => Promise<void>;
 };

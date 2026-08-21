@@ -2,8 +2,11 @@ import { describe, test } from "node:test";
 import {
   defineFunction,
   createFunctionGroupDefiner,
+  createFunctionGroupDefinerWithContext,
   createFunctionsDefiner,
 } from "./defineServerFunction";
+import type { TableHooks } from "../TableHooks/TableHooks";
+import { createProstgles } from "../index";
 
 type TestSchema = {
   items: {
@@ -58,5 +61,50 @@ void describe("defineFunction type test", async () => {
 
     // @ts-expect-error A group must have a user filter.
     defineTestFunctionGroup({ functions });
+
+    type AppContext = {
+      serviceManager: { getService: (name: string) => string };
+    };
+    const defineContextFunctions =
+      createFunctionGroupDefinerWithContext<TestSchema, AppContext>();
+    defineContextFunctions({
+      userFilter: { type: "public" },
+      functions: {
+        getContextItem: defineFunction({
+          run: (_args, { context, dbo }) => {
+            void dbo.items.find();
+            return context.serviceManager.getService("documents");
+          },
+        }),
+      },
+    });
+
+    const contextualHooks: TableHooks<TestSchema, AppContext> = {
+      items: {
+        afterEach: [
+          {
+            commands: { insert: 1 },
+            validate: ({ context }) => {
+              context.serviceManager.getService("documents");
+              return Promise.resolve();
+            },
+          },
+        ],
+      },
+    };
+    contextualHooks satisfies TableHooks<TestSchema, AppContext>;
+
+    const startTestProstgles = createProstgles<TestSchema>();
+    const inferredContextTypeTest = () =>
+      startTestProstgles({
+        dbConnection: "postgres://unused",
+        createContext: () => ({
+          serviceManager: { getService: (name: string) => name },
+        }),
+        onReady: ({ context }) => {
+          context.serviceManager.getService("documents");
+        },
+      });
+    void inferredContextTypeTest;
   });
 });

@@ -115,6 +115,32 @@ const App = () => {
 </html>
 ```
 
+## Application context
+
+Use `createProstgles` with `createContext` to initialize typed, instance-scoped dependencies after
+the database object is ready. The returned context is available to `onReady`, server functions, and
+table hooks. Registered cleanups run in reverse order before the context is recreated or destroyed.
+
+```typescript
+import { createProstgles } from "prostgles-server";
+import type { DBGeneratedSchema } from "./DBGeneratedSchema";
+import { ServiceManager } from "./ServiceManager";
+
+const prostgles = createProstgles<DBGeneratedSchema>();
+
+prostgles({
+  dbConnection: process.env.DATABASE_URL!,
+  createContext: async ({ dbo, onCleanup }) => {
+    const serviceManager = await ServiceManager.create(dbo);
+    onCleanup(() => serviceManager.destroy());
+    return { serviceManager };
+  },
+  onReady: ({ context }) => {
+    context.serviceManager;
+  },
+});
+```
+
 ## License
 
 [MIT](LICENSE)

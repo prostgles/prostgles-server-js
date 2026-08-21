@@ -55,7 +55,7 @@ export class ViewHandler {
   joinPaths?: JoinPaths;
   dboBuilder: DboBuilder;
   config: TableDefinition<any> | undefined;
-  hooks: TableHooksDefinition | undefined;
+  hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
 
   tx?: {
     t: pgPromise.ITask<{}>;
@@ -83,7 +83,7 @@ export class ViewHandler {
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
     config: TableDefinition<any> | undefined;
-    hooks: TableHooksDefinition | undefined;
+    hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths?: JoinPaths;
   }) {

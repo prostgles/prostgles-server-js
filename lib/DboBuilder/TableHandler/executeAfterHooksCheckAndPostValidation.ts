@@ -69,6 +69,7 @@ export const executeAfterHooksCheckAndPostValidation = async ({
         ...txParams,
         command,
         data,
+        context: tableHandler.dboBuilder.prostgles.context,
       } as const;
 
       for (const hook of applicableHooks) {
@@ -121,6 +122,7 @@ export const executeAfterHooksCheckAndPostValidation = async ({
           data: applicableData,
           rows: applicableRows,
           localParams,
+          context: tableHandler.dboBuilder.prostgles.context,
         });
       }
     }

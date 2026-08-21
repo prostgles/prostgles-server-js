@@ -1,6 +1,6 @@
 import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
-import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
+import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
@@ -27,7 +27,7 @@ import {
 } from "./publishTypesAndUtils";
 
 export class PublishParser {
-  publish: ProstglesInitOptions["publish"];
+  publish: ProstglesInitOptions<void, SessionUser, any>["publish"];
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB;
@@ -106,20 +106,22 @@ export class PublishParser {
         const runWithContext = async (args: Record<string, unknown> | undefined) => {
           const ctx = await (async () => {
             if (method.unrestrictedDbAccess) {
-              const unrestrictedCtx: UnrestrictedFunctionContext = {
+              const unrestrictedCtx: UnrestrictedFunctionContext<void, SessionUser, unknown> = {
                 ...publishParams,
                 user,
+                context: this.prostgles.context,
               };
               return unrestrictedCtx;
             }
             const { clientDb } = await publishParams.getClientDBHandlers(undefined);
             const { clientInfo, clientReq, tables } = publishParams;
-            const restrictedCtx: RestrictedFunctionContext = {
+            const restrictedCtx: RestrictedFunctionContext<void, SessionUser, unknown> = {
               dbo: clientDb as unknown as DBOFullyTyped<void>,
               user,
               clientInfo,
               clientReq,
               tables,
+              context: this.prostgles.context,
             };
             return restrictedCtx;
           })();

@@ -1,6 +1,7 @@
 import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
-import type { OnInitReason } from "./initProstgles";
+import type { SessionUser } from "./Auth/AuthTypes";
+import type { ContextCleanup, OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
@@ -68,7 +69,7 @@ export class Prostgles {
    * Used to manage concurrent prostgles connections to the same database
    */
   readonly appId = randomUUID();
-  opts: ProstglesInitOptions = {
+  opts: ProstglesInitOptions<void, SessionUser, any> = {
     DEBUG_MODE: false,
     dbConnection: {
       host: "localhost",
@@ -121,8 +122,8 @@ export class Prostgles {
     return this.opts.fileTable?.tableName === tableName;
   }
 
-  constructor(params: ProstglesInitOptions) {
-    const config: Record<keyof ProstglesInitOptions, 1> = {
+  constructor(params: ProstglesInitOptions<void, SessionUser, any>) {
+    const config: Record<keyof ProstglesInitOptions<void, SessionUser, any>, 1> = {
       transactions: 1,
       joins: 1,
       tsGeneratedTypesDir: 1,
@@ -153,6 +154,7 @@ export class Prostgles {
       restApi: 1,
       testRulesOnConnect: 1,
       modifyClientSchema: 1,
+      createContext: 1,
     };
     const unknownParams = Object.keys(params).filter(
       (key: string) => !Object.keys(config).includes(key),
@@ -211,10 +213,55 @@ export class Prostgles {
     }
   }
 
-  /**
-   * Will re-create the dbo object
-   */
-  refreshDBO = async () => {
+  context: unknown;
+  private contextCleanups: ContextCleanup[] = [];
+
+  cleanupContext = async () => {
+    const cleanups = this.contextCleanups.splice(0).reverse();
+    this.context = undefined;
+    for (const cleanup of cleanups) {
+      try {
+        await cleanup();
+      } catch (error) {
+        console.error("Prostgles: Context cleanup failed", error);
+      }
+    }
+  };
+
+  createContext = async (reason: OnInitReason) => {
+    const createContext = this.opts.createContext;
+    if (!createContext) {
+      this.context = undefined;
+      return;
+    }
+    if (!this.db || !this.dbo) throw new Error("Cannot create context before the DBO is ready");
+
+    const cleanups: ContextCleanup[] = [];
+    try {
+      const context = await createContext({
+        db: this.db,
+        dbo: this.dbo as any,
+        sql: this.dboBuilder.sql,
+        tables: this.dboBuilder.tables,
+        reason,
+        onCleanup: (cleanup) => cleanups.push(cleanup),
+      });
+      this.context = context;
+      this.contextCleanups = cleanups;
+    } catch (error) {
+      for (const cleanup of cleanups.reverse()) {
+        try {
+          await cleanup();
+        } catch (cleanupError) {
+          console.error("Prostgles: Context cleanup failed", cleanupError);
+        }
+      }
+      throw error;
+    }
+  };
+
+  /** Rebuilds the DBO without changing the application context. */
+  rebuildDBO = async () => {
     await this.opts.onLog?.({
       type: "debug",
       command: "refreshDBO.start",
@@ -234,6 +281,14 @@ export class Prostgles {
       duration: Date.now() - start,
     });
     return this.dbo;
+  };
+
+  /** Rebuilds the DBO and replaces the application context. */
+  refreshDBO = async () => {
+    await this.cleanupContext();
+    const dbo = await this.rebuildDBO();
+    await this.createContext({ type: "dbo.refresh" });
+    return dbo;
   };
 
   initRestApi = () => {

@@ -44,7 +44,7 @@ export type FileTableRow = {
 
 export const getFileTableConfig = (
   prg: Prostgles,
-): { tableConfig: TableConfig | undefined; tableHooks: TableHooks | undefined } => {
+): { tableConfig: TableConfig | undefined; tableHooks: TableHooks<void, any> | undefined } => {
   const { fileTable, tableConfig, tableHooks } = prg.opts;
   if (!fileTable) {
     return { tableConfig, tableHooks };
@@ -102,7 +102,7 @@ export const getFileTableConfig = (
   };
 
   const userFileTableHooks = tableHooks?.[fileTableName];
-  const mergedTableHooks: TableHooks = {
+  const mergedTableHooks: TableHooks<void, any> = {
     [fileTableName]: {
       ...userFileTableHooks,
       beforeEach: [

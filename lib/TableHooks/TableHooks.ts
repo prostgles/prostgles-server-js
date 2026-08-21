@@ -1,38 +1,56 @@
 import type pgPromise from "pg-promise";
 import type { AnyObject, DBSchema } from "prostgles-types";
 
-import type { DbTxTableHandlers, LocalParams } from "../DboBuilder/DboBuilderTypes";
+import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type {
   AfterAllTsTrigger,
   AfterEachTsTrigger,
   BeforeEachTsTrigger,
-  InsertRule,
-  ValidateRowArgsCommon,
 } from "../PublishParser/PublishParser";
 
-export type TableHooks<S = void> =
+export type TableHooks<S = void, Context = undefined> =
   S extends DBSchema ?
     Partial<{
       [tableName in keyof S]: TableHooksDefinition<
         Required<S[tableName]["columns"]>,
-        DBOFullyTyped<S>
+        DBOFullyTyped<S>,
+        Context
       >;
     }>
-  : Record<string, TableHooksDefinition>;
+  : Record<string, TableHooksDefinition<AnyObject, DbTxTableHandlers, Context>>;
 
-export type TableHooksDefinition<R = AnyObject, DBX = DbTxTableHandlers> = {
+export type TableHooksDefinition<
+  RowDataType = AnyObject,
+  DBX = DbTxTableHandlers,
+  Context = undefined,
+> = {
   /**
-   * Hook used to run custom logic before inserting a row.
-   * The returned row must satisfy the table schema.
+   * Runs sequentially before validation and SQL for each insert row, or once per update request.
+   * May replace the pending data and pass `hookContext` to the next hook.
+   * `onInserted` also runs for updates, is not awaited, and runs before the transaction commits.
    */
-  getPreInsertRow?: (
-    args: PreInsertRowArgs,
-  ) => Promise<{ row: AnyObject; onInserted: Promise<void> }>;
-  beforeEach?: BeforeEachTsTrigger<R, DBX>[];
-  afterEach?: AfterEachTsTrigger<R, DBX>[];
-  afterAll?: AfterAllTsTrigger<R, DBX>[];
+  beforeEach?: BeforeEachTsTrigger<RowDataType, DBX, Context>[];
+
+  /**
+   * Runs once per affected row after SQL, inside the same transaction.
+   * `row` is the inserted/updated row or the deleted row's pre-delete state. Throwing rolls back.
+   */
+  afterEach?: AfterEachTsTrigger<RowDataType, DBX, Context>[];
+
+  /**
+   * Runs once after all applicable `afterEach` hooks, inside the same transaction.
+   * Receives all affected `rows`; throwing rolls back the operation.
+   * Same-table, same-command writes from after-hooks do not retrigger after-hooks.
+   */
+  afterAll?: AfterAllTsTrigger<RowDataType, DBX, Context>[];
+
+  /**
+   * Replaces the generated DELETE. Must perform the mutation and shape its return value using
+   * the prepared filter and returning arguments. Delete `afterEach`/`afterAll` hooks do not run.
+   */
   onInsteadOfDelete?: (args: {
+    context: Context;
     dbx: DBX;
     tx: pgPromise.ITask<{}>;
     returningQuery: string;
@@ -43,9 +61,4 @@ export type TableHooksDefinition<R = AnyObject, DBX = DbTxTableHandlers> = {
       filter: AnyObject;
     };
   }) => Promise<AnyObject[] | undefined>;
-};
-
-type PreInsertRowArgs = Omit<ValidateRowArgsCommon, "localParams"> & {
-  validate: InsertRule["validate"];
-  localParams: LocalParams | undefined;
 };

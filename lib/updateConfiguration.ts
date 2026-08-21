@@ -5,7 +5,7 @@ import type { Prostgles } from "./Prostgles";
 export const updateConfiguration = async (
   prgl: Prostgles,
   onReady: OnReadyCallbackBasic,
-  newOpts: UpdatableOptions,
+  newOpts: UpdatableOptions<void, any, any>,
   force?: true,
 ) => {
   const optionsThatChanged = getKeys(newOpts)

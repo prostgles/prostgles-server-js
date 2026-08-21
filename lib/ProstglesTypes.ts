@@ -6,7 +6,7 @@ import type {
   SessionUser,
 } from "./Auth/AuthTypes";
 import type { EventTriggerTagFilter } from "./Event_Trigger_Tags";
-import type { DbConnection, OnReadyCallback } from "./initProstgles";
+import type { CreateContext, DbConnection, OnReadyCallback } from "./initProstgles";
 import type { EventInfo } from "./Logging";
 import type { RestApiConfig } from "./RestApi";
 import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
@@ -102,7 +102,11 @@ type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (
   userData: AuthResultWithSID<SUser> | undefined,
 ) => MaybePromise<DBSchemaTable>;
 
-export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUser> = {
+export type ProstglesInitOptions<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  Context = undefined,
+> = {
   /**
    * Database connection details and options
    */
@@ -112,7 +116,14 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
    * Called when the prostgles server is ready to accept connections.
    * It waits for auth, tableConfig and other async configurations to complete before executing
    */
-  onReady: OnReadyCallback<S, SUser>;
+  onReady: OnReadyCallback<S, SUser, Context>;
+
+  /**
+   * Creates instance-scoped dependencies after the database object is ready.
+   * The returned context is available to onReady, server functions, and table hooks.
+   * Registered cleanups run in reverse order before context replacement and destruction.
+   */
+  createContext?: CreateContext<S, Context>;
 
   /**
    * Path to the directory where the generated types (`DBGeneratedSchema.d.ts`) will be saved.
@@ -181,7 +192,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Server-side functions that can be invoked by the client
    */
-  functions?: ServerFunctionDefinitions<S, SUser>;
+  functions?: ServerFunctionDefinitions<S, SUser, Context>;
 
   /**
    * If true then will test all table methods on each socket connect.
@@ -311,7 +322,7 @@ export type ProstglesInitOptions<S = void, SUser extends SessionUser = SessionUs
   /**
    * Allows defining hooks for table events such as insert, update, delete and select.
    */
-  tableHooks?: TableHooks<S>;
+  tableHooks?: TableHooks<S, Context>;
 
   /**
    * Useful for logging or debugging

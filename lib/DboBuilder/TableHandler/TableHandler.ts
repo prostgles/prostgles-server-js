@@ -63,7 +63,7 @@ export class TableHandler extends ViewHandler {
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
     config: TableDefinition<any> | undefined;
-    hooks: TableHooksDefinition | undefined;
+    hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths?: JoinPaths;
   }) {
@@ -98,6 +98,7 @@ export class TableHandler extends ViewHandler {
       if (!isApplicable) continue;
       const hookResult = await hook.validate({
         command,
+        context: this.dboBuilder.prostgles.context,
         data: newRow,
         dbx: this.getFinalDbo(localParams),
         localParams,
