@@ -106,6 +106,7 @@ export class Prostgles {
 
   keywords = DEFAULT_KEYWORDS;
   loaded = false;
+  preparingTableConfig = false;
 
   dbEventsManager?: DBEventsManager;
   schemaAge = "0";

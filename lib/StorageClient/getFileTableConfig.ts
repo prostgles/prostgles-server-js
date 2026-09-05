@@ -103,6 +103,7 @@ export const getFileTableConfig = (
 
   const userFileTableHooks = tableHooks?.[fileTableName];
   const mergedTableHooks: TableHooks<void, any> = {
+    ...tableHooks,
     [fileTableName]: {
       ...userFileTableHooks,
       beforeEach: [

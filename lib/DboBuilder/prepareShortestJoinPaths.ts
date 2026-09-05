@@ -18,6 +18,19 @@ export async function prepareShortestJoinPaths(dboBuilder: DboBuilder): Promise<
       throw new Error("Could not create join config. this.tablesOrViews missing");
     }
 
+    // The initial DBO is needed by tableConfig before its tables/columns exist.
+    // Defer only joins that cannot be resolved yet; the final rebuild validates all.
+    if (Array.isArray(joinConfig) && dboBuilder.prostgles.preparingTableConfig) {
+      const tables = dboBuilder.tablesOrViews;
+      joinConfig = joinConfig.filter((join) => join.tables.every((name, index) => {
+        const table = tables.find((candidate) => candidate.name === name);
+        return table && join.on.every((on) =>
+          (index === 0 ? Object.keys(on) : Object.values(on)).every((column) =>
+            table.columns.some((candidate) => candidate.name === column)
+          )
+        );
+      }));
+    }
     const inferredJoins = await getInferredJoins2(dboBuilder.tablesOrViews);
     if (joinConfig === "inferred") {
       joinConfig = inferredJoins;

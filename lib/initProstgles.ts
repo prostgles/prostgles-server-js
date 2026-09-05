@@ -223,8 +223,14 @@ export const initProstgles = async function (
 
     /* 2. Execute any SQL file if provided */
     await runSQLFile(this);
-    await this.rebuildDBO();
-    await this.initTableConfig(reason);
+    this.preparingTableConfig = true;
+    try {
+      await this.rebuildDBO();
+      await this.initTableConfig(reason);
+    } finally {
+      this.preparingTableConfig = false;
+    }
+    // Validate all configured joins against the completed schema before publishing.
     await this.rebuildDBO();
     await this.createContext(reason);
     this.initRestApi();
