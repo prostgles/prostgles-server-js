@@ -9,6 +9,7 @@ import { fetchTableConstraints } from "./fetchTableConstraints";
 import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getTableColumnQueries } from "./getTableColumnQueries";
+import { getTableTriggerQueries } from "./getTableTriggerQueries";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
 import { runMigrations } from "./runMigrations";
 import type { TableConfigurator } from "./TableConfigurator";
@@ -234,73 +235,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     const indexQueries = await getIndexesQueries(this.db, tableName, tableConf);
     queries.push(...indexQueries);
 
-    const { triggers, dropIfExists, dropIfExistsCascade } = tableConf;
-    if (triggers) {
-      const isDropped = dropIfExists || dropIfExistsCascade;
-
-      const existingTriggers = await this.db.any<{ trigger_name: string }>(
-        `
-            SELECT event_object_table
-              ,trigger_name
-            FROM  information_schema.triggers
-            WHERE event_object_table = \${tableName}
-            ORDER BY event_object_table
-          `,
-        { tableName },
-      );
-
-      // const existingTriggerFuncs = await this.dbo.sql!(`
-      //   SELECT p.oid,proname,prosrc,u.usename
-      //   FROM  pg_proc p
-      //   JOIN  pg_user u ON u.usesysid = p.proowner
-      //   WHERE prorettype = 2279;
-      // `, {}, { returnType: "rows" }) as { proname: string }[];
-
-      Object.entries(triggers).forEach(([triggerFuncName, trigger]) => {
-        const funcNameParsed = asName(triggerFuncName);
-
-        let addedFunc = false;
-        const addFuncDef = () => {
-          if (addedFunc) return;
-          addedFunc = true;
-          queries.push(`
-              CREATE OR REPLACE FUNCTION ${funcNameParsed}()
-                RETURNS trigger
-                LANGUAGE plpgsql
-              AS
-              $$
-  
-              ${trigger.query}
-              
-              $$;
-            `);
-        };
-
-        trigger.actions.forEach((action) => {
-          const triggerActionName = triggerFuncName + "_" + action;
-
-          const triggerActionNameParsed = asName(triggerActionName);
-          if (isDropped) {
-            queries.push(`DROP TRIGGER IF EXISTS ${triggerActionNameParsed} ON ${tableName};`);
-          }
-
-          if (isDropped || !existingTriggers.some((t) => t.trigger_name === triggerActionName)) {
-            addFuncDef();
-            const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
-            const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
-            const transitionTables =
-              trigger.forEach === "row" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
-            queries.push(`
-                CREATE TRIGGER ${triggerActionNameParsed}
-                ${trigger.type} ${action} ON ${tableName}
-                ${transitionTables}
-                FOR EACH ${trigger.forEach}
-                EXECUTE PROCEDURE ${funcNameParsed}();
-              `);
-          }
-        });
-      });
-    }
+    queries.push(...(await getTableTriggerQueries(this.db, tableName, tableConf, asName)));
   }
 
   if (queries.length) {
