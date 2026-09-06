@@ -125,7 +125,11 @@ export async function _delete(
     //   }
     // }
 
-    const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
+    const queryWithRLS = withUserRLS(
+      localParams,
+      queryWithoutRLS,
+      !!this.getTransaction(localParams),
+    );
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,
@@ -154,6 +158,9 @@ export async function _delete(
         throw new Error(
           "onInsteadOfDelete requires a transaction. Please wrap the delete call in a transaction.",
         );
+      }
+      if (localParams?.isRemoteRequest) {
+        await transaction.t.none(withUserRLS(localParams, ""));
       }
       const result = await onInsteadOfDelete({
         context: this.dboBuilder.prostgles.context,

@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import prostgles, { defineFunction, getLocalStorageClient } from "prostgles-server";
+import { withUserRLS } from "prostgles-server/dist/DboBuilder/DboBuilder";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
 import { testTableConfig, testTableHooks } from "./testTableConfig";
@@ -392,7 +393,7 @@ function dd() {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
-          await serverOnlyQueries(dbo as any);
+          await serverOnlyQueries(dbo as any, db, withUserRLS);
           log("Server-only query tests successful");
           await isomorphicQueries(dbo as any, sql, log);
           log("Server isomorphic tests successful");

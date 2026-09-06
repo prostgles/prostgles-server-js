@@ -37,7 +37,10 @@ export async function updateBatch(
         return query;
       }),
     );
-    const queries = [withUserRLS(localParams, ""), ...updateQueries];
+    const queries = [
+      withUserRLS(localParams, "", !!this.getTransaction(localParams)),
+      ...updateQueries,
+    ];
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

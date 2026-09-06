@@ -44,7 +44,11 @@ export async function size(
           ${selectQueryWithoutRLS}
         ) prgl_size_query
       `;
-      const queryWithRLS = withUserRLS(localParams, queryWithoutUserRLS);
+      const queryWithRLS = withUserRLS(
+        localParams,
+        queryWithoutUserRLS,
+        !!this.getTransaction(localParams),
+      );
 
       const queryToReturn = await getReturnTypeQuery({
         handler: this,

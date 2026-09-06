@@ -3,7 +3,12 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import type { DBHandlerServer, DboBuilder, PRGLIOSocket } from "../DboBuilder/DboBuilder";
+import type {
+  DBHandlerServer,
+  DboBuilder,
+  LocalParams,
+  PRGLIOSocket,
+} from "../DboBuilder/DboBuilder";
 import type { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import type { DB } from "../Prostgles";
 import { addSync } from "./addSync";
@@ -56,6 +61,7 @@ export type SyncParams = {
   lr?: AnyObject;
   is_syncing: boolean;
   handlers: ReturnType<(typeof ReplicationProtocol)["getServerHandlers"]>;
+  localParams: LocalParams;
 };
 
 export type AddSyncParams = SyncTableInfo & {
@@ -74,6 +80,7 @@ export type AddSyncParams = SyncTableInfo & {
   };
   condition: string;
   throttle?: number;
+  localParams: LocalParams;
 };
 
 export type ViewSubscriptionOptions = (
@@ -114,6 +121,7 @@ export type SubscriptionParams = {
 
   onData?: OnData;
   socket: PRGLIOSocket | undefined;
+  localParams?: LocalParams;
 
   lastPushed: number;
   /**
@@ -143,6 +151,7 @@ export type Subscription = Pick<
   | "table_info"
   | "filter"
   | "table_rules"
+  | "localParams"
 > & {
   triggers: [AddTriggerParams, ...AddTriggerParams[]];
 };
@@ -321,7 +330,15 @@ export class PubSubManager {
   };
 
   getSubData = async (sub: Subscription) => {
-    const { table_info, filter, selectParams: params, table_rules, socket, onData } = sub; //, subOne = false
+    const {
+      table_info,
+      filter,
+      selectParams: params,
+      table_rules,
+      localParams,
+      socket,
+      onData,
+    } = sub; //, subOne = false
     const { name: table_name } = table_info;
     const tableHandler = this.dbo[table_name];
     if (!onData && !socket) {
@@ -337,9 +354,7 @@ export class PubSubManager {
         params,
         undefined,
         table_rules,
-        socket && {
-          clientReq: { socket },
-        },
+        localParams,
       )) as AnyObject[];
       return { data };
     } catch (err) {

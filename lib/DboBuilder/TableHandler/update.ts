@@ -166,7 +166,7 @@ export async function update(
     ).getQuery();
     query += "\n" + updateFilter.where;
     const queryWithoutUserRLS = query;
-    query = withUserRLS(localParams, query);
+    query = withUserRLS(localParams, query, !!this.getTransaction(localParams));
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

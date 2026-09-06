@@ -113,7 +113,11 @@ export const find = async function (
       !!selectParamsLimitCheck.groupBy,
     );
 
-    const queryWithRLS = withUserRLS(localParams, queryWithoutRLS);
+    const queryWithRLS = withUserRLS(
+      localParams,
+      queryWithoutRLS,
+      !!this.getTransaction(localParams),
+    );
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

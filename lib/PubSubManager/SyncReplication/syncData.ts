@@ -82,7 +82,6 @@ export async function syncData(
   if (!tableHandler?.find) {
     throw `dbo.${table_name}.find missing or not allowed`;
   }
-
   const {
     upsertData,
     updateSyncLR,
@@ -98,6 +97,7 @@ export async function syncData(
     sync,
     pubSubManager: this,
     logSyncData,
+    localParams: sync.localParams,
   });
 
   /* Used to throttle and merge incoming updates */

@@ -65,7 +65,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     checkCondition = `NOT (${checkCond.where})`;
   }
   const hasReturning = !!returningSelectItems.length;
-  const userRLS = withUserRLS(localParams, "");
+  const userRLS = withUserRLS(localParams, "", !!tableHandler.getTransaction(localParams));
   const CHECK_CONDITION_ALIAS = "prostgles_check_condition";
   const RETURNING_ALIAS_PREFIX = "prostgles_returning_";
   const returningSelectKeyRemap = new Map<string, string>();

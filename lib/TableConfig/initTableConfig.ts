@@ -162,7 +162,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
     /* isLookupTable table has already been created */
-    const coldef =
+    const tableColumnDefinition =
       "isLookupTable" in tableConf ? undefined : (
         await getTableColumnQueries({
           db: this.db,
@@ -172,8 +172,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
         })
       );
 
-    if (coldef) {
-      queries.push(coldef.fullQuery);
+    if (tableColumnDefinition) {
+      queries.push(tableColumnDefinition.fullQuery);
     }
 
     /** CONSTRAINTS */
@@ -181,13 +181,13 @@ export const initTableConfig = async function (this: TableConfigurator) {
       tableName,
       tableConf,
     });
-    if (coldef?.isCreate) {
+    if (tableColumnDefinition?.isCreate) {
       queries.push(...(constraintDefs?.map((c) => c.alterQuery) ?? []));
-    } else if (coldef) {
+    } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
         db: this.db,
         tableName,
-        columnDefs: coldef.columnDefs,
+        columnDefs: tableColumnDefinition.columnDefs,
         constraintDefs,
       });
       const futureCons = fullSchema.constraints.map((nc) => ({

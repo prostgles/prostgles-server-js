@@ -178,12 +178,21 @@ export const getCanExecute = async (db: DB) => {
 
 export const QUERY_ID_PREFIX = "-- prostgles query id: ";
 
-export const withUserRLS = (localParams: LocalParams | undefined, query: string) => {
+export const withUserRLS = (
+  localParams: LocalParams | undefined,
+  query: string,
+  inTransaction = false,
+) => {
   const user = localParams?.isRemoteRequest?.user;
-  const queryPrefix = `SET SESSION "prostgles.user" \nTO`;
+  const queryPrefix = `SET LOCAL "prostgles.user" \nTO`;
   let firstQuery = `${queryPrefix} '';`;
   if (user) {
     firstQuery = pgp.as.format(`${queryPrefix} \${user};`, { user });
+  }
+  // Local calls through a transaction's dbx must preserve its request context.
+  // Anonymous remote requests still explicitly clear the user.
+  if (inTransaction && !localParams?.isRemoteRequest) {
+    firstQuery = "";
   }
 
   const queryId = crypto.randomUUID();

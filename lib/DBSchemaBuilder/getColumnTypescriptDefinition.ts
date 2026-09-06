@@ -65,8 +65,8 @@ export const getDataType = ({
 
   const tableConfig = config && config[tableOrView.name];
   if (tableConfig && "isLookupTable" in tableConfig && column.is_pkey) {
-    const enumValus = Object.keys(tableConfig.isLookupTable.values);
-    return buildEnumTypeDefinition(enumValus);
+    const enumValues = Object.keys(tableConfig.isLookupTable.values);
+    return buildEnumTypeDefinition(enumValues);
   }
 
   const colConf = config && getColumnConfig(config, tableOrView.name, column.name);

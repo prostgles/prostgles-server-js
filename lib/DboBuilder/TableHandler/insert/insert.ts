@@ -164,7 +164,7 @@ export async function insert(
     }
 
     const queryWithoutUserRLS = query;
-    const queryWithRLS = withUserRLS(localParams, query);
+    const queryWithRLS = withUserRLS(localParams, query, !!this.getTransaction(localParams));
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

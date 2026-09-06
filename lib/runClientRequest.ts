@@ -1,16 +1,15 @@
-import type { SQLRequest, TableHandler, UserLike } from "prostgles-types";
+import type { SQLRequest, TableHandler } from "prostgles-types";
 import {
   ABORTABLE_METHODS,
   getJSONBObjectSchemaValidationError,
   getJSONBSchemaValidationErrorAsync,
   getKeys,
-  pickKeys,
   type AnyObject,
 } from "prostgles-types";
 import type { AuthClientRequest } from "./Auth/AuthTypes";
+import { getSessionUser } from "./Auth/utils/getSessionUser";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
 import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
-import { parseFieldFilter } from "./DboBuilder/ViewHandler/parseFieldFilter";
 import { canRunSQL } from "./DboBuilder/runSql/runSQL";
 import type { Prostgles } from "./Prostgles";
 import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
@@ -118,18 +117,7 @@ export const runClientRequest = async function (
     scope,
   );
 
-  const sessionUser: UserLike | undefined =
-    !clientInfo.user ? undefined : (
-      {
-        ...parseFieldFilter(
-          //@ts-ignore
-          clientInfo.sessionFields ?? [],
-          false,
-          getKeys(clientInfo.user),
-        ),
-        ...(pickKeys(clientInfo.user, ["id", "type"]) as UserLike),
-      }
-    );
+  const sessionUser = getSessionUser(clientInfo);
   const localParams: LocalParams = {
     clientReq,
     isRemoteRequest: { user: sessionUser, clientInfo },

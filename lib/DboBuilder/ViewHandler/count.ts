@@ -41,7 +41,11 @@ export async function count(
         ${findQuery}
         ) t 
       `;
-      const queryWithRLS = withUserRLS(localParams, queryWithoutUserRLS);
+      const queryWithRLS = withUserRLS(
+        localParams,
+        queryWithoutUserRLS,
+        !!this.getTransaction(localParams),
+      );
 
       const queryToReturn = await getReturnTypeQuery({
         handler: this,

@@ -2,7 +2,6 @@ import test, { describe } from "node:test";
 import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
-import assert from "node:assert";
 
 export const isomorphicQueriesTyped = async (
   db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,

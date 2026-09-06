@@ -34,6 +34,7 @@ export async function addSub(
     table_info,
     subscribeOptions,
     tracked_columns,
+    localParams,
   } = subscriptionParams;
   const table_name = table_info.name;
 
@@ -65,6 +66,7 @@ export async function addSub(
     is_throttling: false,
     socket_id: socket?.id,
     table_rules,
+    localParams,
     triggers: [mainTrigger],
   };
 

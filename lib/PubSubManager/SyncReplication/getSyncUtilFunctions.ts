@@ -6,7 +6,7 @@ import {
   type AnyObject,
   type SyncBatchParams,
 } from "prostgles-types";
-import type { PRGLIOSocket } from "../../DboBuilder/DboBuilder";
+import type { LocalParams, PRGLIOSocket } from "../../DboBuilder/DboBuilder";
 import type { TableHandler } from "../../DboBuilder/TableHandler/TableHandler";
 import { getSyncOrderByAndFields } from "./getSyncOrderByAndFields";
 import type { PubSubManager, SyncParams } from "../PubSubManager";
@@ -26,6 +26,7 @@ type Args = {
   sync: SyncParams;
   pubSubManager: PubSubManager;
   logSyncData: (state: Extract<EventTypes.Sync, { command: "syncData" }>["state"]) => void;
+  localParams: LocalParams;
 };
 
 export const getSyncUtilFunctions = ({
@@ -34,6 +35,7 @@ export const getSyncUtilFunctions = ({
   sync,
   pubSubManager,
   logSyncData,
+  localParams,
 }: Args) => {
   const {
     synced_field,
@@ -71,12 +73,18 @@ export const getSyncUtilFunctions = ({
         { orderBy: orderByAsc, select: sync_fields, limit, offset },
         undefined,
         table_rules,
-        { clientReq: { socket } },
+        localParams,
       )) as AnyObject[];
 
       const last_rows = first_rows.slice(-1); // Why not logic below?
       // const last_rows = await _this?.dbo[table_name]?.find?.(_filter, { orderBy: (orderByDesc as OrderBy), select: sync_fields, limit: 1, offset: -offset || 0 }, null, table_rules);
-      const count = await tableHandler.count(batchFilter, undefined, undefined, table_rules);
+      const count = await tableHandler.count(
+        batchFilter,
+        undefined,
+        undefined,
+        table_rules,
+        localParams,
+      );
 
       return {
         s_fr: first_rows[0],
@@ -128,7 +136,7 @@ export const getSyncUtilFunctions = ({
     },
     getServerData = async (from_synced: number | undefined, offset = 0): Promise<AnyObject[]> => {
       return fetchSyncServerData(
-        { tableHandler, socket, from_synced, offset },
+        { tableHandler, localParams, from_synced, offset },
         { filter, id_fields, params, synced_field, batch_size, table_rules },
       );
     },
@@ -173,7 +181,7 @@ export const getSyncUtilFunctions = ({
             },
             undefined,
             table_rules,
-            { clientReq: { socket } },
+            localParams,
           )) as AnyObject[];
           let rowsToInsert = data.filter(
             (incomingRow) =>
@@ -201,7 +209,7 @@ export const getSyncUtilFunctions = ({
               { removeDisallowedFields: true },
               undefined,
               table_rules,
-              { clientReq: { socket } },
+              localParams,
             );
           } else {
             rowsToUpdate = [];
@@ -213,7 +221,7 @@ export const getSyncUtilFunctions = ({
               { removeDisallowedFields: true },
               undefined,
               table_rules,
-              { clientReq: { socket } },
+              localParams,
             );
           } else {
             rowsToInsert = [];
@@ -355,7 +363,7 @@ export const getSyncUtilFunctions = ({
               { select: sync_fields, limit: 1 },
               undefined,
               table_rules,
-              { clientReq: { socket } },
+              localParams,
             );
           }
 

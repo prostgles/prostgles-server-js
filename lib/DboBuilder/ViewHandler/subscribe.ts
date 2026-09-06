@@ -92,6 +92,7 @@ async function subscribe(
         { actions, skipFirst, throttle, throttleOpts, skipChangedColumnsCheck },
         table_rules?.select,
       ),
+      localParams,
       lastPushed: 0,
       tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
       pushRequestedVersion: 0,

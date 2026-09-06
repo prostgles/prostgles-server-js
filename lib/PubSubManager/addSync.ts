@@ -20,6 +20,7 @@ export async function addSync(
   const res = await tryCatchV2(async () => {
     const { socket, rawSelect, table_info, table_rules, filter, params, condition, initialData } =
       syncParams;
+    const { localParams } = syncParams;
     const conditionParsed = parseCondition(condition);
 
     const { name: table_name } = table_info;
@@ -84,6 +85,7 @@ export async function addSync(
         socket,
         params,
         handlers,
+        localParams,
       };
       const unsyncChn = channelName + "unsync";
       socket.removeAllListeners(unsyncChn);

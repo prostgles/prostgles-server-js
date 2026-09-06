@@ -2,9 +2,15 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { getJSONBSchemaValidationErrorAsync, type TableHandler } from "prostgles-types";
-import type { DBHandlerServer } from "../dist/Prostgles";
+import type { DB, DBHandlerServer } from "../dist/Prostgles";
+import { testWithUserRLS } from "./server/withUserRLS.spec";
+import type { withUserRLS as WithUserRLS } from "../dist/DboBuilder/dboBuilderUtils";
 
-export const serverOnlyQueries = async (db: DBHandlerServer) => {
+export const serverOnlyQueries = async (
+  db: DBHandlerServer,
+  pgDb: DB,
+  withUserRLS: typeof WithUserRLS,
+) => {
   await describe("Server Only Queries", async () => {
     await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {
       const dbMap = new Map(Object.entries(db)) as Map<string, TableHandler>;
@@ -66,6 +72,7 @@ export const serverOnlyQueries = async (db: DBHandlerServer) => {
       (await sub1).unsubscribe();
       (await sub2).unsubscribe();
     });
+    await testWithUserRLS(db, pgDb, withUserRLS);
     await test("Self reference recursion bug", async () => {
       await db.rec.findOne!({ id: 1 }, { select: { "*": 1, rec_ref: "*" } });
     });

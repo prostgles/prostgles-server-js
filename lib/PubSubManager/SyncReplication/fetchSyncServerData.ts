@@ -1,5 +1,5 @@
 import type { AnyObject } from "prostgles-types";
-import type { PRGLIOSocket } from "../../DboBuilder/DboBuilder";
+import type { LocalParams } from "../../DboBuilder/DboBuilder";
 import type { TableHandler } from "../../DboBuilder/TableHandler/TableHandler";
 import type { SyncParams } from "../PubSubManager";
 import { getSyncOrderByAndFields } from "./getSyncOrderByAndFields";
@@ -8,12 +8,12 @@ import { getSyncBatchOptions } from "./getSyncBatchOptions";
 export const fetchSyncServerData = async (
   {
     tableHandler,
-    socket,
+    localParams,
     from_synced,
     offset,
   }: {
     tableHandler: TableHandler;
-    socket: PRGLIOSocket;
+    localParams: LocalParams;
     from_synced: number | undefined;
     offset: number | undefined;
   },
@@ -48,7 +48,7 @@ export const fetchSyncServerData = async (
     },
     undefined,
     table_rules,
-    { clientReq: { socket } },
+    localParams,
   );
 
   return batchRows as AnyObject[];

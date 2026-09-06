@@ -162,11 +162,11 @@ BEGIN
           END IF;
         
           IF length(key) > 0 THEN
-            RETURN jsonb_extract_path(user_jsonb, key);
+            RETURN jsonb_extract_path_text(user_jsonb, key);
           END IF;
           RETURN user_jsonb;
         END;
-        $$ LANGUAGE plpgsql;
+        $$ LANGUAGE plpgsql STABLE PARALLEL SAFE;
         COMMENT ON FUNCTION prostgles."user" IS 'Used for row level security';
  
         CREATE OR REPLACE FUNCTION prostgles.user_id()
@@ -174,7 +174,7 @@ BEGIN
         BEGIN
           RETURN prostgles.user('id')::UUID;
         END;
-        $$ LANGUAGE plpgsql;
+        $$ LANGUAGE plpgsql STABLE PARALLEL SAFE;
         COMMENT ON FUNCTION prostgles.user_id IS 'Session user id';
 
         CREATE OR REPLACE FUNCTION prostgles.user_type()
@@ -182,7 +182,7 @@ BEGIN
         BEGIN
           RETURN prostgles.user('type')::TEXT;
         END;
-        $$ LANGUAGE plpgsql;
+        $$ LANGUAGE plpgsql STABLE PARALLEL SAFE;
         COMMENT ON FUNCTION prostgles.user_type IS 'Session user type'; 
 
         CREATE TABLE IF NOT EXISTS prostgles.apps (

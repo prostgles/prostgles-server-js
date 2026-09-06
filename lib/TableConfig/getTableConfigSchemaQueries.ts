@@ -115,7 +115,7 @@ const getTableQueries = async (
       `);`,
     ].join("\n");
 
-    const dataQuerys = rows.map((row) => {
+    const insertQueries = rows.map((row) => {
       const values = allColumns.map((key) => row[key]);
       return as.format(
         `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
@@ -123,7 +123,7 @@ const getTableQueries = async (
         { values },
       );
     });
-    const queries = [createQuery, ...dataQuerys];
+    const queries = [createQuery, ...insertQueries];
     return {
       queries,
       colDefs,
