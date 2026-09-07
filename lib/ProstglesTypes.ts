@@ -14,6 +14,7 @@ import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
 import type { TableHooks } from "./TableHooks/TableHooks";
+import type { SchemaConfigAudit } from "./Audit/AuditTypes";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
@@ -312,6 +313,8 @@ export type ProstglesInitOptions<
    * made to the database schema through SQL queries
    */
   tableConfig?: TableConfig;
+  /** Audit committed row changes after bootstrap, before application callbacks run. */
+  audit?: SchemaConfigAudit<S>;
 
   /**
    * Migration logic used when the new tableConfig version is higher than the one in the database.

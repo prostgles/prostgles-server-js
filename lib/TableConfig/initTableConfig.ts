@@ -9,10 +9,10 @@ import { fetchTableConstraints } from "./fetchTableConstraints";
 import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getTableColumnQueries } from "./getTableColumnQueries";
-import { getTableTriggerQueries } from "./getTableTriggerQueries";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
 import { runMigrations } from "./runMigrations";
 import type { TableConfigurator } from "./TableConfigurator";
+import { syncTableTriggers } from "./syncTableTriggers";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -234,8 +234,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
     const indexQueries = await getIndexesQueries(this.db, tableName, tableConf);
     queries.push(...indexQueries);
-
-    queries.push(...(await getTableTriggerQueries(this.db, tableName, tableConf, asName)));
   }
 
   if (queries.length) {
@@ -268,7 +266,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
   }
   this.initialising = false;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (changedSchema && !failedQueries.length) {
+  if (changedSchema && !failedQueries.length && !this.prostgles.opts.audit) {
     if (!this.prevInitQueryHistory) {
       this.prevInitQueryHistory = queryHistory;
     } else if (this.prevInitQueryHistory.join() !== queryHistory.join()) {
@@ -284,7 +282,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
   }
 
   await this.prostgles.rebuildDBO();
-  await this.setTableOnMounts();
-  /** Needed in case some onMounts change schema */
-  await this.prostgles.rebuildDBO();
+  await syncTableTriggers(this.prostgles);
+  if (this.prostgles.opts.audit) await this.prostgles.rebuildDBO();
 };

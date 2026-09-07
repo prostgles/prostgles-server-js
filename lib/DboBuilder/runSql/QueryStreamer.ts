@@ -107,6 +107,7 @@ export class QueryStreamer {
     let streamState: "started" | "ended" | "errored" | undefined;
 
     const startStream = async (client: pg.Client | undefined, query: ClientStreamedRequest) => {
+      await this.dboBuilder.prostgles.schemaReady;
       await this.dboBuilder.cacheDBTypes();
       const socketQuery = this.socketQueries.get(socketId)?.get(id);
       if (!socketQuery) {

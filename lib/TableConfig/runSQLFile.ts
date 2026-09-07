@@ -3,7 +3,7 @@ import { getFileText, type Prostgles } from "../Prostgles";
 
 export const runSQLFile = async (prostgles: Prostgles) => {
   const {
-    db,
+    dbForSchema: db,
     opts: { sqlFilePath, onLog },
   } = prostgles;
   if (!sqlFilePath) return;

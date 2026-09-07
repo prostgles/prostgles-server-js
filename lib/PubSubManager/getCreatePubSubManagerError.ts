@@ -6,7 +6,7 @@ import type { DboBuilder } from "../DboBuilder/DboBuilder";
 export const getCreatePubSubManagerError = async (
   dboBuilder: DboBuilder
 ): Promise<string | undefined> => {
-  const db = dboBuilder.db;
+  const db = dboBuilder.prostgles.dbForSchema!;
 
   const canExecute = await getCanExecute(db);
   if (!canExecute) return "Cannot run EXECUTE statements on this connection";

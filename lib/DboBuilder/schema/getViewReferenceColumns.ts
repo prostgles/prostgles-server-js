@@ -1,11 +1,12 @@
-import { isDefined, type SQLResult } from "prostgles-types";
-import type { DboBuilder } from "../DboBuilder";
+import { isDefined } from "prostgles-types";
+import type { DB } from "../../Prostgles";
+import { getDbTypes, getDetailedFieldInfo } from "../runSql/runSqlUtils";
 import type { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
 
 export const getViewReferenceColumns = async (
   table: TableSchema,
   tableSchemaList: TableSchema[],
-  runSQL: DboBuilder["runSQL"]
+  db: DB
 ) => {
   const viewReferenceColumns: Pick<TableSchemaColumn, "name" | "references">[] = [];
   if (!table.is_view || !table.view_definition) {
@@ -16,12 +17,10 @@ export const getViewReferenceColumns = async (
       table.view_definition.endsWith(";") ?
         table.view_definition.slice(0, -1)
       : table.view_definition;
-    const { fields: viewFieldsWithInfo } = (await runSQL(
+    const { fields } = await db.result(
       `SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`,
-      {},
-      {},
-      undefined
-    )) as SQLResult<undefined>;
+    );
+    const viewFieldsWithInfo = getDetailedFieldInfo(await getDbTypes(db), fields);
     const viewTables = tableSchemaList.filter((r) =>
       viewFieldsWithInfo.some((f) => f.tableID === r.oid)
     );

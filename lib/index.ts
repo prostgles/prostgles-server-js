@@ -40,8 +40,11 @@ export type {
 } from "./initProstgles";
 export type { ProstglesInitOptions } from "./ProstglesTypes";
 export type * from "./TableConfig/TableConfigTypes";
+export type * from "./Audit/AuditTypes";
 export type * from "./TableHooks/TableHooks";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;
 export type { FileTableRow } from "./StorageClient/getFileTableConfig";
+
+export { AUDIT_TABLE_COLUMN_DEFINITIONS, AUDIT_TABLE_COLUMNS, type AuditTableRow } from "./Audit/AuditTable";

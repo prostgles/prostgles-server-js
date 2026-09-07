@@ -500,19 +500,19 @@ COMMIT;
 export const getPubSubManagerInitQuery = async function (
   this: DboBuilder,
 ): Promise<string | undefined> {
-  const versionNum = await this.db.one("SELECT current_setting('server_version_num')::int as val");
+  const versionNum = await this.prostgles.dbForSchema!.one("SELECT current_setting('server_version_num')::int as val");
   const initQuery = getInitQuery(this.prostgles.opts.DEBUG_MODE, versionNum.val);
-  const { schema_md5 = "none" } = await this.db.oneOrNone("SELECT md5($1) as schema_md5", [
+  const { schema_md5 = "none" } = await this.prostgles.dbForSchema!.oneOrNone("SELECT md5($1) as schema_md5", [
     initQuery.trim(),
   ]);
   const query = pgp.as.format(initQuery, { schema_md5, version });
-  const existingSchema = await this.db.any(PROSTGLES_SCHEMA_EXISTS_QUERY);
+  const existingSchema = await this.prostgles.dbForSchema!.any(PROSTGLES_SCHEMA_EXISTS_QUERY);
   if (!existingSchema.length) {
     console.log("getPubSubManagerInitQuery: No prostgles.versions table found. Creating...");
     return query;
   }
   const { data: existingSchemaVersions } = await tryCatchV2(async () => {
-    const existingSchemaVersions = await this.db.any(PROSTGLES_SCHEMA_VERSION_OK_QUERY, {
+    const existingSchemaVersions = await this.prostgles.dbForSchema!.any(PROSTGLES_SCHEMA_VERSION_OK_QUERY, {
       schema_md5,
       version,
     });

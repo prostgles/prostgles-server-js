@@ -250,7 +250,7 @@ export class DboBuilder {
       this.checkingCanSubscribe = false;
     }
     const start = Date.now();
-    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(this, {
+    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL({ db: this.prostgles.dbForSchema! }, {
       schemaFilter: this.prostgles.opts.schemaFilter,
     });
     await this.prostgles.opts.onLog?.({
@@ -262,7 +262,7 @@ export class DboBuilder {
     const tablesOrViews = tablesOrViewsReq.result;
     this.tablesOrViews = tablesOrViews;
 
-    this.constraints = await getConstraints(this.db, this.prostgles.opts.schemaFilter);
+    this.constraints = await getConstraints(this.prostgles.dbForSchema!, this.prostgles.opts.schemaFilter);
     await this.prepareShortestJoinPaths();
 
     this.dbo = {};

@@ -1,3 +1,4 @@
+import { getManagedTriggerName } from "./managedTriggerNames";
 import { as } from "pg-promise";
 import { isDefined } from "prostgles-types";
 import type { DB } from "../initProstgles";
@@ -226,14 +227,14 @@ const getTriggerQueries = (
     ];
 
     trigger.actions.forEach((action) => {
-      const triggerActionName = triggerFuncName + "_" + action;
+      const triggerActionName = getManagedTriggerName(triggerFuncName, action);
 
       const triggerActionNameParsed = asName(triggerActionName);
 
       const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
       const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
       const transitionTables =
-        trigger.forEach === "row" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
+        trigger.forEach === "row" || trigger.type !== "after" || action === "truncate" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
       queries.push(`
           CREATE TRIGGER ${triggerActionNameParsed}
           ${trigger.type} ${action} ON ${tableName}

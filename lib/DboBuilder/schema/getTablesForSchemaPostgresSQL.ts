@@ -25,7 +25,7 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 // TODO: Add a onSocketConnect timeout for this query.
 //  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
-  { db, runSQL }: Pick<DboBuilder, "db" | "runSQL">,
+  { db }: Pick<DboBuilder, "db">,
   {
     schemaFilter,
     ddlWithRollback,
@@ -288,7 +288,7 @@ export async function getTablesForSchemaPostgresSQL(
         });
 
         /** Get view reference cols (based on parent table) */
-        const viewReferenceColumns = await getViewReferenceColumns(table, tableSchemaList, runSQL);
+        const viewReferenceColumns = await getViewReferenceColumns(table, tableSchemaList, db);
 
         table.columns = table.columns.map((col) => {
           if (col.has_default) {

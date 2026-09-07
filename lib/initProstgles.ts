@@ -1,3 +1,5 @@
+import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
+import { deferDbQueries } from "./deferDbQueries";
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
 import type { MaybePromise, SQLHandler, TableSchema } from "prostgles-types";
@@ -42,6 +44,7 @@ export type UpdatableOptions<
   | "restApi"
   | "tableHooks"
   | "tableConfig"
+  | "audit"
   | "schemaFilter"
   | "auth"
   | "publish"
@@ -209,7 +212,8 @@ export const initProstgles = async function (
       )
       .catch(() => {});
 
-    this.db = db;
+    this.dbForSchema = db;
+    this.db = deferDbQueries(db, () => this.schemaReady);
     this.pgp = pgp;
     this.isSuperUser = await getIsSuperUser(db);
   }
@@ -221,17 +225,24 @@ export const initProstgles = async function (
   try {
     await this.cleanupContext();
 
-    /* 2. Execute any SQL file if provided */
-    await runSQLFile(this);
-    this.preparingTableConfig = true;
-    try {
+    await this.tableConfigurator?.destroy();
+    await this.runSchemaQueries(async () => {
+      /* 2. Execute any SQL file if provided */
+      await runSQLFile(this);
+      this.preparingTableConfig = true;
+      try {
+        await this.rebuildDBO();
+        await this.initTableConfig(reason);
+      } finally {
+        this.preparingTableConfig = false;
+      }
+    });
+    await this.tableConfigurator?.setTableOnMounts();
+    // onMount may create additional targets; validate joins against the completed schema.
+    await this.runSchemaQueries(async () => {
       await this.rebuildDBO();
-      await this.initTableConfig(reason);
-    } finally {
-      this.preparingTableConfig = false;
-    }
-    // Validate all configured joins against the completed schema before publishing.
-    await this.rebuildDBO();
+      await syncTableTriggers(this);
+    });
     await this.createContext(reason);
     this.initRestApi();
 
@@ -267,7 +278,7 @@ export const initProstgles = async function (
         {
           sql: this.dboBuilder.sql,
           dbo: this.dbo!,
-          db: this.db,
+          db,
           tables: this.dboBuilder.tables,
           reason,
           context: this.context,
@@ -324,6 +335,7 @@ export const initProstgles = async function (
         await this.tableConfigurator?.destroy();
         this.dbo = undefined;
         this.db = undefined;
+        this.dbForSchema = undefined;
         await db.$pool.end();
         await this.adminClient?.end().catch(() => {});
         this.adminClient = undefined;

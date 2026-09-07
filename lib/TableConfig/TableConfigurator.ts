@@ -23,8 +23,8 @@ export class TableConfigurator {
     return this.prostgles.dbo;
   }
   get db(): DB {
-    if (!this.prostgles.db) throw "this.prostgles.db missing";
-    return this.prostgles.db;
+    if (!this.prostgles.dbForSchema) throw "Schema database connection missing";
+    return this.prostgles.dbForSchema;
   }
   prostgles: Prostgles;
 

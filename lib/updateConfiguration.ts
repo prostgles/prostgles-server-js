@@ -20,18 +20,13 @@ export const updateConfiguration = async (
     })
     .filter(isDefined);
   if (!optionsThatChanged.length) {
+    await prgl.schemaReady;
     console.warn("No options changed");
     return;
   }
 
   if (includes(optionsThatChanged, "restApi")) {
     prgl.initRestApi();
-  }
-  if (includes(optionsThatChanged, "tableConfig")) {
-    await prgl.initTableConfig({
-      type: "prgl.update",
-      newOpts,
-    });
   }
   if (includes(optionsThatChanged, "schema")) {
     await prgl.refreshDBO();

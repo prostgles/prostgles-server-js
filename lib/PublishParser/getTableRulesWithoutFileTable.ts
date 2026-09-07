@@ -1,3 +1,4 @@
+import { isAuditTable } from "../Audit/getAuditTableConfig";
 import { getObjectEntries, isObject } from "prostgles-types";
 import type { AuthResultWithSID } from "../Auth/AuthTypes";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
@@ -42,7 +43,7 @@ export async function getTableRulesWithoutFileTable(
 
   const isStarOrTrue = (value: any): value is "*" | true => value === "*" || value === true;
   const { privileges } = tableHandler.tableOrViewInfo;
-  const tableRulesObject =
+  const rawTableRulesObject =
     isStarOrTrue(rawTableRule) ?
       {
         select: privileges.select ? TABLE_RULE_NO_LIMITS.select : undefined,
@@ -51,6 +52,10 @@ export async function getTableRulesWithoutFileTable(
         delete: privileges.delete ? TABLE_RULE_NO_LIMITS.delete : undefined,
       }
     : rawTableRule;
+
+  const tableRulesObject = isAuditTable(this.prostgles, tableName)
+    ? { select: rawTableRulesObject.select, insert: undefined, update: undefined, delete: undefined }
+    : rawTableRulesObject;
 
   const selectRule =
     !tableRulesObject.select ? undefined

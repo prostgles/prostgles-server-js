@@ -63,6 +63,9 @@ import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
 import { dirname } from "path";
+import { getAuditTableConfig, type ParsedAuditConfig } from "./Audit/getAuditTableConfig";
+import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
+import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
 
 export class Prostgles {
   /**
@@ -106,6 +109,16 @@ export class Prostgles {
 
   keywords = DEFAULT_KEYWORDS;
   loaded = false;
+  /** Only schema setup uses this original connection. Application handlers use db. */
+  dbForSchema?: DB;
+  schemaReady: Promise<void> = Promise.resolve();
+
+  runSchemaQueries = (queries: () => Promise<void>) => {
+    this.schemaReady = this.schemaReady.catch(() => {}).then(queries);
+    void this.schemaReady.catch(() => {});
+    return this.schemaReady;
+  };
+  parsedAuditConfig?: ParsedAuditConfig;
   preparingTableConfig = false;
 
   dbEventsManager?: DBEventsManager;
@@ -116,7 +129,15 @@ export class Prostgles {
   tableConfigurator?: TableConfigurator;
 
   get mergedTableConfig() {
-    return getFileTableConfig(this);
+    for (const [tableName, table] of Object.entries(this.opts.tableConfig ?? {})) {
+      for (const name of Object.keys(table.triggers ?? {})) {
+        if (isManagedTriggerName(name)) {
+          throw new Error(`Trigger ${tableName}.${name} uses a prefix reserved for prostgles`);
+        }
+      }
+    }
+    const config = getFileTableConfig(this);
+    return { ...config, tableConfig: getAuditTableConfig(this, config.tableConfig) };
   }
 
   isMedia(tableName: string) {
@@ -148,6 +169,7 @@ export class Prostgles {
       onQuery: 1,
       onConnectionError: 1,
       tableConfig: 1,
+      audit: 1,
       tableHooks: 1,
       tableConfigMigrations: 1,
       onNotice: 1,
@@ -286,10 +308,18 @@ export class Prostgles {
 
   /** Rebuilds the DBO and replaces the application context. */
   refreshDBO = async () => {
+    this.loaded = false;
     await this.cleanupContext();
-    const dbo = await this.rebuildDBO();
+    await this.runSchemaQueries(async () => {
+      await this.rebuildDBO();
+      if (this.opts.audit || this.parsedAuditConfig) {
+        await syncTableTriggers(this);
+        await this.rebuildDBO();
+      }
+    });
     await this.createContext({ type: "dbo.refresh" });
-    return dbo;
+    this.loaded = true;
+    return this.dbo!;
   };
 
   initRestApi = () => {
@@ -307,7 +337,6 @@ export class Prostgles {
       if (this.tableConfigurator?.initialising) {
         console.error("TableConfigurator WILL deadlock", { reason });
       }
-      await this.tableConfigurator?.destroy();
       this.tableConfigurator = new TableConfigurator(this);
       try {
         const now = Date.now();
@@ -323,7 +352,7 @@ export class Prostgles {
           duration: Date.now() - now,
         });
       } catch (e) {
-        if (this.opts.tableConfigMigrations?.silentFail === false) {
+        if (!this.opts.audit && this.opts.tableConfigMigrations?.silentFail === false) {
           console.error("TableConfigurator silentFail: ", e);
         } else {
           throw e;

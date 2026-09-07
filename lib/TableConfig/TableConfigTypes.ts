@@ -31,7 +31,7 @@ type BaseTableDefinition = {
        * Use "before" when you need to change the data before the action
        */
       type: "before" | "after" | "instead of";
-      actions: ("insert" | "update" | "delete")[];
+      actions: ("insert" | "update" | "delete" | "truncate")[];
       forEach: "statement" | "row";
       /**
        * @example
