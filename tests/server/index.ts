@@ -307,11 +307,18 @@ function dd() {
       return true; // Boolean(user && user.type === "admin")
     },
     modifyClientSchema: (table, tableConfig, userData) => {
+      const passes =
+        ((table as typeof table & { clientSchemaTest?: { passes: number } }).clientSchemaTest
+          ?.passes ?? 0) + 1;
       return {
         ...table,
         clientSchemaTest: {
           sid: userData?.sid,
           tableIndex: 0,
+          ...(table.name === "planes" && {
+            passes,
+            primaryKeys: table.columns.filter((column) => column.is_pkey).map((column) => column.name),
+          }),
         },
         columns:
           table.name === "tr2" ?
@@ -321,6 +328,7 @@ function dd() {
               clientSchemaTest: {
                 sid: userData?.sid,
                 columnIndex,
+                ...(table.name === "planes" && { passes }),
               },
             })),
       };

@@ -5,6 +5,7 @@ import {
   DBSchemaTable,
   SocketSQLStreamPacket,
   isDefined,
+  omitKeys,
   type SQLHandler,
 } from "prostgles-types";
 import type { AuthHandler, ClientFunctionHandler, DBHandlerClient } from "./client";
@@ -37,6 +38,30 @@ export const clientOnlyQueries = async (
         | undefined;
       assert.equal(idColumn?.clientSchemaTest?.sid, token);
       assert.equal(typeof idColumn?.clientSchemaTest?.columnIndex, "number");
+
+      const info = (await db.planes.getInfo!()) as Awaited<
+        ReturnType<NonNullable<typeof db.planes.getInfo>>
+      > & {
+        clientSchemaTest: {
+          sid?: string;
+          passes: number;
+          primaryKeys: string[];
+        };
+      };
+      assert.equal(info.clientSchemaTest.sid, token);
+      assert.equal(info.clientSchemaTest.passes, 1);
+      assert.deepEqual(info.clientSchemaTest.primaryKeys, ["id"]);
+      assert.equal("columns" in info, false);
+
+      // A language forces a server request instead of returning cached schema columns.
+      const columns = (await db.planes.getColumns!("en")) as (DBSchemaTable["columns"][number] & {
+        clientSchemaTest: { sid?: string; passes: number };
+      })[];
+      assert.ok(columns.length);
+      for (const column of columns) {
+        assert.equal(column.clientSchemaTest.sid, token);
+        assert.equal(column.clientSchemaTest.passes, 1);
+      }
     });
 
     // await test("Social auth redirect routes work", async ( ) => {
@@ -379,6 +404,11 @@ export const clientOnlyQueries = async (
      * tableSchema must contan an array of all tables and their columns that have getInfo and getColumns allowed
      */
     await test("Check tableSchema", async () => {
+      // Connection setup and direct requests apply customization different numbers of times.
+      const withoutPassCount = ({ clientSchemaTest, ...info }: AnyObject) => ({
+        ...info,
+        clientSchemaTest: omitKeys(clientSchemaTest, ["passes"]),
+      });
       const dbTables = Object.entries(db)
         .map(([k, h]) => {
           return !!(h.getColumns && h.getInfo) ? k : undefined;
@@ -397,7 +427,7 @@ export const clientOnlyQueries = async (
           const cols = await db[name]?.getColumns?.();
           const info = await db[name]?.getInfo?.();
           assert.deepStrictEqual(columns, cols);
-          assert.deepStrictEqual(otherInfo, info);
+          assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info));
         }),
       );
     });

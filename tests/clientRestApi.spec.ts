@@ -1,6 +1,6 @@
 import { strict as assert } from "assert";
 import type { DBHandlerClient, AuthHandler } from "./client";
-import { DBSchemaTable, omitKeys } from "prostgles-types";
+import { DBSchemaTable, omitKeys, type AnyObject } from "prostgles-types";
 import { describe, test } from "node:test";
 
 export const clientRestApi = async (
@@ -68,6 +68,11 @@ export const clientRestApi = async (
           })
         | undefined;
       assert.equal(idColumn?.clientSchemaTest?.sid, token);
+      // Connection setup and direct requests apply customization different numbers of times.
+      const withoutPassCount = ({ clientSchemaTest, ...info }: AnyObject) => ({
+        ...info,
+        clientSchemaTest: clientSchemaTest && omitKeys(clientSchemaTest, ["passes"]),
+      });
       await Promise.all(
         tableSchema.map(async ({ name, columns, ...otherInfo }) => {
           const cols = await db[name]?.getColumns?.();
@@ -75,8 +80,15 @@ export const clientRestApi = async (
           if (db[name]?.getColumns) {
             const restCols = await dbRest(name, "getColumns", {});
             assert.deepStrictEqual(columns, cols);
-            assert.deepStrictEqual(columns, restCols);
-            assert.deepStrictEqual(otherInfo, info);
+            assert.deepStrictEqual(columns.map(withoutPassCount), restCols.map(withoutPassCount));
+            assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info));
+            if (name === "planes") {
+              assert.ok(restCols.length);
+              for (const column of restCols) {
+                assert.equal(column.clientSchemaTest.passes, 1);
+                assert.equal(column.clientSchemaTest.sid, token);
+              }
+            }
           }
         }),
       );
