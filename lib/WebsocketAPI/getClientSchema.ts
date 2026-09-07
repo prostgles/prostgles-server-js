@@ -45,11 +45,17 @@ export async function getClientSchema(
     const { tables: rawTables = [] } = fullSchema ?? {};
     const { tableSchemaErrors = {} } = fullSchema ?? {};
     const { modifyClientSchema } = this.opts;
+    const resolvedAuditConfig = modifyClientSchema ? this.resolvedAuditConfig : undefined;
     const tables =
       modifyClientSchema ?
         await Promise.all(
           rawTables.map(async (t) =>
-            modifyClientSchema(t, this.dboBuilder.dboMap.get(t.name)?.config, userData),
+            modifyClientSchema(
+              t,
+              this.dboBuilder.dboMap.get(t.name)?.config,
+              userData,
+              resolvedAuditConfig,
+            ),
           ),
         )
       : rawTables;

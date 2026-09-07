@@ -236,6 +236,8 @@ export const initProstgles = async function (
       } finally {
         this.preparingTableConfig = false;
       }
+      await syncTableTriggers(this);
+      if (this.opts.audit) await this.rebuildDBO();
     });
     await this.tableConfigurator?.setTableOnMounts();
     // onMount may create additional targets; validate joins against the completed schema.

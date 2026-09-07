@@ -12,7 +12,6 @@ import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
 import { runMigrations } from "./runMigrations";
 import type { TableConfigurator } from "./TableConfigurator";
-import { syncTableTriggers } from "./syncTableTriggers";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -282,6 +281,4 @@ export const initTableConfig = async function (this: TableConfigurator) {
   }
 
   await this.prostgles.rebuildDBO();
-  await syncTableTriggers(this.prostgles);
-  if (this.prostgles.opts.audit) await this.prostgles.rebuildDBO();
 };

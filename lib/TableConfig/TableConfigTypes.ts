@@ -17,7 +17,7 @@ export type ColExtraInfo = {
 
 export type LangToTranslation = Record<string, string>;
 
-type BaseTableDefinition = {
+export type BaseTableDefinition = {
   info?: {
     label?: string | LangToTranslation;
   };

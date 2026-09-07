@@ -31,6 +31,7 @@ export async function getInfo(
     },
     this.config,
     localParams?.isRemoteRequest?.clientInfo,
+    this.dboBuilder.prostgles.resolvedAuditConfig,
   );
   const { columns, name, ...rest } = modifiedTableSchema;
   return rest;

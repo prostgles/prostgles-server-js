@@ -64,6 +64,8 @@ import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
 import { dirname } from "path";
 import { getAuditTableConfig } from "./Audit/getAuditTableConfig";
+import { parseAuditConfig } from "./Audit/parseAuditConfig";
+import { getAuditTriggerConfig } from "./Audit/getAuditTriggerConfig";
 import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
 import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
 
@@ -127,6 +129,11 @@ export class Prostgles {
 
   tableConfigurator?: TableConfigurator;
 
+  get resolvedAuditConfig() {
+    if (!this._dboBuilder || this.preparingTableConfig) return undefined;
+    return parseAuditConfig(this);
+  }
+
   get mergedTableConfig() {
     for (const [tableName, table] of Object.entries(this.opts.tableConfig ?? {})) {
       for (const name of Object.keys(table.triggers ?? {})) {
@@ -136,7 +143,17 @@ export class Prostgles {
       }
     }
     const config = getFileTableConfig(this);
-    return { ...config, tableConfig: getAuditTableConfig(this, config.tableConfig) };
+    const tableConfig = getAuditTableConfig(this, config.tableConfig);
+    const audit = this.resolvedAuditConfig;
+    if (tableConfig && audit) {
+      for (const [name, auditConfig] of Object.entries(getAuditTriggerConfig(audit))) {
+        tableConfig[name] = {
+          ...tableConfig[name],
+          triggers: { ...tableConfig[name]?.triggers, ...auditConfig.triggers },
+        };
+      }
+    }
+    return { ...config, tableConfig };
   }
 
   isMedia(tableName: string) {

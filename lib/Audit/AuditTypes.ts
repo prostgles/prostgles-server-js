@@ -33,3 +33,9 @@ export type SchemaConfigAudit<S = void> = {
   tables?:
     SchemaConfigAuditIncludedTables<S> | SchemaConfigAuditExcludedTables<S>;
 };
+
+/** Validated audit targets with all column and entity defaults resolved. */
+export type ResolvedAuditConfig = {
+  tableName: string;
+  tables: Record<string, Required<SchemaConfigAuditTableOptions<void, string>>>;
+};

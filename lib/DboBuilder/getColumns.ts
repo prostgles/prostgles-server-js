@@ -29,6 +29,7 @@ export async function getColumns(
       },
       this.config,
       localParams?.isRemoteRequest?.clientInfo,
+      this.dboBuilder.prostgles.resolvedAuditConfig,
     );
 
     const columns = modifiedTableSchema?.columns ?? rawColumns;

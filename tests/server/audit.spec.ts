@@ -11,7 +11,6 @@ import {
 } from "prostgles-server";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import { parseAuditConfig } from "prostgles-server/dist/Audit/parseAuditConfig";
 import { PublishParser } from "prostgles-server/dist/PublishParser/PublishParser";
 import {
   AUDIT_TRIGGER_PREFIX,
@@ -149,8 +148,35 @@ export async function testAudit(parentDb: DB) {
           CREATE TRIGGER audit_test_manual AFTER INSERT ON audit_test_source FOR EACH ROW EXECUTE FUNCTION audit_test_manual();`);
         const originalAudit = prgl.opts.audit;
         prgl.opts.audit = { ...audit, tableName: '"audit_events"' };
-        assert.throws(() => parseAuditConfig(prgl), /must exactly match/);
+        assert.throws(() => prgl.mergedTableConfig, /must exactly match/);
         prgl.opts.audit = originalAudit;
+        assert.equal(prgl.resolvedAuditConfig?.tableName, audit.tableName);
+        assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_source, {
+          entityType: "source",
+          idColumns: ["a", "b"],
+          excludeColumns: ["secret"],
+        });
+        assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_nopk, {
+          entityType: "audit_test_nopk",
+          idColumns: ["key"],
+          excludeColumns: ["secret"],
+        });
+        assert.equal(prgl.resolvedAuditConfig?.tables[audit.tableName], undefined);
+        assert(!("audit" in prgl.mergedTableConfig.tableConfig.audit_test_source));
+        const originalModifyClientSchema = prgl.opts.modifyClientSchema;
+        let auditCallbacks = 0;
+        prgl.opts.modifyClientSchema = (table, tableConfig, userData, resolvedAuditConfig) => {
+          assert.deepEqual(resolvedAuditConfig, prgl.resolvedAuditConfig);
+          auditCallbacks++;
+          return table;
+        };
+        await source.getInfo!();
+        await source.getColumns!();
+        assert.equal(auditCallbacks, 2);
+        prgl.opts.modifyClientSchema = originalModifyClientSchema;
+        const mergedTriggers = prgl.mergedTableConfig.tableConfig.audit_test_source.triggers;
+        assert(mergedTriggers.audit_test_custom);
+        assert(Object.keys(mergedTriggers).some((name) => name.startsWith(AUDIT_TRIGGER_PREFIX)));
 
         const history = () =>
           db.any(`SELECT * FROM "audit_events" ORDER BY id`);
@@ -266,6 +292,10 @@ export async function testAudit(parentDb: DB) {
         });
         const freshResult = await fresh.init(() => {}, { type: "init" });
         try {
+          assert.equal(
+            fresh.resolvedAuditConfig?.tables.audit_test_existing,
+            undefined,
+          );
           const sourceTriggers = await db.any<{ tgname: string }>(
             "SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_test_source'::regclass",
           );
@@ -385,6 +415,7 @@ export async function testAudit(parentDb: DB) {
         );
         assert.equal((await history()).length, countBefore);
         await result.update({ audit: undefined });
+        assert.equal(prgl.resolvedAuditConfig, undefined);
         await source.insert!({ a: 8, b: "disabled" });
         assert.equal((await history()).length, countBefore);
         await result.sql(`UPDATE "audit_events" SET actor = NULL WHERE false;

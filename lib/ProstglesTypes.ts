@@ -14,7 +14,7 @@ import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
 import type { TableHooks } from "./TableHooks/TableHooks";
-import type { SchemaConfigAudit } from "./Audit/AuditTypes";
+import type { ResolvedAuditConfig, SchemaConfigAudit } from "./Audit/AuditTypes";
 
 import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
 
@@ -101,6 +101,7 @@ type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (
   table: DBSchemaTable,
   tableConfig: TableConfig[string] | undefined,
   userData: AuthResultWithSID<SUser> | undefined,
+  resolvedAuditConfig: ResolvedAuditConfig | undefined,
 ) => MaybePromise<DBSchemaTable>;
 
 export type ProstglesInitOptions<
