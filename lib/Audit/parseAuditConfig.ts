@@ -1,128 +1,71 @@
 import { as } from "pg-promise";
-import { asName } from "prostgles-types";
+import { asName, getEntries } from "prostgles-types";
 import type { Prostgles } from "../Prostgles";
-import type { SchemaConfigAuditTableOptions } from "./AuditTypes";
-import {
-  getAuditProtection,
-  getAuditWriterName,
-  type ParsedAuditConfig,
-} from "./getAuditTableConfig";
+import type { TableConfig } from "../TableConfig/TableConfigTypes";
+import { isArray } from "../utils/utils";
+import { getAuditProtection, getAuditWriterName } from "./getAuditTableConfig";
 
-/** Resolve column defaults against the completed schema; generate tableConfig entries only. */
-export async function parseAuditConfig(
-  prgl: Prostgles,
-): Promise<ParsedAuditConfig> {
+/**
+ * Resolve column defaults against the completed schema; generate tableConfig entries only.
+ * */
+export const parseAuditConfig = (prgl: Prostgles): TableConfig | undefined => {
   const { audit } = prgl.opts;
+  if (!audit) return undefined;
+
   const tables = prgl.dboBuilder.tables;
-  const auditTableNames = [
-    ...new Set([
-      ...(prgl.parsedAuditConfig?.auditTableNames ?? []),
-      ...(audit ? [audit.tableName] : []),
-    ]),
-  ];
-  const result: ParsedAuditConfig = {
-    auditTableNames,
-    tableConfigs: {},
-  };
-  for (const name of auditTableNames) {
-    if (!tables.some((t) => t.name === name)) {
-      throw new Error(
-        `Audit table name must exactly match a schema table name: ${name}`,
-      );
-    }
-    result.tableConfigs[name] = {
-      triggers: getAuditProtection(name, ["update", "delete", "truncate"]),
-    };
+  if (!tables.some((t) => t.name === audit.tableName)) {
+    throw new Error(`Audit table name must exactly match a schema table name: ${audit.tableName}`);
   }
-  if (!audit) return result;
-  const tableOptions: unknown = audit.tables;
-  if (
-    tableOptions !== undefined &&
-    (!tableOptions ||
-      typeof tableOptions !== "object" ||
-      Array.isArray(tableOptions))
-  ) {
-    throw new Error("audit.tables must be a table map");
-  }
-  const entries = Object.entries(audit.tables ?? {}).filter(
-    ([, value]) => value !== undefined,
-  );
+  const result: TableConfig = {};
+
+  const entries = getEntries(audit.tables ?? {}).filter(([, value]) => value !== undefined);
   const exclusion = entries.some(([, value]) => value === 0);
-  if (exclusion && entries.some(([, value]) => value !== 0))
+  if (exclusion && entries.some(([, value]) => value !== 0)) {
     throw new Error("audit.tables cannot mix enabled and disabled entries");
+  }
   for (const [name, value] of entries) {
-    if (!tables.some((t) => t.name === name))
-      throw new Error(`Unknown audit table: ${name}`);
-    if (
-      value !== 0 &&
-      value !== 1 &&
-      (!value || typeof value !== "object" || Array.isArray(value))
-    )
+    if (!tables.some((t) => t.name === name)) throw new Error(`Unknown audit table: ${name}`);
+    if (value !== 0 && value !== 1 && (!value || typeof value !== "object" || Array.isArray(value)))
       throw new Error(`Invalid audit options for ${name}`);
   }
-  const relations = await prgl.dbForSchema!.any<{
-    oid: number;
-    relkind: string;
-    relispartition: boolean;
-  }>(
-    "SELECT oid, relkind, relispartition FROM pg_class WHERE oid = ANY($1::oid[])",
-    [tables.map((t) => t.oid)],
-  );
+
   for (const table of tables) {
     const entry = entries.find(([name]) => name === table.name);
     if (entries.length && (exclusion ? entry?.[1] === 0 : !entry)) continue;
-    const relation = relations.find((r) => r.oid === table.oid);
-    const isHistory = auditTableNames.includes(table.name);
-    const eligible =
-      !isHistory &&
-      table.schema !== "prostgles" &&
-      !table.is_view &&
-      !table.isHyperTable &&
-      relation &&
-      relation.relkind === "r" &&
-      !relation.relispartition;
+
+    const isHistory = table.name === audit.tableName;
+    const eligible = !isHistory && !table.is_view && !table.isHyperTable;
     if (!eligible) {
-      if (entry && entry[1] !== 0)
+      if (entry && entry[1] !== 0) {
         throw new Error(
-          `Unsupported audit target: ${table.name}. Select ordinary, non-partitioned tables.`,
+          `Unsupported audit target: ${table.name}`,
         );
+      }
       continue;
     }
-    const options: SchemaConfigAuditTableOptions<void, string> =
-      typeof entry?.[1] === "object" ? entry[1] : {};
-    if (
-      Object.keys(options).some(
-        (k) => !["entityType", "idColumns", "excludeColumns"].includes(k),
-      )
-    )
-      throw new Error(`Unknown audit option for ${table.name}`);
-    const ids =
-      options.idColumns ??
-      table.columns.filter((c) => c.is_pkey).map((c) => c.name);
+    const options = typeof entry?.[1] === "object" ? entry[1] : {};
+    const ids = options.idColumns ?? table.columns.filter((c) => c.is_pkey).map((c) => c.name);
     const excluded = options.excludeColumns ?? [];
-    if (!Array.isArray(ids) || !ids.length)
-      throw new Error(
-        `audit.idColumns is required for ${table.name} without a primary key`,
-      );
+    if (!isArray(ids) || !ids.length) {
+      throw new Error(`audit.idColumns is required for ${table.name} without a primary key`);
+    }
+
     for (const list of [ids, excluded]) {
       if (
-        !Array.isArray(list) ||
         new Set(list).size !== list.length ||
         list.some((c) => !table.columns.some((col) => col.name === c))
-      )
+      ) {
         throw new Error(`Invalid audit columns for ${table.name}`);
+      }
     }
-    if (ids.some((c) => excluded.includes(c)))
-      throw new Error(
-        `Audit identity columns cannot be excluded: ${table.name}`,
-      );
-    if (
-      options.entityType !== undefined &&
-      (typeof options.entityType !== "string" || !options.entityType)
-    )
+    if (ids.some((c) => excluded.includes(c))) {
+      throw new Error(`Audit identity columns cannot be excluded: ${table.name}`);
+    }
+    if (options.entityType !== undefined && !options.entityType) {
       throw new Error(`Invalid audit entityType for ${table.name}`);
+    }
     const functionName = getAuditWriterName(audit.tableName, table.name);
-    result.tableConfigs[table.name] = {
+    result[table.name] = {
       triggers: {
         ...getAuditProtection(audit.tableName, ["truncate"]),
         [functionName]: {
@@ -155,4 +98,4 @@ export async function parseAuditConfig(
     };
   }
   return result;
-}
+};

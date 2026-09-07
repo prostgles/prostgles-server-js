@@ -141,35 +141,6 @@ prostgles({
 });
 ```
 
-## Audit history
-
-Set `audit` to record committed inserts, updates and deletes:
-
-```typescript
-prostgles({
-  dbConnection: process.env.DATABASE_URL!,
-  audit: {
-    tableName: "audit_events",
-    tables: { posts: { excludeColumns: ["secret"] } },
-  },
-  onReady: () => {},
-});
-```
-
-The SQL file and tableConfig schema are initialized before audit triggers are
-installed. Application queries wait for setup; `onMount` and `onReady` writes are
-audited. Bootstrap SQL itself is not audited on first initialization.
-
-The audit table is managed entirely by `audit` and cannot also appear in
-`tableConfig`. It rejects updates, deletes and truncation; publishing it exposes
-select only. Audited source tables also reject truncation.
-
-Omit `tables` to include all eligible tables in `schemaFilter`, or use an
-allowlist (`1` or options) or exclusion list (`0`). Do not mix the two.
-Tables without primary keys need `idColumns`. Views, partitioned tables,
-partitions and hypertables are unsupported. Changes affecting only excluded
-columns do not create history rows.
-
 ## License
 
 [MIT](LICENSE)

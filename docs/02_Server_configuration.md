@@ -150,6 +150,9 @@
   Allows adding runtime JSONB validation and type safety.
   Should be used with caution because it tends to revert any changes
   made to the database schema through SQL queries
+- **audit** <span style="color: grey">optional</span> <span style="color: green;">SchemaConfigAudit</span>
+
+  Audit committed row changes after bootstrap, before application callbacks run.
 - **tableConfigMigrations** <span style="color: grey">optional</span> <span style="color: green;">TableConfigMigrations</span>
 
   Migration logic used when the new tableConfig version is higher than the one in the database.

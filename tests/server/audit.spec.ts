@@ -149,7 +149,7 @@ export async function testAudit(parentDb: DB) {
           CREATE TRIGGER audit_test_manual AFTER INSERT ON audit_test_source FOR EACH ROW EXECUTE FUNCTION audit_test_manual();`);
         const originalAudit = prgl.opts.audit;
         prgl.opts.audit = { ...audit, tableName: '"audit_events"' };
-        await assert.rejects(parseAuditConfig(prgl), /must exactly match/);
+        assert.throws(() => parseAuditConfig(prgl), /must exactly match/);
         prgl.opts.audit = originalAudit;
 
         const history = () =>
@@ -169,7 +169,6 @@ export async function testAudit(parentDb: DB) {
           Object.keys(prgl.mergedTableConfig.tableConfig)[0],
           audit.tableName,
         );
-        assert(prgl.mergedTableConfig.tableConfig.audit_test_existing.triggers);
         // Comments are ordinary metadata and have no role in reconciliation or publishing.
         await result.sql(
           `COMMENT ON TABLE "audit_events" IS 'History shown in the UI'`,
@@ -353,8 +352,6 @@ export async function testAudit(parentDb: DB) {
           { missing_table: 1 },
           { audit_test_nopk: 1 },
           { audit_test_view: 1 },
-          { audit_test_partitioned: 1 },
-          { audit_test_partition: 1 },
           { audit_test_source: { excludeColumns: ["a"] } },
         ]) {
           prgl.opts.audit = { ...audit, tables: tables as any };
@@ -363,6 +360,18 @@ export async function testAudit(parentDb: DB) {
           await assert.rejects(sharedDb.one("SELECT 1"));
           await assert.rejects(result.update({}));
           await assert.rejects(source.find!({}));
+        }
+        for (const [tableName, id] of [
+          ["audit_test_partitioned", 91],
+          ["audit_test_partition", 92],
+        ] as const) {
+          await result.update({ audit: { ...audit, tables: { [tableName]: 1 } } });
+          const count = (await history()).length;
+          await result.sql(`INSERT INTO ${tableName} VALUES (${id})`);
+          const rows = await history();
+          assert.equal(rows.length, count + 1);
+          assert.equal(rows.at(-1).operation, "INSERT");
+          assert.deepEqual(rows.at(-1).new_id, { id });
         }
         prgl.opts.audit = audit;
         await result.restart();
@@ -378,9 +387,8 @@ export async function testAudit(parentDb: DB) {
         await result.update({ audit: undefined });
         await source.insert!({ a: 8, b: "disabled" });
         assert.equal((await history()).length, countBefore);
-        await assert.rejects(result.sql(`TRUNCATE "audit_events"`), {
-          message: /Audit protection/,
-        });
+        await result.sql(`UPDATE "audit_events" SET actor = NULL WHERE false;
+          DELETE FROM "audit_events" WHERE false`);
         prgl.opts.sqlFilePath = undefined;
         await result.sql(`CREATE TABLE audit_test.selected (id int PRIMARY KEY);
         CREATE TABLE audit_test.ignored (value text);
@@ -440,6 +448,11 @@ export async function testAudit(parentDb: DB) {
           1,
         );
         assert.equal((await history()).length, countBefore + 2);
+        await result.sql(`UPDATE "audit_events" SET actor = NULL WHERE false;
+          DELETE FROM "audit_events" WHERE false`);
+        await assert.rejects(result.sql(`TRUNCATE "audit_next_events"`), {
+          message: /Audit protection/,
+        });
       } finally {
         releaseSchema?.();
         if (result) await result.destroy();

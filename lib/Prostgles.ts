@@ -63,7 +63,7 @@ import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
 import { dirname } from "path";
-import { getAuditTableConfig, type ParsedAuditConfig } from "./Audit/getAuditTableConfig";
+import { getAuditTableConfig } from "./Audit/getAuditTableConfig";
 import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
 import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
 
@@ -118,7 +118,6 @@ export class Prostgles {
     void this.schemaReady.catch(() => {});
     return this.schemaReady;
   };
-  parsedAuditConfig?: ParsedAuditConfig;
   preparingTableConfig = false;
 
   dbEventsManager?: DBEventsManager;
@@ -312,7 +311,7 @@ export class Prostgles {
     await this.cleanupContext();
     await this.runSchemaQueries(async () => {
       await this.rebuildDBO();
-      if (this.opts.audit || this.parsedAuditConfig) {
+      if (this.opts.audit) {
         await syncTableTriggers(this);
         await this.rebuildDBO();
       }

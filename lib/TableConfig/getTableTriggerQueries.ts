@@ -3,7 +3,6 @@ import type { DB } from "../initProstgles";
 import { asName } from "prostgles-types";
 import type { TableConfig } from "./TableConfigTypes";
 import {
-  AUDIT_HISTORY_PROTECTION_PREFIX,
   getManagedTriggerName,
   isManagedTriggerName,
 } from "./managedTriggerNames";
@@ -108,9 +107,7 @@ export const getTableTriggerQueries = async (
   }
   for (const trigger of existing) {
     const managed = isManagedTriggerName(trigger.name);
-    // History remains append-only even after audit is disabled or moved.
-    const protectsHistory = trigger.name.startsWith(AUDIT_HISTORY_PROTECTION_PREFIX);
-    if (managed && !protectsHistory && !desired.has(trigger.name)) {
+    if (managed && !desired.has(trigger.name)) {
       queries.push(`DROP TRIGGER ${asName(trigger.name)} ON ${tableIdent};`);
     }
   }

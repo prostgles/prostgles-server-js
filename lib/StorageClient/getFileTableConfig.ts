@@ -5,6 +5,7 @@ import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/up
 import type { Prostgles } from "../Prostgles";
 import type { BeforeEachTsTrigger } from "../PublishParser/publishTypesAndUtils";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
+import type { TableRowFromColumnDefinitions } from "../TableConfig/TableRowFromColumnDefinitions";
 import type { TableHooks } from "../TableHooks/TableHooks";
 import { setupFileServeHandler } from "./setupFileServeHandler";
 
@@ -28,19 +29,7 @@ const FILE_TABLE_COLUMN_DEFINITIONS = {
   data: `BYTEA NOT NULL CHECK (data = decode('01', 'hex'))`, // Used as a placeholder to ensure insert types are correct. Actual data is uploaded to storageClient and not stored in the DB
 } as const;
 
-type FileTableColumnDefinitions = typeof FILE_TABLE_COLUMN_DEFINITIONS;
-
-export type FileTableRow = {
-  [K in keyof FileTableColumnDefinitions as K]: FileTableColumnDefinitions[K] extends (
-    `BYTEA NOT NULL${string}`
-  ) ?
-    Buffer
-  : FileTableColumnDefinitions[K] extends (
-    `${string} NOT NULL${string}` | `${string}PRIMARY KEY${string}`
-  ) ?
-    string
-  : string | null;
-};
+export type FileTableRow = TableRowFromColumnDefinitions<typeof FILE_TABLE_COLUMN_DEFINITIONS>;
 
 export const getFileTableConfig = (
   prg: Prostgles,
