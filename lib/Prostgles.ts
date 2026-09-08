@@ -68,13 +68,14 @@ import { parseAuditConfig } from "./Audit/parseAuditConfig";
 import { getAuditTriggerConfig } from "./Audit/getAuditTriggerConfig";
 import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
 import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
+import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
 
 export class Prostgles {
   /**
    * Used to manage concurrent prostgles connections to the same database
    */
   readonly appId = randomUUID();
-  opts: ProstglesInitOptions<void, SessionUser, any> = {
+  opts: ProstglesInitOptions<void, SessionUser, unknown> = {
     DEBUG_MODE: false,
     dbConnection: {
       host: "localhost",
@@ -213,6 +214,10 @@ export class Prostgles {
 
   destroyed = false;
 
+  checkNotDestroyed = () => {
+    if (this.destroyed) throw new Error("Prostgles instance is destroyed");
+  };
+
   checkDb() {
     if (
       !this.db ||
@@ -279,7 +284,7 @@ export class Prostgles {
     try {
       const context = await createContext({
         db: this.db,
-        dbo: this.dbo as any,
+        dbo: this.dbo as DBOFullyTyped<void>,
         sql: this.dboBuilder.sql,
         tables: this.dboBuilder.tables,
         reason,

@@ -51,11 +51,13 @@ export class PublishParser {
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishParams> {
+    this.prostgles.checkNotDestroyed();
     const sessionUser =
       clientInfo ?? (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (sessionUser === "new-session-redirect") {
       throw "new-session-redirect";
     }
+    this.prostgles.checkNotDestroyed();
     return {
       ...sessionUser,
       dbo: this.dbo as DBOFullyTyped,
@@ -104,6 +106,7 @@ export class PublishParser {
         }
 
         const runWithContext = async (args: Record<string, unknown> | undefined) => {
+          this.prostgles.checkNotDestroyed();
           const ctx = await (async () => {
             if (method.unrestrictedDbAccess) {
               const unrestrictedCtx: UnrestrictedFunctionContext<void, SessionUser, unknown> = {
@@ -126,6 +129,7 @@ export class PublishParser {
             return restrictedCtx;
           })();
 
+          this.prostgles.checkNotDestroyed();
           return method.run(args, ctx);
         };
         allowedFunctionsMap.set(name, { ...method, run: runWithContext });

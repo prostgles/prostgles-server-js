@@ -65,6 +65,7 @@ export const runClientRequest = async function (
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
 ) {
+  this.checkNotDestroyed();
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
   if (!this.publishParser || !this.dbo) {
     throw "socket/httpReq or authHandler missing";
@@ -124,6 +125,7 @@ export const runClientRequest = async function (
     scope,
   };
 
+  this.checkNotDestroyed();
   if (command === "abort") {
     const validation = getJSONBObjectSchemaValidationError(
       {
@@ -173,6 +175,7 @@ export const runClientRequest = async function (
   tableHandler[command].bind(tableHandler) satisfies
     undefined | TableMethodFunctionWithRulesAndLocalParams;
 
+  this.checkNotDestroyed();
   return (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
     param1,
     param2,
@@ -186,11 +189,13 @@ export const clientCanRunSqlRequest = async function (
   this: Prostgles,
   clientReq: AuthClientRequest,
 ) {
+  this.checkNotDestroyed();
   if (!this.opts.publishRawSQL || typeof this.opts.publishRawSQL !== "function") {
     return { allowed: false, clientReq };
   }
   const canRunSQL = async () => {
     const publishParams = await this.publishParser?.getPublishParams(clientReq, undefined);
+    this.checkNotDestroyed();
     const allowedToRunSQL = publishParams && (await this.opts.publishRawSQL?.(publishParams));
     return allowedToRunSQL === true || allowedToRunSQL === "*";
   };
@@ -222,6 +227,7 @@ export const runClientSqlRequest = async function (
   }
   const reqData = validation.data;
   const { query, params, options } = reqData;
+  this.checkNotDestroyed();
   return this.dboBuilder.runSQL(query, params, options, { clientReq });
 };
 
@@ -235,6 +241,7 @@ export const runClientMethod = async function (
   unvalidatedArgs: ArgsMethod,
   clientReq: AuthClientRequest,
 ) {
+  this.checkNotDestroyed();
   const validation = getJSONBObjectSchemaValidationError(
     {
       name: "string",
@@ -276,6 +283,7 @@ export const runClientMethod = async function (
   }
 
   /** Allowed functions are wrapped with their request context by PublishParser. */
+  this.checkNotDestroyed();
   const res = await functionDefinition.run(input as never, undefined);
 
   return res;

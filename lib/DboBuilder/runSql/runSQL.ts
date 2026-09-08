@@ -160,8 +160,10 @@ export const canRunSQL = async (
 ): Promise<boolean> => {
   if (!clientReq) return true;
   const publishParams = await prostgles.publishParser?.getPublishParams(clientReq, undefined);
+  prostgles.checkNotDestroyed();
   //@ts-ignore union type that is too complex to represent.
   const publishResult = publishParams && (await prostgles.opts.publishRawSQL?.(publishParams));
+  prostgles.checkNotDestroyed();
   return Boolean((publishResult && typeof publishResult === "boolean") || publishResult === "*");
 };
 

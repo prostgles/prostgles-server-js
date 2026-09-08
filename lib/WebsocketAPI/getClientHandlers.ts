@@ -25,6 +25,7 @@ export const getClientHandlers = async <S = void>(
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
 ): Promise<ClientHandlers> => {
+  prostgles.checkNotDestroyed();
   const clientSchema =
     clientReq.socket?.prostgles?.get(prostgles.appId) ??
     (await getClientSchema.bind(prostgles)(clientReq, scope));

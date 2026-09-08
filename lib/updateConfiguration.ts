@@ -8,6 +8,7 @@ export const updateConfiguration = async (
   newOpts: UpdatableOptions<void, any, any>,
   force?: true,
 ) => {
+  prgl.checkNotDestroyed();
   const optionsThatChanged = getKeys(newOpts)
     .map((k) => {
       // eslint-disable-next-line @typescript-eslint/unbound-method

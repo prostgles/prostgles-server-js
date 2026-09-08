@@ -143,6 +143,7 @@ export const initProstgles = async function (
   onReady: OnReadyCallbackBasic,
   reason: OnInitReason,
 ): Promise<InitResult<void, SessionUser, any>> {
+  this.checkNotDestroyed();
   this.loaded = false;
   const expressApp =
     this.opts.fileTable?.expressApp ??
@@ -314,23 +315,17 @@ export const initProstgles = async function (
       getFieldsWithTypes: this.dboBuilder.getDetailedFieldInfo,
       restart: () => this.init(onReady, { type: "prgl.restart" }),
       destroy: async () => {
+        if (this.destroyed) return true;
         console.log("destroying prgl instance");
         this.destroyed = true;
         if (this.opts.io) {
-          this.opts.io.on("connection", () => {
-            console.log("Socket connected to destroyed instance");
-          });
-
-          /** Try to close IO without stopping http server */
-          if (this.opts.io.sockets.constructor.name === "Namespace") {
-            for (const socket of this.opts.io.sockets.sockets.values()) {
-              socket._onclose("server shutting down");
-            }
-          }
-          if (this.opts.io.engine.constructor.name === "Server") {
-            this.opts.io.engine.close();
+          this.opts.io.off("connection", this.onSocketConnected);
+          // Close transports so clients can reconnect, but keep the caller's server reusable.
+          for (const socket of this.opts.io.sockets.sockets.values()) {
+            socket.conn.close();
           }
         }
+        this.restApi?.destroy();
         await this.cleanupContext();
         await this.dboBuilder.destroy();
         this.authHandler.destroy();

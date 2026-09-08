@@ -8,12 +8,13 @@ import type { Prostgles, TABLE_METHODS } from "../Prostgles";
 import { runClientMethod, runClientRequest } from "../runClientRequest";
 
 export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
-  if (!this.db || !this.dbo) throw new Error("db/dbo missing");
-  if (this.destroyed) {
+  const isDestroyed = () => this.destroyed;
+  if (isDestroyed()) {
     console.log("Socket connected to destroyed instance");
     socket.disconnect();
     return;
   }
+  if (!this.db || !this.dbo) throw new Error("db/dbo missing");
 
   const { dbo, db } = this;
   this.connectedSockets.push(socket);
@@ -60,6 +61,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       connectedSocketIds: this.connectedSockets.map((s) => s.id),
     });
 
+    if (isDestroyed()) return;
     const { onUseOrSocketConnected } = this.opts.auth ?? {};
     const { authHandler } = this;
     if (onUseOrSocketConnected) {
@@ -76,6 +78,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
         return;
       }
     }
+    if (isDestroyed()) return;
     if (this.opts.onSocketConnect) {
       try {
         await this.opts.onSocketConnect({
@@ -96,6 +99,7 @@ export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
       }
     }
 
+    if (isDestroyed()) return;
     socket.removeAllListeners(CHANNELS.DEFAULT);
     socket.on(
       CHANNELS.DEFAULT,

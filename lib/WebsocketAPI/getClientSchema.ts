@@ -10,6 +10,7 @@ export async function getClientSchema(
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
 ) {
+  this.checkNotDestroyed();
   const result = await tryCatchV2(async () => {
     const clientInfo =
       clientReq.socket ?

@@ -4,8 +4,11 @@ import type { Prostgles } from "../Prostgles";
 import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
 export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
+  const isDestroyed = () => this.destroyed;
+  if (isDestroyed()) return;
   try {
     const clientSchema = await this.getClientSchema({ socket }, undefined);
+    if (isDestroyed()) return;
     socket.prostgles ??= new Map();
     socket.prostgles.set(this.appId, clientSchema);
     if (clientSchema.rawSQL) {
@@ -35,8 +38,10 @@ export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
       duration: -1,
       data: { socketId: socket.id, clientSchema },
     });
+    if (isDestroyed()) return;
     socket.emit(CHANNELS.SCHEMA, clientSchema);
   } catch (err: any) {
+    if (isDestroyed()) return;
     socket.emit(CHANNELS.SCHEMA, { err: getSerialisableError(err) });
   }
 }
