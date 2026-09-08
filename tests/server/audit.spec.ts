@@ -70,7 +70,6 @@ export async function testAudit(parentDb: DB) {
         tableName: `audit_events`,
         tables: {
           audit_test_source: {
-            entityType: "source",
             excludeColumns: ["secret"],
           },
           audit_test_existing: 1,
@@ -152,12 +151,10 @@ export async function testAudit(parentDb: DB) {
         prgl.opts.audit = originalAudit;
         assert.equal(prgl.resolvedAuditConfig?.tableName, audit.tableName);
         assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_source, {
-          entityType: "source",
           idColumns: ["a", "b"],
           excludeColumns: ["secret"],
         });
         assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_nopk, {
-          entityType: "audit_test_nopk",
           idColumns: ["key"],
           excludeColumns: ["secret"],
         });
@@ -215,7 +212,7 @@ export async function testAudit(parentDb: DB) {
         const rows = await history();
         assert.deepEqual(rows[2].old_id, { a: 1, b: "one" });
         assert.deepEqual(rows[2].new_id, { a: 2, b: "one" });
-        assert.equal(rows[2].entity_type, "source");
+        assert.equal(rows[2].table_name, "audit_test_source");
         assert.equal(rows[3].operation, "DELETE");
         assert.equal(rows[3].new_row, null);
         assert(!JSON.stringify(rows).includes("secret"));
@@ -238,8 +235,29 @@ export async function testAudit(parentDb: DB) {
           `BEGIN; SET LOCAL "prostgles.user" = '{"id":"actor"}'; INSERT INTO audit_test_nopk VALUES ('k', 'hidden'); COMMIT;`,
         );
         assert.deepEqual((await history()).at(-1).actor, { id: "actor" });
+        // Database context captures transaction identity, statement times, roles and application name.
+        await db.tx(async (tx) => {
+          await tx.none("SET LOCAL application_name = 'audit context test'");
+          const expected = await tx.one(`SELECT
+            pg_current_xact_id()::text AS transaction_id,
+            to_jsonb(transaction_timestamp()) AS transaction_started_at,
+            current_role, session_user,
+            current_setting('application_name') AS application_name`);
+          for (const key of ["context1", "context2"]) {
+            const { statement_started_at } = await tx.one(
+              `INSERT INTO audit_test_nopk VALUES ($1, 'hidden')
+               RETURNING to_jsonb(statement_timestamp()) AS statement_started_at`,
+              [key],
+            );
+            const row = await tx.one(
+              "SELECT db_context FROM audit_events WHERE new_id = $1::jsonb",
+              [{ key }],
+            );
+            assert.deepEqual(row.db_context, { ...expected, statement_started_at });
+          }
+        });
         for (const sql of [
-          `UPDATE "audit_events" SET entity_type = 'tampered'`,
+          `UPDATE "audit_events" SET table_name = 'tampered'`,
           `DELETE FROM "audit_events"`,
           `TRUNCATE "audit_events"`,
           "TRUNCATE audit_test_source",
@@ -284,7 +302,6 @@ export async function testAudit(parentDb: DB) {
             ...audit,
             tables: {
               audit_test_source: {
-                entityType: "source",
                 excludeColumns: ["secret"],
               },
             },

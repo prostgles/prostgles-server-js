@@ -15,7 +15,6 @@ export type SchemaConfigAuditTableOptions<
   S,
   T extends SchemaConfigTableName<S>,
 > = {
-  entityType?: string;
   /** Defaults to all primary-key columns. Required for tables without a primary key. */
   idColumns?: readonly SchemaConfigColumnName<S, T>[];
   excludeColumns?: readonly SchemaConfigColumnName<S, T>[];
@@ -34,7 +33,7 @@ export type SchemaConfigAudit<S = void> = {
     SchemaConfigAuditIncludedTables<S> | SchemaConfigAuditExcludedTables<S>;
 };
 
-/** Validated audit targets with all column and entity defaults resolved. */
+/** Validated audit targets with all column defaults resolved. */
 export type ResolvedAuditConfig = {
   tableName: string;
   tables: Record<string, Required<SchemaConfigAuditTableOptions<void, string>>>;

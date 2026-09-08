@@ -58,11 +58,7 @@ export const parseAuditConfig = (prgl: Prostgles): ResolvedAuditConfig | undefin
     if (ids.some((c) => excluded.includes(c))) {
       throw new Error(`Audit identity columns cannot be excluded: ${table.name}`);
     }
-    if (options.entityType !== undefined && !options.entityType) {
-      throw new Error(`Invalid audit entityType for ${table.name}`);
-    }
     result[table.name] = {
-      entityType: options.entityType ?? table.name,
       idColumns: [...ids],
       excludeColumns: [...excluded],
     };

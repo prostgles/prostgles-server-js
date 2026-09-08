@@ -7,7 +7,7 @@ import { getAuditProtection, getAuditWriterName } from "./getAuditTableConfig";
 export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig => {
   const result: TableConfig = {};
   for (const [name, options] of Object.entries(audit.tables)) {
-    const { entityType, idColumns: ids, excludeColumns: excluded } = options;
+    const { idColumns: ids, excludeColumns: excluded } = options;
     const functionName = getAuditWriterName(audit.tableName, name);
     result[name] = {
       triggers: {
@@ -32,9 +32,17 @@ export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig =
               after_row := after_row - excluded;
             END IF;
             IF TG_OP = 'UPDATE' AND before_row IS NOT DISTINCT FROM after_row THEN RETURN NULL; END IF;
-            INSERT INTO ${asName(audit.tableName)} (schema_name, table_name, entity_type, operation, old_id, new_id, old_row, new_row, actor)
-              VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, ${as.text(entityType)}, TG_OP, before_id, after_id, before_row, after_row,
-                nullif(current_setting('prostgles.user', true), '')::jsonb);
+            INSERT INTO ${asName(audit.tableName)} (schema_name, table_name, operation, old_id, new_id, old_row, new_row, actor, db_context)
+              VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, before_id, after_id, before_row, after_row,
+                nullif(current_setting('prostgles.user', true), '')::jsonb,
+                jsonb_build_object(
+                  'transaction_id', pg_current_xact_id()::text,
+                  'transaction_started_at', transaction_timestamp(),
+                  'statement_started_at', statement_timestamp(),
+                  'current_role', current_role,
+                  'session_user', session_user,
+                  'application_name', current_setting('application_name')
+                ));
             RETURN NULL;
           END;`,
         },
