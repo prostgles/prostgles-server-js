@@ -11,7 +11,7 @@ import type { PublishParser } from "../PublishParser/PublishParser";
 import type { OnCommitCallback } from "../PublishParser/publishTypesAndUtils";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
-import type { Graph } from "../shortestPath";
+import type { Graph } from "./joins/shortestPath";
 import { clone } from "../utils/utils";
 import type {
   DBHandlerServer,
@@ -31,7 +31,7 @@ import {
   getConstraints,
   getSerializedClientErrorFromPGError,
 } from "./dboBuilderUtils";
-import { prepareShortestJoinPaths } from "./prepareShortestJoinPaths";
+import { prepareShortestJoinPaths } from "./joins/prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSql/runSQL";
 import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
@@ -140,10 +140,7 @@ export class DboBuilder {
 
   onSchemaChange?: (event: { command: string; query: string }) => void;
 
-  private readonly onCommitCallbacksByTransaction = new WeakMap<
-    object,
-    OnCommitCallback[]
-  >();
+  private readonly onCommitCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
 
   registerOnCommitCallback = (transaction: object, callback: OnCommitCallback) => {
     const callbacks = this.onCommitCallbacksByTransaction.get(transaction);
@@ -250,9 +247,12 @@ export class DboBuilder {
       this.checkingCanSubscribe = false;
     }
     const start = Date.now();
-    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL({ db: this.prostgles.dbForSchema! }, {
-      schemaFilter: this.prostgles.opts.schemaFilter,
-    });
+    const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(
+      { db: this.prostgles.dbForSchema! },
+      {
+        schemaFilter: this.prostgles.opts.schemaFilter,
+      },
+    );
     await this.prostgles.opts.onLog?.({
       type: "debug",
       command: "DboBuilder.getTablesForSchemaPostgresSQL",
@@ -262,7 +262,10 @@ export class DboBuilder {
     const tablesOrViews = tablesOrViewsReq.result;
     this.tablesOrViews = tablesOrViews;
 
-    this.constraints = await getConstraints(this.prostgles.dbForSchema!, this.prostgles.opts.schemaFilter);
+    this.constraints = await getConstraints(
+      this.prostgles.dbForSchema!,
+      this.prostgles.opts.schemaFilter,
+    );
     await this.prepareShortestJoinPaths();
 
     this.dbo = {};

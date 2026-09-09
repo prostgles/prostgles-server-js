@@ -94,6 +94,8 @@ export type Join = {
   tables: [string, string];
   on: { [key: string]: string }[]; // Allow multi references to table
   type: (typeof JOIN_TYPES)[number];
+  /** Replace inferred joins for this table pair. Defaults to false. */
+  override?: boolean;
 };
 type Joins = Join[] | "inferred";
 
@@ -203,9 +205,8 @@ export type ProstglesInitOptions<
   testRulesOnConnect?: boolean;
 
   /**
-   * Allows defining table relationships that can then be used in filters and data inserts:
-   *  - `inferred` - uses the foreign keys to infer the joins
-   *  - `Join[]` - specifies the joins manually
+   * Allows defining custom table relationships that can then be used in filters and data inserts.
+   * By default FKs are used to infer the joins.
    */
   joins?: Joins;
 

@@ -338,6 +338,7 @@ function dd() {
         tables: ["items", "items2"],
         on: [{ name: "name" }],
         type: "many-many",
+        override: true,
       },
       {
         tables: ["items2", "items3"],

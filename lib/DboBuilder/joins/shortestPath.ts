@@ -2,17 +2,6 @@
 /* eslint-disable */
 import { AnyObject } from "prostgles-types";
 
-const shortestDistanceNode = (distances: Graph, visited: Graph) => {
-  let shortest = null;
-
-  for (const node in distances) {
-    const currentIsShortest = shortest === null || distances[node] < distances[shortest];
-    if (currentIsShortest && !visited.includes(node)) {
-      shortest = node;
-    }
-  }
-  return shortest;
-};
 export type Graph = {
   [key: string]: { [key: string]: number };
 };
@@ -20,7 +9,7 @@ export type Graph = {
 export const findShortestPath = (
   graph: Graph,
   startNode: string,
-  endNode: string
+  endNode: string,
 ): { distance: number; path: string[] } => {
   // establish object for recording distances from the start node
   let distances: AnyObject = {};
@@ -87,7 +76,19 @@ export const findShortestPath = (
   return results;
 };
 
-/* Usage: 
+const shortestDistanceNode = (distances: Graph, visited: Graph) => {
+  let shortest = null;
+
+  for (const node in distances) {
+    const currentIsShortest = shortest === null || distances[node] < distances[shortest];
+    if (currentIsShortest && !visited.includes(node)) {
+      shortest = node;
+    }
+  }
+  return shortest;
+};
+
+/* Example: 
 
 const graph = {
 	start: { A: 5, B: 2 },

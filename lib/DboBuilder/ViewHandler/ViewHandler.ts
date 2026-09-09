@@ -13,7 +13,7 @@ import type { TableEvent } from "../../Logging";
 import type { DB } from "../../Prostgles";
 import type { Join } from "../../ProstglesTypes";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { Graph } from "../../shortestPath";
+import type { Graph } from "../joins/shortestPath";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";

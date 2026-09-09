@@ -3,7 +3,7 @@
   "compilerOptions": {
     "target": "es2022",
     "lib": [
-      "es2022"
+      "ES2023"
     ],
     "strict": true,
     "module": "node16",

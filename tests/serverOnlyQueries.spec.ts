@@ -6,6 +6,7 @@ import type { DB, DBHandlerServer } from "../dist/Prostgles";
 import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
 import { testSocketLifecycle } from "./server/socketLifecycle.spec";
+import { testJoins } from "./server/joins.spec";
 import type { withUserRLS as WithUserRLS } from "../dist/DboBuilder/dboBuilderUtils";
 
 export const serverOnlyQueries = async (
@@ -14,6 +15,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
+    await testJoins(pgDb);
     await testSocketLifecycle(pgDb);
     await testAudit(pgDb);
     await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {

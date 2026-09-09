@@ -1,3 +1,5 @@
+import { isEqual } from "prostgles-types";
+
 export { get } from "prostgles-types";
 export const clone = <T extends any[] | Record<string, any>>(obj: T): T => {
   if (typeof structuredClone !== "undefined") {
@@ -27,3 +29,7 @@ const canBeUsedAsIsInTypescript = (str: string): boolean => {
 };
 
 export const isArray = <T>(data: T): data is Extract<T, readonly unknown[]> => Array.isArray(data);
+
+export const sortedArraysMatch = (a: string[], b: string[]): boolean => {
+  return isEqual(a.toSorted(), b.toSorted());
+};
