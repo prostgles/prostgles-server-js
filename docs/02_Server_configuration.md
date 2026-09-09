@@ -72,9 +72,8 @@
   Not recommended for production
 - **joins** <span style="color: grey">optional</span> <span style="color: green;">Joins</span>
 
-  Allows defining table relationships that can then be used in filters and data inserts:
-   - `inferred` - uses the foreign keys to infer the joins
-   - `Join[]` - specifies the joins manually
+  Allows defining custom table relationships that can then be used in filters and data inserts.
+  By default FKs are used to infer the joins.
 - **schemaFilter** <span style="color: grey">optional</span> <span style="color: green;">Record&lt;string, 1&gt; | Record&lt;string, 0&gt; | undefined</span>
 
   If defined then the specified schemas are included/excluded from the prostgles schema.
