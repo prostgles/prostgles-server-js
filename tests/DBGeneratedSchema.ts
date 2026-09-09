@@ -86,6 +86,7 @@ export type DBGeneratedSchema = {
       original_name: string;
       signed_url?: null | string;
       signed_url_expires?: null | number | string;
+      storage_key?: null | string;
       updated?: string;
       url?: string;
     };

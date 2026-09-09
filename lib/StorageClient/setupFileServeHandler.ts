@@ -8,6 +8,7 @@ import type { FileTableConfig } from "../ProstglesTypes";
 import { runClientRequest } from "../runClientRequest";
 import type { StorageClient } from "./StorageClientTypes";
 import type { FileTableRow } from "./getFileTableConfig";
+import { getFileStorageKey } from "./getFileStorageKey";
 
 export const getFileServeRoute = (config: FileTableConfig) => {
   const fileTableName = config.tableName;
@@ -39,6 +40,7 @@ export const setupFileServeHandler = (
       const selectParams = {
         select: {
           id: 1,
+          storage_key: 1,
           signed_url: 1,
           signed_url_expires: 1,
           content_type: 1,
@@ -71,13 +73,14 @@ export const setupFileServeHandler = (
         const HOUR = 3600 * 1000;
         const EXPIRES = Date.now() + HOUR;
         if (!url || expires < EXPIRES) {
-          url = await storageClient.getSignedUrlForDownload(file.id, 60 * 60);
+          url = await storageClient.getSignedUrlForDownload(getFileStorageKey(file), 60 * 60);
 
           await db.any(
-            "UPDATE ${fileTableName:name} SET signed_url = ${signed_url}, signed_url_expires = ${signed_url_expires} WHERE id = ${id}",
+            "UPDATE ${fileTableName:name} SET signed_url = ${signed_url}, signed_url_expires = ${signed_url_expires} WHERE id = ${id} AND storage_key IS NOT DISTINCT FROM ${storage_key}::uuid",
             {
               fileTableName,
               id: file.id,
+              storage_key: file.storage_key,
               signed_url: url,
               signed_url_expires: EXPIRES,
             },
@@ -86,7 +89,7 @@ export const setupFileServeHandler = (
 
         res.redirect(url);
       } else {
-        const localFilePath = join(storageClient.localFolderPath, file.id);
+        const localFilePath = join(storageClient.localFolderPath, getFileStorageKey(file));
         if (!fs.existsSync(localFilePath)) {
           throw new Error("File not found");
         }

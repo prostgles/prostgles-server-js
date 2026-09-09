@@ -4,18 +4,40 @@ import type { FileTableConfig } from "../../ProstglesTypes";
 import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import type { TableHandler } from "./TableHandler";
 import { uploadFile, type UploadFileArgs } from "./uploadFile";
+import { deleteUnreferencedFile } from "../../StorageClient/deleteUnreferencedFile";
+import { getFileStorageKey } from "../../StorageClient/getFileStorageKey";
 
 type Args = Pick<
   UploadFileArgs,
-  "localParams" | "data" | "original_name" | "original_last_modified"
+  "localParams" | "data" | "original_name" | "original_last_modified" | "onCommit" | "onRollback"
 > & {
   filter: AnyObject;
 };
 export const updateFile = async (
   tableHandler: TableHandler,
   config: FileTableConfig,
-  { filter, data, original_name, original_last_modified, localParams }: Args,
+  { filter, data, original_name, original_last_modified, localParams, onCommit, onRollback }: Args,
 ) => {
+  const existingFile = (await tableHandler.findOne(filter)) as FileTableRow | undefined;
+
+  if (!existingFile?.id) {
+    throw new Error("Existing file record not found");
+  }
+
+  onCommit(({ db }) => deleteUnreferencedFile(db, config, getFileStorageKey(existingFile)));
+  const newFile = await uploadFile(config, {
+    onCommit,
+    onRollback,
+    original_name,
+    data,
+    localParams,
+    mediaId: existingFile.id,
+    original_last_modified,
+  });
+  return { newData: omitKeys(newFile, ["id"]) };
+};
+
+export const getFileUpdateId = (filter: AnyObject): string => {
   const { data: validFilter } = getJSONBObjectSchemaValidationError(
     { id: { optional: true, type: "string" } },
     filter,
@@ -30,21 +52,5 @@ export const updateFile = async (
     );
   }
 
-  const existingFile = (await tableHandler.findOne({
-    id: existingMediaId,
-  })) as FileTableRow | undefined;
-
-  if (!existingFile?.id) {
-    throw new Error("Existing file record not found");
-  }
-
-  await config.storageClient.delete(existingFile.id);
-  const newFile = await uploadFile(config, {
-    original_name,
-    data,
-    localParams,
-    mediaId: existingFile.id,
-    original_last_modified,
-  });
-  return { newData: omitKeys(newFile, ["id"]) };
+  return existingMediaId;
 };

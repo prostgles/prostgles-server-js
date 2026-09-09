@@ -87,6 +87,9 @@ export const getValidatedFileType = async (
       }
     }
   }
-  if (!result?.mime) throw `File MIME type not found for the provided extension: ${result?.ext}`;
+  if (!result?.mime) {
+    const extension = fileName.includes(".") ? fileName.split(".").at(-1) : "(none)";
+    throw `File MIME type not found for the provided extension: ${extension}`;
+  }
   return result;
 };

@@ -1,8 +1,3 @@
-// const fileType = require("file-type");
-// const res = await fileType.fromBuffer(typeof file === "string"? Buffer.from(file, 'utf8') : file);
-
-// import * as sharp from "sharp";
-
 import type { ALLOWED_CONTENT_TYPE, ALLOWED_EXTENSION } from "prostgles-types";
 import { CONTENT_TYPE_TO_EXT, getKeys } from "prostgles-types";
 
@@ -17,24 +12,26 @@ export const getFileType = async (
 
   const fileNameMime = getFileTypeFromFilename(fileName);
   if (!fileNameMime?.ext) throw new Error("File name must contain extension");
-  const res = await fileTypeFromBuffer(typeof file === "string" ? Buffer.from(file, "utf8") : file);
+  const detectedFileType = await fileTypeFromBuffer(
+    typeof file === "string" ? Buffer.from(file, "utf8") : file,
+  );
 
-  if (!res) {
-    /* Set correct/missing extension */
-    const nameExt = fileNameMime.ext;
-    if (["xml", "txt", "csv", "tsv", "svg", "sql"].includes(nameExt)) {
+  if (!detectedFileType) {
+    // Text formats may not have a detectable binary signature.
+    const { mime } = fileNameMime;
+    if (mime.startsWith("text/") || mime.endsWith("+xml") || mime === "application/sql") {
       return fileNameMime;
     }
 
     throw new Error("Could not get the file type from file buffer");
   } else {
-    if (fileNameMime.ext.toLowerCase() !== res.ext.toLowerCase()) {
+    if (fileNameMime.ext.toLowerCase() !== detectedFileType.ext.toLowerCase()) {
       throw new Error(
-        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime.ext} vs ${res.ext}`,
+        `There is a mismatch between file name extension and actual buffer extension: ${fileNameMime.ext} vs ${detectedFileType.ext}`,
       );
     }
   }
-  return res as any;
+  return detectedFileType as any;
 };
 
 export const getFileTypeFromFilename = (

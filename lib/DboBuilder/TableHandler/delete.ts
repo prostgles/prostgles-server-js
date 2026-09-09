@@ -163,6 +163,7 @@ export async function _delete(
         await transaction.t.none(withUserRLS(localParams, ""));
       }
       const result = await onInsteadOfDelete({
+        ...this.getTransactionCallbacks(localParams),
         context: this.dboBuilder.prostgles.context,
         queryType,
         isOneOrNone,

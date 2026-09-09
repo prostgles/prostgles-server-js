@@ -88,11 +88,12 @@ export type BeforeEachTsTrigger<R, DBX, Context = undefined> = {
    */
   changedFields?: (keyof R)[];
   validate: (
-    params: ValidateBeforeRowArgsCommon<R, DBX> & {
-      localParams: undefined | LocalParams;
-      hookContext: AnyObject | undefined;
-      context: Context;
-    },
+    params: ValidateBeforeRowArgsCommon<R, DBX> &
+      TransactionCallbacks<DBX> & {
+        localParams: undefined | LocalParams;
+        hookContext: AnyObject | undefined;
+        context: Context;
+      },
   ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject; onInserted?: () => void }>;
 };
 
@@ -102,6 +103,16 @@ export type OnCommitCallback<DBO = DBHandlerServer> = (args: {
 }) => MaybePromise<unknown>;
 export type OnCommit<DBO = DBHandlerServer> = (callback: OnCommitCallback<DBO>) => void;
 
+export type TransactionCallbacks<DBO = DBHandlerServer> = {
+  /** Awaited after the outer transaction commits. Errors are logged. */
+  onCommit: OnCommit<DBO>;
+  /**
+   * Awaited after the outer transaction rejects. Errors are logged.
+   * A failed COMMIT acknowledgement may have committed; verify state before destructive cleanup.
+   */
+  onRollback: OnCommit<DBO>;
+};
+
 export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /**
@@ -109,11 +120,11 @@ export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
    */
   changedFields?: (keyof R)[];
   validate: (
-    params: ValidateRowArgsCommon<R, DBX> & {
-      localParams: undefined | LocalParams;
-      context: Context;
-      onCommit: OnCommit<DBX>;
-    },
+    params: ValidateRowArgsCommon<R, DBX> &
+      TransactionCallbacks<DBX> & {
+        localParams: undefined | LocalParams;
+        context: Context;
+      },
   ) => Promise<void>;
 };
 
@@ -152,11 +163,11 @@ export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   changedFields?: string[];
   validate: (
-    params: ValidateRowsArgsCommon<R, DBX> & {
-      localParams: undefined | LocalParams;
-      context: Context;
-      onCommit: OnCommit<DBX>;
-    },
+    params: ValidateRowsArgsCommon<R, DBX> &
+      TransactionCallbacks<DBX> & {
+        localParams: undefined | LocalParams;
+        context: Context;
+      },
   ) => Promise<void>;
 };
 

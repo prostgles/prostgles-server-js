@@ -46,7 +46,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       assert.equal(files.length, 1);
       assert.equal(files[0].id, nestedInsert.avatar.id);
       assert.equal(files[0].original_name, file.original_name);
-      const initialFileStr = fs.readFileSync(fileFolder + files[0].id).toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + files[0].storage_key).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
       insertedFile = files[0];
     });
@@ -60,10 +60,71 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       }
     });
 
+    await test("Disallowed updates cannot change stored bytes or create nested uploads", async () => {
+      const before = fs.readdirSync(fileFolder).sort();
+      await sql("UPDATE users_public_info SET sid = 'another-user' WHERE avatar = $1", [
+        insertedFile.id,
+      ]);
+      try {
+        assert.ok(!(await db.files.findOne!({ id: insertedFile.id })));
+        const rows = await db.files.update!(
+          { id: insertedFile.id },
+          {
+            data: Buffer.from("unauthorized replacement"),
+            original_name: "forbidden.txt",
+          },
+          { returning: "*" },
+        );
+        assert.deepEqual(rows, []);
+        assert.deepEqual(
+          await db.users_public_info.update!(
+            { avatar: insertedFile.id },
+            { avatar: file },
+            { returning: "*" },
+          ),
+          [],
+        );
+        assert.equal(
+          fs.readFileSync(fileFolder + insertedFile.storage_key, "utf8"),
+          file.data.toString(),
+        );
+        assert.deepEqual(fs.readdirSync(fileFolder).sort(), before);
+      } finally {
+        await sql("UPDATE users_public_info SET sid = 'files' WHERE avatar = $1", [
+          insertedFile.id,
+        ]);
+      }
+    });
+
+    await test("Duplicate file IDs and failed validation preserve the original object", async () => {
+      const before = fs.readdirSync(fileFolder).sort();
+      await assert.rejects(() =>
+        db.users_public_info.insert!({
+          name: "duplicate",
+          avatar: {
+            ...file,
+            id: insertedFile.id,
+            data: Buffer.from("collision"),
+          },
+        }),
+      );
+      await assert.rejects(() =>
+        db.files.update!(
+          { id: insertedFile.id },
+          { data: Buffer.from("invalid"), original_name: "missing-extension" },
+        ),
+      );
+      assert.equal(
+        fs.readFileSync(fileFolder + insertedFile.storage_key, "utf8"),
+        file.data.toString(),
+      );
+      assert.deepEqual(fs.readdirSync(fileFolder).sort(), before);
+    });
+
     await test("Can update allowed files directly", async () => {
       const newData = {
-        data: Buffer.from("aa", "utf-8"),
-        original_name: "a.txt",
+        data: Buffer.from("# Replacement markdown", "utf-8"),
+        original_name: "replacement.md",
       };
       await db.files.update!({ id: insertedFile.id }, newData);
       const newFiles = await db.files.find!();
@@ -71,13 +132,17 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       const [newFile] = newFiles;
       assert.equal(newFile?.original_name, newData.original_name);
       assert.equal(newFile.id, insertedFile.id);
+      assert.equal(newFile.content_type, "text/markdown");
+      assert.equal(newFile.extension, "md");
       assert.equal(
         fs
-          .readFileSync(fileFolder + newFile.id)
+          .readFileSync(fileFolder + newFile.storage_key)
           .toString("utf8")
           .toString(),
         newData.data.toString(),
       );
+      assert.notEqual(newFile.storage_key, insertedFile.storage_key);
+      assert.equal(fs.existsSync(fileFolder + insertedFile.storage_key), false);
     });
 
     await test("Can insert allowed files through a nested update", async () => {
@@ -94,7 +159,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       );
       const avatarRow = d?.at(0)?.avatar;
       const avatarFile = await db.files.findOne?.({ id: avatarRow.id });
-      const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.id).toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.storage_key).toString("utf8");
       assert.equal(newData.data.toString(), initialFileStr);
     });
 

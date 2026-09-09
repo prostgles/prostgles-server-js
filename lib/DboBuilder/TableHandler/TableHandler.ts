@@ -40,6 +40,7 @@ import { upsert } from "./upsert";
 import { isApplicableHook } from "./isApplicableHook";
 import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
 import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
+import type { TransactionCallbacks } from "../../PublishParser/publishTypesAndUtils";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -98,12 +99,14 @@ export class TableHandler extends ViewHandler {
       await transaction.t.none(withUserRLS(localParams, ""));
     }
     let newRow = row;
+    const initialKeys = Object.keys(row);
     let newHookContext: AnyObject | undefined = undefined;
     const successCallbacks: (() => void)[] = [];
     for (const hook of hooks) {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
       const hookResult = await hook.validate({
+        ...this.getTransactionCallbacks(localParams),
         command,
         context: this.dboBuilder.prostgles.context,
         data: newRow,
@@ -123,11 +126,26 @@ export class TableHandler extends ViewHandler {
       }
     }
 
-    const initialKeys = Object.keys(row);
     return {
       row: newRow,
       successCallbacks,
       columnsAdded: Object.keys(newRow).filter((col) => !initialKeys.includes(col)),
+    };
+  };
+
+  getTransactionCallbacks = (
+    localParams: LocalParams | undefined,
+  ): TransactionCallbacks<TableHandlers> => {
+    const transaction = this.getTransaction(localParams);
+    return {
+      onCommit: (callback) => {
+        if (!transaction) throw new Error("onCommit requires a transaction");
+        this.dboBuilder.registerOnCommitCallback(transaction.t, callback);
+      },
+      onRollback: (callback) => {
+        if (!transaction) throw new Error("onRollback requires a transaction");
+        this.dboBuilder.registerOnRollbackCallback(transaction.t, callback);
+      },
     };
   };
 

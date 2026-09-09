@@ -11,15 +11,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^20.9.2",
-    "prostgles-client": "^4.0.389",
-    "prostgles-types": "^4.0.51",
-    "socket.io-client": "^4.8.1"
+    "@types/node": "^20.19.43",
+    "prostgles-client": "^4.0.390",
+    "prostgles-types": "^4.0.280",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "typescript": "^5.3.3"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3"
   }
 }

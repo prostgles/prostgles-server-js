@@ -6,12 +6,13 @@ import { type PublishObject } from "../PublishParser/PublishParser";
 export type ServerTableHandler<
   T extends AnyObject = AnyObject,
   Schema extends DBSchema | void = void,
-> = TableHandler<T, Schema> & { isView: boolean };
+  TName extends PropertyKey = never,
+> = TableHandler<T, Schema, TName> & { isView: boolean };
 
 export type DBTableHandlersFromSchema<Schema = void> =
   Schema extends DBSchema ?
     {
-      [tov_name in keyof Schema]: ServerTableHandler<Schema[tov_name]["columns"], Schema>;
+      [tov_name in keyof Schema]: ServerTableHandler<Schema[tov_name]["columns"], Schema, tov_name>;
     }
   : Record<string, Partial<ServerTableHandler>>;
 

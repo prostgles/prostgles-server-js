@@ -7,7 +7,9 @@ import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules } from "./insert/getInsertTableRules";
 import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
+import { getFileUpdateId } from "./updateFile";
 import type { TableHandler } from "./TableHandler";
+import { prepareBeforeHookData } from "./prepareBeforeHookData";
 
 export async function update(
   this: TableHandler,
@@ -65,7 +67,37 @@ export async function update(
         );
     }
 
-    const beforeResult = await this.beforeEach(newData, localParams, "update", filter);
+    const updateFilter = await this.prepareWhere({
+      select: undefined,
+      filter,
+      forcedFilter,
+      filterFields,
+      localParams,
+      tableRule: tableRules,
+    });
+    if (this.is_media) getFileUpdateId(filter);
+    if (this.getBeforeHooks("update", [newData]).length) {
+      newData = prepareBeforeHookData(this, newData, fields, removeDisallowedFields, "update");
+      if (params?.returnType?.startsWith("statement") || localParams?.returnQuery) {
+        throw new Error("Updates with beforeEach hooks cannot return SQL statements");
+      }
+      if (!transaction) throw new Error("beforeEach hooks require a transaction");
+      const permittedRows = await transaction.t.any(
+        withUserRLS(
+          localParams,
+          `SELECT 1 FROM ${this.escapedName} ${updateFilter.where} FOR UPDATE`,
+          true,
+        ),
+      );
+      if (!permittedRows.length) {
+        return params?.returning && params.multi !== false ? [] : undefined;
+      }
+      if (params?.multi === false && permittedRows.length > 1) {
+        throw `More than 1 row modified: ${permittedRows.length} rows affected`;
+      }
+    }
+
+    const beforeResult = await this.beforeEach(newData, localParams, "update", updateFilter.filter);
     newData = beforeResult.row;
 
     const { data, allowedCols } = prepareNewData({
@@ -77,15 +109,6 @@ export async function update(
       tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
       tableHandler: this,
       columnsAddedFromBeforeHooks: beforeResult.columnsAdded,
-    });
-
-    const updateFilter = await this.prepareWhere({
-      select: undefined,
-      filter,
-      forcedFilter,
-      filterFields,
-      localParams,
-      tableRule: tableRules,
     });
 
     /**
@@ -105,10 +128,13 @@ export async function update(
       if (+updateCount > 1) {
         throw "Cannot do a nestedInsert from an update that targets more than 1 row";
       }
+      if (!+updateCount) {
+        return params?.returning && params.multi !== false ? [] : undefined;
+      }
       if (!transaction) {
         return wrapInTx();
       }
-      await Promise.all(
+      const nestedResults = await Promise.allSettled(
         nestedInserts.map(async (nestedInsert) => {
           const nestedTableHandler = transaction.dbTX[nestedInsert.tableName];
           if (!nestedTableHandler)
@@ -151,6 +177,9 @@ export async function update(
           };
         }),
       );
+      for (const result of nestedResults) {
+        if (result.status === "rejected") throw result.reason;
+      }
     }
 
     const tx = localParams?.tx?.t || this.tx?.t || this.db;

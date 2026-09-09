@@ -13,7 +13,7 @@
     "prostgles-server": "file:../.."
   },
   "devDependencies": {
-    "@types/node": "^20.19.37",
+    "@types/node": "^20.19.43",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "tsc-watch": "^6.3.1",

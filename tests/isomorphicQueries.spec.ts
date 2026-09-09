@@ -347,7 +347,7 @@ export const isomorphicQueries = async (
       const file = await (
         db as DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>
       ).files.insert!(mediaFile, { returning: "*" });
-      const _data = fs.readFileSync(fileFolder + file.id);
+      const _data = fs.readFileSync(fileFolder + file.storage_key);
       assert.equal(str, _data.toString("utf8"));
       assert.deepStrictEqual((await db.files.findOne!())!.metadata, {
         description: "Updated by afterEach hook",
@@ -381,10 +381,10 @@ export const isomorphicQueries = async (
 
       const files = await db.files.find!({ original_name: file.original_name });
       assert.equal(files.length, 1);
-      const exists0 = fs.existsSync(fileFolder + files[0].id);
+      const exists0 = fs.existsSync(fileFolder + files[0].storage_key);
       assert.equal(exists0, true);
       await db.files.delete!({ original_name: file.original_name }, { returning: "*" });
-      const exists = fs.existsSync(fileFolder + files[0].name);
+      const exists = fs.existsSync(fileFolder + files[0].storage_key);
       assert.equal(exists, false);
     });
 
@@ -404,7 +404,7 @@ export const isomorphicQueries = async (
       const originals = await db.files.find!({ original_name: file.original_name });
       assert.equal(originals.length, 1);
       const [original] = originals;
-      const initialFileStr = fs.readFileSync(fileFolder + original.id).toString("utf8");
+      const initialFileStr = fs.readFileSync(fileFolder + original.storage_key).toString("utf8");
       assert.equal(initialStr, initialFileStr);
       assert.equal(original.url, ["/files", original.id].join("/"));
 
@@ -420,10 +420,9 @@ export const isomorphicQueries = async (
 
       await db.files.update!({ id: original.id }, newFile);
 
-      const newFileStr = fs.readFileSync(fileFolder + original.id).toString("utf8");
-      assert.equal(newStr, newFileStr);
-
       const newF = await db.files.findOne!({ id: original.id });
+      const newFileStr = fs.readFileSync(fileFolder + newF.storage_key).toString("utf8");
+      assert.equal(newStr, newFileStr);
 
       assert.equal(newF?.original_name, newFile.original_name);
     });

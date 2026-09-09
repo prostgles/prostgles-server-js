@@ -7,6 +7,7 @@ import type { DB, DBHandlerServer } from "../../dist/Prostgles";
 import type { LocalParams } from "../../dist/DboBuilder/DboBuilderTypes";
 import type { TableHandler } from "../../dist/DboBuilder/TableHandler/TableHandler";
 import type { withUserRLS as WithUserRLS } from "../../dist/DboBuilder/dboBuilderUtils";
+import type { ParsedTableRule } from "../../dist/PublishParser/PublishParser";
 
 export const testWithUserRLS = async (
   dbo: DBHandlerServer,
@@ -156,6 +157,123 @@ export const testWithUserRLS = async (
         throw rollback;
       }),
       (error) => error === rollback,
+    );
+  });
+
+  await test("ordinary beforeEach hooks enforce fields and the forced update filter", async () => {
+    await table.dboBuilder.getTX(async (dbx) => {
+      const rec = dbx.rec as TableHandler;
+      const allowedId = -43001;
+      const deniedId = -43002;
+      await rec.insert([{ id: allowedId }, { id: deniedId }]);
+      const calls: number[][] = [];
+      const inputs: object[] = [];
+      rec.hooks = {
+        beforeEach: [
+          {
+            commands: { insert: 1, update: 1 },
+            validate: async ({ data, command, filter, dbx }) => {
+              inputs.push({ ...data });
+              // Removing an input must not let a caller evade field permissions.
+              delete data.recf;
+              if (command === "update") {
+                calls.push((await dbx.rec!.find(filter)).map((row) => row.id));
+              } else {
+                // Trusted hooks may add fields in place that clients cannot supply.
+                data.parent_id = allowedId;
+              }
+              return { row: data };
+            },
+          },
+        ],
+      };
+      const rules: ParsedTableRule = {
+        insert: { fields: ["id"], returningFields: "*" },
+        update: {
+          fields: ["parent_id"],
+          filterFields: "*",
+          returningFields: "*",
+          forcedFilter: { id: allowedId },
+        },
+      };
+      await assert.rejects(() =>
+        rec.insert({ id: -43003, recf: null }, undefined, undefined, rules),
+      );
+      await assert.rejects(() =>
+        rec.insert([{ id: -43003 }, { id: -43004, recf: null }], undefined, undefined, rules),
+      );
+      await assert.rejects(() => rec.update({ id: allowedId }, { recf: null }, undefined, rules));
+      assert.deepEqual(inputs, []);
+      assert.deepEqual(
+        await rec.update({ id: deniedId }, { parent_id: allowedId }, { returning: "*" }, rules),
+        [],
+      );
+      assert.deepEqual(
+        await rec.update({ id: -43999 }, { parent_id: allowedId }, { returning: "*" }, rules),
+        [],
+      );
+      assert.deepEqual(inputs, []);
+      await rec.update({}, { parent_id: allowedId }, undefined, rules);
+      assert.deepEqual(calls, [[allowedId]]);
+      assert.equal((await rec.findOne({ id: deniedId }))!.parent_id, null);
+      const inserted = await rec.insert(
+        { id: -43003, recf: null },
+        { returning: "*", removeDisallowedFields: true },
+        undefined,
+        rules,
+      );
+      assert.equal(inserted.parent_id, allowedId);
+      assert.deepEqual(inputs.at(-1), { id: -43003 });
+      const count = inputs.length;
+      await assert.rejects(() =>
+        rec.insert({ id: -43004 }, { returnType: "statement" }, undefined, rules),
+      );
+      await assert.rejects(() =>
+        rec.update({}, { parent_id: allowedId }, { returnType: "statement" }, rules),
+      );
+      await assert.rejects(() =>
+        rec.updateBatch([[{}, { parent_id: allowedId }]], undefined, undefined, rules),
+      );
+      assert.equal(inputs.length, count);
+      await rec.delete({ id: { $in: [allowedId, deniedId, -43003] } });
+    });
+  });
+
+  await test("ordinary beforeEach hooks do not run when PostgreSQL UPDATE policy denies rows", async () => {
+    const abort = new Error("rollback hook RLS fixture");
+    await assert.rejects(
+      table.dboBuilder.getTX(async (dbx, tx) => {
+        const rec = dbx.rec as TableHandler;
+        await rec.insert({ id: -43001 });
+        let calls = 0;
+        rec.hooks = {
+          beforeEach: [
+            {
+              commands: { update: 1 },
+              validate: () => {
+                calls++;
+              },
+            },
+          ],
+        };
+        const role = pgPromise.as.name(`hook_rls_${process.pid}`);
+        await tx.none(`
+        CREATE ROLE ${role};
+        GRANT USAGE ON SCHEMA public, prostgles TO ${role};
+        GRANT SELECT, UPDATE ON rec TO ${role};
+        ALTER TABLE rec ENABLE ROW LEVEL SECURITY;
+        CREATE POLICY hook_select ON rec FOR SELECT TO ${role} USING (true);
+        CREATE POLICY hook_update ON rec FOR UPDATE TO ${role} USING (false);
+        SET LOCAL ROLE ${role};
+      `);
+        assert.deepEqual(
+          await rec.update({ id: -43001 }, { parent_id: null }, { returning: "*" }),
+          [],
+        );
+        assert.equal(calls, 0);
+        throw abort;
+      }),
+      (error) => error === abort,
     );
   });
 

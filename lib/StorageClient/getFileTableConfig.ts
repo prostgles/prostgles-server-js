@@ -8,9 +8,11 @@ import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import type { TableRowFromColumnDefinitions } from "../TableConfig/TableRowFromColumnDefinitions";
 import type { TableHooks } from "../TableHooks/TableHooks";
 import { setupFileServeHandler } from "./setupFileServeHandler";
+import type { TableHandlers } from "../DboBuilder/DboBuilder";
 
 const FILE_TABLE_COLUMN_DEFINITIONS = {
   id: `UUID PRIMARY KEY DEFAULT gen_random_uuid()`,
+  storage_key: `UUID UNIQUE`, // NULL for legacy objects stored under their file ID.
   extension: `TEXT NOT NULL DEFAULT ''`,
   content_type: `TEXT NOT NULL DEFAULT ''`,
   content_length: `BIGINT NOT NULL DEFAULT 0`,
@@ -101,8 +103,16 @@ export const getFileTableConfig = (
             insert: 1,
             update: 1,
           },
-          validate: async ({ data: insertData, localParams, command, filter }) => {
-            const tableHandler = prg.dboBuilder.dboMap.get(fileTableName);
+          validate: async ({
+            data: insertData,
+            localParams,
+            command,
+            filter,
+            dbx,
+            onCommit,
+            onRollback,
+          }) => {
+            const tableHandler = dbx[fileTableName];
             if (!tableHandler) throw "Storage tableHandler not found";
             assertFileObjectValid(insertData);
 
@@ -110,6 +120,8 @@ export const getFileTableConfig = (
             const data = dataBlob as unknown as Buffer;
             if (command === "update") {
               const { newData } = await updateFile(tableHandler, fileTable, {
+                onCommit,
+                onRollback,
                 filter: filter ?? {},
                 localParams,
                 data,
@@ -125,6 +137,8 @@ export const getFileTableConfig = (
             }
 
             const media = await uploadFile(fileTable, {
+              onCommit,
+              onRollback,
               data,
               original_name,
               localParams,
@@ -139,12 +153,12 @@ export const getFileTableConfig = (
               },
             };
           },
-        } satisfies BeforeEachTsTrigger<FileTableRow, {}>,
+        } satisfies BeforeEachTsTrigger<FileTableRow, TableHandlers>,
         ...(userFileTableHooks?.beforeEach || []),
       ],
-      onInsteadOfDelete: async ({ dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
+      onInsteadOfDelete: async ({ onCommit, tx, returningQuery, isOneOrNone, filterOpts }) => {
         return onDeleteFromFileTable(fileTable, {
-          dbTX: dbx,
+          onCommit,
           t: tx,
           returningQuery,
           isOneOrNone,

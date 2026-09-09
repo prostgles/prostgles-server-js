@@ -2,6 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import stream from "stream";
+import { pipeline } from "stream/promises";
 import type {
   UploadFileOptions,
   LocalStorageClient,
@@ -55,52 +56,28 @@ export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageCli
       const hash = crypto.createHash("md5");
       let contentLength = 0;
 
-      return new Promise((resolve, reject) => {
-        const writeStream = fs.createWriteStream(filePath);
-
-        writeStream.on("error", reject);
-        writeStream.on("finish", () => {
-          resolve({
-            type: "local",
-            filePath,
-            contentHash: hash.digest("hex"),
-            contentLength: contentLength,
-          });
-        });
-
-        if (typeof args.file === "string" || Buffer.isBuffer(args.file)) {
-          const buffer = Buffer.isBuffer(args.file) ? args.file : Buffer.from(args.file);
-
-          contentLength = buffer.length;
-          hash.update(buffer);
-
-          if (args.onProgress) {
+      const buffered = typeof args.file === "string" || Buffer.isBuffer(args.file);
+      const source = buffered ? stream.Readable.from([args.file]) : args.file;
+      let lastProgress = Date.now();
+      const measure = new stream.Transform({
+        transform: (chunk: Buffer, _encoding, callback) => {
+          contentLength += chunk.length;
+          hash.update(chunk);
+          if (args.onProgress && (buffered || Date.now() - lastProgress > 1000)) {
+            lastProgress = Date.now();
             args.onProgress(contentLength);
           }
-
-          writeStream.write(buffer);
-          writeStream.end();
-        } else if (
-          args.file instanceof stream.Readable ||
-          (args.file as unknown) instanceof stream.PassThrough
-        ) {
-          let lastProgress = Date.now();
-          const throttle = 1000; // 1 second
-          args.file.on("data", (chunk: Buffer) => {
-            contentLength += chunk.length;
-            hash.update(chunk);
-            if (args.onProgress && Date.now() - lastProgress > throttle) {
-              lastProgress = Date.now();
-              args.onProgress(contentLength);
-            }
-          });
-
-          args.file.on("error", reject);
-          args.file.pipe(writeStream);
-        } else {
-          reject(new Error("Unsupported file type provided to upload."));
-        }
+          callback(null, chunk);
+        },
       });
+      // Wait for all streams to close before transaction cleanup can remove a failed upload.
+      await pipeline(source, measure, fs.createWriteStream(filePath));
+      return {
+        type: "local",
+        filePath,
+        contentHash: hash.digest("hex"),
+        contentLength,
+      };
     },
 
     downloadAsStream: async (name: string) => {

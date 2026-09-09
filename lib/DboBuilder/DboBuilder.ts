@@ -141,6 +141,13 @@ export class DboBuilder {
   onSchemaChange?: (event: { command: string; query: string }) => void;
 
   private readonly onCommitCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
+  private readonly onRollbackCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
+
+  registerOnRollbackCallback = (transaction: object, callback: OnCommitCallback) => {
+    const callbacks = this.onRollbackCallbacksByTransaction.get(transaction);
+    if (!callbacks) throw new Error("Transaction is not active");
+    callbacks.push(callback);
+  };
 
   registerOnCommitCallback = (transaction: object, callback: OnCommitCallback) => {
     const callbacks = this.onCommitCallbacksByTransaction.get(transaction);
@@ -150,7 +157,10 @@ export class DboBuilder {
     callbacks.push(callback);
   };
 
-  private runOnCommitCallbacks = async (callbacks: OnCommitCallback[]) => {
+  private runOnCommitCallbacks = async (
+    callbacks: OnCommitCallback[],
+    command: "DboBuilder.onCommit" | "DboBuilder.onRollback" = "DboBuilder.onCommit",
+  ) => {
     for (const callback of callbacks) {
       const start = Date.now();
       try {
@@ -159,13 +169,13 @@ export class DboBuilder {
         const error = getSerialisableError(rawError);
         const onLog = this.prostgles.opts.onLog;
         if (!onLog) {
-          console.error("DboBuilder.onCommit callback failed", error);
+          console.error(`${command} callback failed`, error);
           continue;
         }
         try {
           await onLog({
             type: "debug",
-            command: "DboBuilder.onCommit",
+            command,
             duration: Date.now() - start,
             error,
           });
@@ -423,12 +433,14 @@ export class DboBuilder {
 
   getTX = async <R, TH extends DbTxTableHandlers>(cb: TxCB<Promise<R> | R, TH>) => {
     const onCommitCallbacks: OnCommitCallback[] = [];
+    const onRollbackCallbacks: OnCommitCallback[] = [];
     let transaction: object | undefined;
     let result: R;
     try {
       result = await this.db.tx((t) => {
         transaction = t;
         this.onCommitCallbacksByTransaction.set(transaction, onCommitCallbacks);
+        this.onRollbackCallbacksByTransaction.set(transaction, onRollbackCallbacks);
 
         const dbTX: DbTxTableHandlers = {};
         this.tablesOrViews?.map((tov) => {
@@ -447,10 +459,13 @@ export class DboBuilder {
       });
     } catch (error) {
       if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
+      if (transaction) this.onRollbackCallbacksByTransaction.delete(transaction);
+      await this.runOnCommitCallbacks(onRollbackCallbacks, "DboBuilder.onRollback");
       throw error;
     }
 
     if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
+    if (transaction) this.onRollbackCallbacksByTransaction.delete(transaction);
     await this.runOnCommitCallbacks(onCommitCallbacks);
     return result;
   };

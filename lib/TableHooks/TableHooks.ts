@@ -7,6 +7,7 @@ import type {
   AfterAllTsTrigger,
   AfterEachTsTrigger,
   BeforeEachTsTrigger,
+  TransactionCallbacks,
 } from "../PublishParser/PublishParser";
 
 export type TableHooks<S = void, Context = undefined> =
@@ -26,9 +27,15 @@ export type TableHooksDefinition<
   Context = undefined,
 > = {
   /**
-   * Runs sequentially before validation and SQL for each insert row, or once per update request.
+   * Runs after input field permissions are checked, before row validation and mutation SQL.
+   * Runs for each insert row, or once per update request with permitted matching rows.
+   * The update filter includes the publish forcedFilter. Matching rows are locked before hooks.
+   * SQL-only requests (including updateBatch) cannot run applicable beforeEach hooks.
    * May replace the pending data and pass `hookContext` to the next hook.
    * `onInserted` also runs for updates, is not awaited, and runs before the transaction commits.
+   * Register `onCommit`/`onRollback` before starting external work so cleanup also runs if the
+   * hook throws. These callbacks are awaited after the outer transaction finishes and receive
+   * the non-transactional `db` and `dbo` objects.
    */
   beforeEach?: BeforeEachTsTrigger<RowDataType, DBX, Context>[];
 
@@ -52,17 +59,20 @@ export type TableHooksDefinition<
   /**
    * Replaces the generated DELETE. Must perform the mutation and shape its return value using
    * the prepared filter and returning arguments. Delete `afterEach`/`afterAll` hooks do not run.
+   * Use `onCommit`/`onRollback` for external side effects after the outer transaction finishes.
    */
-  onInsteadOfDelete?: (args: {
-    context: Context;
-    dbx: DBX;
-    tx: pgPromise.ITask<{}>;
-    returningQuery: string;
-    isOneOrNone: boolean;
-    queryType: "any" | "none";
-    filterOpts: {
-      where: string;
-      filter: AnyObject;
-    };
-  }) => Promise<AnyObject[] | undefined>;
+  onInsteadOfDelete?: (
+    args: {
+      context: Context;
+      dbx: DBX;
+      tx: pgPromise.ITask<{}>;
+      returningQuery: string;
+      isOneOrNone: boolean;
+      queryType: "any" | "none";
+      filterOpts: {
+        where: string;
+        filter: AnyObject;
+      };
+    } & TransactionCallbacks<DBX>,
+  ) => Promise<AnyObject[] | undefined>;
 };

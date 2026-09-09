@@ -8,6 +8,7 @@ import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
+import { prepareBeforeHookData } from "../prepareBeforeHookData";
 import { getInsertQuery } from "./getInsertQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
 
@@ -86,20 +87,43 @@ export async function insert(
     });
 
     validateInsertParams(insertParams);
+    const hasBeforeHooks = this.getBeforeHooks("insert", rows).length > 0;
+    if (hasBeforeHooks && (insertParams?.returnType === "statement" || localParams?.returnQuery)) {
+      throw new Error("Inserts with beforeEach hooks cannot return SQL statements");
+    }
+    if (this.is_media) {
+      const conflict = insertParams?.onConflict;
+      if ((typeof conflict === "string" ? conflict : conflict?.action) === "DoUpdate") {
+        throw new Error("Use update to replace an existing file");
+      }
+    }
 
     const transaction = this.getTransaction(localParams);
     const tx = transaction?.t || this.db;
 
     const successCallbacks: (() => void)[] = [];
-    const preValidatedRows: InsertedRowWithInfo[] = await Promise.all(
-      rows.map(async (nonValidated) => {
+    // Check every input before any hook can perform work or remove disallowed fields.
+    const inputs =
+      hasBeforeHooks ?
+        rows.map((row) =>
+          prepareBeforeHookData(
+            this,
+            row,
+            fields,
+            insertParams?.removeDisallowedFields ?? false,
+            "insert",
+          ),
+        )
+      : rows;
+    const preparedRows = await Promise.allSettled(
+      inputs.map(async (input) => {
         const { preValidate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) {
           throw "tableConfigurator missing";
         }
 
-        const beforeResult = await this.beforeEach(nonValidated, localParams, "insert", undefined);
+        const beforeResult = await this.beforeEach(input, localParams, "insert", undefined);
         let row = beforeResult.row;
         beforeResult.successCallbacks.forEach((cb) => successCallbacks.push(cb));
 
@@ -120,6 +144,10 @@ export async function insert(
         return { row, columnsAddedFromBeforeHooks: beforeResult.columnsAdded };
       }),
     );
+    const preValidatedRows: InsertedRowWithInfo[] = preparedRows.map((result) => {
+      if (result.status === "rejected") throw result.reason;
+      return result.value;
+    });
     const preValidatedRowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
 
     /**
