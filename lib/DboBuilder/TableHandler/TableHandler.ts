@@ -101,7 +101,6 @@ export class TableHandler extends ViewHandler {
     let newRow = row;
     const initialKeys = Object.keys(row);
     let newHookContext: AnyObject | undefined = undefined;
-    const successCallbacks: (() => void)[] = [];
     for (const hook of hooks) {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
@@ -119,16 +118,11 @@ export class TableHandler extends ViewHandler {
       if (hookResult) {
         newRow = hookResult.row;
         newHookContext = hookResult.hookContext;
-        const { onInserted } = hookResult;
-        if (onInserted) {
-          successCallbacks.push(onInserted);
-        }
       }
     }
 
     return {
       row: newRow,
-      successCallbacks,
       columnsAdded: Object.keys(newRow).filter((col) => !initialKeys.includes(col)),
     };
   };

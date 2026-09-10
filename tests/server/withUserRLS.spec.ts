@@ -160,12 +160,19 @@ export const testWithUserRLS = async (
     );
   });
 
-  await test("ordinary beforeEach hooks enforce fields and the forced update filter", async () => {
+  await test("ordinary beforeEach hooks transform inputs before validation", async () => {
     await table.dboBuilder.getTX(async (dbx) => {
       const rec = dbx.rec as TableHandler;
-      const allowedId = -43001;
-      const deniedId = -43002;
-      await rec.insert([{ id: allowedId }, { id: deniedId }]);
+      // Negative fixture IDs avoid collisions with generated positive IDs.
+      const rows = {
+        allowed: { id: -43001 },
+        denied: { id: -43002 },
+        transformed: { id: -43003 },
+        stripped: { id: -43004 },
+        statementOnly: { id: -43005 },
+        missing: { id: -43999 },
+      };
+      await rec.insert([rows.allowed, rows.denied]);
       const calls: number[][] = [];
       const inputs: object[] = [];
       rec.hooks = {
@@ -174,13 +181,16 @@ export const testWithUserRLS = async (
             commands: { insert: 1, update: 1 },
             validate: async ({ data, command, filter, dbx }) => {
               inputs.push({ ...data });
-              // Removing an input must not let a caller evade field permissions.
-              delete data.recf;
+              // Pre-validation hooks can consume fields that are not database columns.
+              if ("parent" in data) {
+                data.parent_id = data.parent;
+                delete data.parent;
+              }
               if (command === "update") {
                 calls.push((await dbx.rec!.find(filter)).map((row) => row.id));
               } else {
                 // Trusted hooks may add fields in place that clients cannot supply.
-                data.parent_id = allowedId;
+                data.parent_id = rows.allowed.id;
               }
               return { row: data };
             },
@@ -193,58 +203,103 @@ export const testWithUserRLS = async (
           fields: ["parent_id"],
           filterFields: "*",
           returningFields: "*",
-          forcedFilter: { id: allowedId },
+          forcedFilter: rows.allowed,
         },
       };
-      await assert.rejects(() =>
-        rec.insert({ id: -43003, recf: null }, undefined, undefined, rules),
-      );
-      await assert.rejects(() =>
-        rec.insert([{ id: -43003 }, { id: -43004, recf: null }], undefined, undefined, rules),
-      );
-      await assert.rejects(() => rec.update({ id: allowedId }, { recf: null }, undefined, rules));
-      assert.deepEqual(inputs, []);
-      assert.deepEqual(
-        await rec.update({ id: deniedId }, { parent_id: allowedId }, { returning: "*" }, rules),
-        [],
-      );
-      assert.deepEqual(
-        await rec.update({ id: -43999 }, { parent_id: allowedId }, { returning: "*" }, rules),
-        [],
-      );
-      assert.deepEqual(inputs, []);
-      await rec.update({}, { parent_id: allowedId }, undefined, rules);
-      assert.deepEqual(calls, [[allowedId]]);
-      assert.equal((await rec.findOne({ id: deniedId }))!.parent_id, null);
       const inserted = await rec.insert(
-        { id: -43003, recf: null },
+        { ...rows.transformed, parent: rows.allowed.id },
+        { returning: "*" },
+        undefined,
+        rules,
+      );
+      assert.equal(inserted.parent_id, rows.allowed.id);
+      assert.deepEqual(inputs.at(-1), { ...rows.transformed, parent: rows.allowed.id });
+      // Fields left by the hook still undergo the usual validation.
+      await assert.rejects(() =>
+        rec.insert({ ...rows.stripped, recf: null }, undefined, undefined, rules),
+      );
+      await assert.rejects(() => rec.update(rows.allowed, { recf: null }, undefined, rules));
+      assert.equal(inputs.length, 3);
+      calls.length = 0;
+      assert.deepEqual(
+        await rec.update(rows.denied, { parent: rows.allowed.id }, { returning: "*" }, rules),
+        [],
+      );
+      assert.deepEqual(
+        await rec.update(rows.missing, { parent: rows.allowed.id }, { returning: "*" }, rules),
+        [],
+      );
+      await rec.update({}, { parent: rows.allowed.id }, undefined, rules);
+      assert.deepEqual(calls, [[], [], [rows.allowed.id]]);
+      assert.equal((await rec.findOne(rows.denied))!.parent_id, null);
+      const stripped = await rec.insert(
+        { ...rows.stripped, recf: null },
         { returning: "*", removeDisallowedFields: true },
         undefined,
         rules,
       );
-      assert.equal(inserted.parent_id, allowedId);
-      assert.deepEqual(inputs.at(-1), { id: -43003 });
+      assert.equal(stripped.parent_id, rows.allowed.id);
+      assert.deepEqual(inputs.at(-1), { ...rows.stripped, recf: null });
       const count = inputs.length;
-      await assert.rejects(() =>
-        rec.insert({ id: -43004 }, { returnType: "statement" }, undefined, rules),
+      assert.equal(
+        typeof (await rec.insert(
+          { ...rows.statementOnly },
+          { returnType: "statement" },
+          undefined,
+          rules,
+        )),
+        "string",
       );
-      await assert.rejects(() =>
-        rec.update({}, { parent_id: allowedId }, { returnType: "statement" }, rules),
+      assert.equal(
+        typeof (await rec.update(
+          {},
+          { parent: rows.allowed.id },
+          { returnType: "statement" },
+          rules,
+        )),
+        "string",
       );
-      await assert.rejects(() =>
-        rec.updateBatch([[{}, { parent_id: allowedId }]], undefined, undefined, rules),
-      );
-      assert.equal(inputs.length, count);
-      await rec.delete({ id: { $in: [allowedId, deniedId, -43003] } });
+      await rec.updateBatch([[{}, { parent: rows.denied.id }]], undefined, undefined, rules);
+      assert.equal(inputs.length, count + 3);
+      assert.equal((await rec.findOne(rows.allowed))!.parent_id, rows.denied.id);
+      assert.equal(await rec.findOne(rows.statementOnly), undefined);
+      await rec.delete({ id: { $in: Object.values(rows).map(({ id }) => id) } });
     });
   });
 
-  await test("ordinary beforeEach hooks do not run when PostgreSQL UPDATE policy denies rows", async () => {
+  await test("multi false is checked after beforeEach and rolls back the update", async () => {
+    let calls = 0;
+    const rows = [{ id: -43001 }, { id: -43002 }];
+    const filter = { id: { $in: rows.map(({ id }) => id) } };
+    await assert.rejects(
+      table.dboBuilder.getTX(async (dbx) => {
+        const rec = dbx.rec as TableHandler;
+        await rec.insert(rows);
+        rec.hooks = {
+          beforeEach: [
+            {
+              commands: { update: 1 },
+              validate: () => {
+                calls++;
+              },
+            },
+          ],
+        };
+        await rec.update(filter, { parent_id: rows[0].id }, { multi: false });
+      }),
+      (error: unknown) => JSON.stringify(error).includes("More than 1 row modified"),
+    );
+    assert.equal(calls, 1);
+    assert.equal(await table.count(filter), 0);
+  });
+
+  await test("ordinary beforeEach hooks run before PostgreSQL UPDATE policy checks", async () => {
     const abort = new Error("rollback hook RLS fixture");
     await assert.rejects(
       table.dboBuilder.getTX(async (dbx, tx) => {
         const rec = dbx.rec as TableHandler;
-        await rec.insert({ id: -43001 });
+        const row = { id: -43001 };
+        await rec.insert(row);
         let calls = 0;
         rec.hooks = {
           beforeEach: [
@@ -260,6 +315,8 @@ export const testWithUserRLS = async (
         await tx.none(`
         CREATE ROLE ${role};
         GRANT USAGE ON SCHEMA public, prostgles TO ${role};
+        -- Statement triggers still run when RLS prevents every row update.
+        GRANT SELECT ON prostgles.v_triggers TO ${role};
         GRANT SELECT, UPDATE ON rec TO ${role};
         ALTER TABLE rec ENABLE ROW LEVEL SECURITY;
         CREATE POLICY hook_select ON rec FOR SELECT TO ${role} USING (true);
@@ -267,10 +324,10 @@ export const testWithUserRLS = async (
         SET LOCAL ROLE ${role};
       `);
         assert.deepEqual(
-          await rec.update({ id: -43001 }, { parent_id: null }, { returning: "*" }),
+          await rec.update(row, { parent_id: null }, { returning: "*" }),
           [],
         );
-        assert.equal(calls, 0);
+        assert.equal(calls, 1);
         throw abort;
       }),
       (error) => error === abort,

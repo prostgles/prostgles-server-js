@@ -1,3 +1,4 @@
+import { withUserRLS, type LocalParams } from "../DboBuilder";
 import type { AnyObject } from "prostgles-types";
 import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
 import type { FileTableConfig } from "../../ProstglesTypes";
@@ -37,7 +38,23 @@ export const updateFile = async (
   return { newData: omitKeys(newFile, ["id"]) };
 };
 
-export const getFileUpdateId = (filter: AnyObject): string => {
+export const lockFileForUpdate = async (
+  tableHandler: TableHandler,
+  filter: AnyObject,
+  where: string,
+  localParams: LocalParams | undefined,
+) => {
+  getFileUpdateId(filter);
+  const transaction = tableHandler.getTransaction(localParams);
+  if (!transaction) throw new Error("File updates require a transaction");
+  // Lock the permitted file version before uploading its replacement.
+  const row = await transaction.t.oneOrNone<{}>(
+    withUserRLS(localParams, `SELECT 1 FROM ${tableHandler.escapedName} ${where} FOR UPDATE`, true),
+  );
+  return !!row;
+};
+
+const getFileUpdateId = (filter: AnyObject): string => {
   const { data: validFilter } = getJSONBObjectSchemaValidationError(
     { id: { optional: true, type: "string" } },
     filter,

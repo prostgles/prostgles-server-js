@@ -1,4 +1,4 @@
-## insertMany<span style="opacity: 0.6;">(data: InsertDataWithNested<T, S>[], params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, T, S&gt;[]&gt;</span>
+## insertMany<span style="opacity: 0.6;">(data: InsertDataWithNested<T, S, never>[], params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, T, S&gt;[]&gt;</span>
 Inserts new records into the table.
 #### Parameters
 

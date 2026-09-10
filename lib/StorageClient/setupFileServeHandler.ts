@@ -75,8 +75,13 @@ export const setupFileServeHandler = (
         if (!url || expires < EXPIRES) {
           url = await storageClient.getSignedUrlForDownload(getFileStorageKey(file), 60 * 60);
 
+          // Match the storage key to avoid caching a stale URL after replacement; NULL matches legacy files.
           await db.any(
-            "UPDATE ${fileTableName:name} SET signed_url = ${signed_url}, signed_url_expires = ${signed_url_expires} WHERE id = ${id} AND storage_key IS NOT DISTINCT FROM ${storage_key}::uuid",
+            "UPDATE ${fileTableName:name} \
+              SET signed_url = ${signed_url}, \
+              signed_url_expires = ${signed_url_expires} \
+            WHERE id = ${id} \
+            AND storage_key IS NOT DISTINCT FROM ${storage_key}::uuid",
             {
               fileTableName,
               id: file.id,

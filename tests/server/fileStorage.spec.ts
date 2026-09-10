@@ -73,7 +73,7 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         assert.equal(await updated.text(), "updated");
       });
 
-      await t.test("filtered and disallowed-field updates do not upload", async () => {
+      await t.test("filtered updates and failed validation preserve storage", async () => {
         const count = uploads;
         const rules = {
           update: {
@@ -87,6 +87,8 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
           await files.update({ id: original.id }, fileData("forbidden"), { returning: "*" }, rules),
           [],
         );
+        assert.equal(uploads, count);
+        const before = list();
         await assert.rejects(() =>
           files.update({ id: original.id }, fileData("forbidden"), undefined, {
             update: {
@@ -96,7 +98,9 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
             },
           }),
         );
-        assert.equal(uploads, count);
+        assert.equal(uploads, count + 1);
+        assert.deepEqual(list(), before);
+        assert.deepEqual(await files.findOne({ id: original.id }), original);
         assert.equal(read(original), "updated");
       });
 
@@ -207,12 +211,6 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
               });
               if (data.original_name === "callback-failure.txt")
                 throw new Error("beforeEach failed");
-              return {
-                row: data,
-                onInserted: () => {
-                  events.push("inserted");
-                },
-              };
             },
           },
         ];
@@ -225,19 +223,16 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
                 returning: "*",
               });
               id = row.id;
-              assert.deepEqual(events, ["inserted"]);
+              assert.deepEqual(events, []);
               if (outcome === "rollback") throw new Error("outer transaction failed");
             });
             if (outcome === "commit") {
               await mutation;
-              assert.deepEqual(events, ["inserted", "commit"]);
+              assert.deepEqual(events, ["commit"]);
               await files.delete({ id });
             } else {
               await assert.rejects(mutation);
-              assert.deepEqual(
-                events,
-                outcome === "failure" ? ["rollback"] : ["inserted", "rollback"],
-              );
+              assert.deepEqual(events, ["rollback"]);
             }
           }
         } finally {

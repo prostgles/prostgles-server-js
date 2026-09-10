@@ -27,12 +27,12 @@ export type TableHooksDefinition<
   Context = undefined,
 > = {
   /**
-   * Runs after input field permissions are checked, before row validation and mutation SQL.
-   * Runs for each insert row, or once per update request with permitted matching rows.
-   * The update filter includes the publish forcedFilter. Matching rows are locked before hooks.
-   * SQL-only requests (including updateBatch) cannot run applicable beforeEach hooks.
+   * Runs sequentially before data validation and mutation SQL for each insert row,
+   * or once per update request, including requests with no matching rows.
+   * The update filter includes the publish forcedFilter.
+   * Also runs when generating SQL statements (including updateBatch).
+   * File inserts/updates reject SQL-only requests; file updates lock matching rows before hooks.
    * May replace the pending data and pass `hookContext` to the next hook.
-   * `onInserted` also runs for updates, is not awaited, and runs before the transaction commits.
    * Register `onCommit`/`onRollback` before starting external work so cleanup also runs if the
    * hook throws. These callbacks are awaited after the outer transaction finishes and receive
    * the non-transactional `db` and `dbo` objects.

@@ -7,9 +7,8 @@ import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules } from "./insert/getInsertTableRules";
 import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
-import { getFileUpdateId } from "./updateFile";
+import { lockFileForUpdate } from "./updateFile";
 import type { TableHandler } from "./TableHandler";
-import { prepareBeforeHookData } from "./prepareBeforeHookData";
 
 export async function update(
   this: TableHandler,
@@ -75,25 +74,12 @@ export async function update(
       localParams,
       tableRule: tableRules,
     });
-    if (this.is_media) getFileUpdateId(filter);
-    if (this.getBeforeHooks("update", [newData]).length) {
-      newData = prepareBeforeHookData(this, newData, fields, removeDisallowedFields, "update");
+    if (this.is_media) {
       if (params?.returnType?.startsWith("statement") || localParams?.returnQuery) {
-        throw new Error("Updates with beforeEach hooks cannot return SQL statements");
+        throw new Error("File updates cannot return SQL statements");
       }
-      if (!transaction) throw new Error("beforeEach hooks require a transaction");
-      const permittedRows = await transaction.t.any(
-        withUserRLS(
-          localParams,
-          `SELECT 1 FROM ${this.escapedName} ${updateFilter.where} FOR UPDATE`,
-          true,
-        ),
-      );
-      if (!permittedRows.length) {
+      if (!(await lockFileForUpdate(this, filter, updateFilter.where, localParams))) {
         return params?.returning && params.multi !== false ? [] : undefined;
-      }
-      if (params?.multi === false && permittedRows.length > 1) {
-        throw `More than 1 row modified: ${permittedRows.length} rows affected`;
       }
     }
 
@@ -227,7 +213,6 @@ export async function update(
       data: { filter, newData, params },
       duration: Date.now() - start,
     });
-    beforeResult.successCallbacks.forEach((cb) => cb());
     return result;
   } catch (e) {
     await this._log({

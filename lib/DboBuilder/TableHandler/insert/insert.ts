@@ -8,7 +8,6 @@ import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
-import { prepareBeforeHookData } from "../prepareBeforeHookData";
 import { getInsertQuery } from "./getInsertQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
 
@@ -87,11 +86,10 @@ export async function insert(
     });
 
     validateInsertParams(insertParams);
-    const hasBeforeHooks = this.getBeforeHooks("insert", rows).length > 0;
-    if (hasBeforeHooks && (insertParams?.returnType === "statement" || localParams?.returnQuery)) {
-      throw new Error("Inserts with beforeEach hooks cannot return SQL statements");
-    }
     if (this.is_media) {
+      if (insertParams?.returnType === "statement" || localParams?.returnQuery) {
+        throw new Error("File inserts cannot return SQL statements");
+      }
       const conflict = insertParams?.onConflict;
       if ((typeof conflict === "string" ? conflict : conflict?.action) === "DoUpdate") {
         throw new Error("Use update to replace an existing file");
@@ -101,22 +99,8 @@ export async function insert(
     const transaction = this.getTransaction(localParams);
     const tx = transaction?.t || this.db;
 
-    const successCallbacks: (() => void)[] = [];
-    // Check every input before any hook can perform work or remove disallowed fields.
-    const inputs =
-      hasBeforeHooks ?
-        rows.map((row) =>
-          prepareBeforeHookData(
-            this,
-            row,
-            fields,
-            insertParams?.removeDisallowedFields ?? false,
-            "insert",
-          ),
-        )
-      : rows;
     const preparedRows = await Promise.allSettled(
-      inputs.map(async (input) => {
+      rows.map(async (input) => {
         const { preValidate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) {
@@ -125,7 +109,6 @@ export async function insert(
 
         const beforeResult = await this.beforeEach(input, localParams, "insert", undefined);
         let row = beforeResult.row;
-        beforeResult.successCallbacks.forEach((cb) => successCallbacks.push(cb));
 
         if (preValidate) {
           if (!localParams) {
@@ -232,7 +215,6 @@ export async function insert(
       data: { rowOrRows, param2: insertParams },
       duration: Date.now() - start,
     });
-    successCallbacks.forEach((cb) => cb());
     return result;
   } catch (e) {
     await this._log({

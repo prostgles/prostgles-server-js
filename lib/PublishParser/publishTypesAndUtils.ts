@@ -94,7 +94,7 @@ export type BeforeEachTsTrigger<R, DBX, Context = undefined> = {
         hookContext: AnyObject | undefined;
         context: Context;
       },
-  ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject; onInserted?: () => void }>;
+  ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject }>;
 };
 
 export type OnCommitCallback<DBO = DBHandlerServer> = (args: {
