@@ -1,8 +1,27 @@
 import { ProstglesInitOptions } from "prostgles-server/dist/ProstglesTypes";
 import { DBGeneratedSchema } from "../DBGeneratedSchema";
+import type { PublishProfile } from "prostgles-server";
 
 import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 export const testPublishTypes = () => {
+  const profiles: PublishProfile<DBGeneratedSchema>[] = [
+    {
+      userTypes: ["member"],
+      publish: {
+        items: {
+          select: {
+            fields: {
+              id: 1,
+              // @ts-expect-error profile fields must belong to the table
+              missing_column: 1,
+            },
+          },
+        },
+      },
+    },
+  ];
+  const syncPublish: ProstglesInitOptions<DBGeneratedSchema>["publish"] = () => profiles;
+  const asyncPublish: ProstglesInitOptions<DBGeneratedSchema>["publish"] = async () => profiles;
   () => {
     const p1: PublishFullyTyped<DBGeneratedSchema> = {
       items: {

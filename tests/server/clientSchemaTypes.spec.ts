@@ -201,6 +201,15 @@ export const testClientSchemaTypes = async (db: DB) => {
         };
       `,
         );
+        const originalPublish = instance.options.publish;
+        assert(Array.isArray(originalPublish));
+        await instance.update({
+          publish: async ({ db, user }) => {
+            assert.equal((await db.one("SELECT 1 AS value")).value, 1);
+            assert(user === undefined || typeof user.type === "string");
+            return originalPublish;
+          },
+        });
         const profiles: Record<string, ClientSchema> = {};
         for (const [role, name] of [
           ["guest", "GuestDBSchema"],
@@ -245,6 +254,12 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         assert.equal(updated[0].body, "updated");
         assert.equal(updated[0].created_by, "guest");
+        await instance.update({ publish: () => originalPublish });
+        assert.equal(
+          (await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({ id: inserted.id }))
+            .created_by,
+          "guest",
+        );
         await assert.rejects(
           (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
             { id: inserted.id },
@@ -253,7 +268,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
-        const originalPublish = instance.options.publish;
+        await instance.update({ publish: originalPublish });
         for (const [publish, error] of [
           [[{ userTypes: [], publish: null }], /userTypes must not be empty/],
           [
@@ -275,6 +290,12 @@ export const testClientSchemaTypes = async (db: DB) => {
             /Duplicate publish schema name/,
           ],
         ] as const) {
+          await instance.update({ publish: () => publish as unknown as typeof originalPublish });
+          await assert.rejects(
+            (handlers.clientDb as DBHandlerServer)[tableName]!.find!(),
+            error,
+          );
+          await instance.update({ publish: originalPublish });
           await assert.rejects(
             instance.update({
               publish: publish as unknown as ProstglesInitOptions["publish"],

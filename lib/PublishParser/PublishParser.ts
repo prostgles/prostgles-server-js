@@ -151,16 +151,13 @@ export class PublishParser {
   ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
 
-    const publish = await (() => {
-      if (Array.isArray(this.publish)) {
-        const { user } = publishParams;
-        if (!user) return undefined;
-        return this.publish.find((publishRule) => publishRule.userTypes.includes(user.type))
-          ?.publish;
-      }
-
-      return applyParamsIfFunc(this.publish, publishParams);
-    })();
+    const result = await applyParamsIfFunc(this.publish, publishParams);
+    const publish =
+      Array.isArray(result) ?
+        validatePublishProfiles(result).find((profile) =>
+          publishParams.user ? profile.userTypes.includes(publishParams.user.type) : false,
+        )?.publish
+      : result;
 
     if (publish === "*") {
       const publish: PublishObject = {};

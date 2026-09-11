@@ -566,4 +566,6 @@ export type PublishProfile<Schema = void> = {
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> =
   | PublishProfile<Schema>[]
   | PublishedResult<Schema>
-  | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
+  | ((
+      params: PublishParams<Schema, SUser>,
+    ) => Awaitable<PublishedResult<Schema> | PublishProfile<Schema>[]>);
