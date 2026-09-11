@@ -4,6 +4,7 @@ import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { PublishParser } from "./PublishParser";
 import { type PermissionScope, type PublishObject } from "./PublishParser";
 import { getDBSchemaTable } from "./getDBSchemaTable";
+import { getPublishedTableNames } from "./getPublishedTableNames";
 
 type Args = AuthClientRequest & {
   userData: AuthResultWithSID | undefined;
@@ -18,8 +19,6 @@ export async function getSchemaFromPublish(
 }> {
   const tableSchemaErrors: TableSchemaErrors = {};
   const tables: DBSchemaTable[] = [];
-
-  const txKey = !this.prostgles.opts.transactions ? "" : "tx";
 
   try {
     /* Publish tables and views based on socket */
@@ -39,21 +38,7 @@ export async function getSchemaFromPublish(
     if (!publish || !Object.keys(publish).length) {
       return { tables, tableSchemaErrors };
     }
-    const tableNames = Object.keys(publish).filter((k) => !txKey || txKey !== k);
-
-    /**
-     * Add file table to the list of published tables if it's referenced by other published tables.
-     * Access to the file table is controlled through the publish rules of the tables referencing it.
-     */
-    const fileTableName = this.prostgles.opts.fileTable?.tableName;
-    if (fileTableName && this.dbo[fileTableName]?.is_media && !tableNames.includes(fileTableName)) {
-      const isReferenced = this.prostgles.dboBuilder.tablesOrViews?.some((t) =>
-        t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
-      );
-      if (isReferenced) {
-        tableNames.unshift(fileTableName);
-      }
-    }
+    const tableNames = getPublishedTableNames(this, publish);
 
     await Promise.all(
       tableNames.map(async (tableName) => {

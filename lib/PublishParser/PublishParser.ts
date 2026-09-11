@@ -25,9 +25,12 @@ import {
   type PermissionScope,
   type PublishObject,
 } from "./publishTypesAndUtils";
+import { validatePublishProfiles } from "./validatePublishProfiles";
 
 export class PublishParser {
-  publish: ProstglesInitOptions<void, SessionUser, any>["publish"];
+  publish:
+    | Exclude<ProstglesInitOptions<void, SessionUser, any>["publish"], unknown[]>
+    | ReturnType<typeof validatePublishProfiles>;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB;
@@ -35,7 +38,8 @@ export class PublishParser {
 
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
-    this.publish = prostgles.opts.publish;
+    const { publish } = prostgles.opts;
+    this.publish = Array.isArray(publish) ? validatePublishProfiles(publish) : publish;
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
@@ -146,7 +150,17 @@ export class PublishParser {
     clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
-    const publish = await applyParamsIfFunc(this.publish, publishParams);
+
+    const publish = await (() => {
+      if (Array.isArray(this.publish)) {
+        const { user } = publishParams;
+        if (!user) return undefined;
+        return this.publish.find((publishRule) => publishRule.userTypes.includes(user.type))
+          ?.publish;
+      }
+
+      return applyParamsIfFunc(this.publish, publishParams);
+    })();
 
     if (publish === "*") {
       const publish: PublishObject = {};
@@ -271,13 +285,18 @@ export class PublishParser {
     args: DboTable,
     clientInfo: AuthResultWithSID | undefined,
     scope: PermissionScope | undefined,
+    overriddenPublish?: PublishObject,
   ): Promise<ParsedTableRule | undefined> {
     const { tableName } = args;
     const tableHandler = this.dbo[tableName];
     if (!tableHandler) {
       throw "INTERNAL ERROR: table handler not found for " + args.tableName;
     }
-    const fileTablePublishRules = await this.getTableRulesWithoutFileTable(args, clientInfo);
+    const fileTablePublishRules = await this.getTableRulesWithoutFileTable(
+      args,
+      clientInfo,
+      overriddenPublish,
+    );
     if (this.dbo[args.tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         args.tableName,
@@ -285,6 +304,7 @@ export class PublishParser {
         args.clientReq,
         clientInfo,
         scope,
+        overriddenPublish,
       );
       return applyScopeToTableRules(
         tableName,

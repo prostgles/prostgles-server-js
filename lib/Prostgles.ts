@@ -1,3 +1,4 @@
+import { DB_GENERATED_SCHEMA_NAME } from "./DBSchemaBuilder/constants";
 import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import type { SessionUser } from "./Auth/AuthTypes";
@@ -21,7 +22,7 @@ export { applyTableConfig } from "./TableConfig/applyTableConfig";
 
 import { CHANNELS, tryCatchV2 } from "prostgles-types";
 import type { DBEventsManager } from "./DBEventsManager";
-import type { PublishParser } from "./PublishParser/PublishParser";
+import { PublishParser } from "./PublishParser/PublishParser";
 import { pushSocketSchema } from "./WebsocketAPI/pushSocketSchema";
 
 export type DB = pgPromise.IDatabase<{}, pg.IClient>;
@@ -229,7 +230,7 @@ export class Prostgles {
   }
 
   getTSFileName() {
-    const fileName = "DBGeneratedSchema.ts";
+    const fileName = `${DB_GENERATED_SCHEMA_NAME}.ts`;
     const _dir = this.opts.tsGeneratedTypesDir || "";
     const dir = _dir.endsWith("/") ? _dir : `${_dir}/`;
     const fullPath = dir + fileName;
@@ -240,10 +241,10 @@ export class Prostgles {
    * Will write the Schema Typescript definitions to file (tsGeneratedTypesDir)
    * force is used for hotReloadMode to trigger a restart
    */
-  writeDBSchema(force = false) {
+  async writeDBSchema(force = false) {
     if (this.opts.tsGeneratedTypesDir) {
+      const { tsSchema: fileContent } = await this.dboBuilder.getTsDefinitions();
       const { fullPath, fileName } = this.getTSFileName();
-      const { tsSchema: fileContent } = this.dboBuilder.getTsDefinitions();
       fs.mkdirSync(dirname(fullPath), { recursive: true });
 
       const existingContent =
@@ -346,6 +347,11 @@ export class Prostgles {
   initRestApi = () => {
     this.restApi?.destroy();
     this.restApi = this.opts.restApi && new RestApi({ prostgles: this, ...this.opts.restApi });
+  };
+
+  initPublishParser = () => {
+    this.publishParser = new PublishParser(this);
+    this.dboBuilder.publishParser = this.publishParser;
   };
 
   initAuthHandler = () => {

@@ -81,7 +81,7 @@ export class SchemaWatch {
           console.log("watchSchema: Re-writing TS schema");
 
           await this.dboBuilder.prostgles.refreshDBO();
-          this.dboBuilder.prostgles.writeDBSchema(true);
+          await this.dboBuilder.prostgles.writeDBSchema(true);
         }
       } else {
         /* Full re-init. Sockets must reconnect */

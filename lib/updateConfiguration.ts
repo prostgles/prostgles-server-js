@@ -32,6 +32,9 @@ export const updateConfiguration = async (
   if (includes(optionsThatChanged, "schema")) {
     await prgl.refreshDBO();
   }
+  if (includes(optionsThatChanged, "publish")) {
+    prgl.initPublishParser();
+  }
   if (includes(optionsThatChanged, "auth")) {
     prgl.initAuthHandler();
   }
@@ -42,10 +45,11 @@ export const updateConfiguration = async (
   }
 
   if (
+    includes(optionsThatChanged, "publish") ||
     includes(optionsThatChanged, "tsGeneratedTypesDir") ||
     includes(optionsThatChanged, "tsGeneratedTypesFunctionsPath")
   ) {
-    prgl.writeDBSchema();
+    await prgl.writeDBSchema();
   }
 
   if (isEmpty(newOpts)) return;

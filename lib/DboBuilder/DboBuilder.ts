@@ -35,6 +35,7 @@ import { prepareShortestJoinPaths } from "./joins/prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSql/runSQL";
 import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
+import { getPublishSchemas } from "../DBSchemaBuilder/getPublishSchemas";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -208,8 +209,8 @@ export class DboBuilder {
     return this.shortestJoinPaths;
   }
 
-  prepareShortestJoinPaths = async () => {
-    const { joins, shortestJoinPaths, joinGraph } = await prepareShortestJoinPaths(this);
+  prepareShortestJoinPaths = () => {
+    const { joins, shortestJoinPaths, joinGraph } = prepareShortestJoinPaths(this);
     this.joinGraph = joinGraph;
     this.joins = joins;
     this.shortestJoinPaths = shortestJoinPaths;
@@ -276,7 +277,7 @@ export class DboBuilder {
       this.prostgles.dbForSchema!,
       this.prostgles.opts.schemaFilter,
     );
-    await this.prepareShortestJoinPaths();
+    this.prepareShortestJoinPaths();
 
     this.dbo = {};
     this.tablesOrViews.map((tov) => {
@@ -349,7 +350,7 @@ export class DboBuilder {
     }
     return this.tablesOrViews;
   };
-  getTsDefinitions = <DDL extends string | undefined = undefined>({
+  getTsDefinitions = async ({
     excludeFunctions,
     extraTables = [],
     ddlWithRollback,
@@ -362,12 +363,13 @@ export class DboBuilder {
      * This is useful for generating an updated TypeScript schema after running a migration SQL file, for example.
      * Note that this will be run within a transaction that is rolled back, so it SHOULD not affect the actual database schema.
      */
-    ddlWithRollback?: DDL;
-  } = {}): DDL extends string ? Promise<{ tsSchema: string; tablesOrViews: TableSchema[] }>
-  : { tsSchema: string; tablesOrViews: TableSchema[] } => {
+    ddlWithRollback?: string;
+  } = {}): Promise<{ tsSchema: string; tablesOrViews: TableSchema[] }> => {
+    const clientSchemas = this.publishParser && (await getPublishSchemas(this.publishParser));
     const getSchema = (tablesOrViews: TableSchema[]) => {
       const tableTsDefinitions = getDBGeneratedSchema({
         config: this.prostgles.mergedTableConfig.tableConfig,
+        clientSchemas,
         tablesOrViews: [
           ...tablesOrViews,
           ...extraTables.filter(
@@ -386,26 +388,17 @@ export class DboBuilder {
       return { tsSchema, tablesOrViews };
     };
     if (ddlWithRollback) {
-      return new Promise<{ tsSchema: string; tablesOrViews: TableSchema[] }>((resolve, reject) => {
-        getTablesForSchemaPostgresSQL(this, {
-          schemaFilter: this.prostgles.opts.schemaFilter,
-          ddlWithRollback,
-        })
-          .then((res) => {
-            const tablesOrViews = res.result;
-            resolve(getSchema(tablesOrViews));
-          })
-          .catch(reject);
-      }) as DDL extends string ? Promise<{ tsSchema: string; tablesOrViews: TableSchema[] }>
-      : { tsSchema: string; tablesOrViews: TableSchema[] };
+      const { result } = await getTablesForSchemaPostgresSQL(this, {
+        schemaFilter: this.prostgles.opts.schemaFilter,
+        ddlWithRollback,
+      });
+      return getSchema(result);
     }
     const tablesOrViews = this.tablesOrViews;
     if (!tablesOrViews) {
       throw new Error("Unexpected error: tablesOrViews is undefined");
     }
-    return getSchema(tablesOrViews) as DDL extends string ?
-      Promise<{ tsSchema: string; tablesOrViews: TableSchema[] }>
-    : { tsSchema: string; tablesOrViews: TableSchema[] };
+    return getSchema(tablesOrViews);
   };
 
   getShortestJoinPath = (

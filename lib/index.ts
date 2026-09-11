@@ -20,7 +20,7 @@ export const createProstgles = <S = void, SUser extends SessionUser = SessionUse
 };
 export * from "./PublishParser/defineServerFunction";
 export * from "./Auth/AuthTypes";
-export type { PublishParams } from "./PublishParser/publishTypesAndUtils";
+export type { PublishParams, PublishProfile } from "./PublishParser/publishTypesAndUtils";
 export type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
 export type { DBHandlerServer } from "./Prostgles";
 export type { StorageClient as CloudClient } from "./StorageClient/StorageClientTypes";

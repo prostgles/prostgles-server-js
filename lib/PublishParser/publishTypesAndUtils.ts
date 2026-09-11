@@ -556,6 +556,13 @@ export type ParsedPublishTables = {
 
 type PublishAllOrNothingRoot = Exclude<PublishAllOrNothing, boolean>;
 export type PublishedResult<Schema = void> = PublishAllOrNothingRoot | PublishFullyTyped<Schema>;
+export type PublishProfile<Schema = void> = {
+  /** Exported schema type name; defaults to Publish1Schema, Publish2Schema, etc. */
+  name?: string;
+  userTypes: string[];
+  publish: PublishedResult<Schema>;
+};
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> =
+  | PublishProfile<Schema>[]
   | PublishedResult<Schema>
   | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);

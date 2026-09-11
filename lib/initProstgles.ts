@@ -12,7 +12,7 @@ import { getDbConnection } from "./getDbConnection";
 import type { DBHandlerServer, Prostgles } from "./Prostgles";
 import { getIsSuperUser } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
-import { PublishParser, type PermissionScope } from "./PublishParser/PublishParser";
+import type { PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
 import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
@@ -92,15 +92,9 @@ export type CreateContextParams<S> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>;
   onCleanup: (cleanup: ContextCleanup) => void;
 };
-export type CreateContext<S, Context> = (
-  params: CreateContextParams<S>,
-) => MaybePromise<Context>;
+export type CreateContext<S, Context> = (params: CreateContextParams<S>) => MaybePromise<Context>;
 
-export type OnReadyCallback<
-  S,
-  SUser extends SessionUser,
-  Context = undefined,
-> = (
+export type OnReadyCallback<S, SUser extends SessionUser, Context = undefined> = (
   params: OnReadyParams<S, Context>,
   update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
@@ -109,11 +103,7 @@ export type OnReadyCallbackBasic = (
   update: (newOpts: UpdatableOptions<void, SessionUser, any>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 
-export type InitResult<
-  S = void,
-  SUser extends SessionUser = SessionUser,
-  Context = undefined,
-> = {
+export type InitResult<S = void, SUser extends SessionUser = SessionUser, Context = undefined> = {
   db: DBOFullyTyped<S>;
   context: Context;
   sql: SQLHandler;
@@ -126,7 +116,7 @@ export type InitResult<
    */
   getTSSchema: typeof DboBuilder.prototype.getTsDefinitions;
   getSchema: typeof DboBuilder.prototype.getSchema;
-  reWriteDBSchema: () => void;
+  reWriteDBSchema: () => Promise<void>;
   update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser, Context>>;
   options: ProstglesInitOptions<S, SUser, Context>;
@@ -259,10 +249,8 @@ export const initProstgles = async function (
       /* 3.9 Check auth config */
       this.initAuthHandler();
 
-      this.publishParser = new PublishParser(this);
-      this.dboBuilder.publishParser = this.publishParser;
-
       /* 4. Set publish and auth listeners */
+      this.initPublishParser();
       this.setupSocketIO();
     } else if (this.opts.auth) {
       throw "Auth config does not work without publish";
@@ -270,7 +258,7 @@ export const initProstgles = async function (
 
     this.dbEventsManager = new DBEventsManager(db, pgp);
 
-    this.writeDBSchema();
+    await this.writeDBSchema();
 
     /* 5. Finish init and provide DBO object */
     try {

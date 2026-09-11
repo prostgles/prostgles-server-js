@@ -3,7 +3,7 @@ import { includes, isDefined } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { PublishParser } from "./PublishParser";
-import type { ParsedPublishTable, UpdateRule } from "./publishTypesAndUtils";
+import type { ParsedPublishTable, PublishObject, UpdateRule } from "./publishTypesAndUtils";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
 
 /**
@@ -21,6 +21,7 @@ export async function getFileTableRules(
   clientReq: AuthClientRequest | undefined,
   clientInfo: AuthResultWithSID | undefined,
   scope: LocalParams["scope"],
+  overriddenPublish?: PublishObject,
 ) {
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
@@ -42,7 +43,7 @@ export async function getFileTableRules(
     .filter(isDefined);
   if (referencedColumns?.length) {
     for (const { tableName, fileColumns, allColumns } of referencedColumns) {
-      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo, scope);
+      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo, scope, overriddenPublish);
       if (tableRules) {
         fileColumns.map((column) => {
           const path = [{ table: tableName, on: [{ id: column }] }];

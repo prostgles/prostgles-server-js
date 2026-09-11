@@ -25,8 +25,8 @@ export const getColumnTypescriptDefinition = ({
   column: TableSchema["columns"][number];
 }) => {
   /**
-   * Columns that are nullable or have default values can be ommitted from an insert
-   * Non nullable columns with default values cannot containt null values in an insert so they must contain a valid value or be omitted
+   * Columns that are nullable or have default values can be omitted from an insert
+   * Non nullable columns with default values cannot contain null values in an insert so they must contain a valid value or be omitted
    */
 
   const dataType = getDataType({

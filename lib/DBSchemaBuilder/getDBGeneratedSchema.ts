@@ -1,15 +1,22 @@
+import { DB_GENERATED_SCHEMA_NAME } from "./constants";
 import { isDefined, isEmpty, type TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { escapeTSNames } from "../utils/utils";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
 import { fromEntries } from "../PublishParser/applyScopeToTableRules";
+import {
+  getClientDBGeneratedSchemas,
+  type ClientSchemaProfiles,
+} from "./getClientDBGeneratedSchemas";
 
 export const getDBGeneratedSchema = ({
   config,
   tablesOrViews,
+  clientSchemas,
 }: {
   config: TableConfig | undefined;
   tablesOrViews: TableSchema[];
+  clientSchemas?: ClientSchemaProfiles;
 }): string => {
   const tables: string[] = [];
 
@@ -61,7 +68,7 @@ export const getDBGeneratedSchema = ({
   };\n  `);
     });
   return `
-export type DBGeneratedSchema = {
+export type ${DB_GENERATED_SCHEMA_NAME} = {
   ${tables.join("")}
 }
 
@@ -69,14 +76,14 @@ export type DBGeneratedSchema = {
  * Data types as expected when selecting from the database
  * */
 export type DBSchema = {
-  [K in keyof DBGeneratedSchema]: Required<DBGeneratedSchema[K]["columns"]>;
+  [K in keyof ${DB_GENERATED_SCHEMA_NAME}]: Required<${DB_GENERATED_SCHEMA_NAME}[K]["columns"]>;
 };
 
 /**
  * Data types as expected when inserting into the database (optional fields might be nullable/with defaults)
  * */
 export type DBSchemaForInsert = {
-  [K in keyof DBGeneratedSchema]: DBGeneratedSchema[K]["columns"];
-};
+  [K in keyof ${DB_GENERATED_SCHEMA_NAME}]: ${DB_GENERATED_SCHEMA_NAME}[K]["columns"];
+};${clientSchemas ? "\n" + getClientDBGeneratedSchemas(clientSchemas, tablesOrViews, config) : ""}
 `;
 };

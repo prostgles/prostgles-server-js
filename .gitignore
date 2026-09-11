@@ -2,3 +2,4 @@ node_modules
 .npmrc
 dist
 tests/client/PID.txt
+debug/
