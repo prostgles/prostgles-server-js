@@ -62,7 +62,7 @@ export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = 
   data: Partial<R>;
   filter: AnyObject | undefined;
 };
-export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer, InputDataType = R> = {
   row: R;
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
@@ -73,11 +73,12 @@ export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
     }
   | {
       command: "insert";
-      data: R;
+      /** The whole input, including all rows for a bulk insert. */
+      data: Partial<InputDataType> | Partial<InputDataType>[];
     }
   | {
       command: "update";
-      data: Partial<R>;
+      data: Partial<InputDataType>;
     }
 );
 
@@ -113,14 +114,14 @@ export type TransactionCallbacks<DBO = DBHandlerServer> = {
   onRollback: OnCommit<DBO>;
 };
 
-export type AfterEachTsTrigger<R, DBX, Context = undefined> = {
+export type AfterEachTsTrigger<R, DBX, Context = undefined, InputDataType = R> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /**
    * Will only run this trigger if the insert/update provides non null values for these fields.
    */
   changedFields?: (keyof R)[];
   validate: (
-    params: ValidateRowArgsCommon<R, DBX> &
+    params: ValidateRowArgsCommon<R, DBX, InputDataType> &
       TransactionCallbacks<DBX> & {
         localParams: undefined | LocalParams;
         context: Context;

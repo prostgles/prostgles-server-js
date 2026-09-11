@@ -1,5 +1,9 @@
 import type pgPromise from "pg-promise";
-import type { AnyObject, DBSchema } from "prostgles-types";
+import type {
+  AnyObject,
+  DBSchema,
+  InsertDataWithNested,
+} from "prostgles-types";
 
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -10,13 +14,13 @@ import type {
   TransactionCallbacks,
 } from "../PublishParser/PublishParser";
 
-export type TableHooks<S = void, Context = undefined> =
-  S extends DBSchema ?
-    Partial<{
+export type TableHooks<S = void, Context = undefined> = S extends DBSchema
+  ? Partial<{
       [tableName in keyof S]: TableHooksDefinition<
         Required<S[tableName]["columns"]>,
         DBOFullyTyped<S>,
-        Context
+        Context,
+        InsertDataWithNested<S[tableName]["columns"], S, tableName>
       >;
     }>
   : Record<string, TableHooksDefinition<AnyObject, DbTxTableHandlers, Context>>;
@@ -25,6 +29,7 @@ export type TableHooksDefinition<
   RowDataType = AnyObject,
   DBX = DbTxTableHandlers,
   Context = undefined,
+  InputDataType = RowDataType,
 > = {
   /**
    * Runs sequentially before data validation and mutation SQL for each insert row,
@@ -33,19 +38,21 @@ export type TableHooksDefinition<
    * Also runs when generating SQL statements (including updateBatch).
    * File inserts/updates reject SQL-only requests; file updates lock matching rows before hooks.
    * May replace the pending data and pass `hookContext` to the next hook.
+   * Data is the raw input, including nested inserts and values awaiting PostgreSQL casts.
    * Register `onCommit`/`onRollback` before starting external work so cleanup also runs if the
    * hook throws. These callbacks are awaited after the outer transaction finishes and receive
    * the non-transactional `db` and `dbo` objects.
    */
-  beforeEach?: BeforeEachTsTrigger<RowDataType, DBX, Context>[];
+  beforeEach?: BeforeEachTsTrigger<InputDataType, DBX, Context>[];
 
   /**
    * Runs once per affected row after SQL, inside the same transaction.
    * `row` is the inserted/updated row or the deleted row's pre-delete state. Throwing rolls back.
+   * `data` is the input for the operation, including the whole array for bulk inserts.
    * Use `onCommit` for side effects that must only run after the transaction commits.
    * Its callback receives the non-transactional `db` and `dbo` objects.
    */
-  afterEach?: AfterEachTsTrigger<RowDataType, DBX, Context>[];
+  afterEach?: AfterEachTsTrigger<RowDataType, DBX, Context, InputDataType>[];
 
   /**
    * Runs once after all applicable `afterEach` hooks, inside the same transaction.

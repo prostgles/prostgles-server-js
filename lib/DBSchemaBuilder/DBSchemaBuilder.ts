@@ -27,6 +27,16 @@ export type DBOFullyTyped<
 > = DBTableHandlersFromSchema<Schema> &
   DBHandlerServerWithTx<DBTableHandlersFromSchema<Schema>, WithTransactions>;
 
+/** Publish-aware server wrappers for client requests; transactions and isView are unavailable. */
+export type DBOFullyTypedClient<Schema = void> =
+  Schema extends DBSchema ?
+    {
+      [TName in keyof Schema]:
+        | TableHandler<Schema[TName]["columns"], Schema, TName>
+        | (Schema[TName] extends { optional: true } ? undefined : never);
+    }
+  : Record<string, Partial<TableHandler>>;
+
 export type PublishFullyTyped<Schema = void> =
   Schema extends DBSchema ?
     {

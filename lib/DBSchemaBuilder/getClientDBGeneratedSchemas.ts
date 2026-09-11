@@ -59,15 +59,40 @@ export const getClientDBGeneratedSchemas = (
               .filter(Boolean)
               .join(" & ") || "Record<string, never>"
           );
-        return [`  ${JSON.stringify(table.name)}: ${tableType} & { insertColumns: ${input} };`];
+        const updating = published.filter((t) => t?.publishInfo.update);
+        const updateAllowed = table.columns
+          .filter((column) =>
+            updating.some((t) => t?.columns.some((c) => c.name === column.name && c.update)),
+          )
+          .map((column) => column.name)
+          .sort();
+        const updateExcluded = table.columns
+          .filter((column) => !updateAllowed.includes(column.name))
+          .map((column) => `${JSON.stringify(column.name)}?: never`)
+          .sort();
+        const updateInput =
+          !updating.length ? "never" : (
+            [
+              updateAllowed.length ?
+                `Partial<import("prostgles-types").UpsertDataToPGCast<Pick<${tableType}["columns"], ${keys(updateAllowed)}>>>`
+              : "",
+              updateExcluded.length ? `{ ${updateExcluded.join("; ")} }` : "",
+            ]
+              .filter(Boolean)
+              .join(" & ") || "Record<string, never>"
+          );
+        const optionalTable = published.every(Boolean) ? "" : " optional: true;";
+        return [
+          `  ${JSON.stringify(table.name)}: ${tableType} & { insertColumns: ${input}; updateColumns: ${updateInput};${optionalTable} };`,
+        ];
       });
     return `export type ${name} = {\n${definitions.join("\n")}\n};`;
   };
 
   return [
-    "/** Insert access profiles. Row types retain the database schema; runtime permissions still apply. */",
+    "/** Publish access profiles. Row types retain the database schema; runtime permissions still apply. */",
     ...entries.map(([name, schema]) => generate(name, [schema])),
-    "/** Permissive insert inputs across all supplied profiles; narrow to a named profile for exact inputs. */",
+    "/** Permissive write inputs across all supplied profiles; tables missing from a profile are optional. */",
     generate(
       "ClientDBSchema",
       entries.map(([, schema]) => schema),

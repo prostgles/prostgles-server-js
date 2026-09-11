@@ -7,7 +7,7 @@ import {
   type TableHandler,
 } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
@@ -16,7 +16,7 @@ import { getClientSchema } from "./getClientSchema";
 
 export type ClientHandlers<S = void> = {
   clientSql: SQLHandler;
-  clientDb: DBOFullyTyped<S, false>;
+  clientDb: DBOFullyTypedClient<S>;
   clientMethods: Record<string, ServerFunctionDefinition>;
   clientSchema: ClientSchema;
 };
@@ -24,7 +24,7 @@ export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
-): Promise<ClientHandlers> => {
+): Promise<ClientHandlers<S>> => {
   prostgles.checkNotDestroyed();
   const clientSchema =
     clientReq.socket?.prostgles?.get(prostgles.appId) ??
@@ -67,7 +67,7 @@ export const getClientHandlers = async <S = void>(
   const clientDb = {
     ...tableHandlers,
     ...txNotAllowed,
-  } as DBOFullyTyped<S, false>;
+  } as DBOFullyTypedClient<S>;
 
   const clientMethods: Record<string, ServerFunctionDefinition> = Object.fromEntries(
     clientSchema.methods.map(({ name, input, description, output }) => {

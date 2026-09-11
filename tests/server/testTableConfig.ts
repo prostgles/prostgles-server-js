@@ -2,6 +2,52 @@ import type { TableConfig, TableHooks } from "prostgles-server";
 import type { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 export const testTableHooks: TableHooks<DBGeneratedSchema> = {
+  rec: {
+    beforeEach: [
+      {
+        commands: { insert: 1, update: 1 },
+        validate: ({ data }) => {
+          // Before hooks receive nested inputs, not resolved foreign-key values.
+          const nested: typeof data = {
+            parent_id: { id: "1" },
+            rec: [{ recf: { id: 1 } }],
+          };
+
+          // @ts-expect-error Can be nested insert
+          data.parent_id! + 1;
+
+          // @ts-expect-error Nested rows retain their column types.
+          const invalid: typeof data = { rec: [{ missing_column: true }] };
+          void nested;
+          void invalid;
+          return { row: data };
+        },
+      },
+    ],
+    afterEach: [
+      {
+        commands: { insert: 1, update: 1 },
+        validate: async ({ command, data, row }) => {
+          row.id satisfies number;
+          if (command === "insert") {
+            const inputs: typeof data = [{}, { id: "1" }];
+            void inputs;
+            // @ts-expect-error Bulk insert data must be narrowed before accessing columns.
+            data.id;
+            const input = Array.isArray(data) ? data[0] : data;
+            // @ts-expect-error Input values can still require PostgreSQL casts.
+            input.id satisfies number;
+          } else if (command === "update") {
+            const input: typeof data = { id: "1" };
+            // @ts-expect-error Updates receive one input object, not an array.
+            const inputs: typeof data = [{ id: 1 }];
+            void input;
+            void inputs;
+          }
+        },
+      },
+    ],
+  },
   files: {
     afterEach: [
       {
@@ -11,6 +57,7 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
         validate: async ({ command, data, row, tx }) => {
           row satisfies DBGeneratedSchema["files"]["columns"];
           if (command === "insert") {
+            // @ts-expect-error Input data is partial and may contain multiple rows.
             data satisfies DBGeneratedSchema["files"]["columns"];
           }
           // @ts-expect-error The hook row is typed from DBGeneratedSchema.

@@ -15,7 +15,7 @@ import ts from "typescript";
 
 export const testClientSchemaTypes = async (db: DB) => {
   await test(
-    "client insert profiles compile at startup and follow user types",
+    "client publish profiles compile at startup and follow user types",
     { timeout: 30000 },
     async () => {
       const http = createServer();
@@ -68,6 +68,10 @@ export const testClientSchemaTypes = async (db: DB) => {
               publish: {
                 [tableName]: {
                   select: "*",
+                  update: {
+                    fields: ["body", "note", "created_by", "synced"],
+                    forcedData: { created_by: "guest" },
+                  },
                   insert: {
                     fields: { internal: 0 },
                     forcedData: { created_by: "guest" },
@@ -78,7 +82,10 @@ export const testClientSchemaTypes = async (db: DB) => {
             {
               name: "AdminDBSchema",
               userTypes: ["admin"],
-              publish: { [tableName]: { select: "*", insert: "*" } },
+              publish: {
+                [tableName]: { select: "*", insert: "*", update: "*" },
+                "client_schema_types.private_table": { select: "*" },
+              },
             },
             {
               name: "ViewerDBSchema",
@@ -103,13 +110,63 @@ export const testClientSchemaTypes = async (db: DB) => {
           tsSchema,
           `
         import type { TableHandler, InsertDataWithNested } from "prostgles-types";
+        import type { DBHandlerClient } from "prostgles-client";
+        import type { DBOFullyTypedClient } from "../server/node_modules/prostgles-server";
+        import type { RestrictedFunctionContext, UnrestrictedFunctionContext } from "../server/node_modules/prostgles-server/dist/PublishParser/defineServerFunction";
+        import type { getClientHandlers } from "../server/node_modules/prostgles-server/dist/WebsocketAPI/getClientHandlers";
         type Name = "${tableName}";
         declare const guest: TableHandler<GuestDBSchema[Name]["columns"], GuestDBSchema, Name>;
         declare const admin: TableHandler<AdminDBSchema[Name]["columns"], AdminDBSchema, Name>;
         declare const combined: TableHandler<ClientDBSchema[Name]["columns"], ClientDBSchema, Name>;
         declare const server: TableHandler<${DB_GENERATED_SCHEMA_NAME}[Name]["columns"], ${DB_GENERATED_SCHEMA_NAME}, Name>;
         declare const viewer: TableHandler<ViewerDBSchema[Name]["columns"], ViewerDBSchema, Name>;
+        declare const client: DBHandlerClient<ClientDBSchema>;
+        declare const adminClient: DBHandlerClient<AdminDBSchema>;
+        declare const restricted: RestrictedFunctionContext<GuestDBSchema>;
+        declare const unrestricted: UnrestrictedFunctionContext<DBGeneratedSchema>;
+        declare const serverClient: DBOFullyTypedClient<ClientDBSchema>;
+        declare const handlers: Awaited<ReturnType<typeof getClientHandlers<GuestDBSchema>>>;
         async () => {
+          const restrictedRow = await restricted.dbo["${tableName}"].insert({ body: "hello" }, { returning: "*" });
+          restrictedRow.created_by satisfies string;
+          await handlers.clientDb["${tableName}"].update({}, { body: "changed" });
+          // @ts-expect-error getClientHandlers preserves profile field restrictions
+          await handlers.clientDb["${tableName}"].update({}, { internal: "private" });
+          // @ts-expect-error restricted functions respect forced insert fields
+          await restricted.dbo["${tableName}"].insert({ body: "hello", created_by: "other" });
+          // @ts-expect-error restricted functions cannot start transactions
+          restricted.dbo.tx(() => {});
+          // @ts-expect-error client wrappers do not expose isView
+          restricted.dbo["${tableName}"].isView;
+          // @ts-expect-error table is absent for some profiles
+          await serverClient["client_schema_types.private_table"].find();
+          await serverClient["client_schema_types.private_table"]?.find();
+          await unrestricted.dbo.tx(async (tx) => {
+            await tx["${tableName}"].update({}, { internal: "private" });
+          });
+
+          await client["${tableName}"].update({}, { body: "changed" });
+          // @ts-expect-error table is absent for guests and viewers
+          await client["client_schema_types.private_table"].find();
+          await client["client_schema_types.private_table"]?.find();
+          await adminClient["client_schema_types.private_table"].find();
+          const updated = await guest.update({}, { body: "changed", note: null }, { returning: "*" });
+          updated?.[0]?.created_by satisfies string | undefined;
+          await guest.updateBatch([[{}, { body: "changed" }]]);
+          // @ts-expect-error excluded update field
+          await guest.update({}, { internal: "private" });
+          const forcedUpdate = { body: "changed", created_by: "other" };
+          // @ts-expect-error forced update field through a variable
+          await guest.update({}, forcedUpdate);
+          // @ts-expect-error casts must not bypass excluded fields
+          await guest.update({}, { created_by: { $merge: [] } });
+          // @ts-expect-error updateBatch respects allowed fields
+          await guest.updateBatch([[{}, { internal: "private" }]]);
+          // @ts-expect-error read-only profiles cannot update
+          await viewer.update({}, {});
+          await admin.update({}, { internal: "private" });
+          await combined.update({}, { internal: "private" });
+          await server.update({}, { internal: "private" });
           const row = await guest.insert({ body: "hello", note: null }, { returning: "*" });
           row.created_by satisfies string;
           row.synced satisfies string;
@@ -181,6 +238,19 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         assert.equal(inserted.created_by, "guest");
         assert(Number(inserted.synced) > 0);
+        const updated = await (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
+          { id: inserted.id },
+          { body: "updated" },
+          { returning: "*" },
+        );
+        assert.equal(updated[0].body, "updated");
+        assert.equal(updated[0].created_by, "guest");
+        await assert.rejects(
+          (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
+            { id: inserted.id },
+            { internal: "forbidden" },
+          ),
+        );
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
         const originalPublish = instance.options.publish;
@@ -239,7 +309,7 @@ export const testClientSchemaTypes = async (db: DB) => {
 };
 
 const checkTypes = (schema: string, checks: string) => {
-  const filename = path.resolve("client-schema-typecheck.ts");
+  const filename = path.resolve(__dirname, "../../../client/client-schema-typecheck.ts");
   const options: ts.CompilerOptions = {
     strict: true,
     noEmit: true,
@@ -251,9 +321,9 @@ const checkTypes = (schema: string, checks: string) => {
   const host = ts.createCompilerHost(options);
   const getSourceFile = host.getSourceFile;
   host.getSourceFile = (name, languageVersion, onError, shouldCreateNewSourceFile) =>
-    name === filename ?
-      ts.createSourceFile(name, schema + checks, languageVersion, true)
-    : getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile);
+    name === filename
+      ? ts.createSourceFile(name, schema + checks, languageVersion, true)
+      : getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile);
   const program = ts.createProgram([filename], options, host);
   const diagnostics = ts.getPreEmitDiagnostics(program);
   assert.equal(
