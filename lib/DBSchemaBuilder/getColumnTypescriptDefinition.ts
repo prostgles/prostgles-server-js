@@ -2,7 +2,6 @@ import {
   _PG_numbers,
   getJSONBSchemaTSTypes,
   includes,
-  isDefined,
   isObject,
   postgresToTsType,
   type JSONB,
@@ -12,6 +11,7 @@ import type { TableSchemaColumn } from "../DboBuilder/DboBuilder";
 import { escapeTSNames } from "../utils/utils";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { getColumnConfig } from "../TableConfig/getColumnConfig";
+import { getLookupTableValues } from "./getLookupTableValues";
 
 export const getColumnTypescriptDefinition = ({
   config,
@@ -69,12 +69,10 @@ export const getDataType = ({
     return buildEnumTypeDefinition(enumValues);
   }
 
-  const colConf = config && getColumnConfig(config, tableOrView.name, column.name);
-  if (!colConf || !isObject(colConf)) {
-    return typeFromUdtName;
-  }
+  const columnConfig = config && getColumnConfig(config, tableOrView.name, column.name);
+  const colConf = isObject(columnConfig) ? columnConfig : undefined;
 
-  if (colConf.jsonbSchema || colConf.jsonbSchemaType) {
+  if (colConf?.jsonbSchema || colConf?.jsonbSchemaType) {
     const schema: JSONB.JSONBSchema = colConf.jsonbSchema || {
       ...colConf,
       type: colConf.jsonbSchemaType,
@@ -82,29 +80,13 @@ export const getDataType = ({
     return getJSONBSchemaTSTypes(schema, { nullable: colConf.nullable }, "      ", tablesOrViews);
   }
 
-  if ("enum" in colConf) {
+  if (colConf && "enum" in colConf) {
     if (!colConf.enum) throw "colConf.enum missing";
     return buildEnumTypeDefinition(colConf.enum);
   }
 
-  /** When referencing a isLookupTable table we add the isLookupTable.values as enums */
-  if (("references" in colConf && colConf.references) || column.references?.length) {
-    const lookupTableConfig =
-      colConf.references ?
-        config[colConf.references.tableName]
-      : column.references
-          ?.map((ref) => {
-            const refTableConfig = config[ref.ftable];
-            if (refTableConfig && "isLookupTable" in refTableConfig) {
-              return refTableConfig;
-            }
-          })
-          .find(isDefined);
-    if (lookupTableConfig && "isLookupTable" in lookupTableConfig) {
-      const enumValus = Object.keys(lookupTableConfig.isLookupTable.values);
-      return buildEnumTypeDefinition(enumValus);
-    }
-  }
+  const lookupValues = getLookupTableValues({ config, tablesOrViews, tableOrView, column });
+  if (lookupValues) return buildEnumTypeDefinition(lookupValues);
 
   return typeFromUdtName;
 };

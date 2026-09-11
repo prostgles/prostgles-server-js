@@ -9,6 +9,7 @@ import { testSocketLifecycle } from "./server/socketLifecycle.spec";
 import { testJoins } from "./server/joins.spec";
 import { testFileStorage } from "./server/fileStorage.spec";
 import type { withUserRLS as WithUserRLS } from "../dist/DboBuilder/dboBuilderUtils";
+import { testSchemaTypes } from "./server/schemaTypes.spec";
 
 export const serverOnlyQueries = async (
   db: DBHandlerServer,
@@ -16,6 +17,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
+    await testSchemaTypes(db);
     await testFileStorage(db, pgDb);
     await testJoins(pgDb);
     await testSocketLifecycle(pgDb);
