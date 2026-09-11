@@ -1,18 +1,13 @@
+import { defineJoin } from "prostgles-types";
 import type { SessionUser } from "./Auth/AuthTypes";
 import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 
-function prostgles<
-  S = void,
-  SUser extends SessionUser = SessionUser,
-  Context = undefined,
->(
+function prostgles<S = void, SUser extends SessionUser = SessionUser, Context = undefined>(
   params: ProstglesInitOptions<S, SUser, Context>,
 ) {
-  const prgl = new Prostgles(
-    params as unknown as ProstglesInitOptions<void, SessionUser, any>,
-  );
+  const prgl = new Prostgles(params as unknown as ProstglesInitOptions<void, SessionUser, any>);
   return prgl.init(params.onReady as unknown as OnReadyCallbackBasic, {
     type: "init",
   }) as unknown as Promise<InitResult<S, SUser, Context>>;
@@ -46,5 +41,9 @@ export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;
 export type { FileTableRow } from "./StorageClient/getFileTableConfig";
-
-export { AUDIT_TABLE_COLUMN_DEFINITIONS, AUDIT_TABLE_COLUMNS, type AuditTableRow } from "./Audit/AuditTable";
+export { defineJoin };
+export {
+  AUDIT_TABLE_COLUMN_DEFINITIONS,
+  AUDIT_TABLE_COLUMNS,
+  type AuditTableRow,
+} from "./Audit/AuditTable";
