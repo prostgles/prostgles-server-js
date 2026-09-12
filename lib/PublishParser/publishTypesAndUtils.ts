@@ -560,7 +560,7 @@ export type PublishedResult<Schema = void> = PublishAllOrNothingRoot | PublishFu
 export type PublishProfile<Schema = void> = {
   /** Exported schema type name; defaults to Publish1Schema, Publish2Schema, etc. */
   name?: string;
-  userTypes: string[];
+  userTypes: readonly string[];
   publish: PublishedResult<Schema>;
 };
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> =

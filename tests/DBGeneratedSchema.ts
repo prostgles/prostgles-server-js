@@ -416,11 +416,23 @@ export type DBGeneratedSchema = {
   
 }
 
+type CollapseNumberIfStringPresent<T> =
+  [Extract<T, string>] extends [never] ? T : Exclude<T, number>;
+
+/**
+ * Numeric columns that serialize to strings keep the numeric type as well to allow:
+ * - inserting numeric values as either numbers or strings
+ * - reading numeric values as strings
+ */
+export type NormalizedRow<T extends Record<string, unknown>> = Required<{
+  [K in keyof T]: CollapseNumberIfStringPresent<T[K]>;
+}>;
+
 /**
  * Data types as expected when selecting from the database
  * */
 export type DBSchema = {
-  [K in keyof DBGeneratedSchema]: Required<DBGeneratedSchema[K]["columns"]>;
+  [K in keyof DBGeneratedSchema]: NormalizedRow<DBGeneratedSchema[K]["columns"]>;
 };
 
 /**

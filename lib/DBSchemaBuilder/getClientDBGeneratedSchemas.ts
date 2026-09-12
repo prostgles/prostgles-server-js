@@ -1,6 +1,6 @@
-import { DB_GENERATED_SCHEMA_NAME } from "./constants";
 import type { DBSchemaTable, TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
+import { DB_GENERATED_NAMES } from "./constants";
 
 /** Permissions compiled from publish profiles at startup. */
 export type ClientSchemaProfiles = Record<string, { tableSchema: DBSchemaTable[] }>;
@@ -30,7 +30,7 @@ export const getClientDBGeneratedSchemas = (
         const published = schemas.map((s) => s.tableSchema.find((t) => t.name === table.name));
         if (!published.some(Boolean)) return [];
         const inserting = published.filter((t) => t?.publishInfo.insert);
-        const tableType = `${DB_GENERATED_SCHEMA_NAME}[${JSON.stringify(table.name)}]`;
+        const tableType = `${DB_GENERATED_NAMES.SCHEMA}[${JSON.stringify(table.name)}]`;
         const required: string[] = [];
         const optional: string[] = [];
         const excluded: string[] = [];
@@ -94,23 +94,20 @@ export const getClientDBGeneratedSchemas = (
     ...entries.map(([name, schema]) => generate(name, [schema])),
     "/** Permissive write inputs across all supplied profiles; tables missing from a profile are optional. */",
     generate(
-      "ClientDBSchema",
+      DB_GENERATED_NAMES.CLIENT_SCHEMA,
       entries.map(([, schema]) => schema),
     ),
   ].join("\n\n");
 };
 
 const keys = (names: string[]) => names.map((name) => JSON.stringify(name)).join(" | ");
-const reservedNames = new Set([
-  DB_GENERATED_SCHEMA_NAME,
-  "DBSchema",
-  "DBSchemaForInsert",
-  "ClientDBSchema",
-]);
+const reservedNames = new Set(Object.values(DB_GENERATED_NAMES) as string[]);
 
 export const validateClientSchemaName = (name: string) => {
   // Requiring a Schema suffix also avoids TypeScript keywords and primitive type names.
   if (!/^[A-Za-z_$][\w$]*Schema$/.test(name) || reservedNames.has(name)) {
-    throw new Error(`Invalid client schema name: ${name}. Use a unique name ending in Schema.`);
+    throw new Error(
+      `Invalid client schema name: ${JSON.stringify(name)}. Use a unique name ending in Schema.`,
+    );
   }
 };

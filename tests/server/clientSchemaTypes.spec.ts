@@ -1,4 +1,4 @@
-import { DB_GENERATED_SCHEMA_NAME } from "prostgles-server/dist/DBSchemaBuilder/constants";
+import { DB_GENERATED_NAMES } from "prostgles-server/dist/DBSchemaBuilder/constants";
 import { strict as assert } from "node:assert";
 import { once } from "node:events";
 import { createServer } from "node:http";
@@ -98,7 +98,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         const { tsSchema } = await instance.getTSSchema();
         assert.equal(
           readFileSync(
-            path.resolve(`debug/client-schema-types/${DB_GENERATED_SCHEMA_NAME}.ts`),
+            path.resolve(`debug/client-schema-types/${DB_GENERATED_NAMES.SCHEMA}.ts`),
             "utf8",
           ),
           tsSchema,
@@ -118,7 +118,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         declare const guest: TableHandler<GuestDBSchema[Name]["columns"], GuestDBSchema, Name>;
         declare const admin: TableHandler<AdminDBSchema[Name]["columns"], AdminDBSchema, Name>;
         declare const combined: TableHandler<ClientDBSchema[Name]["columns"], ClientDBSchema, Name>;
-        declare const server: TableHandler<${DB_GENERATED_SCHEMA_NAME}[Name]["columns"], ${DB_GENERATED_SCHEMA_NAME}, Name>;
+        declare const server: TableHandler<${DB_GENERATED_NAMES.SCHEMA}[Name]["columns"], ${DB_GENERATED_NAMES.SCHEMA}, Name>;
         declare const viewer: TableHandler<ViewerDBSchema[Name]["columns"], ViewerDBSchema, Name>;
         declare const client: DBHandlerClient<ClientDBSchema>;
         declare const adminClient: DBHandlerClient<AdminDBSchema>;
@@ -247,13 +247,13 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         assert.equal(inserted.created_by, "guest");
         assert(Number(inserted.synced) > 0);
-        const updated = await (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
+        const updated = await handlers.clientDb[tableName]!.update!(
           { id: inserted.id },
           { body: "updated" },
           { returning: "*" },
         );
-        assert.equal(updated[0].body, "updated");
-        assert.equal(updated[0].created_by, "guest");
+        assert.equal(updated![0].body, "updated");
+        assert.equal(updated![0].created_by, "guest");
         await instance.update({ publish: () => originalPublish });
         assert.equal(
           (await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({ id: inserted.id }))
@@ -291,10 +291,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           ],
         ] as const) {
           await instance.update({ publish: () => publish as unknown as typeof originalPublish });
-          await assert.rejects(
-            (handlers.clientDb as DBHandlerServer)[tableName]!.find!(),
-            error,
-          );
+          await assert.rejects((handlers.clientDb as DBHandlerServer)[tableName]!.find!(), error);
           await instance.update({ publish: originalPublish });
           await assert.rejects(
             instance.update({
@@ -312,7 +309,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert(!updatedSchema.includes("GuestDBSchema"));
         assert.equal(
           readFileSync(
-            path.resolve(`debug/client-schema-types/${DB_GENERATED_SCHEMA_NAME}.ts`),
+            path.resolve(`debug/client-schema-types/${DB_GENERATED_NAMES.SCHEMA}.ts`),
             "utf8",
           ),
           updatedSchema,
@@ -342,9 +339,9 @@ const checkTypes = (schema: string, checks: string) => {
   const host = ts.createCompilerHost(options);
   const getSourceFile = host.getSourceFile;
   host.getSourceFile = (name, languageVersion, onError, shouldCreateNewSourceFile) =>
-    name === filename
-      ? ts.createSourceFile(name, schema + checks, languageVersion, true)
-      : getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile);
+    name === filename ?
+      ts.createSourceFile(name, schema + checks, languageVersion, true)
+    : getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile);
   const program = ts.createProgram([filename], options, host);
   const diagnostics = ts.getPreEmitDiagnostics(program);
   assert.equal(

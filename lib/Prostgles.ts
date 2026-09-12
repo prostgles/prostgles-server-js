@@ -1,4 +1,4 @@
-import { DB_GENERATED_SCHEMA_NAME } from "./DBSchemaBuilder/constants";
+import { DB_GENERATED_NAMES } from "./DBSchemaBuilder/constants";
 import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import type { SessionUser } from "./Auth/AuthTypes";
@@ -230,7 +230,7 @@ export class Prostgles {
   }
 
   getTSFileName() {
-    const fileName = `${DB_GENERATED_SCHEMA_NAME}.ts`;
+    const fileName = `${DB_GENERATED_NAMES.SCHEMA}.ts`;
     const _dir = this.opts.tsGeneratedTypesDir || "";
     const dir = _dir.endsWith("/") ? _dir : `${_dir}/`;
     const fullPath = dir + fileName;
