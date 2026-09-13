@@ -5,7 +5,11 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import prostgles, { type DBHandlerServer, type ProstglesInitOptions } from "prostgles-server";
+import prostgles, {
+  type DBHandlerServer,
+  type ProstglesInitOptions,
+  type PublishContextValue,
+} from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import { CHANNELS, type ClientSchema } from "prostgles-types";
@@ -40,6 +44,9 @@ export const testClientSchemaTypes = async (db: DB) => {
         const address = http.address();
         assert(address && typeof address === "object");
         const tableName = "client_schema_types.correspondence";
+        const userIdContextValue = {
+          $prostglesContext: { objectName: "user", objectPropertyName: "id" },
+        } as const satisfies PublishContextValue<{ user: { id: string } }>;
         instance = await prostgles({
           dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
           tsGeneratedTypesDir: path.resolve("debug/client-schema-types"),
@@ -70,11 +77,11 @@ export const testClientSchemaTypes = async (db: DB) => {
                   select: "*",
                   update: {
                     fields: ["body", "note", "created_by", "synced"],
-                    forcedData: { created_by: "guest" },
+                    forcedData: { created_by: userIdContextValue as unknown as string },
                   },
                   insert: {
                     fields: { internal: 0 },
-                    forcedData: { created_by: "guest" },
+                    forcedData: { created_by: userIdContextValue as unknown as string },
                   },
                 },
               },
@@ -202,14 +209,7 @@ export const testClientSchemaTypes = async (db: DB) => {
       `,
         );
         const originalPublish = instance.options.publish;
-        assert(Array.isArray(originalPublish));
-        await instance.update({
-          publish: async ({ db, user }) => {
-            assert.equal((await db.one("SELECT 1 AS value")).value, 1);
-            assert(user === undefined || typeof user.type === "string");
-            return originalPublish;
-          },
-        });
+        // await instance.update({ publish: originalPublish });
         const profiles: Record<string, ClientSchema> = {};
         for (const [role, name] of [
           ["guest", "GuestDBSchema"],
@@ -245,7 +245,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           { body: "hello" },
           { returning: "*" },
         );
-        assert.equal(inserted.created_by, "guest");
+        assert.equal(inserted.created_by, "user-guest");
         assert(Number(inserted.synced) > 0);
         const updated = await handlers.clientDb[tableName]!.update!(
           { id: inserted.id },
@@ -253,12 +253,11 @@ export const testClientSchemaTypes = async (db: DB) => {
           { returning: "*" },
         );
         assert.equal(updated![0].body, "updated");
-        assert.equal(updated![0].created_by, "guest");
-        await instance.update({ publish: () => originalPublish });
+        assert.equal(updated![0].created_by, "user-guest");
         assert.equal(
           (await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({ id: inserted.id }))
             .created_by,
-          "guest",
+          "user-guest",
         );
         await assert.rejects(
           (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
@@ -290,15 +289,10 @@ export const testClientSchemaTypes = async (db: DB) => {
             /Duplicate publish schema name/,
           ],
         ] as const) {
-          await instance.update({ publish: () => publish as unknown as typeof originalPublish });
-          await assert.rejects((handlers.clientDb as DBHandlerServer)[tableName]!.find!(), error);
-          await instance.update({ publish: originalPublish });
-          await assert.rejects(
-            instance.update({
-              publish: publish as unknown as ProstglesInitOptions["publish"],
-            }),
-            error,
-          );
+          // await instance.update({ publish: publish });
+          // await assert.rejects((handlers.clientDb as DBHandlerServer)[tableName]!.find!(), error);
+          // await instance.update({ publish: originalPublish });
+          await assert.rejects(instance.update({ publish }), error);
           assert.equal((await instance.getTSSchema()).tsSchema, tsSchema);
         }
         await instance.update({

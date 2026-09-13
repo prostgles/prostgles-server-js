@@ -27,18 +27,18 @@ export async function getSchemaFromPublish(
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
-    let publish: PublishObject | undefined;
+    let resolvedPublishObject: PublishObject | undefined;
     try {
-      publish = await this.getPublishObject(clientReq, clientInfo);
+      resolvedPublishObject = await this.getPublishObjectForUser(clientReq, clientInfo);
     } catch (err) {
       console.error("Error within then Publish function ", err);
       throw err;
     }
 
-    if (!publish || !Object.keys(publish).length) {
+    if (!resolvedPublishObject || !Object.keys(resolvedPublishObject).length) {
       return { tables, tableSchemaErrors };
     }
-    const tableNames = getPublishedTableNames(this, publish);
+    const tableNames = getPublishedTableNames(this, resolvedPublishObject);
 
     await Promise.all(
       tableNames.map(async (tableName) => {
@@ -52,11 +52,13 @@ export async function getSchemaFromPublish(
           throw errMsg;
         }
 
-        const parsedTableRule = await this.getTableRules(
-          { clientReq, tableName },
+        const parsedTableRule = await this.getTableRules({
+          clientReq,
+          tableName,
           clientInfo,
           scope,
-        );
+          resolvedPublishObject,
+        });
 
         if (!parsedTableRule || isEmpty(parsedTableRule)) return;
         if (!isObject(parsedTableRule)) {

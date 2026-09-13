@@ -112,11 +112,12 @@ export const runClientRequest = async function (
     throw clientInfo;
   }
 
-  const parsedTableRule = await this.publishParser.getParsedTableRule(
-    { tableName, clientReq },
+  const parsedTableRule = await this.publishParser.getParsedTableRule({
+    tableName,
+    clientReq,
     clientInfo,
     scope,
-  );
+  });
 
   const sessionUser = getSessionUser(clientInfo);
   const localParams: LocalParams = {

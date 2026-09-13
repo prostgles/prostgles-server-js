@@ -27,6 +27,7 @@ import type {
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
+import { isArray } from "../utils/utils";
 
 export type InsertRequestData = {
   data: object | object[];
@@ -556,16 +557,40 @@ export type ParsedPublishTables = {
 };
 
 type PublishAllOrNothingRoot = Exclude<PublishAllOrNothing, boolean>;
-export type PublishedResult<Schema = void> = PublishAllOrNothingRoot | PublishFullyTyped<Schema>;
+export type PublishAllTables = [
+  "*",
+  Partial<{ select: boolean; update: boolean; insert: boolean; delete: boolean }>,
+];
+export type PublishedResult<Schema = void> =
+  PublishAllOrNothingRoot | PublishAllTables | PublishFullyTyped<Schema>;
+
 export type PublishProfile<Schema = void> = {
   /** Exported schema type name; defaults to Publish1Schema, Publish2Schema, etc. */
   name?: string;
-  userTypes: readonly string[];
+  userTypes: readonly string[] | string[];
   publish: PublishedResult<Schema>;
 };
+
+/**
+ * Used in PublishProfile to provide user data
+ */
+export type PublishContextValue<C extends { user: AnyObject } = { user: AnyObject }> = {
+  $prostglesContext: {
+    [K in keyof C]: {
+      objectName: K;
+      objectPropertyName: keyof C[K];
+    };
+  }[keyof C];
+};
+
 export type Publish<Schema = void, SUser extends SessionUser = SessionUser> =
-  | PublishProfile<Schema>[]
   | PublishedResult<Schema>
-  | ((
-      params: PublishParams<Schema, SUser>,
-    ) => Awaitable<PublishedResult<Schema> | PublishProfile<Schema>[]>);
+  | PublishProfile<Schema>[]
+  | readonly PublishProfile<Schema>[]
+  | ((params: PublishParams<Schema, SUser>) => Awaitable<PublishedResult<Schema>>);
+
+export const isPublishProfiles = <const P extends Publish | undefined>(
+  publish: P,
+): publish is Extract<P, PublishProfile[] | readonly PublishProfile[]> => {
+  return isArray(publish) && publish[0] !== "*";
+};

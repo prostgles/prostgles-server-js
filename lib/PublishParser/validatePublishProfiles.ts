@@ -1,7 +1,7 @@
 import { validateClientSchemaName } from "../DBSchemaBuilder/getClientDBGeneratedSchemas";
 import type { PublishProfile } from "./publishTypesAndUtils";
 
-export const validatePublishProfiles = (profiles: PublishProfile[]) => {
+export const validatePublishProfiles = (profiles: readonly PublishProfile[]) => {
   const names = new Set<string>();
   const userTypes = new Set<string>();
   const entries = profiles.map((profile, index) => {

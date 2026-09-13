@@ -1,9 +1,13 @@
-import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS } from "prostgles-types";
+import {
+  getObjectEntries,
+  includes,
+  SQL_COMMAND_TABLE_METHODS,
+  type TableSchema,
+} from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
-import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { applyScopeToTableRules } from "./applyScopeToTableRules";
 import type {
@@ -12,15 +16,18 @@ import type {
   UnrestrictedFunctionContext,
 } from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
+import { getPublishedObjectFromResult } from "./getPublishedObjectFromResult";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
-import { getTableRulesWithoutFileTable } from "./getTableRulesWithoutFileTable";
+import { getParsedPublishTable } from "./getParsedPublishTable";
 import type {
   DboTable,
   DboTableCommand,
   ParsedTableRule,
+  Publish,
   PublishParams,
 } from "./publishTypesAndUtils";
 import {
+  isPublishProfiles,
   parsePublishTableRule,
   type PermissionScope,
   type PublishObject,
@@ -28,9 +35,7 @@ import {
 import { validatePublishProfiles } from "./validatePublishProfiles";
 
 export class PublishParser {
-  publish:
-    | Exclude<ProstglesInitOptions<void, SessionUser, any>["publish"], unknown[]>
-    | ReturnType<typeof validatePublishProfiles>;
+  parsedPublish: ReturnType<typeof getParsedPublish>;
   publishRawSQL?: any;
   dbo: DBHandlerServer;
   db: DB;
@@ -39,7 +44,8 @@ export class PublishParser {
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
     const { publish } = prostgles.opts;
-    this.publish = Array.isArray(publish) ? validatePublishProfiles(publish) : publish;
+
+    this.parsedPublish = getParsedPublish(publish, prostgles.dboBuilder.tablesOrViews ?? []);
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
@@ -145,50 +151,54 @@ export class PublishParser {
   /**
    * Parses the first level of publish. (If false then nothing if * then all tables and views)
    */
-  async getPublishObject(
+  async getPublishObjectForUser(
     clientReq: AuthClientRequest,
     clientInfo: AuthResultWithSID | undefined,
   ): Promise<PublishObject | undefined> {
     const publishParams = await this.getPublishParams(clientReq, clientInfo);
 
-    const result = await applyParamsIfFunc(this.publish, publishParams);
-    const publish =
-      Array.isArray(result) ?
-        validatePublishProfiles(result).find((profile) =>
-          publishParams.user ? profile.userTypes.includes(publishParams.user.type) : false,
-        )?.publish
-      : result;
+    const parsedPublish = await applyParamsIfFunc(this.parsedPublish, publishParams);
 
-    if (publish === "*") {
-      const publish: PublishObject = {};
-      this.prostgles.dboBuilder.tablesOrViews?.map((tov) => {
-        publish[tov.name] = "*";
-      });
-      return publish;
-    }
+    const publishResult = (() => {
+      if (!isPublishProfiles(parsedPublish)) {
+        return parsedPublish;
+      }
 
-    return publish || undefined;
+      const { user } = publishParams;
+      if (!user) return;
+      return parsedPublish.find(({ userTypes }) => userTypes.includes(user.type))?.publish;
+    })();
+
+    if (!publishResult) return;
+
+    const publishedObject = getPublishedObjectFromResult(
+      publishResult,
+      this.prostgles.dboBuilder.tablesOrViews ?? [],
+      publishParams,
+    );
+    return publishedObject;
   }
 
   async getValidatedRequestRuleWusr(
     { tableName, command, clientReq }: DboTableCommand,
     scope: PermissionScope | undefined,
   ): Promise<ParsedTableRule> {
-    const rules = await this.getParsedTableRule({ tableName, clientReq }, undefined, scope);
     const clientInfo =
       clientReq && (await this.prostgles.authHandler.getSidAndUserFromRequest(clientReq));
     if (clientInfo === "new-session-redirect") {
       throw "new-session-redirect";
     }
+    const rules = await this.getParsedTableRule({ tableName, clientReq, scope, clientInfo });
     this.validateRequestRule({ tableName, command, clientReq }, rules, scope);
     return rules;
   }
 
-  async getParsedTableRule(
-    { tableName, clientReq }: Pick<DboTableCommand, "tableName" | "clientReq">,
-    clientInfo: AuthResultWithSID | undefined,
-    scope: PermissionScope | undefined,
-  ): Promise<ParsedTableRule> {
+  async getParsedTableRule({
+    tableName,
+    clientReq,
+    clientInfo,
+    scope,
+  }: Omit<TableRequest, "resolvedPublishObject">): Promise<ParsedTableRule> {
     if (!tableName) throw "tableName missing";
 
     /* Must be local request -> allow everything */
@@ -202,7 +212,7 @@ export class PublishParser {
     }
 
     /* Must be from socket. Must have a publish */
-    if (!this.publish) throw "publish is missing";
+    if (!this.parsedPublish) throw "publish is missing";
 
     const tableErrors = clientReq.socket?.prostgles?.get(this.prostgles.appId)?.tableSchemaErrors[
       tableName
@@ -212,7 +222,13 @@ export class PublishParser {
       throw errorInfo.error;
     });
 
-    const tableRule = await this.getTableRules({ tableName, clientReq }, clientInfo, scope);
+    const tableRule = await this.getTableRules({
+      tableName,
+      clientReq,
+      clientInfo,
+      scope,
+      resolvedPublishObject: undefined,
+    });
 
     if (!tableRule) {
       throw {
@@ -278,27 +294,28 @@ export class PublishParser {
     }
   }
 
-  async getTableRules(
-    args: DboTable,
-    clientInfo: AuthResultWithSID | undefined,
-    scope: PermissionScope | undefined,
-    overriddenPublish?: PublishObject,
-  ): Promise<ParsedTableRule | undefined> {
-    const { tableName } = args;
+  async getTableRules({
+    resolvedPublishObject: overriddenPublish,
+    scope,
+    clientInfo,
+    clientReq,
+    tableName,
+  }: TableRequest): Promise<ParsedTableRule | undefined> {
     const tableHandler = this.dbo[tableName];
     if (!tableHandler) {
-      throw "INTERNAL ERROR: table handler not found for " + args.tableName;
+      throw "INTERNAL ERROR: table handler not found for " + tableName;
     }
-    const fileTablePublishRules = await this.getTableRulesWithoutFileTable(
-      args,
+    const publishRulesExcludingFileTable = await this.getParsedPublishTable({
+      clientReq,
+      tableName,
       clientInfo,
-      overriddenPublish,
-    );
-    if (this.dbo[args.tableName]?.is_media) {
+      resolvedPublishObject: overriddenPublish,
+    });
+    if (this.dbo[tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
-        args.tableName,
-        fileTablePublishRules,
-        args.clientReq,
+        tableName,
+        publishRulesExcludingFileTable,
+        clientReq,
         clientInfo,
         scope,
         overriddenPublish,
@@ -314,16 +331,31 @@ export class PublishParser {
     return applyScopeToTableRules(
       tableName,
       tableHandler,
-      parsePublishTableRule(fileTablePublishRules),
+      parsePublishTableRule(publishRulesExcludingFileTable),
       scope,
     );
   }
 
-  getTableRulesWithoutFileTable = getTableRulesWithoutFileTable.bind(this);
+  getParsedPublishTable = getParsedPublishTable.bind(this);
 
   /* Prepares schema for client. Only allowed views and commands will be present */
   getSchemaFromPublish = getSchemaFromPublish.bind(this);
 }
+
+const getParsedPublish = (publish: Publish | undefined, tablesOrViews: TableSchema[]) => {
+  if (!publish) return;
+  return (
+    isPublishProfiles(publish) ? validatePublishProfiles(publish)
+    : typeof publish === "function" ? publish
+    : getPublishedObjectFromResult(publish, tablesOrViews, undefined)
+  );
+};
+
+export type TableRequest = DboTable & {
+  clientInfo: AuthResultWithSID | undefined;
+  scope: PermissionScope | undefined;
+  resolvedPublishObject: PublishObject | undefined;
+};
 
 export * from "./publishTypesAndUtils";
 

@@ -1,24 +1,22 @@
-import { isAuditTable } from "../Audit/getAuditTableConfig";
 import { getObjectEntries, isObject } from "prostgles-types";
-import type { AuthResultWithSID } from "../Auth/AuthTypes";
+import { isAuditTable } from "../Audit/getAuditTableConfig";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
-import type { PublishParser } from "./PublishParser";
-import type { DboTable, ParsedPublishTable } from "./publishTypesAndUtils";
-import { TABLE_RULE_NO_LIMITS, type PublishObject } from "./publishTypesAndUtils";
+import type { PublishParser, TableRequest } from "./PublishParser";
+import type { ParsedPublishTable } from "./publishTypesAndUtils";
+import { TABLE_RULE_NO_LIMITS } from "./publishTypesAndUtils";
 
-export async function getTableRulesWithoutFileTable(
+export async function getParsedPublishTable(
   this: PublishParser,
-  { tableName, clientReq }: DboTable,
-  clientInfo: AuthResultWithSID | undefined,
-  overridenPublish?: PublishObject,
+  { tableName, clientReq, clientInfo, resolvedPublishObject }: Omit<TableRequest, "scope">,
 ): Promise<ParsedPublishTable | undefined> {
   if (!tableName) {
     throw new Error("tableName is missing in getTableRules");
   }
 
   const publish =
-    overridenPublish ?? (clientReq && (await this.getPublishObject(clientReq, clientInfo)));
+    resolvedPublishObject ??
+    (clientReq && (await this.getPublishObjectForUser(clientReq, clientInfo)));
 
   const rawTableRule = publish?.[tableName];
   if (!rawTableRule || (isObject(rawTableRule) && Object.values(rawTableRule).every((v) => !v))) {
@@ -53,8 +51,14 @@ export async function getTableRulesWithoutFileTable(
       }
     : rawTableRule;
 
-  const tableRulesObject = isAuditTable(this.prostgles, tableName)
-    ? { select: rawTableRulesObject.select, insert: undefined, update: undefined, delete: undefined }
+  const tableRulesObject =
+    isAuditTable(this.prostgles, tableName) ?
+      {
+        select: rawTableRulesObject.select,
+        insert: undefined,
+        update: undefined,
+        delete: undefined,
+      }
     : rawTableRulesObject;
 
   const selectRule =

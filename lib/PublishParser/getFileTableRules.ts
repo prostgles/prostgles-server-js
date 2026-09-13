@@ -20,8 +20,8 @@ export async function getFileTableRules(
   fileTablePublishRules: ParsedPublishTable | undefined,
   clientReq: AuthClientRequest | undefined,
   clientInfo: AuthResultWithSID | undefined,
-  scope: LocalParams["scope"],
-  overriddenPublish?: PublishObject,
+  scope: LocalParams["scope"] | undefined,
+  resolvedPublishObject: PublishObject | undefined,
 ) {
   const forcedDeleteFilters: FullFilter<AnyObject, void>[] = [];
   const forcedSelectFilters: FullFilter<AnyObject, void>[] = [];
@@ -43,51 +43,58 @@ export async function getFileTableRules(
     .filter(isDefined);
   if (referencedColumns?.length) {
     for (const { tableName, fileColumns, allColumns } of referencedColumns) {
-      const tableRules = await this.getTableRules({ clientReq, tableName }, clientInfo, scope, overriddenPublish);
-      if (tableRules) {
-        fileColumns.map((column) => {
-          const path = [{ table: tableName, on: [{ id: column }] }];
-          if (tableRules.delete) {
-            forcedDeleteFilters.push({
+      const tableRules = await this.getTableRules({
+        clientReq,
+        tableName,
+        clientInfo,
+        scope,
+        resolvedPublishObject,
+      });
+      if (!tableRules) {
+        continue;
+      }
+      fileColumns.map((column) => {
+        const path = [{ table: tableName, on: [{ id: column }] }];
+        if (tableRules.delete) {
+          forcedDeleteFilters.push({
+            $existsJoined: {
+              path,
+              filter: tableRules.delete.forcedFilter ?? {},
+            },
+          });
+        }
+        if (tableRules.select) {
+          const parsedFields = parseFieldFilter(tableRules.select.fields, false, allColumns);
+          /** Must be allowed to view this column */
+          if (includes(parsedFields, column)) {
+            forcedSelectFilters.push({
               $existsJoined: {
                 path,
-                filter: tableRules.delete.forcedFilter ?? {},
+                filter: tableRules.select.forcedFilter ?? {},
               },
             });
           }
-          if (tableRules.select) {
-            const parsedFields = parseFieldFilter(tableRules.select.fields, false, allColumns);
-            /** Must be allowed to view this column */
-            if (includes(parsedFields, column)) {
-              forcedSelectFilters.push({
-                $existsJoined: {
-                  path,
-                  filter: tableRules.select.forcedFilter ?? {},
-                },
-              });
-            }
+        }
+        if (tableRules.insert) {
+          const parsedFields = parseFieldFilter(tableRules.insert.fields, false, allColumns);
+          /** Must be allowed to view this column */
+          if (includes(parsedFields, column)) {
+            allowedNestedInserts.push({ table: tableName, column });
           }
-          if (tableRules.insert) {
-            const parsedFields = parseFieldFilter(tableRules.insert.fields, false, allColumns);
-            /** Must be allowed to view this column */
-            if (includes(parsedFields, column)) {
-              allowedNestedInserts.push({ table: tableName, column });
-            }
+        }
+        if (tableRules.update) {
+          const parsedFields = parseFieldFilter(tableRules.update.fields, false, allColumns);
+          /** Must be allowed to view this column */
+          if (includes(parsedFields, column)) {
+            forcedUpdateFilters.push({
+              $existsJoined: {
+                path,
+                filter: tableRules.update.forcedFilter ?? {},
+              },
+            });
           }
-          if (tableRules.update) {
-            const parsedFields = parseFieldFilter(tableRules.update.fields, false, allColumns);
-            /** Must be allowed to view this column */
-            if (includes(parsedFields, column)) {
-              forcedUpdateFilters.push({
-                $existsJoined: {
-                  path,
-                  filter: tableRules.update.forcedFilter ?? {},
-                },
-              });
-            }
-          }
-        });
-      }
+        }
+      });
     }
   }
 
@@ -137,11 +144,11 @@ export async function getFileTableRules(
     };
   }
 
-  /** Add missing implied methods (getColumns, getInfo) */
-  const rules = await this.getTableRulesWithoutFileTable.bind(this)(
-    { clientReq, tableName: fileTableName },
+  const rules = await this.getParsedPublishTable.bind(this)({
+    clientReq,
+    tableName: fileTableName,
     clientInfo,
-    { [fileTableName]: fileTableRule },
-  );
+    resolvedPublishObject: { [fileTableName]: fileTableRule },
+  });
   return { rules, allowedInserts: allowedNestedInserts };
 }

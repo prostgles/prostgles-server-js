@@ -35,7 +35,7 @@ import { prepareShortestJoinPaths } from "./joins/prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSql/runSQL";
 import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
-import { getPublishSchemas } from "../DBSchemaBuilder/getPublishSchemas";
+import { getPublishSchemas } from "../PublishParser/getPublishSchemas";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";

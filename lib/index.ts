@@ -20,7 +20,19 @@ export const createProstgles = <S = void, SUser extends SessionUser = SessionUse
 };
 export * from "./PublishParser/defineServerFunction";
 export * from "./Auth/AuthTypes";
-export type { PublishParams, PublishProfile } from "./PublishParser/publishTypesAndUtils";
+
+export type {
+  PublishContextValue,
+  Publish,
+  PublishObject,
+  PublishAllTables,
+  PublishedResult,
+  BeforeEachTsTrigger,
+  AfterAllTsTrigger,
+  AfterEachTsTrigger,
+  PublishProfile,
+  PublishParams,
+} from "./PublishParser/publishTypesAndUtils";
 export type { DBOFullyTyped, DBOFullyTypedClient } from "./DBSchemaBuilder/DBSchemaBuilder";
 export type { DBHandlerServer } from "./Prostgles";
 export type { StorageClient as CloudClient } from "./StorageClient/StorageClientTypes";

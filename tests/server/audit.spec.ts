@@ -16,11 +16,7 @@ import {
   AUDIT_TRIGGER_PREFIX,
   TABLE_CONFIG_TRIGGER_PREFIX,
 } from "prostgles-server/dist/TableConfig/managedTriggerNames";
-import type {
-  SchemaConfigAudit,
-  TableDefinition,
-  ProstglesInitOptions,
-} from "prostgles-server";
+import type { SchemaConfigAudit, TableDefinition, ProstglesInitOptions } from "prostgles-server";
 
 // Keep the public schema and column inference checked alongside the integration tests.
 const typedAudit: SchemaConfigAudit<{
@@ -45,6 +41,7 @@ export async function testAudit(parentDb: DB) {
     "Managed audit setup, row history, protection and query readiness",
     { timeout: 60000 },
     async () => {
+      await parentDb.none("DROP SCHEMA IF EXISTS audit_test_main CASCADE");
       await parentDb.none("CREATE SCHEMA audit_test_main");
       const pgp = pgPromise();
       const dbConnection = {
@@ -57,6 +54,7 @@ export async function testAudit(parentDb: DB) {
       await writeFile(
         sqlFilePath,
         `
+      DROP SCHEMA IF EXISTS audit_test CASCADE;
       CREATE SCHEMA IF NOT EXISTS audit_test;
       CREATE TABLE IF NOT EXISTS audit_test_existing (id int PRIMARY KEY, value text);
       CREATE TABLE IF NOT EXISTS audit_test_child (id int PRIMARY KEY, parent int REFERENCES audit_test_existing ON DELETE CASCADE);
@@ -81,9 +79,7 @@ export async function testAudit(parentDb: DB) {
       let releaseSchema: (() => void) | undefined;
       let schemaStarted: (() => void) | undefined;
       const prgl = new Prostgles({
-        dbConnection: getConnectionDetails(
-          db,
-        ) as unknown as ProstglesInitOptions["dbConnection"],
+        dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
         sqlFilePath,
         audit,
         transactions: true,
@@ -133,15 +129,18 @@ export async function testAudit(parentDb: DB) {
       try {
         result = await prgl.init(() => {}, { type: "init" });
         const source = result.db.audit_test_source!;
+        if (!prgl.opts.tableConfig) {
+          throw new Error("tableConfig is not defined");
+        }
         prgl.opts.tableConfig.audit_events = {};
         assert.throws(() => prgl.mergedTableConfig, /cannot also be defined/);
         delete prgl.opts.tableConfig.audit_events;
         const sourceConfig = prgl.opts.tableConfig.audit_test_source as TableDefinition;
         for (const prefix of [AUDIT_TRIGGER_PREFIX, TABLE_CONFIG_TRIGGER_PREFIX]) {
           const name = prefix + "user_trigger";
-          sourceConfig.triggers[name] = sourceConfig.triggers.audit_test_custom;
+          sourceConfig.triggers![name] = sourceConfig.triggers!.audit_test_custom;
           assert.throws(() => prgl.mergedTableConfig, /prefix reserved for prostgles/);
-          delete sourceConfig.triggers[name];
+          delete sourceConfig.triggers![name];
         }
         await result.sql(`CREATE OR REPLACE FUNCTION audit_test_manual() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END;';
           CREATE TRIGGER audit_test_manual AFTER INSERT ON audit_test_source FOR EACH ROW EXECUTE FUNCTION audit_test_manual();`);
@@ -159,7 +158,7 @@ export async function testAudit(parentDb: DB) {
           excludeColumns: ["secret"],
         });
         assert.equal(prgl.resolvedAuditConfig?.tables[audit.tableName], undefined);
-        assert(!("audit" in prgl.mergedTableConfig.tableConfig.audit_test_source));
+        assert(!("audit" in prgl.mergedTableConfig.tableConfig!.audit_test_source));
         const originalModifyClientSchema = prgl.opts.modifyClientSchema;
         let auditCallbacks = 0;
         prgl.opts.modifyClientSchema = (table, tableConfig, userData, resolvedAuditConfig) => {
@@ -171,34 +170,21 @@ export async function testAudit(parentDb: DB) {
         await source.getColumns!();
         assert.equal(auditCallbacks, 2);
         prgl.opts.modifyClientSchema = originalModifyClientSchema;
-        const mergedTriggers = prgl.mergedTableConfig.tableConfig.audit_test_source.triggers;
+        const mergedTriggers = prgl.mergedTableConfig.tableConfig!.audit_test_source.triggers!;
         assert(mergedTriggers.audit_test_custom);
         assert(Object.keys(mergedTriggers).some((name) => name.startsWith(AUDIT_TRIGGER_PREFIX)));
 
-        const history = () =>
-          db.any(`SELECT * FROM "audit_events" ORDER BY id`);
+        const history = () => db.any(`SELECT * FROM "audit_events" ORDER BY id`);
         assert.equal((await history())[0].new_row.value, "mounted");
-        assert.deepEqual(
-          Object.keys((await history())[0]),
-          AUDIT_TABLE_COLUMNS,
-        );
-        assert.deepEqual(
-          Object.keys(AUDIT_TABLE_COLUMN_DEFINITIONS),
-          AUDIT_TABLE_COLUMNS,
-        );
+        assert.deepEqual(Object.keys((await history())[0]), AUDIT_TABLE_COLUMNS);
+        assert.deepEqual(Object.keys(AUDIT_TABLE_COLUMN_DEFINITIONS), AUDIT_TABLE_COLUMNS);
         const auditRow: AuditTableRow = (await history())[0];
         assert.equal(auditRow.operation, "INSERT");
-        assert.equal(
-          Object.keys(prgl.mergedTableConfig.tableConfig)[0],
-          audit.tableName,
-        );
+        assert.equal(Object.keys(prgl.mergedTableConfig.tableConfig!)[0], audit.tableName);
         // Comments are ordinary metadata and have no role in reconciliation or publishing.
-        await result.sql(
-          `COMMENT ON TABLE "audit_events" IS 'History shown in the UI'`,
-        );
+        await result.sql(`COMMENT ON TABLE "audit_events" IS 'History shown in the UI'`);
         // Avoid duplicate bootstrap rows on subsequent initialization.
-        (prgl.opts.tableConfig.audit_test_source as TableDefinition).onMount =
-          async () => {};
+        (prgl.opts.tableConfig.audit_test_source as TableDefinition).onMount = async () => {};
         await source.insert!({
           a: 1,
           b: "one",
@@ -227,10 +213,7 @@ export async function testAudit(parentDb: DB) {
         await result.sql(
           `INSERT INTO audit_test_existing VALUES (1, 'raw'); INSERT INTO audit_test_child VALUES (1, 1); DELETE FROM audit_test_existing WHERE id = 1;`,
         );
-        assert.equal(
-          (await history()).filter((r) => r.operation === "DELETE").length,
-          3,
-        );
+        assert.equal((await history()).filter((r) => r.operation === "DELETE").length, 3);
         await result.sql(
           `BEGIN; SET LOCAL "prostgles.user" = '{"id":"actor"}'; INSERT INTO audit_test_nopk VALUES ('k', 'hidden'); COMMIT;`,
         );
@@ -270,19 +253,19 @@ export async function testAudit(parentDb: DB) {
         const auditName = prgl.dboBuilder.tables.find(
           (t) => t.qualifiedNameParts.name === audit.tableName,
         )!.name;
-        const rules = await parser.getTableRulesWithoutFileTable(
-          { tableName: auditName, clientReq: undefined },
-          undefined,
-          { [auditName]: "*" },
-        );
+        const rules = await parser.getParsedPublishTable({
+          tableName: auditName,
+          clientReq: undefined,
+          clientInfo: undefined,
+          resolvedPublishObject: { [auditName]: "*" },
+        });
         assert(rules?.select);
         assert(!rules?.insert && !rules?.update && !rules?.delete);
 
         const triggerOids = () =>
-          db.any(
-            "SELECT oid FROM pg_trigger WHERE left(tgname, length($1)) = $1 ORDER BY oid",
-            [AUDIT_TRIGGER_PREFIX],
-          );
+          db.any("SELECT oid FROM pg_trigger WHERE left(tgname, length($1)) = $1 ORDER BY oid", [
+            AUDIT_TRIGGER_PREFIX,
+          ]);
         const beforeTriggers = await triggerOids();
         await result.sql(`CREATE TRIGGER audit_test_custom_insert AFTER INSERT ON audit_test_source
           FOR EACH ROW EXECUTE FUNCTION audit_test_custom();`);
@@ -309,23 +292,14 @@ export async function testAudit(parentDb: DB) {
         });
         const freshResult = await fresh.init(() => {}, { type: "init" });
         try {
-          assert.equal(
-            fresh.resolvedAuditConfig?.tables.audit_test_existing,
-            undefined,
-          );
+          assert.equal(fresh.resolvedAuditConfig?.tables.audit_test_existing, undefined);
           const sourceTriggers = await db.any<{ tgname: string }>(
             "SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_test_source'::regclass",
           );
           assert(sourceTriggers.some((t) => t.tgname === "audit_test_manual"));
-          assert(
-            !sourceTriggers.some((t) =>
-              t.tgname.startsWith(TABLE_CONFIG_TRIGGER_PREFIX),
-            ),
-          );
+          assert(!sourceTriggers.some((t) => t.tgname.startsWith(TABLE_CONFIG_TRIGGER_PREFIX)));
           const count = (await history()).length;
-          await freshResult.sql(
-            "INSERT INTO audit_test_existing VALUES (10, 'deselected')",
-          );
+          await freshResult.sql("INSERT INTO audit_test_existing VALUES (10, 'deselected')");
           assert.equal((await history()).length, count);
         } finally {
           await freshResult.destroy();
@@ -356,10 +330,7 @@ export async function testAudit(parentDb: DB) {
         const restart = result.restart();
         await schemaPaused;
         // Schema queries explicitly use the original database and must pass through.
-        assert.equal(
-          (await prgl.dbForSchema!.one("SELECT 1 AS value")).value,
-          1,
-        );
+        assert.equal((await prgl.dbForSchema!.one("SELECT 1 AS value")).value, 1);
         const sharedDb = prgl.db!;
         const finished: string[] = [];
         const waitingDbQueries = Promise.all([
@@ -427,9 +398,7 @@ export async function testAudit(parentDb: DB) {
         await result.update({
           audit: { ...audit, tables: { audit_test_source: 1 } },
         });
-        await result.sql(
-          "INSERT INTO audit_test_existing VALUES (2, 'excluded')",
-        );
+        await result.sql("INSERT INTO audit_test_existing VALUES (2, 'excluded')");
         assert.equal((await history()).length, countBefore);
         await result.update({ audit: undefined });
         assert.equal(prgl.resolvedAuditConfig, undefined);
@@ -461,16 +430,12 @@ export async function testAudit(parentDb: DB) {
         assert.equal((await history()).length, countBefore + 1);
         await result.sql("DROP TABLE audit_test.ignored");
         // Default inclusion must reject the remaining unkeyed source table.
-        await assert.rejects(
-          result.update({ audit: { tableName: audit.tableName } }),
-        );
+        await assert.rejects(result.update({ audit: { tableName: audit.tableName } }));
         await result.update({
           audit: {
             ...audit,
             tables: Object.fromEntries(
-              Object.entries(excludedTables).filter(
-                ([name]) => !name.includes("ignored"),
-              ),
+              Object.entries(excludedTables).filter(([name]) => !name.includes("ignored")),
             ),
           },
         });
@@ -480,19 +445,13 @@ export async function testAudit(parentDb: DB) {
           audit: {
             tableName: "audit_next_events",
             tables: Object.fromEntries(
-              Object.entries(excludedTables).filter(
-                ([name]) => !name.includes("ignored"),
-              ),
+              Object.entries(excludedTables).filter(([name]) => !name.includes("ignored")),
             ),
           },
         });
         await result.sql("INSERT INTO audit_test.selected VALUES (3)");
         assert.equal(
-          (
-            await db.one(
-              `SELECT count(*)::int AS count FROM "audit_next_events"`,
-            )
-          ).count,
+          (await db.one(`SELECT count(*)::int AS count FROM "audit_next_events"`)).count,
           1,
         );
         assert.equal((await history()).length, countBefore + 2);

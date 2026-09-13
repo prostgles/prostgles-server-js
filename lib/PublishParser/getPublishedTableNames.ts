@@ -6,7 +6,12 @@ export const getPublishedTableNames = (
   publishObject: PublishObject,
 ) => {
   const txKey = !publishParserInstance.prostgles.opts.transactions ? "" : "tx";
-  const tableNames = Object.keys(publishObject).filter((k) => !txKey || txKey !== k);
+  if (txKey && txKey in publishObject) {
+    throw new Error(
+      `Transactions key ${JSON.stringify(txKey)} collides with a published table name`,
+    );
+  }
+  const tableNames = Object.keys(publishObject);
 
   /**
    * Add file table to the list of published tables if it's referenced by other published tables.

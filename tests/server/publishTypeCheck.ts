@@ -20,8 +20,7 @@ export const testPublishTypes = () => {
       },
     },
   ];
-  const syncPublish: ProstglesInitOptions<DBGeneratedSchema>["publish"] = () => profiles;
-  const asyncPublish: ProstglesInitOptions<DBGeneratedSchema>["publish"] = async () => profiles;
+  const syncPublish: ProstglesInitOptions<DBGeneratedSchema>["publish"] = profiles;
   () => {
     const p1: PublishFullyTyped<DBGeneratedSchema> = {
       items: {

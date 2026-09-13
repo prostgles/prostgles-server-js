@@ -7,13 +7,14 @@
 		"allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
 		"allowJs": true,
-		"module": "commonjs",
-    "moduleResolution": "Node10",
+		"module": "node16",
+    "moduleResolution": "node16",
 		"declaration": true,
 		"declarationMap": true, 
 		"ignoreDeprecations": "5.0",
 		"skipLibCheck": true,
-    "outDir": "dist",
+    "rootDir": "..",
+    "outDir": "dist"
 	},
 	"exclude": [
 		"dist",
