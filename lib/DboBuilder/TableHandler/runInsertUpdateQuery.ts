@@ -6,6 +6,7 @@ import { rejectWithPGClientError, withUserRLS } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
+import { prepareWhere } from "../ViewHandler/prepareWhere";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
@@ -54,7 +55,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   // let checkCondition = "WHERE FALSE";
   let checkCondition = "FALSE";
   if (checkFilter) {
-    const checkCond = await tableHandler.prepareWhere({
+    const checkCond = await prepareWhere(tableHandler, {
       select: undefined,
       localParams: undefined,
       tableRule: undefined,

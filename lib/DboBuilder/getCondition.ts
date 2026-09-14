@@ -1,4 +1,4 @@
-import { pickKeys } from "prostgles-types";
+import { pickKeys, type AnyObject } from "prostgles-types";
 import { parseFilterItem } from "../Filtering/Filtering";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ExistsFilterConfig, LocalParams, PGIdentifier } from "./DboBuilder";
@@ -9,6 +9,7 @@ import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getExistsCondition } from "./ViewHandler/getExistsCondition";
 import { getExistsFilters } from "./ViewHandler/getExistsFilters";
 import { parseComplexFilter } from "./ViewHandler/parseComplexFilter";
+import { isArray } from "../utils/utils";
 
 const FILTER_FUNCS = FUNCTIONS.filter((f) => f.canBeUsedForFilter);
 
@@ -21,7 +22,7 @@ const FILTER_FUNCS = FUNCTIONS.filter((f) => f.canBeUsedForFilter);
 export async function getCondition(
   this: ViewHandler,
   params: {
-    filter: any;
+    filter: AnyObject;
     select: SelectItemValidated[] | undefined;
     allowed_colnames: string[];
     tableAlias?: PGIdentifier;
@@ -44,21 +45,21 @@ export async function getCondition(
 
   const existsConfigs = getExistsFilters(filter, this);
 
-  const funcConds: string[] = [];
+  const functionConditions: string[] = [];
   const funcFilter = FILTER_FUNCS.filter((f) => f.name in filter);
 
   funcFilter.map((f) => {
     const funcArgs = filter[f.name];
-    if (!Array.isArray(funcArgs)) {
+    if (!isArray(funcArgs)) {
       throw `A function filter must contain an array. E.g: { $funcFilterName: ["col1"] } \n but got: ${JSON.stringify(pickKeys(filter, [f.name]))} `;
     }
     const fields = this.parseFieldFilter(f.getFields(funcArgs), true, allowed_colnames);
 
-    const dissallowedCols = fields.filter((fname) => !allowed_colnames.includes(fname));
-    if (dissallowedCols.length) {
-      throw `Invalid/disallowed columns found in function filter: ${dissallowedCols}`;
+    const disallowedCols = fields.filter((fname) => !allowed_colnames.includes(fname));
+    if (disallowedCols.length) {
+      throw `Invalid/disallowed columns found in function filter: ${disallowedCols}`;
     }
-    funcConds.push(
+    functionConditions.push(
       f.getQuery({
         args: funcArgs,
         allColumns: this.columns,
@@ -84,7 +85,7 @@ export async function getCondition(
   const p = this.getValidatedRules(tableRules, localParams);
   const computedFields = p.allColumns.filter((c) => c.type === "computed");
   const computedColConditions: string[] = [];
-  Object.keys(filter || {}).map((key) => {
+  Object.keys(filter).map((key) => {
     const compCol = computedFields.find((cf) => cf.name === key);
     if (compCol) {
       if (!p.select) throw new Error("Computed column filter requires p.select.fields");
@@ -231,7 +232,7 @@ export async function getCondition(
   let templates: string[] = q?.condition ? [q.condition] : [];
 
   if (existsCond) templates.push(existsCond);
-  templates = templates.concat(funcConds);
+  templates = templates.concat(functionConditions);
   templates = templates.concat(computedColConditions);
   templates = templates.concat(complexFilters);
 

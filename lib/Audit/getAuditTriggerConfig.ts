@@ -3,9 +3,22 @@ import { asName } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import type { ResolvedAuditConfig } from "./AuditTypes";
 import { getAuditProtection, getAuditWriterName } from "./getAuditTableConfig";
+import { AUDIT_TABLE_COLUMN_NAMES } from "./AuditTable";
 
 export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig => {
   const result: TableConfig = {};
+  const columns = AUDIT_TABLE_COLUMN_NAMES;
+  const insertColumns = [
+    columns.schema_name,
+    columns.table_name,
+    columns.operation,
+    columns.old_id,
+    columns.new_id,
+    columns.old_row,
+    columns.new_row,
+    columns.actor,
+    columns.db_context,
+  ].map((columnName) => asName(columnName));
   for (const [name, options] of Object.entries(audit.tables)) {
     const { idColumns: ids, excludeColumns: excluded } = options;
     const functionName = getAuditWriterName(audit.tableName, name);
@@ -32,7 +45,7 @@ export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig =
               after_row := after_row - excluded;
             END IF;
             IF TG_OP = 'UPDATE' AND before_row IS NOT DISTINCT FROM after_row THEN RETURN NULL; END IF;
-            INSERT INTO ${asName(audit.tableName)} (schema_name, table_name, operation, old_id, new_id, old_row, new_row, actor, db_context)
+            INSERT INTO ${asName(audit.tableName)} (${insertColumns.join(", ")})
               VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, before_id, after_id, before_row, after_row,
                 nullif(current_setting('prostgles.user', true), '')::jsonb,
                 jsonb_build_object(

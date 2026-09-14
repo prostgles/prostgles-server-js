@@ -56,6 +56,7 @@ export type { FileTableRow } from "./StorageClient/getFileTableConfig";
 export { defineJoin };
 export {
   AUDIT_TABLE_COLUMN_DEFINITIONS,
+  AUDIT_TABLE_COLUMN_NAMES,
   AUDIT_TABLE_COLUMNS,
   type AuditTableRow,
 } from "./Audit/AuditTable";

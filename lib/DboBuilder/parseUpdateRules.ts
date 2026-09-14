@@ -9,6 +9,7 @@ import { type ParsedTableRule } from "../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "./DboBuilder";
 import { prepareNewData } from "./TableHandler/DataValidator";
 import type { TableHandler } from "./TableHandler/TableHandler";
+import { prepareWhere } from "./ViewHandler/prepareWhere";
 
 /**
  * 1) Check if publish is valid
@@ -57,7 +58,7 @@ export async function parseUpdateRules(
       throw ` Invalid update rule fo r ${this.name}. fields missing `;
     }
     finalUpdateFilter = (
-      await this.prepareWhere({
+      await prepareWhere(this, {
         select: undefined,
         filter,
         forcedFilter,
@@ -77,7 +78,7 @@ export async function parseUpdateRules(
           /**
            * Validated filter and fields
            */
-          const condition = await this.prepareWhere({
+          const condition = await prepareWhere(this, {
             select: undefined,
             filterFields: this.column_names,
             filter: dfRule.filter,

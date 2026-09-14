@@ -6,6 +6,7 @@ import {
 } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
+import { getAuditTableRules } from "../Audit/getAuditTableRules";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
@@ -305,16 +306,40 @@ export class PublishParser {
     if (!tableHandler) {
       throw "INTERNAL ERROR: table handler not found for " + tableName;
     }
-    const publishRulesExcludingFileTable = await this.getParsedPublishTable({
-      clientReq,
-      tableName,
-      clientInfo,
-      resolvedPublishObject: overriddenPublish,
-    });
+    const audit = this.prostgles.resolvedAuditConfig;
+    const isAuditTable = audit?.tableName === tableName;
+    const resolvedPublishObject =
+      overriddenPublish ??
+      (isAuditTable && clientReq ?
+        await this.getPublishObjectForUser(clientReq, clientInfo)
+      : undefined);
+    const publishRulesExcludingInferredTables =
+      await this.getParsedPublishTable({
+        clientReq,
+        tableName,
+        clientInfo,
+        resolvedPublishObject,
+      });
+    if (audit && isAuditTable) {
+      const auditTableRules = await getAuditTableRules.bind(this)(
+        audit,
+        publishRulesExcludingInferredTables,
+        clientReq,
+        clientInfo,
+        scope,
+        resolvedPublishObject,
+      );
+      return applyScopeToTableRules(
+        tableName,
+        tableHandler,
+        parsePublishTableRule(auditTableRules),
+        scope,
+      );
+    }
     if (this.dbo[tableName]?.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         tableName,
-        publishRulesExcludingFileTable,
+        publishRulesExcludingInferredTables,
         clientReq,
         clientInfo,
         scope,
@@ -331,7 +356,7 @@ export class PublishParser {
     return applyScopeToTableRules(
       tableName,
       tableHandler,
-      parsePublishTableRule(publishRulesExcludingFileTable),
+      parsePublishTableRule(publishRulesExcludingInferredTables),
       scope,
     );
   }

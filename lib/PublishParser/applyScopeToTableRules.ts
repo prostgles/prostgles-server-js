@@ -1,4 +1,4 @@
-import { getObjectEntries, isDefined, isEmpty } from "prostgles-types";
+import { fromEntries, getObjectEntries, isDefined, isEmpty } from "prostgles-types";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { type ParsedTableRule, type PermissionScope } from "./PublishParser";
 export const applyScopeToTableRules = (
@@ -67,10 +67,4 @@ export const applyScopeToTableRules = (
       .filter(isDefined),
   ) as ParsedTableRule;
   return result;
-};
-
-export const fromEntries = <K extends string | number | symbol, V>(
-  entries: readonly (readonly [K, V])[],
-): Record<K, V> => {
-  return Object.fromEntries(entries) as Record<K, V>;
 };

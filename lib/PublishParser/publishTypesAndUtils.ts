@@ -228,11 +228,6 @@ export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    * */
   filterFields?: FieldFilter<Cols>;
 
-  /**
-   * Validation logic to check/update data for each request
-   */
-  validate?(args: SelectRequestData): SelectRequestData | Promise<SelectRequestData>;
-
   subscribeThrottle?: number;
 
   disableMethods?: Partial<Record<"sync" | "subscribe", 1>>;

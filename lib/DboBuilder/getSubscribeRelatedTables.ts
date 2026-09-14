@@ -8,6 +8,7 @@ import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getViewRelatedTables } from "./ViewRelatedTables/getViewRelatedTables";
 import type { AddTriggerParams } from "../PubSubManager/addTrigger";
+import { prepareWhere } from "./ViewHandler/prepareWhere";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -66,9 +67,9 @@ export async function getSubscribeRelatedTables(
         isEmpty(targetTableFilter) ? reversedJoinFilter : (
           { $and: [targetTableFilter, reversedJoinFilter] }
         );
-      const joinConditionInfo = await relatedTableOrViewHandler.prepareWhere({
-        select: undefined,
+      const joinConditionInfo = await prepareWhere(relatedTableOrViewHandler, {
         filter,
+        select: undefined,
         addWhere: false,
         localParams: undefined,
         tableRule: undefined,

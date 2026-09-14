@@ -1,10 +1,11 @@
-import type { AnyObject, EXISTS_KEY, FieldFilter } from "prostgles-types";
-import { EXISTS_KEYS, asName } from "prostgles-types";
-import type { LocalParams, ExistsFilterConfig } from "../DboBuilder";
-import type { ViewHandler } from "./ViewHandler";
+import type { EXISTS_KEY } from "prostgles-types";
+import { EXISTS_KEYS } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { TableHandler } from "../TableHandler/TableHandler";
-import { getTableJoinQuery } from "./getTableJoinQuery";
+import type { ExistsFilterConfig, LocalParams } from "../DboBuilder";
+import { getQuerySourceSQL } from "../QueryBuilder/getQuerySource";
+import { getTableJoinAlias, getTableJoinQuery } from "./getTableJoinQuery";
+import type { ViewHandler } from "./ViewHandler";
+import { prepareWhere } from "./prepareWhere";
 
 export async function getExistsCondition(
   this: ViewHandler,
@@ -25,17 +26,22 @@ export async function getExistsCondition(
     };
   }
 
-  let t2Rules: ParsedTableRule | undefined = undefined,
-    forcedFilter: AnyObject | undefined,
-    filterFields: FieldFilter | undefined;
-
   /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
   if (localParams?.isRemoteRequest && !localParams.clientReq) {
     throw "Unexpected: localParams isRemoteRequest and missing clientReq";
   }
+
+  let targetTableRules: ParsedTableRule | undefined = undefined;
   const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
-  if (localParams?.clientReq && this.dboBuilder.publishParser) {
-    t2Rules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr(
+  const tableHandler = this.dboBuilder.dboMap.get(targetTable);
+  if (!tableHandler) {
+    throw `Table handler for ${targetTable} not found`;
+  }
+  if (localParams?.clientReq) {
+    if (!this.dboBuilder.publishParser) {
+      throw "Unexpected: missing publishParser";
+    }
+    targetTableRules = await this.dboBuilder.publishParser.getValidatedRequestRuleWusr(
       {
         tableName: targetTable,
         command: "find",
@@ -44,27 +50,27 @@ export async function getExistsCondition(
       localParams.scope,
     );
 
-    if (!t2Rules.select) throw "Disallowed";
-    ({ forcedFilter, filterFields } = t2Rules.select);
+    if (!targetTableRules.select) throw "Disallowed";
   }
 
-  const tableHandler = this.dboBuilder.dbo[targetTable] as TableHandler;
-  const finalWhere = (
-    await tableHandler.prepareWhere({
-      select: undefined,
-      filter: targetTableFilter,
-      forcedFilter,
-      filterFields,
-      addWhere: false,
-      tableAlias: undefined,
-      localParams,
-      tableRule: t2Rules,
-    })
-  ).where;
+  const targetAlias =
+    eConfig.isJoined ? getTableJoinAlias(targetTable, eConfig.parsedPath.length - 1) : undefined;
+  const whereOpts = await prepareWhere(tableHandler, {
+    select: undefined,
+    selectParams: {},
+    filter: targetTableFilter,
+    forcedFilter: targetTableRules?.select?.forcedFilter,
+    filterFields: targetTableRules?.select?.filterFields,
+    tableRule: targetTableRules,
+    addWhere: false,
+    tableAlias: targetAlias,
+    localParams,
+  });
+  const { source: targetSource, where: finalWhere } = whereOpts;
 
   let innerQuery = [
     `SELECT 1`,
-    `FROM ${asName(targetTable)}`,
+    `FROM ${getQuerySourceSQL(targetSource)}`,
     `${finalWhere ? `WHERE ${finalWhere}` : ""}`,
   ].join("\n");
 
@@ -74,6 +80,7 @@ export async function getExistsCondition(
       rootTableAlias: rootTableAlias ?? rootTable,
       type: "EXISTS",
       finalWhere,
+      finalTableExpression: targetSource.expression,
     });
     innerQuery = query;
   }

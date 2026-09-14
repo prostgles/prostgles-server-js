@@ -11,6 +11,7 @@ import {
 import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
+import { prepareWhere } from "../ViewHandler/prepareWhere";
 
 export async function _delete(
   this: TableHandler,
@@ -86,7 +87,7 @@ export async function _delete(
 
     let queryType: keyof pgPromise.ITask<{}> = "none";
     let queryWithoutRLS = `DELETE FROM ${this.escapedName} `;
-    const filterOpts = await this.prepareWhere({
+    const filterOpts = await prepareWhere(this, {
       select: undefined,
       filter,
       forcedFilter,

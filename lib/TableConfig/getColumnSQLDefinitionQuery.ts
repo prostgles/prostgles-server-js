@@ -1,8 +1,14 @@
 import type pgPromise from "pg-promise";
-import { asName, getObjectEntries, isObject, pickKeys, type JSONB } from "prostgles-types";
+import {
+  asName,
+  fromEntries,
+  getObjectEntries,
+  isObject,
+  pickKeys,
+  type JSONB,
+} from "prostgles-types";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import type { DB } from "../Prostgles";
-import { fromEntries } from "../PublishParser/applyScopeToTableRules";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import type { BaseColumnTypes, ColumnConfig } from "./TableConfigTypes";
 

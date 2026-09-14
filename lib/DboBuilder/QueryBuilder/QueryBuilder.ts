@@ -5,7 +5,6 @@
 
 import type {
   ColumnInfo,
-  JoinSelect,
   PG_COLUMN_UDT_DATA_TYPE,
   Select,
   ValidatedColumnInfo,
@@ -13,12 +12,15 @@ import type {
 import { getKeys, isEmpty, isObject, postgresToTsType } from "prostgles-types";
 import type { PGIdentifier, SortItem } from "../DboBuilder";
 
-import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
-import type { ViewHandler } from "../ViewHandler/ViewHandler";
-import type { FieldSpec, FunctionSpec } from "./Functions/Functions";
-import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
-import { parseFunction } from "./Functions/parseFunction";
+import type { Awaitable } from "../../PublishParser/publishTypesAndUtils";
 import { asNameAlias } from "../../utils/asNameAlias";
+import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
+import type { WhereOptions } from "../ViewHandler/prepareWhere";
+import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
+import type { FieldSpec, FunctionSpec } from "./Functions/Functions";
+import { parseFunction } from "./Functions/parseFunction";
+import { parseJoinSelect, type ParsedJoin } from "./parseJoinSelect";
+import type { QuerySource } from "./getQuerySource";
 
 export type SelectItem = {
   getFields: (args: any[]) => string[] | "*";
@@ -36,13 +38,9 @@ export type SelectItem = {
   | {
       type: "function" | "aggregation" | "joinedColumn" | "computed";
       columnName?: undefined;
-      // args: any[];
-      // getFields: (args: any[]) => string[] | "*";
-      // columnNames: string[];
     }
 );
 export type SelectItemValidated = Omit<SelectItem, "getFields"> & { fields: string[] };
-export type WhereOptions = Awaited<ReturnType<ViewHandler["prepareWhere"]>>;
 export type NewQueryRoot = {
   /**
    * All fields from the table will be in nested SELECT and GROUP BY to allow order/filter by fields not in select
@@ -55,6 +53,7 @@ export type NewQueryRoot = {
   select: SelectItemValidated[];
 
   table: PGIdentifier;
+  source: QuerySource;
   where: string;
   whereOpts: WhereOptions;
   orderByItems: SortItem[];
@@ -148,7 +147,7 @@ export class SelectItemBuilder {
     const allowedFields = isSelected ? allowedSelectedFields : allowedNonSelectedFields;
     if (!allowedFields.includes(f)) {
       throw (
-        "Field " + f + " is invalid or dissallowed. \nAllowed fields: " + allowedFields.join(", ")
+        "Field " + f + " is invalid or disallowed. \nAllowed fields: " + allowedFields.join(", ")
       );
     }
     return f;
@@ -193,7 +192,7 @@ export class SelectItemBuilder {
     });
   };
 
-  addColumn = (fieldName: string, selected: boolean) => {
+  private addColumn = (fieldName: string, selected: boolean) => {
     /* Check if computed col */
     if (selected) {
       const compCol = COMPUTED_FIELDS.find((cf) => cf.name === fieldName);
@@ -225,10 +224,19 @@ export class SelectItemBuilder {
     });
   };
 
-  parseUserSelect = async (
+  parse = async (
     userSelect: Select,
-    joinParse?: (key: string, val: JoinSelect, throwErr: (msg: string) => any) => any,
-  ) => {
+    joinParse?: (key: string, parsedJoin: ParsedJoin) => Awaitable<void>,
+  ): Promise<void> => {
+    if (userSelect === "") {
+      return;
+    }
+
+    if (userSelect === "*") {
+      this.allowedFields.map((key) => this.addColumn(key, true));
+      return;
+    }
+
     /* [col1, col2, col3] */
     if (Array.isArray(userSelect)) {
       if (userSelect.find((key) => typeof (key as unknown) !== "string")) {
@@ -236,90 +244,110 @@ export class SelectItemBuilder {
       }
 
       userSelect.map((key) => this.addColumn(key, true));
+      return;
+    }
 
-      /* Empty select */
-    } else if (userSelect === "") {
-      return [];
-    } else if (userSelect === "*") {
-      this.allowedFields.map((key) => this.addColumn(key, true));
-    } else if (isObject(userSelect) && !isEmpty(userSelect)) {
-      const selectKeys = Object.keys(userSelect),
-        selectValues = Object.values(userSelect);
-
-      /* Cannot include and exclude at the same time */
-      if (selectValues.filter((v) => [0, false].includes(v as number)).length) {
-        if (selectValues.filter((v) => ![0, false].includes(v as number)).length) {
-          throw "\nCannot include and exclude fields at the same time";
-        }
-
-        /* Exclude only */
-        this.allowedFields
-          .filter((f) => !selectKeys.includes(f))
-          .map((key) => this.addColumn(key, true));
-      } else {
-        await Promise.all(
-          selectKeys.map(async (key) => {
-            const val: unknown = userSelect[key as keyof typeof userSelect];
-            const throwErr = (extraErr = "") => {
-              console.trace(extraErr);
-              throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + extraErr;
-            };
-
-            /* Included fields */
-            if ([1, true].includes(val as number | boolean)) {
-              if (key === "*") {
-                this.allowedFields.map((key) => this.addColumn(key, true));
-              } else {
-                this.addColumn(key, true);
-              }
-
-              /* Aggs and functions */
-            } else if (typeof val === "string" || isObject(val)) {
-              /* Function shorthand notation
-                { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
-            */
-              if (
-                (typeof val === "string" && val !== "*") ||
-                (isObject(val) &&
-                  Object.keys(val).length === 1 &&
-                  Array.isArray(Object.values(val)[0]))
-              ) {
-                let funcName: string | undefined, args: any[] | undefined;
-                if (typeof val === "string") {
-                  /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
-                  try {
-                    this.checkField(key, true);
-                  } catch {
-                    throwErr(
-                      ` Shorthand function notation error: the specifield column ( ${key} ) is invalid or dissallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `,
-                    );
-                  }
-                  funcName = val;
-                  args = [key];
-
-                  /** Function full notation { $funcName: ["colName", ...args] } */
-                } else {
-                  ({ funcName, args } = parseFunctionObject(val));
-                }
-
-                this.addFunction(funcName, args, key);
-
-                /* Join */
-              } else {
-                if (!joinParse) {
-                  throw "Joins disallowed";
-                }
-                await joinParse(key, val as JoinSelect, throwErr);
-              }
-            } else throwErr();
-          }),
-        );
-      }
-    } else {
-      if (isEmpty(userSelect)) {
-        throw "Unexpected empty object select";
-      }
+    if (!isObject(userSelect)) {
       throw "Unexpected select -> " + JSON.stringify(userSelect);
     }
+
+    if (isEmpty(userSelect)) {
+      throw "Unexpected empty object select";
+    }
+
+    const selectKeys = Object.keys(userSelect),
+      selectValues = Object.values(userSelect);
+
+    /* Cannot include and exclude at the same time */
+    if (selectValues.filter((v) => [0, false].includes(v as number)).length) {
+      if (selectValues.filter((v) => ![0, false].includes(v as number)).length) {
+        throw "\nCannot include and exclude fields at the same time";
+      }
+
+      /* Exclude only */
+      this.allowedFields
+        .filter((f) => !selectKeys.includes(f))
+        .map((key) => this.addColumn(key, true));
+    } else {
+      await Promise.all(
+        selectKeys.map(async (key) => {
+          const val: unknown = userSelect[key as keyof typeof userSelect];
+          const throwErr: (message: string) => never = (message) => {
+            console.trace(message);
+            throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + message;
+          };
+
+          /* Included fields */
+          if ([1, true].includes(val as number | boolean)) {
+            if (key === "*") {
+              this.allowedFields.map((key) => this.addColumn(key, true));
+            } else {
+              this.addColumn(key, true);
+            }
+
+            /* Aggregations and functions */
+          } else if (typeof val === "string" || isObject(val)) {
+            /* Function shorthand notation
+                { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
+              */
+            if (
+              (typeof val === "string" && val !== "*") ||
+              (isObject(val) &&
+                Object.keys(val).length === 1 &&
+                Array.isArray(Object.values(val)[0]))
+            ) {
+              let funcName: string | undefined, args: any[] | undefined;
+              if (typeof val === "string") {
+                /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
+                try {
+                  this.checkField(key, true);
+                } catch {
+                  throwErr(
+                    ` Shorthand function notation error: the specified column ( ${key} ) is invalid or disallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `,
+                  );
+                }
+                funcName = val;
+                args = [key];
+
+                /** Function full notation { $funcName: ["colName", ...args] } */
+              } else {
+                ({ funcName, args } = parseFunctionObject(val));
+              }
+
+              this.addFunction(funcName, args, key);
+
+              /* Join */
+            } else {
+              if (!joinParse) {
+                throw "Joins disallowed";
+              }
+              const joinSelect = val;
+
+              const parsedJoin = parseJoinSelect(joinSelect);
+
+              if (typeof parsedJoin === "string") {
+                throwErr(parsedJoin);
+              }
+              await joinParse(key, parsedJoin);
+            }
+          } else throwErr("Invalid select value");
+        }),
+      );
+    }
+
+    if (!joinParse) return;
+    /**
+     * Is this still needed?!!!
+     * Add non selected columns
+     * This ensures all fields are available for orderBy in case of nested select
+     * */
+    Array.from(new Set([...this.allowedFields, ...this.allowedOrderByFields])).map((columnName) => {
+      if (!this.select.find((s) => s.alias === columnName && s.type === "column")) {
+        this.addColumn(columnName, false);
+      }
+    });
   };
+
+  parseUserSelect = (userSelect: Select) => this.parse(userSelect);
+  parseUserSelectWithJoins = this.parse;
 }

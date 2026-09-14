@@ -320,6 +320,7 @@ export class Prostgles {
       this.dboBuilder = await DboBuilder.create(this);
     }
     this.dbo = this.dboBuilder.dbo;
+    if (this.publishParser) this.initPublishParser();
     await this.opts.onLog?.({
       type: "debug",
       command: "refreshDBO.end",

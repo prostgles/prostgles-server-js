@@ -13,26 +13,25 @@ import type { TableEvent } from "../../Logging";
 import type { DB } from "../../Prostgles";
 import type { Join } from "../../ProstglesTypes";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { Graph } from "../joins/shortestPath";
+import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
+import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
+import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
+import { escapeTSNames } from "../../utils/utils";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { getValidatedTableRules } from "../TableRules/getValidatedTableRules";
 import { getColumns } from "../getColumns";
+import type { Graph } from "../joins/shortestPath";
 import { count } from "./count";
 import { find, type Param3 } from "./find";
+import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
-import { prepareWhere } from "./prepareWhere";
 import { size } from "./size";
 import type { OnData } from "./subscribe";
 import { subscribe } from "./subscribe";
 import { validateViewRules } from "./validateViewRules";
-import { escapeTSNames } from "../../utils/utils";
-import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
-import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
-import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
-import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 
 export type JoinPaths = {
   t1: string;
@@ -337,11 +336,6 @@ export class ViewHandler {
 
     return col_names;
   }
-
-  /**
-   * Parses group or simple filter
-   */
-  prepareWhere = prepareWhere.bind(this);
 
   intersectColumns(
     allowedFields: FieldFilter,

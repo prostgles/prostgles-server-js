@@ -1,9 +1,10 @@
-import type { AnyObject, FieldFilter } from "prostgles-types/dist";
+import type { AnyObject, FieldFilter, SelectParams } from "prostgles-types/dist";
 import { getKeys, isDefined, isObject } from "prostgles-types/dist";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { ExistsFilterConfig, Filter, LocalParams, PGIdentifier } from "../DboBuilder";
 import { getCondition } from "../getCondition";
 import { type SelectItemValidated } from "../QueryBuilder/QueryBuilder";
+import { getQuerySource, type QuerySource } from "../QueryBuilder/getQuerySource";
 import type { ViewHandler } from "./ViewHandler";
 
 export type PrepareWhereParams = {
@@ -16,46 +17,61 @@ export type PrepareWhereParams = {
   localParams: LocalParams | undefined;
   tableRule: ParsedTableRule | undefined;
   isHaving?: boolean;
+  selectParams?: SelectParams;
 };
 
-export async function prepareWhere(
-  this: ViewHandler,
-  params: PrepareWhereParams,
-): Promise<{
+export type WhereOptions = {
   columnsUsed: string[];
   condition: string;
   where: string;
   filter: AnyObject;
   exists: ExistsFilterConfig[];
-}> {
-  const {
+  source: QuerySource;
+};
+
+export const prepareWhere = async (
+  viewHandler: ViewHandler,
+  {
     filter,
     select,
     forcedFilter,
-    filterFields: ff,
     addWhere: addKeywords = true,
     tableAlias,
     localParams,
     tableRule,
-  } = params;
-  const { $and: $and_key, $or: $or_key } = this.dboBuilder.prostgles.keywords;
+    /* Local update allow all. TODO: tidy all calls */
+    filterFields = !tableRule ? "*" : undefined,
+    isHaving,
+    selectParams,
+  }: PrepareWhereParams,
+): Promise<WhereOptions> => {
+  const { $and: $and_key, $or: $or_key } = viewHandler.dboBuilder.prostgles.keywords;
 
-  let filterFields = ff;
-  /* Local update allow all. TODO -> FIX THIS */
-  if (!ff && !tableRule) filterFields = "*";
+  if (localParams?.isRemoteRequest && !tableRule) {
+    throw "Unexpected: localParams isRemoteRequest and missing tableRule";
+  }
+
+  const source = await getQuerySource(
+    viewHandler,
+    selectParams ? tableRule : undefined,
+    filter ?? {},
+    selectParams ?? {},
+    tableAlias,
+  );
 
   const exists: ExistsFilterConfig[] = [];
 
   type FilterItemResult = { condition: string; columnsUsed: string[] };
   const parseFullFilter = async (
-    f: any,
+    fullFilter: any,
     parentFilter: AnyObject | null = null,
     isForcedFilterBypass: boolean,
   ): Promise<FilterItemResult | undefined> => {
-    if (!f) throw "Invalid/missing group filter provided";
-    if (!isObject(f)) throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(f);
+    if (!fullFilter) throw "Invalid/missing group filter provided";
+    if (!isObject(fullFilter))
+      throw "\nInvalid filter\nExpecting an object but got -> " + JSON.stringify(fullFilter);
 
-    const keys = getKeys(f);
+    const keys = getKeys(fullFilter);
     if (!keys.length) {
       return;
     }
@@ -66,8 +82,8 @@ export async function prepareWhere(
         throw "group filter ($and/$or) can only be placed at the root or within another group filter";
     }
 
-    const { [$and_key]: $and, [$or_key]: $or } = f,
-      group: AnyObject[] | undefined = $and || $or;
+    const { [$and_key]: $and, [$or_key]: $or } = fullFilter;
+    const group = ($and || $or) as AnyObject[] | undefined;
 
     if (group && group.length) {
       const operand = $and ? " AND " : " OR ";
@@ -82,20 +98,24 @@ export async function prepareWhere(
       if (conditionItems.length) {
         const conditions = conditionItems.map((c) => c.condition);
         const columnsUsed = conditionItems.map((c) => c.columnsUsed).flat();
-        if (conditions.length === 1) return { columnsUsed, condition: conditions.join(operand) };
-        else return { columnsUsed, condition: ` ( ${conditions.sort().join(operand)} ) ` };
+        if (conditions.length === 1) {
+          return { columnsUsed, condition: conditions.join(operand) };
+        }
+        return { columnsUsed, condition: ` ( ${conditions.sort().join(operand)} ) ` };
       }
     } else if (!group) {
       /** forcedFilters do not get checked against publish and are treated as server-side requests */
-      const itemInfo = await getCondition.bind(this)({
-        filter: { ...f },
+      const itemInfo = await getCondition.bind(viewHandler)({
+        filter: { ...fullFilter },
         select,
         allowed_colnames:
-          isForcedFilterBypass ? this.column_names.slice(0) : this.parseFieldFilter(filterFields),
-        tableAlias,
+          isForcedFilterBypass ?
+            viewHandler.column_names.slice(0)
+          : viewHandler.parseFieldFilter(filterFields),
+        tableAlias: source.alias,
         localParams: isForcedFilterBypass ? undefined : localParams,
         tableRules: isForcedFilterBypass ? undefined : tableRule,
-        isHaving: params.isHaving,
+        isHaving,
       });
       exists.push(...itemInfo.exists);
       return {
@@ -135,5 +155,6 @@ export async function prepareWhere(
     where: combinedConditions || "",
     filter: finalFilter,
     exists,
+    source,
   };
-}
+};

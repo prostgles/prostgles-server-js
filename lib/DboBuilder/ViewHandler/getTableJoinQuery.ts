@@ -1,10 +1,12 @@
 import { asName } from "prostgles-types";
+import type { PGIdentifier } from "../DboBuilder";
 import type { ParsedJoinPath } from "./parseJoinPath";
 
 type getTableJoinsArgs = {
   rootTableAlias: string;
   type: "INNER" | "LEFT" | "EXISTS";
   finalWhere?: string;
+  finalTableExpression?: string;
   path: ParsedJoinPath[];
 };
 export const getTableJoinQuery = ({
@@ -12,14 +14,14 @@ export const getTableJoinQuery = ({
   type,
   rootTableAlias,
   finalWhere,
+  finalTableExpression,
 }: getTableJoinsArgs): { targetAlias: string; query: string } => {
   const [firstPath] = path;
   if (!firstPath) {
     throw `Cannot create join query for empty path`;
   }
-  const aliasSufix = "jd";
   const getTableAlias = (table: string, pathIndex: number) =>
-    asName(`${aliasSufix}_${pathIndex}_${table}`);
+    getTableJoinAlias(table, pathIndex).escaped;
 
   const query = path
     .map(({ table, on }, i) => {
@@ -45,19 +47,19 @@ export const getTableJoinQuery = ({
        */
       const whereJoinCondition =
         isLast && isExists ?
-          `WHERE (${getJoinOnCondition({
-            on: firstPath.on,
-            leftAlias: rootTableAlias,
-            rightAlias: getTableAlias(firstPath.table, 0),
-          })})`
+          `WHERE (${[
+            getJoinOnCondition({
+              on: firstPath.on,
+              leftAlias: rootTableAlias,
+              rightAlias: getTableAlias(firstPath.table, 0),
+            }),
+            finalWhere,
+          ]
+            .filter(Boolean)
+            .join(") AND (")})`
         : "";
 
-      const tableSelect =
-        isExists && isLast ?
-          [`(`, ` SELECT *`, ` FROM ${tableName}`, finalWhere ? `  WHERE ${finalWhere}` : "", `)`]
-            .filter((v) => v)
-            .join("\n")
-        : tableName;
+      const tableSelect = isLast ? (finalTableExpression ?? tableName) : tableName;
       if (isExists && isFirst) {
         return [`SELECT 1`, `FROM ${tableSelect} ${tableAlias}`, whereJoinCondition]
           .filter((v) => v)
@@ -74,6 +76,12 @@ export const getTableJoinQuery = ({
     query,
     targetAlias: getTableAlias(path.at(-1)!.table, path.length - 1),
   };
+};
+
+export const getTableJoinAlias = (table: string, pathIndex: number): PGIdentifier => {
+  const prefix = "jd";
+  const raw = `${prefix}_${pathIndex}_${table}`;
+  return { raw, escaped: asName(raw) };
 };
 
 type GetJoinOnConditionArgs = {
@@ -95,7 +103,7 @@ export const getJoinOnConditions = ({
       .map(([leftCol, rightCol]) => {
         return `${leftAlias}.${getLeftColName(leftCol)} = ${rightAlias}.${getRightColName(rightCol)}`;
       })
-      .join(" AND ")
+      .join(" AND "),
   );
 };
 

@@ -29,7 +29,7 @@ import { spawn } from "child_process";
 import type { DBOFullyTyped } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server";
 
-let logs = [];
+let logs: unknown[] = [];
 
 export const log = (msg: string, extra?: any, trace?: boolean) => {
   const msgs = msg.includes("show-logs") ? logs : ["(server): " + msg, extra].filter((v) => v);
@@ -39,7 +39,7 @@ export const log = (msg: string, extra?: any, trace?: boolean) => {
     console.log(...msgs);
   }
 };
-const stopTest = (err?) => {
+const stopTest = (err?: unknown) => {
   log("Stopping server ...");
   if (err) {
     console.trace(err);
@@ -317,7 +317,9 @@ function dd() {
           tableIndex: 0,
           ...(table.name === "planes" && {
             passes,
-            primaryKeys: table.columns.filter((column) => column.is_pkey).map((column) => column.name),
+            primaryKeys: table.columns
+              .filter((column) => column.is_pkey)
+              .map((column) => column.name),
           }),
         },
         columns:

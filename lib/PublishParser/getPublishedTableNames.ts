@@ -1,3 +1,4 @@
+import { isObject } from "prostgles-types";
 import type { PublishParser } from "./PublishParser";
 import { type PublishObject } from "./PublishParser";
 
@@ -29,6 +30,27 @@ export const getPublishedTableNames = (
     if (isReferenced) {
       tableNames.unshift(fileTableName);
     }
+  }
+
+  const audit = publishParserInstance.prostgles.resolvedAuditConfig;
+  const publishedFileTableName =
+    fileTableName && tableNames.includes(fileTableName) ?
+      fileTableName
+    : undefined;
+  if (
+    audit &&
+    !tableNames.includes(audit.tableName) &&
+    Object.keys(audit.tables).some((tableName) => {
+      const rule = publishObject[tableName];
+      return (
+        tableName === publishedFileTableName ||
+        rule === "*" ||
+        rule === true ||
+        (isObject(rule) && Boolean(rule.select))
+      );
+    })
+  ) {
+    tableNames.unshift(audit.tableName);
   }
   return tableNames;
 };

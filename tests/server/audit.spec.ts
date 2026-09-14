@@ -4,9 +4,12 @@ import pgPromise from "pg-promise";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import express from "express";
 import {
   AUDIT_TABLE_COLUMNS,
   AUDIT_TABLE_COLUMN_DEFINITIONS,
+  AUDIT_TABLE_COLUMN_NAMES,
+  getLocalStorageClient,
   type AuditTableRow,
 } from "prostgles-server";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
@@ -38,7 +41,7 @@ void invalidColumn;
 
 export async function testAudit(parentDb: DB) {
   await test(
-    "Managed audit setup, row history, protection and query readiness",
+    "Managed audit setup, row history, protection, access and query readiness",
     { timeout: 60000 },
     async () => {
       await parentDb.none("DROP SCHEMA IF EXISTS audit_test_main CASCADE");
@@ -51,6 +54,9 @@ export async function testAudit(parentDb: DB) {
       const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
       const dir = await mkdtemp(join(tmpdir(), "prostgles-audit-"));
       const sqlFilePath = join(dir, "init.sql");
+      const fileTable = "audit_test_files";
+      const documentTable = "audit_test_documents";
+      const maskedTable = "audit_test_masked";
       await writeFile(
         sqlFilePath,
         `
@@ -61,6 +67,7 @@ export async function testAudit(parentDb: DB) {
       CREATE TABLE IF NOT EXISTS audit_test_nopk (key text, secret text);
       CREATE TABLE IF NOT EXISTS audit_test_partitioned (id int PRIMARY KEY) PARTITION BY RANGE (id);
       CREATE TABLE IF NOT EXISTS audit_test_partition PARTITION OF audit_test_partitioned FOR VALUES FROM (0) TO (100);
+      CREATE TABLE IF NOT EXISTS ${maskedTable} (id int, secret text, PRIMARY KEY (id, secret));
       CREATE OR REPLACE VIEW audit_test_view AS SELECT * FROM audit_test_existing;
     `,
       );
@@ -73,8 +80,16 @@ export async function testAudit(parentDb: DB) {
           audit_test_existing: 1,
           audit_test_child: 1,
           audit_test_nopk: { idColumns: ["key"], excludeColumns: ["secret"] },
+          [fileTable]: 1,
+          [maskedTable]: 1,
         },
       };
+      const sourcePublish = {
+        audit_test_source: {
+          select: { fields: { a: 1 }, forcedFilter: { b: "one" } },
+        },
+        [maskedTable]: { select: { fields: { id: 1 } } },
+      } as const;
       let pauseSchema = false;
       let releaseSchema: (() => void) | undefined;
       let schemaStarted: (() => void) | undefined;
@@ -82,8 +97,17 @@ export async function testAudit(parentDb: DB) {
         dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
         sqlFilePath,
         audit,
+        publish: sourcePublish,
         transactions: true,
+        joins: "inferred",
         schemaFilter: { audit_test_main: 1, audit_test: 1 },
+        fileTable: {
+          tableName: fileTable,
+          expressApp: express(),
+          storageClient: getLocalStorageClient({
+            localFolderPath: join(process.cwd(), "debug", "audit-access-files"),
+          }),
+        },
         tableConfig: {
           audit_test_source: {
             columns: {
@@ -107,6 +131,12 @@ export async function testAudit(parentDb: DB) {
                 b: "mount",
                 value: "mounted",
               });
+            },
+          },
+          [documentTable]: {
+            columns: {
+              id: "serial PRIMARY KEY",
+              file_id: `uuid NOT NULL REFERENCES ${fileTable}(id)`,
             },
           },
         },
@@ -178,6 +208,7 @@ export async function testAudit(parentDb: DB) {
         assert.equal((await history())[0].new_row.value, "mounted");
         assert.deepEqual(Object.keys((await history())[0]), AUDIT_TABLE_COLUMNS);
         assert.deepEqual(Object.keys(AUDIT_TABLE_COLUMN_DEFINITIONS), AUDIT_TABLE_COLUMNS);
+        assert.deepEqual(Object.values(AUDIT_TABLE_COLUMN_NAMES), AUDIT_TABLE_COLUMNS);
         const auditRow: AuditTableRow = (await history())[0];
         assert.equal(auditRow.operation, "INSERT");
         assert.equal(Object.keys(prgl.mergedTableConfig.tableConfig!)[0], audit.tableName);
@@ -239,6 +270,15 @@ export async function testAudit(parentDb: DB) {
             assert.deepEqual(row.db_context, { ...expected, statement_started_at });
           }
         });
+        await result.sql(
+          `INSERT INTO ${maskedTable} VALUES (1, 'mySecret'); DELETE FROM ${maskedTable} WHERE id = 1`,
+        );
+        const storedMaskedHistory = await db.any<AuditTableRow>(
+          `SELECT * FROM "audit_events" WHERE table_name = $1 ORDER BY id`,
+          [maskedTable],
+        );
+        assert.equal(storedMaskedHistory[0]?.new_row.secret, "mySecret");
+        assert.equal(storedMaskedHistory[1]?.old_row.secret, "mySecret");
         for (const sql of [
           `UPDATE "audit_events" SET table_name = 'tampered'`,
           `DELETE FROM "audit_events"`,
@@ -262,6 +302,161 @@ export async function testAudit(parentDb: DB) {
         assert(rules?.select);
         assert(!rules?.insert && !rules?.update && !rules?.delete);
 
+        const clientRequest = {
+          httpReq: {
+            ip: "127.0.0.1",
+            headers: { authorization: "Bearer dGVzdA==" },
+            connection: { remoteAddress: "127.0.0.1" },
+          },
+          res: {},
+        } as never;
+        const sourceClient = await result.getClientDBHandlers(
+          clientRequest,
+          undefined,
+        );
+        assert(
+          sourceClient.clientSchema.tableSchema.some(
+            ({ name }) => name === auditName,
+          ),
+        );
+        const clientAudit = sourceClient.clientDb[auditName]!;
+        await assert.rejects(() => clientAudit.find!({}));
+        await assert.rejects(() =>
+          clientAudit.find!({ invalid_audit_column: 1 }),
+        );
+        await assert.rejects(() =>
+          clientAudit.find!(
+            {},
+            { select: { invalid_audit_column: 1 } as never },
+          ),
+        );
+        const auditTableFilter = {
+          schema_name: "audit_test_main",
+          table_name: "audit_test_source",
+        };
+        const visibleHistory = await clientAudit.find!(auditTableFilter, {
+          orderBy: { id: 1 },
+        });
+        assert.deepEqual(
+          visibleHistory.map(({ operation, old_id, new_id, old_row, new_row }) => ({
+            operation,
+            old_id,
+            new_id,
+            old_row,
+            new_row,
+          })),
+          [
+            {
+              operation: "INSERT",
+              old_id: null,
+              new_id: { a: 1 },
+              old_row: null,
+              new_row: { a: 1 },
+            },
+            {
+              operation: "UPDATE",
+              old_id: { a: 1 },
+              new_id: { a: 2 },
+              old_row: { a: 1 },
+              new_row: { a: 2 },
+            },
+            {
+              operation: "DELETE",
+              old_id: { a: 2 },
+              new_id: null,
+              old_row: { a: 2 },
+              new_row: null,
+            },
+          ],
+        );
+        assert.deepEqual(
+          (
+            await clientAudit.find!({
+              $and: [auditTableFilter, { "new_row->>a": "1" }],
+            })
+          ).map(({ operation }) => operation),
+          ["INSERT"],
+        );
+        const maskedAuditTableFilter = {
+          schema_name: "audit_test_main",
+          table_name: maskedTable,
+        };
+        const serverAudit = result.db[auditName]!;
+        for (const snapshotColumn of [
+          AUDIT_TABLE_COLUMN_NAMES.old_id,
+          AUDIT_TABLE_COLUMN_NAMES.new_id,
+          AUDIT_TABLE_COLUMN_NAMES.old_row,
+          AUDIT_TABLE_COLUMN_NAMES.new_row,
+        ]) {
+          const secretFilter = {
+            $and: [
+              maskedAuditTableFilter,
+              { [`${snapshotColumn}->>secret`]: "mySecret" },
+            ],
+          };
+          assert.deepEqual(
+            (await serverAudit.find!(secretFilter)).map(({ operation }) => operation),
+            [snapshotColumn.startsWith("old_") ? "DELETE" : "INSERT"],
+          );
+          assert.deepEqual(
+            await clientAudit.find!(secretFilter),
+            [],
+          );
+        }
+        assert.deepEqual(
+          await clientAudit.find!(
+            {
+              $and: [
+                { schema_name: "audit_test_main" },
+                { table_name: { $eq: "audit_test_source" } },
+              ],
+            },
+            { orderBy: { id: 1 } },
+          ),
+          visibleHistory,
+        );
+
+        const clientSource = sourceClient.clientDb.audit_test_source!;
+        await assert.rejects(() =>
+          clientSource.find!({
+            $exists: { [auditName]: { operation: "INSERT" } },
+          }),
+        );
+        await source.insert!({ a: 3, b: "one" });
+        assert.deepEqual(
+          await clientSource.find!({
+            $exists: {
+              [auditName]: {
+                schema_name: "audit_test_main",
+                table_name: "audit_test_source",
+              },
+            },
+          }),
+          [{ a: 3 }],
+        );
+
+        const file = await result._db.one<{ id: string }>(
+          `INSERT INTO ${fileTable} (original_name, data) VALUES ('test.txt', decode('01', 'hex')) RETURNING id`,
+        );
+        await result.db[documentTable]!.insert!({ file_id: file.id });
+        await result.update({
+          publish: { [documentTable]: { select: { fields: "*" } } },
+        });
+        const fileClient = await result.getClientDBHandlers(
+          clientRequest,
+          undefined,
+        );
+        assert.deepEqual(
+          fileClient.clientSchema.tableSchema.map(({ name }) => name).sort(),
+          [auditName, documentTable, fileTable].sort(),
+        );
+        const fileHistory = await fileClient.clientDb[auditName]!.find!({
+          schema_name: "audit_test_main",
+          table_name: fileTable,
+        });
+        assert.equal(fileHistory.length, 1);
+        assert.equal(fileHistory[0]!.new_row.id, file.id);
+
         const triggerOids = () =>
           db.any("SELECT oid FROM pg_trigger WHERE left(tgname, length($1)) = $1 ORDER BY oid", [
             AUDIT_TRIGGER_PREFIX,
@@ -280,6 +475,7 @@ export async function testAudit(parentDb: DB) {
         // A fresh instance derives deselected trigger names from config, without saved state.
         const fresh = new Prostgles({
           ...prgl.opts,
+          fileTable: undefined,
           tableConfig: undefined,
           audit: {
             ...audit,
@@ -468,7 +664,7 @@ export async function testAudit(parentDb: DB) {
           await prgl.adminClient?.end();
         }
         await db.none(
-          `DROP TABLE IF EXISTS audit_test_source, audit_test_existing, audit_test_child, audit_test_nopk, audit_test_partitioned CASCADE; DROP TABLE IF EXISTS "audit_events", "audit_next_events" CASCADE; DROP SCHEMA IF EXISTS audit_test CASCADE;`,
+          `DROP TABLE IF EXISTS audit_test_source, audit_test_existing, audit_test_child, audit_test_nopk, audit_test_partitioned, ${maskedTable} CASCADE; DROP TABLE IF EXISTS "audit_events", "audit_next_events" CASCADE; DROP SCHEMA IF EXISTS audit_test CASCADE;`,
         );
         await parentDb.none("DROP SCHEMA audit_test_main CASCADE");
         await db.$pool.end();

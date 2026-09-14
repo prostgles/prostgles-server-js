@@ -3,6 +3,7 @@ import { isDefined, asName } from "prostgles-types";
 import type { NewQuery } from "./QueryBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinQuery } from "./getJoinQuery";
+import { getQuerySourceSQL } from "./getQuerySource";
 
 /**
  * Used to prevent single row nested results in case of OR join conditions
@@ -46,6 +47,7 @@ export function getSelectQuery(
 
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
   const hasOrJoins = parsedJoins.some((j) => j.isOrJoin);
+  const tableExpression = getQuerySourceSQL(q.source);
 
   const joinCtes: string[][] = parsedJoins
     .map((j) => {
@@ -58,7 +60,7 @@ export function getSelectQuery(
     joinCtes.unshift([
       `${q.table.escaped} AS (`,
       `  SELECT *, ${pkey ? asName(pkey.name) : "ROW_NUMBER() OVER()"} as ${ROOT_TABLE_ROW_NUM_ID}`,
-      `  FROM ${q.table.escaped}`,
+      `  FROM ${tableExpression}`,
       `)`,
     ]);
   }
@@ -80,7 +82,11 @@ export function getSelectQuery(
     ...indentLines(selectItems, { appendCommas: true }),
     `FROM ( `,
     `  SELECT *`,
-    `  FROM ${q.table.escaped}`,
+    `  FROM ${
+      hasOrJoins ?
+        getQuerySourceSQL({ expression: q.table.escaped, alias: q.source.alias })
+      : tableExpression
+    }`,
     ...(q.where ? [`  ${q.where}`] : []),
     `) ${ROOT_TABLE_ALIAS}`,
     ...parsedJoins.flatMap((j) => j.joinLines),

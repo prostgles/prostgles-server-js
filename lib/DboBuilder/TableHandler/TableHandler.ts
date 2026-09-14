@@ -19,11 +19,7 @@ import type {
 import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
 import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  withUserRLS,
-} from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
@@ -41,6 +37,7 @@ import { isApplicableHook } from "./isApplicableHook";
 import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
 import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 import type { TransactionCallbacks } from "../../PublishParser/publishTypesAndUtils";
+import { prepareWhere } from "../ViewHandler/prepareWhere";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -359,7 +356,7 @@ export class TableHandler extends ViewHandler {
       ).then(async (data: AnyObject[]) => {
         const { filterFields, forcedFilter } = table_rules.select || {};
         const condition = (
-          await this.prepareWhere({
+          await prepareWhere(this, {
             select: undefined,
             filter,
             forcedFilter,

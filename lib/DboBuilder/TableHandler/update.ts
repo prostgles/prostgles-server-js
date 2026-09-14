@@ -9,6 +9,7 @@ import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
 import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
 import { lockFileForUpdate } from "./updateFile";
 import type { TableHandler } from "./TableHandler";
+import { prepareWhere } from "../ViewHandler/prepareWhere";
 
 export async function update(
   this: TableHandler,
@@ -66,7 +67,7 @@ export async function update(
         );
     }
 
-    const updateFilter = await this.prepareWhere({
+    const updateFilter = await prepareWhere(this, {
       select: undefined,
       filter,
       forcedFilter,

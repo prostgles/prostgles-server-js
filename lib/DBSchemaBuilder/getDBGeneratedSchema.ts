@@ -1,5 +1,4 @@
-import { isDefined, isEmpty, type TableSchema } from "prostgles-types";
-import { fromEntries } from "../PublishParser/applyScopeToTableRules";
+import { fromEntries, isDefined, isEmpty, type TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { escapeTSNames } from "../utils/utils";
 import { DB_GENERATED_NAMES } from "./constants";

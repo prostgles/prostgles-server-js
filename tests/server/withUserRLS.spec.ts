@@ -1,10 +1,15 @@
 import { strict as assert } from "node:assert";
+import { once } from "node:events";
+import { createServer } from "node:http";
 import { test } from "node:test";
+import express from "express";
 import pgPromise from "pg-promise";
+import prostgles, { type ProstglesInitOptions } from "prostgles-server";
 import { fetchSyncServerData } from "prostgles-server/dist/PubSubManager/SyncReplication/fetchSyncServerData";
 import type { Subscription } from "../../dist/PubSubManager/PubSubManager";
 import type { DB, DBHandlerServer } from "../../dist/Prostgles";
 import type { LocalParams } from "../../dist/DboBuilder/DboBuilderTypes";
+import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "../../dist/DboBuilder/TableHandler/TableHandler";
 import type { withUserRLS as WithUserRLS } from "../../dist/DboBuilder/dboBuilderUtils";
 import type { ParsedTableRule } from "../../dist/PublishParser/PublishParser";
@@ -377,25 +382,85 @@ export const testWithUserRLS = async (
     });
   });
 
-  await test("onInsteadOfDelete receives the authenticated or anonymous request context", async () => {
-    await table.dboBuilder.getTX(async (dbx, tx) => {
-      const rec = dbx.rec as TableHandler;
-      let expectedUser: object = requestUser;
-      let calls = 0;
-      rec.hooks = {
-        onInsteadOfDelete: async ({ tx, dbx }) => {
-          await assertUser(tx, expectedUser);
-          await dbx.rec!.find({});
-          await assertUser(tx, expectedUser);
-          calls++;
-          return [];
-        },
-      };
-      await rec.delete({ id: -1 }, undefined, undefined, undefined, localParams);
-      expectedUser = {};
-      await rec.delete({ id: -1 }, undefined, undefined, undefined, anonymousParams);
-      await assertUser(tx, {});
-      assert.equal(calls, 2);
-    });
-  });
+  await test(
+    "onInsteadOfDelete receives the authenticated or anonymous request context",
+    { timeout: 15_000 },
+    async () => {
+      const schemaName = `delete_context_${process.pid}_${Date.now()}`;
+      const tableName = `${schemaName}.rec`;
+      const schema = pgPromise.as.name(schemaName);
+      const app = express();
+      const http = createServer(app);
+      let instance: Awaited<ReturnType<typeof prostgles>> | undefined;
+      app.use(express.json());
+
+      try {
+        await db.none(`CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.rec (id INTEGER PRIMARY KEY)`);
+        http.listen(0, "127.0.0.1");
+        await once(http, "listening");
+        const address = http.address();
+        assert(address && typeof address === "object");
+
+        instance = await prostgles({
+          dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
+          schemaFilter: { [schemaName]: 1 },
+          publish: "*",
+          tableHooks: {
+            [tableName]: {
+              onInsteadOfDelete: async ({ tx, dbx }) => {
+                const before = (await tx.one(readUser)).user;
+                await (dbx[tableName] as TableHandler).find({});
+                const after = (await tx.one(readUser)).user;
+                return [{ before, after }];
+              },
+            },
+          },
+          auth: {
+            sidKeyName: "token",
+            findUser: async () => requestUser,
+            getUser: async (sid) =>
+              sid === "authenticated" ?
+                {
+                  user: requestUser,
+                  clientUser: { id: requestUser.id, type: requestUser.type },
+                  sessionFields: "*",
+                }
+              : undefined,
+          },
+          restApi: { expressApp: app, path: "/rls-context" },
+          onReady: () => {},
+        });
+
+        const url = `http://127.0.0.1:${address.port}/rls-context/db/${tableName}/delete`;
+        const deleteRequest = async (sid?: string) => {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(sid && {
+                Authorization: `Bearer ${Buffer.from(sid).toString("base64")}`,
+              }),
+            },
+            body: JSON.stringify([{ id: -1 }]),
+          });
+          const result = await response.json();
+          assert.equal(response.status, 200, JSON.stringify(result));
+          return result;
+        };
+
+        assert.deepEqual(await deleteRequest("authenticated"), [
+          { before: requestUser, after: requestUser },
+        ]);
+        assert.deepEqual(await deleteRequest("anonymous"), [{ before: {}, after: {} }]);
+      } finally {
+        await instance?.destroy();
+        if (http.listening) {
+          await new Promise<void>((resolve, reject) =>
+            http.close((error) => (error ? reject(error) : resolve())),
+          );
+        }
+        await db.none(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      }
+    },
+  );
 };

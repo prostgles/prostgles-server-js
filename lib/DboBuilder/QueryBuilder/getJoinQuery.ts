@@ -255,6 +255,7 @@ const getInnerJoinQuery = ({
 
     const isFirst = !i;
     if (isFirst) {
+      const tableExpression = isLast ? q2.source.expression : table.name;
       return [
         `SELECT `,
         `  /* Join fields + select */`,
@@ -262,13 +263,13 @@ const getInnerJoinQuery = ({
           rootSelectItems.map((s) => s.query),
           { appendCommas: true },
         ),
-        `FROM ${table.name} ${table.alias}`,
+        `FROM ${tableExpression} ${table.alias}`,
         ...targetQueryExtraQueries,
       ];
     }
 
     return [
-      `INNER JOIN ${table.name} ${table.alias}`,
+      `INNER JOIN ${isLast ? q2.source.expression : table.name} ${table.alias}`,
       `ON ${getJoinOnCondition({
         on: path.on,
         leftAlias: prevTable.alias,

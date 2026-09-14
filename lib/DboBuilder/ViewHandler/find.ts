@@ -101,7 +101,6 @@ export const find = async function (
       this,
       filter,
       selectParamsLimitCheck,
-      undefined,
       tableRules,
       localParams,
     );

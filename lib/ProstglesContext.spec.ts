@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { describe, test } from "node:test";
 import type { DboBuilder } from "./DboBuilder/DboBuilder";
 import { Prostgles } from "./Prostgles";
+import type { PublishParser } from "./PublishParser/PublishParser";
 
 void describe("Prostgles context", async () => {
   await test("recreates context and runs cleanups in reverse order", async () => {
@@ -45,6 +46,35 @@ void describe("Prostgles context", async () => {
       "cleanup:first:2",
     ]);
     assert.equal(prostgles.context, undefined);
+  });
+
+  await test("recreates the publish parser with the rebuilt DBO", async () => {
+    const prostgles = new Prostgles({
+      dbConnection: "postgres://unused",
+      onReady: () => {},
+    });
+    prostgles.db = {} as typeof prostgles.db;
+    const rebuiltDbo = {};
+    const dboBuilder = {
+      build: () => {
+        dboBuilder.dbo = rebuiltDbo;
+        return Promise.resolve();
+      },
+      dbo: {},
+      sql: {},
+      tables: [],
+    };
+    prostgles.dboBuilder = dboBuilder as unknown as DboBuilder;
+
+    // PublishParser captures the DBO on construction, so it must be recreated after a rebuild.
+    const initialPublishParser = {} as PublishParser;
+    prostgles.publishParser = initialPublishParser;
+
+    await prostgles.rebuildDBO();
+
+    assert.equal(prostgles.dbo, rebuiltDbo);
+    assert.notEqual(prostgles.publishParser, initialPublishParser);
+    assert.equal(prostgles.publishParser.dbo, prostgles.dbo);
   });
 
   await test("cleans partially-created context after an error", async () => {
