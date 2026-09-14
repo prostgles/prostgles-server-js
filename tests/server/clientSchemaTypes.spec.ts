@@ -268,6 +268,15 @@ export const testClientSchemaTypes = async (db: DB) => {
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
         await instance.update({ publish: originalPublish });
+        await instance.update({
+          publish: [{ name: "EmptyDBSchema", userTypes: ["empty"], publish: null }],
+        });
+        assert(
+          (await instance.getTSSchema()).tsSchema.includes(
+            "export type EmptyDBSchema = Record<string, never>;",
+          ),
+        );
+        await instance.update({ publish: originalPublish });
         for (const [publish, error] of [
           [[{ userTypes: [], publish: null }], /userTypes must not be empty/],
           [

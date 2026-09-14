@@ -86,6 +86,9 @@ export const getClientDBGeneratedSchemas = (
           `  ${JSON.stringify(table.name)}: ${tableType} & { insertColumns: ${input}; updateColumns: ${updateInput};${optionalTable} };`,
         ];
       });
+    if (!definitions.length) {
+      return `export type ${name} = Record<string, never>;`;
+    }
     return `export type ${name} = {\n${definitions.join("\n")}\n};`;
   };
 
@@ -105,9 +108,14 @@ const reservedNames = new Set(Object.values(DB_GENERATED_NAMES) as string[]);
 
 export const validateClientSchemaName = (name: string) => {
   // Requiring a Schema suffix also avoids TypeScript keywords and primitive type names.
-  if (!/^[A-Za-z_$][\w$]*Schema$/.test(name) || reservedNames.has(name)) {
+  if (!/^[A-Za-z_$][\w$]*Schema$/.test(name)) {
     throw new Error(
       `Invalid client schema name: ${JSON.stringify(name)}. Use a unique name ending in Schema.`,
+    );
+  }
+  if (reservedNames.has(name)) {
+    throw new Error(
+      `Invalid client schema name: ${JSON.stringify(name)}. Use a unique name ending in Schema that does not conflict with reserved names (${Array.from(reservedNames).join(", ")}).`,
     );
   }
 };

@@ -89,8 +89,35 @@ export type DBGeneratedSchema = {
       storage_key?: null | string;
       updated?: string;
       url?: string;
+      version?: number;
     };
-    referencedBy: {"users_public_info":["avatar"]};
+    referencedBy: {"files_versions":["file_id"],"users_public_info":["avatar"]};
+  };
+  files_versions: {
+    columns: {
+      added?: string;
+      cloud_url?: null | string;
+      content_length?: number | string;
+      content_type?: string;
+      created?: string;
+      deleted?: null | string;
+      deleted_from_storage?: null | string;
+      description?: null | string;
+      etag?: string;
+      extension?: string;
+      file_id: string;
+      id?: string;
+      metadata?: null | {    description: string;  };
+      original_last_modified?: null | string;
+      original_name: string;
+      signed_url?: null | string;
+      signed_url_expires?: null | number | string;
+      storage_key: string;
+      updated?: string;
+      url?: string;
+      version: number;
+    };
+    
   };
   geography_columns: {
     columns: {

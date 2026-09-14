@@ -310,25 +310,28 @@ export async function testAudit(parentDb: DB) {
           },
           res: {},
         } as never;
-        const sourceClient = await result.getClientDBHandlers(
-          clientRequest,
-          undefined,
+        // Excluded columns are absent from stored snapshots, so they cannot safely be used to enforce inferred audit access.
+        await assert.rejects(
+          parser.getTableRules({
+            tableName: auditName,
+            clientReq: clientRequest,
+            clientInfo: undefined,
+            scope: undefined,
+            resolvedPublishObject: {
+              audit_test_source: {
+                select: { fields: { a: 1 }, forcedFilter: { secret: null } },
+              },
+            },
+          }),
+          /secret.*invalid\/disallowed|invalid\/disallowed.*secret/,
         );
-        assert(
-          sourceClient.clientSchema.tableSchema.some(
-            ({ name }) => name === auditName,
-          ),
-        );
+        const sourceClient = await result.getClientDBHandlers(clientRequest, undefined);
+        assert(sourceClient.clientSchema.tableSchema.some(({ name }) => name === auditName));
         const clientAudit = sourceClient.clientDb[auditName]!;
         await assert.rejects(() => clientAudit.find!({}));
+        await assert.rejects(() => clientAudit.find!({ invalid_audit_column: 1 }));
         await assert.rejects(() =>
-          clientAudit.find!({ invalid_audit_column: 1 }),
-        );
-        await assert.rejects(() =>
-          clientAudit.find!(
-            {},
-            { select: { invalid_audit_column: 1 } as never },
-          ),
+          clientAudit.find!({}, { select: { invalid_audit_column: 1 } as never }),
         );
         const auditTableFilter = {
           schema_name: "audit_test_main",
@@ -389,19 +392,13 @@ export async function testAudit(parentDb: DB) {
           AUDIT_TABLE_COLUMN_NAMES.new_row,
         ]) {
           const secretFilter = {
-            $and: [
-              maskedAuditTableFilter,
-              { [`${snapshotColumn}->>secret`]: "mySecret" },
-            ],
+            $and: [maskedAuditTableFilter, { [`${snapshotColumn}->>secret`]: "mySecret" }],
           };
           assert.deepEqual(
             (await serverAudit.find!(secretFilter)).map(({ operation }) => operation),
             [snapshotColumn.startsWith("old_") ? "DELETE" : "INSERT"],
           );
-          assert.deepEqual(
-            await clientAudit.find!(secretFilter),
-            [],
-          );
+          assert.deepEqual(await clientAudit.find!(secretFilter), []);
         }
         assert.deepEqual(
           await clientAudit.find!(
@@ -442,10 +439,7 @@ export async function testAudit(parentDb: DB) {
         await result.update({
           publish: { [documentTable]: { select: { fields: "*" } } },
         });
-        const fileClient = await result.getClientDBHandlers(
-          clientRequest,
-          undefined,
-        );
+        const fileClient = await result.getClientDBHandlers(clientRequest, undefined);
         assert.deepEqual(
           fileClient.clientSchema.tableSchema.map(({ name }) => name).sort(),
           [auditName, documentTable, fileTable].sort(),

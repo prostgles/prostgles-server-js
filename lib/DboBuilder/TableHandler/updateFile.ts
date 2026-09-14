@@ -33,6 +33,7 @@ export const updateFile = async (
     data,
     localParams,
     mediaId: existingFile.id,
+    version: Number(existingFile.version ?? 1) + 1,
     original_last_modified,
   });
   return { newData: omitKeys(newFile, ["id"]) };

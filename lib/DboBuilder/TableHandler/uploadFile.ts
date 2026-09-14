@@ -44,6 +44,7 @@ export type UploadFileArgs = TransactionCallbacks & {
    * Used to update an existing file
    */
   mediaId: string | undefined;
+  version?: number;
 };
 
 export const uploadFile = async (
@@ -54,6 +55,7 @@ export const uploadFile = async (
     original_last_modified,
     localParams,
     mediaId,
+    version,
     onCommit,
     onRollback,
   }: UploadFileArgs,
@@ -115,6 +117,7 @@ export const uploadFile = async (
     url: [fileServeRoute, coreInfo.id].join("/"),
     content_length: String(contentLength),
     data: Buffer.from([0x01]),
+    ...(config.versioning ? { version: version ?? 1 } : {}),
   };
 
   const isInsert = !mediaId;

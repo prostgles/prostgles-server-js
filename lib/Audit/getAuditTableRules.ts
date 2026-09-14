@@ -59,6 +59,7 @@ export const getAuditTableRules = async function (
           additionalForcedCondition: await getSourceAuditCondition(
             tableHandler,
             rules.select.forcedFilter,
+            audit.tables[tableName]!.excludeColumns,
           ),
           tableColumnOverrides: getAuditRowColumnOverrides(
             tableHandler.parseFieldFilter(rules.select.fields),
@@ -155,6 +156,7 @@ const getAuditRowColumnOverrides = (allowedColumns: string[], idColumns: readonl
 const getSourceAuditCondition = async (
   sourceHandler: ViewHandler,
   forcedFilter: Filter | undefined,
+  excludedColumns: readonly string[],
 ) => {
   const { schema, name } = sourceHandler.tableOrViewInfo.qualifiedNameParts;
   const auditColumn = (columnName: keyof AuditTableRow) => asName(columnName);
@@ -175,7 +177,9 @@ const getSourceAuditCondition = async (
     const { condition } = await prepareWhere(sourceHandler, {
       filter: forcedFilter,
       select: undefined,
-      filterFields: "*",
+      filterFields: sourceHandler.column_names.filter(
+        (columnName) => !excludedColumns.includes(columnName),
+      ),
       addWhere: false,
       tableAlias: { raw: alias, escaped: asName(alias) },
       localParams: undefined,

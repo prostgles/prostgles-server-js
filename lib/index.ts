@@ -52,11 +52,12 @@ export type * from "./TableHooks/TableHooks";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";
 export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;
-export type { FileTableRow } from "./StorageClient/getFileTableConfig";
+export type { FileTableInsertRow, FileTableRow } from "./StorageClient/getFileTableConfig";
 export { defineJoin };
 export {
   AUDIT_TABLE_COLUMN_DEFINITIONS,
   AUDIT_TABLE_COLUMN_NAMES,
   AUDIT_TABLE_COLUMNS,
+  type AuditTableInsertRow,
   type AuditTableRow,
 } from "./Audit/AuditTable";

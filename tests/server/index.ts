@@ -122,6 +122,7 @@ function dd() {
     testRulesOnConnect: true,
     fileTable: {
       tableName: "files",
+      versioning: {},
       storageClient: getLocalStorageClient({ localFolderPath: path.join(__dirname + "/media") }),
       expressApp: app,
       referencedTables: {

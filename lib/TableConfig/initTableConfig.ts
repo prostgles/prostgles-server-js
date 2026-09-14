@@ -183,6 +183,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
     });
     if (tableColumnDefinition?.isCreate) {
       queries.push(...(constraintDefs?.map((c) => c.alterQuery) ?? []));
+      await runQueries(queries);
+      await this.prostgles.rebuildDBO();
     } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
         db: this.db,
@@ -215,17 +217,19 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
       /** Add missing named constraints */
       constraintDefs?.forEach((c) => {
-        if (c.name && !currCons.some((cc) => cc.name === c.name)) {
-          const fc = futureCons.find((nc) => nc.name === c.name);
-          if (fc) {
-            queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
-          }
+        if (!c.name) return;
+        const fc = futureCons.find((nc) => nc.name === c.name);
+        if (
+          fc &&
+          !currCons.some((cc) => cc.name === c.name && cc.definition === fc.definition)
+        ) {
+          queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
         }
       });
 
       /** Add remaining missing constraints */
       futureCons
-        .filter((nc) => !currCons.some((c) => c.definition === nc.definition))
+        .filter((nc) => !nc.isNamed && !currCons.some((c) => c.definition === nc.definition))
         .forEach((c) => {
           queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`);
         });

@@ -2,6 +2,7 @@ import { type TableInfo as TInfo } from "prostgles-types/dist";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
+import { isFileVersionTable } from "../../StorageClient/fileVersionUtils";
 
 /** Table metadata before client schema customisation. */
 export function getRawInfo(
@@ -11,7 +12,9 @@ export function getRawInfo(
   localParams?: LocalParams,
 ): TInfo {
   const validatedTableRules = this.getValidatedRules(tableRules, localParams);
-  const fileTableName = this.dboBuilder.prostgles.opts.fileTable?.tableName;
+  const fileTableConfig = this.dboBuilder.prostgles.opts.fileTable;
+  const fileTableName = fileTableConfig?.tableName;
+  const isVersionTable = isFileVersionTable(fileTableConfig, this.name);
   const allowedFieldsToSelect = this.parseFieldFilter(tableRules?.select?.fields);
   const { requiredNestedInserts, allowedNestedInserts } = tableRules?.insert ?? {};
   const label = this.dboBuilder.prostgles.tableConfigurator?.getTableLabel({
@@ -32,10 +35,11 @@ export function getRawInfo(
     isView: this.isView,
     hasFiles: Boolean(
       !this.is_media &&
+      !isVersionTable &&
       fileTableName &&
       this.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
     ),
-    fileTableName,
+    fileTableName: isVersionTable ? undefined : fileTableName,
     dynamicRules: {
       update: Boolean(tableRules?.update?.dynamicFields?.length),
     },

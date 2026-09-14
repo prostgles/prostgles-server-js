@@ -5,7 +5,10 @@ import { getFileTableConfig } from "./getFileTableConfig";
 
 void test("managed files preserve hooks on other tables and append file hooks", () => {
   const guard = { afterEach: [{ commands: { insert: 1 }, validate: async () => {} }] };
-  const fileGuard = { beforeEach: [{ commands: { insert: 1 }, validate: async () => {} }] };
+  const fileGuard = {
+    beforeEach: [{ commands: { insert: 1 }, validate: async () => {} }],
+    afterEach: [{ commands: { insert: 1 }, validate: async () => {} }],
+  };
   const prostgles = {
     opts: {
       fileTable: { tableName: "files", storageClient: {}, expressApp: {} },
@@ -16,4 +19,6 @@ void test("managed files preserve hooks on other tables and append file hooks", 
   assert.equal(result.tableHooks?.documents, guard);
   assert.equal(result.tableHooks.files?.beforeEach?.length, 2);
   assert.equal(result.tableHooks.files.beforeEach[1], fileGuard.beforeEach[0]);
+  assert.equal(result.tableHooks.files.afterEach?.length, 2);
+  assert.equal(result.tableHooks.files.afterEach[0], fileGuard.afterEach[0]);
 });

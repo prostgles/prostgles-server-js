@@ -1,6 +1,7 @@
 import { isObject } from "prostgles-types";
 import type { PublishParser } from "./PublishParser";
 import { type PublishObject } from "./PublishParser";
+import { getFileVersionTableName, isFileVersionTable } from "../StorageClient/fileVersionUtils";
 
 export const getPublishedTableNames = (
   publishParserInstance: PublishParser,
@@ -24,19 +25,27 @@ export const getPublishedTableNames = (
     publishParserInstance.dbo[fileTableName]?.is_media &&
     !tableNames.includes(fileTableName)
   ) {
-    const isReferenced = publishParserInstance.prostgles.dboBuilder.tablesOrViews?.some((t) =>
-      t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
+    const isReferenced = publishParserInstance.prostgles.dboBuilder.tablesOrViews?.some(
+      (t) =>
+        !isFileVersionTable(publishParserInstance.prostgles.opts.fileTable, t.name) &&
+        t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
     );
     if (isReferenced) {
       tableNames.unshift(fileTableName);
     }
   }
 
+  const fileConfig = publishParserInstance.prostgles.opts.fileTable;
+  if (fileConfig?.versioning && tableNames.includes(fileConfig.tableName)) {
+    const versionTableName = getFileVersionTableName(fileConfig);
+    if (!tableNames.includes(versionTableName)) {
+      tableNames.unshift(versionTableName);
+    }
+  }
+
   const audit = publishParserInstance.prostgles.resolvedAuditConfig;
   const publishedFileTableName =
-    fileTableName && tableNames.includes(fileTableName) ?
-      fileTableName
-    : undefined;
+    fileTableName && tableNames.includes(fileTableName) ? fileTableName : undefined;
   if (
     audit &&
     !tableNames.includes(audit.tableName) &&

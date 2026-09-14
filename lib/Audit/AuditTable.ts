@@ -25,7 +25,10 @@ export const AUDIT_TABLE_COLUMN_DEFINITIONS = {
   },
 } as const;
 
-export type AuditTableRow = TableRowFromColumnDefinitions<typeof AUDIT_TABLE_COLUMN_DEFINITIONS>;
+export type AuditTableInsertRow = TableRowFromColumnDefinitions<
+  typeof AUDIT_TABLE_COLUMN_DEFINITIONS
+>;
+export type AuditTableRow = Required<AuditTableInsertRow>;
 export const AUDIT_TABLE_COLUMN_NAMES = Object.fromEntries(
   Object.keys(AUDIT_TABLE_COLUMN_DEFINITIONS).map((columnName) => [columnName, columnName]),
 ) as { [K in keyof AuditTableRow]: K };

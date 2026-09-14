@@ -41,6 +41,7 @@ export const testSocketLifecycle = async (db: DB) => {
       };
       let instance: Awaited<ReturnType<typeof prostgles>> | undefined;
       try {
+        await db.none("DROP SCHEMA IF EXISTS socket_lifecycle_test CASCADE");
         await db.none("CREATE SCHEMA socket_lifecycle_test");
         http.listen(0, "127.0.0.1");
         await once(http, "listening");

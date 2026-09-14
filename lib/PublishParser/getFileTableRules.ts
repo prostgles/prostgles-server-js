@@ -5,6 +5,7 @@ import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { PublishParser } from "./PublishParser";
 import type { ParsedPublishTable, PublishObject, UpdateRule } from "./publishTypesAndUtils";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
+import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
 
 /**
  * Permissions for referencedTables columns are propagated to the file table (even if file table has no permissions)
@@ -28,7 +29,12 @@ export async function getFileTableRules(
   const forcedUpdateFilters: FullFilter<AnyObject, void>[] = [];
   const allowedNestedInserts: { table: string; column: string }[] = [];
   const referencedColumns = this.prostgles.dboBuilder.tablesOrViews
-    ?.filter((t) => !t.is_view && t.name !== fileTableName)
+    ?.filter(
+      (t) =>
+        !t.is_view &&
+        t.name !== fileTableName &&
+        !isFileVersionTable(this.prostgles.opts.fileTable, t.name),
+    )
     .map((t) => {
       const refCols = t.columns.filter((c) =>
         c.references?.some((r) => r.ftable === fileTableName),

@@ -49,6 +49,17 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       const initialFileStr = fs.readFileSync(fileFolder + files[0].storage_key).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
       insertedFile = files[0];
+      const versions = await db.files_versions.find!({
+        file_id: insertedFile.id,
+      });
+      assert.equal(versions.length, 1);
+      assert.equal(versions[0].version, 1);
+      assert.deepEqual(versions[0].metadata, {
+        description: "Updated by afterEach hook",
+      });
+      assert.equal(db.files_versions.insert, undefined);
+      assert.equal(db.files_versions.update, undefined);
+      assert.equal(db.files_versions.delete, undefined);
     });
 
     await test("Cannot Insert file directly", async () => {
@@ -67,6 +78,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       ]);
       try {
         assert.ok(!(await db.files.findOne!({ id: insertedFile.id })));
+        assert.deepEqual(await db.files_versions.find!({ file_id: insertedFile.id }), []);
         const rows = await db.files.update!(
           { id: insertedFile.id },
           {
@@ -142,7 +154,31 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         newData.data.toString(),
       );
       assert.notEqual(newFile.storage_key, insertedFile.storage_key);
-      assert.equal(fs.existsSync(fileFolder + insertedFile.storage_key), false);
+      assert.equal(fs.existsSync(fileFolder + insertedFile.storage_key), true);
+      const versions = await db.files_versions.find!(
+        { file_id: insertedFile.id },
+        { orderBy: "version" },
+      );
+      assert.deepEqual(
+        versions.map(({ version }) => version),
+        [1, 2],
+      );
+      assert.deepEqual(
+        versions.map(({ metadata }) => metadata),
+        Array(2).fill({ description: "Updated by afterEach hook" }),
+      );
+      const previousFile = await fetch(`http://localhost:3001${versions[0].url}`, {
+        headers: {
+          Authorization: `Bearer ${Buffer.from("files").toString("base64")}`,
+        },
+      });
+      assert.equal(await previousFile.text(), file.data.toString());
+      const disallowedPreviousFile = await fetch(`http://localhost:3001${versions[0].url}`, {
+        headers: {
+          Authorization: `Bearer ${Buffer.from("files_versions_denied").toString("base64")}`,
+        },
+      });
+      assert.equal(disallowedPreviousFile.status, 404);
     });
 
     await test("Can insert allowed files through a nested update", async () => {
@@ -173,6 +209,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       await db.users_public_info.delete!();
       const files = await db.files.find!();
       assert.deepStrictEqual(files, []);
+      assert.deepStrictEqual(await db.files_versions.find!(), []);
       const latestFiles = await getFiles();
       assert.equal(initialFiles?.length, latestFiles?.length);
     });

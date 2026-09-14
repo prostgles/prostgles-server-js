@@ -71,6 +71,17 @@ export type FileTableConfig = {
   };
 
   /**
+   * Keeps immutable metadata records for every uploaded file revision.
+   * Existing file IDs and URLs continue to resolve to the latest version.
+   */
+  versioning?: {
+    /** Defaults to `${tableName}_versions`. */
+    tableName?: string;
+    /** Maximum versions kept per file. Undefined keeps every version. */
+    maxVersions?: number;
+  };
+
+  /**
    * Specifying referencedTables with referenceColumns allows restricting the
    * allowed file types that can be inserted and referenced in the specified tables.
    */

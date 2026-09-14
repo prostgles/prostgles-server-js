@@ -6,6 +6,7 @@ import { getErrorAsObject, getSerializedClientErrorFromPGError } from "./DboBuil
 import type { TableHandler } from "./TableHandler/TableHandler";
 import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getRawInfo } from "./ViewHandler/getRawInfo";
+import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
 
 export const isTableHandler = (v: any): v is TableHandler => "parseUpdateRules" in v;
 
@@ -173,6 +174,7 @@ const getFileColumnInfo = (args: {
   if (!fileTableConfig) return undefined;
   const { colName, tableHandler } = args;
   const tableName = tableHandler.name;
+  if (isFileVersionTable(fileTableConfig, tableName)) return undefined;
   const tableConfig = fileTableConfig.referencedTables?.[tableName];
   const isReferencingFileTable = tableHandler.columns.some(
     (c) =>

@@ -42,6 +42,23 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
       users_public_info,
     };
   }
+  if (sid === "files_versions_denied") {
+    return {
+      users_public_info: {
+        ...users_public_info,
+        select: {
+          ...users_public_info.select,
+          forcedFilter: { sid: "files" },
+        },
+      },
+      files_versions: {
+        select: {
+          fields: "*",
+          forcedFilter: { version: -1 },
+        },
+      },
+    };
+  }
   const res: PublishFullyTyped<DBGeneratedSchema> = {
     shapes: "*",
     items: "*",

@@ -1,37 +1,27 @@
-import { omitKeys } from "prostgles-types";
+import { asName, omitKeys } from "prostgles-types";
+import { md5 } from "prostgles-types/dist/md5";
 import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
 import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/uploadFile";
 import type { Prostgles } from "../Prostgles";
-import type { BeforeEachTsTrigger } from "../PublishParser/publishTypesAndUtils";
+import type {
+  AfterEachTsTrigger,
+  BeforeEachTsTrigger,
+} from "../PublishParser/publishTypesAndUtils";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
-import type { TableRowFromColumnDefinitions } from "../TableConfig/TableRowFromColumnDefinitions";
 import type { TableHooks } from "../TableHooks/TableHooks";
 import { setupFileServeHandler } from "./setupFileServeHandler";
 import type { TableHandlers } from "../DboBuilder/DboBuilder";
+import { getFileTableHandler, getFileVersionTableName } from "./fileVersionUtils";
+import { backfillFileVersions, saveFileVersion } from "./saveFileVersion";
+import {
+  FILE_TABLE_COLUMN_DEFINITIONS,
+  FILE_TABLE_VERSION_COLUMN_DEFINITIONS,
+  FILE_VERSION_TABLE_COLUMN_DEFINITIONS,
+  type FileTableRow,
+} from "./fileTableDefinitions";
 
-const FILE_TABLE_COLUMN_DEFINITIONS = {
-  id: `UUID PRIMARY KEY DEFAULT gen_random_uuid()`,
-  storage_key: `UUID UNIQUE`, // NULL for legacy objects stored under their file ID.
-  extension: `TEXT NOT NULL DEFAULT ''`,
-  content_type: `TEXT NOT NULL DEFAULT ''`,
-  content_length: `BIGINT NOT NULL DEFAULT 0`,
-  etag: `TEXT NOT NULL DEFAULT ''`,
-  original_name: `TEXT NOT NULL`,
-  original_last_modified: `TIMESTAMPTZ`,
-  description: `TEXT`,
-  url: `TEXT NOT NULL DEFAULT ''`,
-  cloud_url: `TEXT`,
-  signed_url: `TEXT`,
-  signed_url_expires: `BIGINT`,
-  added: `TIMESTAMP NOT NULL DEFAULT NOW()`,
-  updated: `TIMESTAMP NOT NULL DEFAULT NOW()`,
-  deleted: `TIMESTAMPTZ`,
-  deleted_from_storage: `TIMESTAMPTZ`,
-  data: `BYTEA NOT NULL CHECK (data = decode('01', 'hex'))`, // Used as a placeholder to ensure insert types are correct. Actual data is uploaded to storageClient and not stored in the DB
-} as const;
-
-export type FileTableRow = TableRowFromColumnDefinitions<typeof FILE_TABLE_COLUMN_DEFINITIONS>;
+export type { FileTableInsertRow, FileTableRow } from "./fileTableDefinitions";
 
 export const getFileTableConfig = (
   prg: Prostgles,
@@ -44,7 +34,30 @@ export const getFileTableConfig = (
   const { expressApp } = fileTable;
 
   const { tableName: fileTableName, storageClient } = fileTable;
+  const versionTableName = getFileVersionTableName(fileTable);
+  const versionConstraintName = `prostgles_file_version_${md5(JSON.stringify([versionTableName, fileTableName]))}`;
+  const versionIndexName = `prostgles_file_version_${md5(versionTableName)}_key`;
+  if (fileTable.versioning) {
+    if (versionTableName === fileTableName) {
+      throw new Error("File version table name must differ from the file table name");
+    }
+    if (
+      fileTable.versioning.maxVersions !== undefined &&
+      (!Number.isInteger(fileTable.versioning.maxVersions) || fileTable.versioning.maxVersions < 1)
+    ) {
+      throw new Error("fileTable.versioning.maxVersions must be a positive integer");
+    }
+    if (tableConfig?.[versionTableName]) {
+      throw new Error(
+        `File version table name (${versionTableName}) is managed and cannot be configured in tableConfig`,
+      );
+    }
+  }
 
+  const fileColumnDefinitions = {
+    ...FILE_TABLE_COLUMN_DEFINITIONS,
+    ...(fileTable.versioning && FILE_TABLE_VERSION_COLUMN_DEFINITIONS),
+  };
   const userFileTableConfig = tableConfig?.[fileTableName];
   if (userFileTableConfig) {
     if ("isLookupTable" in userFileTableConfig) {
@@ -59,12 +72,21 @@ export const getFileTableConfig = (
     }
     if ("columns" in userFileTableConfig && userFileTableConfig.columns) {
       const userCols = new Set(Object.keys(userFileTableConfig.columns));
-      const clashingColumns = Object.keys(FILE_TABLE_COLUMN_DEFINITIONS).filter((col) =>
+      const clashingFileColumns = Object.keys(fileColumnDefinitions).filter((col) =>
         userCols.has(col),
       );
-      if (clashingColumns.length) {
+      if (clashingFileColumns.length) {
         throw new Error(
-          `FileManager table name (${fileTableName}) has clashing column names in tableConfig: ${clashingColumns}`,
+          `FileManager table name (${fileTableName}) has clashing column names in tableConfig: ${clashingFileColumns}`,
+        );
+      }
+
+      const clashingFileRevisionColumns = Object.keys(FILE_VERSION_TABLE_COLUMN_DEFINITIONS).filter(
+        (col) => userCols.has(col),
+      );
+      if (clashingFileRevisionColumns.length) {
+        throw new Error(
+          `FileManager table name (${fileTableName}) has clashing column names with file revision table in tableConfig: ${clashingFileRevisionColumns}`,
         );
       }
     }
@@ -74,7 +96,7 @@ export const getFileTableConfig = (
     [fileTableName]: {
       ...userFileTableConfig,
       columns: {
-        ...FILE_TABLE_COLUMN_DEFINITIONS,
+        ...fileColumnDefinitions,
         ...userFileTableConfig?.columns,
       },
       onMount: ({ _db }) => {
@@ -89,6 +111,24 @@ export const getFileTableConfig = (
         };
       },
     },
+    ...(fileTable.versioning && {
+      [versionTableName]: {
+        /** Mirror user columns in the file revision table */
+        columns: { ...FILE_VERSION_TABLE_COLUMN_DEFINITIONS, ...userFileTableConfig?.columns },
+        constraints: {
+          [versionConstraintName]: `FOREIGN KEY (file_id) REFERENCES ${asName(fileTableName)}(id) ON DELETE CASCADE`,
+        },
+        indexes: {
+          [versionIndexName]: {
+            unique: true,
+            columns: "file_id, version",
+          },
+        },
+        onMount: async ({ dbo }) => {
+          await backfillFileVersions(dbo, fileTable);
+        },
+      },
+    }),
     ...omitKeys(tableConfig ?? {}, [fileTableName]),
   };
 
@@ -156,9 +196,24 @@ export const getFileTableConfig = (
         } satisfies BeforeEachTsTrigger<FileTableRow, TableHandlers>,
         ...(userFileTableHooks?.beforeEach || []),
       ],
-      onInsteadOfDelete: async ({ onCommit, tx, returningQuery, isOneOrNone, filterOpts }) => {
+      afterEach: [
+        ...(userFileTableHooks?.afterEach || []),
+        {
+          commands: { insert: 1, update: 1 },
+          validate: async ({ row, dbx, onCommit }) => {
+            const fileRow = await getFileTableHandler(dbx, fileTable).findOne({ id: row.id });
+            if (!fileRow) throw new Error(`File not found after write: ${row.id}`);
+            await saveFileVersion(fileTable, fileRow, dbx, onCommit);
+          },
+        } satisfies AfterEachTsTrigger<FileTableRow, TableHandlers> as AfterEachTsTrigger<
+          any,
+          TableHandlers
+        >,
+      ],
+      onInsteadOfDelete: async ({ onCommit, dbx, tx, returningQuery, isOneOrNone, filterOpts }) => {
         return onDeleteFromFileTable(fileTable, {
           onCommit,
+          dbx,
           t: tx,
           returningQuery,
           isOneOrNone,

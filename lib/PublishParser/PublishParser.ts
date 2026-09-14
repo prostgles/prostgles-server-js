@@ -17,6 +17,8 @@ import type {
   UnrestrictedFunctionContext,
 } from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
+import { getFileVersionTableRules } from "./getFileVersionTableRules";
+import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
 import { getPublishedObjectFromResult } from "./getPublishedObjectFromResult";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getParsedPublishTable } from "./getParsedPublishTable";
@@ -313,13 +315,12 @@ export class PublishParser {
       (isAuditTable && clientReq ?
         await this.getPublishObjectForUser(clientReq, clientInfo)
       : undefined);
-    const publishRulesExcludingInferredTables =
-      await this.getParsedPublishTable({
-        clientReq,
-        tableName,
-        clientInfo,
-        resolvedPublishObject,
-      });
+    const publishRulesExcludingInferredTables = await this.getParsedPublishTable({
+      clientReq,
+      tableName,
+      clientInfo,
+      resolvedPublishObject,
+    });
     if (audit && isAuditTable) {
       const auditTableRules = await getAuditTableRules.bind(this)(
         audit,
@@ -333,6 +334,23 @@ export class PublishParser {
         tableName,
         tableHandler,
         parsePublishTableRule(auditTableRules),
+        scope,
+      );
+    }
+    const fileConfig = this.prostgles.opts.fileTable;
+    if (isFileVersionTable(fileConfig, tableName)) {
+      const versionRules = await getFileVersionTableRules.bind(this)(
+        fileConfig,
+        publishRulesExcludingInferredTables,
+        clientReq,
+        clientInfo,
+        scope,
+        overriddenPublish,
+      );
+      return applyScopeToTableRules(
+        tableName,
+        tableHandler,
+        parsePublishTableRule(versionRules),
         scope,
       );
     }

@@ -10,6 +10,7 @@ import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler
 import type { CloudStorageClient } from "prostgles-server/dist/StorageClient/StorageClientTypes";
 import { setupFileServeHandler } from "prostgles-server/dist/StorageClient/setupFileServeHandler";
 import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileStorageKey";
+import { deleteUnreferencedFile } from "prostgles-server/dist/StorageClient/deleteUnreferencedFile";
 
 export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
   await test("Managed storage permission and transaction safety", async (t) => {
@@ -41,6 +42,16 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
     const list = () => fs.readdirSync(folder).sort();
     const read = (row: { id: string; storage_key: string | null }) =>
       fs.readFileSync(join(folder, getFileStorageKey(row)), "utf8");
+    const fileVersions = dbo.files_versions as TableHandler;
+    const versions = (fileId: string) =>
+      fileVersions.find(
+        { file_id: fileId },
+        {
+          select: { version: 1, storage_key: 1 },
+          orderBy: "version",
+          limit: null,
+        },
+      ) as Promise<{ version: number; storage_key: string }[]>;
     const hooks = files.dboBuilder.prostgles.opts.tableHooks!.files!;
     const originalHooks = hooks.afterEach;
     hooks.afterEach = [
@@ -57,6 +68,7 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
       await t.test("legacy ID-based files remain readable and replaceable", async () => {
         fs.renameSync(join(folder, original.storage_key), join(folder, original.id));
         await db.none("UPDATE files SET storage_key = NULL WHERE id = $1", [original.id]);
+        await fileVersions.update({ file_id: original.id }, { storage_key: original.id });
         const response = await fetch(`http://127.0.0.1:3001/files/${original.id}`, {
           headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
         });
@@ -65,7 +77,16 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         await files.update({ id: original.id }, fileData("updated"));
         original = await files.findOne({ id: original.id });
         assert.equal(read(original), "updated");
-        assert.equal(fs.existsSync(join(folder, original.id)), false);
+        assert.equal(fs.existsSync(join(folder, original.id)), true);
+        assert.deepEqual(
+          (await versions(original.id)).map(({ version }) => version),
+          [1, 2],
+        );
+        const previous = await fetch(`http://127.0.0.1:3001/files/${original.id}?version=1`, {
+          headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
+        });
+        assert.equal(previous.status, 200);
+        assert.equal(await previous.text(), "original");
         const updated = await fetch(`http://127.0.0.1:3001/files/${original.id}`, {
           headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
         });
@@ -186,6 +207,43 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         }
       });
 
+      await t.test("RLS-hidden references fail closed during storage cleanup", async () => {
+        const role = "storage_cleanup_rls_test";
+        await db.none(`
+          CREATE ROLE ${role};
+          GRANT USAGE ON SCHEMA public TO ${role};
+          GRANT SELECT ON files, files_versions TO ${role};
+          ALTER TABLE files ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE files_versions ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY storage_cleanup_files ON files TO ${role} USING (false);
+          CREATE POLICY storage_cleanup_versions ON files_versions TO ${role} USING (false);
+        `);
+        const rlsDb = {
+          tx: (callback: (tx: DB) => unknown) =>
+            db.tx(async (tx) => {
+              await tx.none(`SET LOCAL ROLE ${role}`);
+              return callback(tx as unknown as DB);
+            }),
+        } as unknown as DB;
+        try {
+          await assert.rejects(
+            deleteUnreferencedFile(rlsDb, config, original.storage_key),
+            /row-level security policy/,
+          );
+          assert.equal(fs.existsSync(join(folder, original.storage_key)), true);
+        } finally {
+          await db.none(`
+            DROP POLICY storage_cleanup_files ON files;
+            DROP POLICY storage_cleanup_versions ON files_versions;
+            ALTER TABLE files DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE files_versions DISABLE ROW LEVEL SECURITY;
+            REVOKE SELECT ON files, files_versions FROM ${role};
+            REVOKE USAGE ON SCHEMA public FROM ${role};
+            DROP ROLE ${role};
+          `);
+        }
+      });
+
       await t.test("beforeEach lifecycle callbacks follow the outer transaction", async () => {
         const beforeHooks = hooks.beforeEach;
         const events: string[] = [];
@@ -271,13 +329,39 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
 
       await t.test("concurrent replacements leave one complete referenced object", async () => {
         const before = list();
+        const beforeVersions = await versions(original.id);
         await Promise.all([
           files.update({ id: original.id }, fileData("first")),
           files.update({ id: original.id }, fileData("second")),
         ]);
         original = await files.findOne({ id: original.id });
         assert.equal(`${read(original)}.txt`, original.original_name);
-        assert.equal(list().length, before.length);
+        assert.equal(list().length, before.length + 2);
+        assert.deepEqual(
+          (await versions(original.id)).map(({ version }) => version),
+          [...beforeVersions.map(({ version }) => version), original.version - 1, original.version],
+        );
+      });
+
+      await t.test("version retention removes only unreferenced objects", async () => {
+        config.versioning!.maxVersions = 2;
+        let retained = await files.insert(fileData("retained-1"), {
+          returning: "*",
+        });
+        const firstKey = retained.storage_key;
+        try {
+          await files.update({ id: retained.id }, fileData("retained-2"));
+          await files.update({ id: retained.id }, fileData("retained-3"));
+          retained = await files.findOne({ id: retained.id });
+          assert.deepEqual(
+            (await versions(retained.id)).map(({ version }) => version),
+            [2, 3],
+          );
+          assert.equal(fs.existsSync(join(folder, firstKey)), false);
+        } finally {
+          await files.delete({ id: retained.id });
+          config.versioning!.maxVersions = undefined;
+        }
       });
 
       await t.test(
@@ -290,12 +374,15 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
           await assert.rejects(() => files.delete({ id: original.id }));
           assert.equal(fs.existsSync(join(folder, original.storage_key)), true);
           await db.none("DROP TABLE storage_file_ref");
+          const storedKeys = new Set(
+            (await versions(original.id)).map(({ storage_key }) => storage_key),
+          );
           failDelete = true;
           await files.delete({ id: original.id });
           assert.ok(!(await files.findOne({ id: original.id })));
           assert.equal(fs.existsSync(join(folder, original.storage_key)), true);
           failDelete = false;
-          await remove(original.storage_key);
+          await Promise.all([...storedKeys].map((storageKey) => remove(storageKey)));
         },
       );
       await t.test("cloud downloads and cleanup use the committed storage key", async () => {
@@ -337,6 +424,11 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
             headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
             redirect: "manual",
           });
+        const downloadVersion = (version: number) =>
+          fetch(`http://127.0.0.1:${address.port}/storage-cloud/${row.id}?version=${version}`, {
+            headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
+            redirect: "manual",
+          });
         try {
           const firstKey = row.storage_key;
           const response = await download();
@@ -352,11 +444,15 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
           await files.update({ id: row.id }, fileData("cloud-updated"));
           row = await files.findOne({ id: row.id });
           assert.equal(row.signed_url, null);
-          assert.deepEqual([...objects.keys()], [row.storage_key]);
+          assert.deepEqual(new Set(objects.keys()), new Set([firstKey, row.storage_key]));
           assert.equal(objects.get(row.storage_key)!.toString(), "cloud-updated");
           assert.equal(
             (await download()).headers.get("location"),
             `https://storage.invalid/${row.storage_key}`,
+          );
+          assert.equal(
+            (await downloadVersion(1)).headers.get("location"),
+            `https://storage.invalid/${firstKey}`,
           );
           await files.delete({ id: row.id });
           assert.equal(objects.size, 0);
