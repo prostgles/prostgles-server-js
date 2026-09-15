@@ -4,7 +4,7 @@ import { asName, includes, isObject, TextFilter_FullTextSearchFilterKeys } from 
 import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
-import { asFunction } from "./utils";
+import { asFunction, getAggregateQuery } from "./utils";
 const pgp = pgPromise();
 
 type GetQueryArgs = {
@@ -13,13 +13,15 @@ type GetQueryArgs = {
   args: any[];
   tableAliasRaw?: string;
   ctidField?: string;
+  aggregateFilter?: string;
+  aggregateOrderBy?: string;
 };
 
 export type FieldSpec = {
   name: string;
   type: "column" | "computed";
   /**
-   * allowedFields passed for multicol functions (e.g.: $rowhash)
+   * allowedFields passed for multicolumn functions (e.g.: $rowhash)
    */
   getQuery: (params: Omit<GetQueryArgs, "args">) => string;
 };
@@ -454,12 +456,18 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
       singleColArg: true,
       numArgs: 1,
       getFields: (args: any[]) => [args[0]],
-      getQuery: ({ args, tableAliasRaw: tableAlias }) => {
-        const escTabelName = asNameAlias(args[0], tableAlias) + "::geometry";
+      getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
+        const escapeTableName = asNameAlias(args[0], tableAlias) + "::geometry";
         if (fname.includes("Extent")) {
-          return `${fname}(${escTabelName})`;
+          return getAggregateQuery(fname, escapeTableName, aggregateFilter, aggregateOrderBy);
         }
-        return `${fname.endsWith("_Agg") ? fname.slice(0, -4) : fname}(ST_Collect(${escTabelName}))`;
+        const collectedGeometry = getAggregateQuery(
+          "ST_Collect",
+          escapeTableName,
+          aggregateFilter,
+          aggregateOrderBy,
+        );
+        return `${fname.endsWith("_Agg") ? fname.slice(0, -4) : fname}(${collectedGeometry})`;
       },
     };
     return res;
@@ -753,13 +761,23 @@ export const FUNCTIONS: FunctionSpec[] = [
         type: "aggregation",
         numArgs: 1,
         singleColArg: true,
-        getFields: (args: any[]) => [args[0]],
-        getQuery: ({ args, tableAliasRaw: tableAlias }) => {
+        minCols: aggName === "count" ? 0 : undefined,
+        getFields: (args: any[]) => (aggName === "count" && !args.length ? [] : [args[0]]),
+        getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
           let extraArgs = "";
           if (args.length > 1) {
             extraArgs = pgp.as.format(", $1:csv", args.slice(1));
           }
-          return aggName + "(" + asNameAlias(args[0], tableAlias) + `${extraArgs})`;
+          const firstArg =
+            args.length ? asNameAlias(args[0], tableAlias)
+            : aggregateOrderBy ? "1"
+            : "*";
+          return getAggregateQuery(
+            aggName,
+            `${firstArg}${extraArgs}`,
+            aggregateFilter,
+            aggregateOrderBy,
+          );
         },
       }),
   ),
@@ -784,8 +802,13 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: true,
     numArgs: 0,
     getFields: (args: any[]) => [],
-    getQuery: ({ allowedFields, args, tableAliasRaw: tableAlias }) => {
-      return "COUNT(*)";
+    getQuery: ({ aggregateFilter, aggregateOrderBy }) => {
+      return getAggregateQuery(
+        "COUNT",
+        aggregateOrderBy ? "1" : "*",
+        aggregateFilter,
+        aggregateOrderBy,
+      );
     },
   }),
   asFunction({
@@ -794,9 +817,11 @@ export const FUNCTIONS: FunctionSpec[] = [
     numArgs: 1,
     singleColArg: true,
     getFields: (args: any[]) => [args[0]],
-    getQuery: ({ allowedFields, args, tableAliasRaw: tableAlias }) => {
+    getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
       const col = asNameAlias(args[0], tableAlias);
-      return `round( ( ( MAX(${col}) - MIN(${col}) )::float/MIN(${col}) ) * 100, 2)`;
+      const max = getAggregateQuery("MAX", col, aggregateFilter, aggregateOrderBy);
+      const min = getAggregateQuery("MIN", col, aggregateFilter, aggregateOrderBy);
+      return `round( ( ( ${max} - ${min} )::float/${min} ) * 100, 2)`;
     },
   }),
 ];

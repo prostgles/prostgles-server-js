@@ -164,7 +164,7 @@ const getSourceAuditCondition = async (
     `${auditColumn(AUDIT_TABLE_COLUMN_NAMES.schema_name)} = ${as.text(schema)}`,
     `${auditColumn(AUDIT_TABLE_COLUMN_NAMES.table_name)} = ${as.text(name)}`,
   ].join(" AND ");
-  if (!forcedFilter || !Object.keys(forcedFilter).length) {
+  if (!forcedFilter || isEmpty(forcedFilter)) {
     return sourceCondition;
   }
 

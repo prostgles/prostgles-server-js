@@ -1,5 +1,5 @@
 import type { AnyObject, ParsedJoinPath, SubscribeParams } from "prostgles-types";
-import { asName, isDefined, isEmpty, reverseParsedPath } from "prostgles-types";
+import { asName, isEmpty, reverseParsedPath } from "prostgles-types";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
 import type { Filter, LocalParams } from "./DboBuilder";
@@ -36,6 +36,9 @@ export async function getSubscribeRelatedTables(
       relatedTables: [],
     };
 
+    const dependencyExists = newQuery.select
+      .filter((item) => item.selected)
+      .flatMap((item) => item.dependencyExists ?? []);
     const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
     const pushRelatedTable = async (
       relatedTableName: string,
@@ -112,11 +115,15 @@ export async function getSubscribeRelatedTables(
       await pushRelatedTable(
         j.table.raw,
         j.joinPath,
-        j.select.map((s) => (s.selected ? s.columnName : undefined)).filter(isDefined),
+        j.select
+          .filter((item) => item.selected)
+          .flatMap((item) => [...item.fields, ...(item.dependencyFields ?? [])]),
         {},
       );
     }
-    for (const existsFilter of newQuery.whereOpts.exists.filter((e) => e.isJoined)) {
+    for (const existsFilter of [...newQuery.whereOpts.exists, ...dependencyExists].filter(
+      (existsFilter) => existsFilter.isJoined,
+    )) {
       for (const [index, pathItem] of existsFilter.parsedPath.entries()) {
         const isLast = index === existsFilter.parsedPath.length - 1;
         await pushRelatedTable(

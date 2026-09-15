@@ -11,6 +11,7 @@ import {
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
+import { validateSelectParams } from "./validateSelectParams";
 import type { ViewHandler } from "./ViewHandler";
 
 export type Param3 = {
@@ -30,44 +31,13 @@ export const find = async function (
 
   const command = limit === 1 && returnType === "row" ? "findOne" : "find";
   try {
-    const allowedReturnTypes = Object.keys({
-      row: 1,
-      statement: 1,
-      value: 1,
-      values: 1,
-      "statement-no-rls": 1,
-      "statement-where": 1,
-    } satisfies Record<Required<SelectParams>["returnType"], 1>);
+    validateSelectParams(selectParams);
 
     const { returnType } = selectParams || {};
-    if (returnType && !allowedReturnTypes.includes(returnType)) {
-      throw `returnType (${returnType}) can only be ${allowedReturnTypes.join(" OR ")}`;
-    }
 
     const { testRule = false } = localParams || {};
 
     if (testRule) return [];
-    if (selectParams) {
-      const validParamNames = Object.keys({
-        select: 1,
-        orderBy: 1,
-        offset: 1,
-        limit: 1,
-        returnType: 1,
-        groupBy: 1,
-        having: 1,
-        abortSignal: 1,
-      } satisfies Record<keyof SelectParams, 1>);
-
-      const invalidParams = Object.keys(selectParams).filter((k) => !validParamNames.includes(k));
-      if (invalidParams.length)
-        throw (
-          "Invalid params: " +
-          invalidParams.join(", ") +
-          " \n Expecting: " +
-          validParamNames.join(", ")
-        );
-    }
 
     /* Validate publish */
     if (tableRules) {

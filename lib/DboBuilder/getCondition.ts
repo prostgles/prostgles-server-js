@@ -44,6 +44,11 @@ export async function getCondition(
   const filter = { ...rawFilter };
 
   const existsConfigs = getExistsFilters(filter, this);
+  const dependencyColumns = existsConfigs.flatMap((existsConfig) =>
+    existsConfig.isJoined ?
+      (existsConfig.parsedPath[0]?.on.flatMap((columnPair) => Object.keys(columnPair)) ?? [])
+    : [],
+  );
 
   const functionConditions: string[] = [];
   const funcFilter = FILTER_FUNCS.filter((f) => f.name in filter);
@@ -59,6 +64,7 @@ export async function getCondition(
     if (disallowedCols.length) {
       throw `Invalid/disallowed columns found in function filter: ${disallowedCols}`;
     }
+    dependencyColumns.push(...fields);
     functionConditions.push(
       f.getQuery({
         args: funcArgs,
@@ -89,6 +95,7 @@ export async function getCondition(
     const compCol = computedFields.find((cf) => cf.name === key);
     if (compCol) {
       if (!p.select) throw new Error("Computed column filter requires p.select.fields");
+      dependencyColumns.push(...p.select.fields);
       computedColConditions.push(
         compCol.getQuery({
           tableAliasRaw: tableAlias?.raw,
@@ -157,14 +164,15 @@ export async function getCondition(
   const complexFilters: string[] = [];
   const complexFilterKey = "$filter";
   if (complexFilterKey in filter) {
-    const complexFilterCondition = parseComplexFilter({
+    const complexFilter = parseComplexFilter({
       filter,
       complexFilterKey,
       tableAliasRaw: tableAlias?.raw,
       allowed_colnames,
       columns: this.columns,
     });
-    complexFilters.push(complexFilterCondition);
+    complexFilters.push(complexFilter.condition);
+    dependencyColumns.push(...complexFilter.columnsUsed);
   }
 
   /* Parse join filters
@@ -238,7 +246,7 @@ export async function getCondition(
 
   /*  sorted to ensure duplicate subscription channels are not created due to different condition order */
   return {
-    columnsUsed: q?.columnsUsed ?? [],
+    columnsUsed: Array.from(new Set([...(q?.columnsUsed ?? []), ...dependencyColumns])),
     exists: existsConfigs,
     condition: templates.sort().join(" AND \n"),
   };

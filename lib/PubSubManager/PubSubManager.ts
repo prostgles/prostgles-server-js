@@ -200,7 +200,7 @@ export class PubSubManager {
 
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];
-  readonly socketChannelPreffix = CHANNELS._preffix;
+  readonly socketChannelPrefix = CHANNELS._preffix;
   postgresNotifListenManager?: PostgresNotifListenManager;
 
   private constructor(dboBuilder: DboBuilder) {

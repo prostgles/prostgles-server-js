@@ -5,18 +5,7 @@ import type {
   RawJoinPath,
   SimpleJoinSelect,
 } from "prostgles-types";
-import { getKeys, includes } from "prostgles-types";
-
-const JOIN_KEYS = ["$innerJoin", "$leftJoin"] as const;
-const JOIN_PARAM_KEYS = getKeys({
-  $condition: 1,
-  filter: 1,
-  having: 1,
-  limit: 1,
-  offset: 1,
-  orderBy: 1,
-  select: 1,
-} satisfies Record<keyof Omit<DetailedJoinSelect, (typeof JOIN_KEYS)[number]>, 1>);
+import { getKeys, includes, JOIN_KEYS, JOIN_PARAMS } from "prostgles-types";
 
 export type ParsedJoin =
   | {
@@ -47,7 +36,7 @@ export const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin | string => 
   } else if (joinKey) {
     /* Full option join  { field_name: db.innerJoin.table_name(filter, select)  } */
     const invalidParams = Object.keys(joinParams).filter(
-      (k) => !includes([...JOIN_PARAM_KEYS, ...JOIN_KEYS], k),
+      (k) => !includes([...JOIN_PARAMS, ...JOIN_KEYS], k),
     );
     if (invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");

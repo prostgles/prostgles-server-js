@@ -183,8 +183,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
     });
     if (tableColumnDefinition?.isCreate) {
       queries.push(...(constraintDefs?.map((c) => c.alterQuery) ?? []));
-      await runQueries(queries);
-      await this.prostgles.rebuildDBO();
     } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
         db: this.db,
@@ -219,10 +217,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       constraintDefs?.forEach((c) => {
         if (!c.name) return;
         const fc = futureCons.find((nc) => nc.name === c.name);
-        if (
-          fc &&
-          !currCons.some((cc) => cc.name === c.name && cc.definition === fc.definition)
-        ) {
+        if (fc && !currCons.some((cc) => cc.name === c.name && cc.definition === fc.definition)) {
           queries.push(`${ALTER_TABLE_Q} ADD CONSTRAINT ${asName(c.name)} ${c.content};`);
         }
       });

@@ -77,9 +77,16 @@ async function subscribe(
       newQuery,
     });
 
-    const [firstField, ...otherFields] = newQuery.select
-      .filter((s) => s.selected)
-      .flatMap((c) => c.fields);
+    const [firstField, ...otherFields] = Array.from(
+      new Set([
+        ...newQuery.select
+          .filter((s) => s.selected)
+          .flatMap((item) => [...item.fields, ...(item.dependencyFields ?? [])]),
+        ...newQuery.orderByItems
+          .map(({ key }) => key)
+          .filter((key) => this.column_names.includes(key)),
+      ]),
+    );
 
     const commonSubOpts = {
       table_info: this.tableOrViewInfo,

@@ -1,6 +1,7 @@
 import pgPromise from "pg-promise";
 import { asNameAlias } from "../../../utils/asNameAlias";
 import type { FunctionSpec } from "./Functions";
+import { getAggregateQuery } from "./utils";
 
 const pgp = pgPromise();
 
@@ -33,15 +34,16 @@ export const HASHING_FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ args, tableAliasRaw: tableAlias }) => {
-      const q = pgp.as.format(
-        "md5(string_agg(" +
-          args
-            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )")
-            .join(" || ") +
-          ", ','))",
+    getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
+      const stringAgg = getAggregateQuery(
+        "string_agg",
+        args
+          .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + "::text, '' )")
+          .join(" || ") + ", ','",
+        aggregateFilter,
+        aggregateOrderBy,
       );
-      return q;
+      return pgp.as.format(`md5(${stringAgg})`);
     },
   },
 
@@ -70,15 +72,16 @@ export const HASHING_FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ args, tableAliasRaw: tableAlias }) => {
-      const q = pgp.as.format(
-        "encode(sha256(string_agg(" +
-          args
-            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
-            .join(" || ") +
-          ", ',')::text::bytea), 'hex')",
+    getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
+      const stringAgg = getAggregateQuery(
+        "string_agg",
+        args
+          .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
+          .join(" || ") + ", ','",
+        aggregateFilter,
+        aggregateOrderBy,
       );
-      return q;
+      return pgp.as.format(`encode(sha256(${stringAgg}::text::bytea), 'hex')`);
     },
   },
   {
@@ -106,15 +109,16 @@ export const HASHING_FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     numArgs: MAX_COL_NUM,
     getFields: (args: any[]) => args,
-    getQuery: ({ args, tableAliasRaw: tableAlias }) => {
-      const q = pgp.as.format(
-        "encode(sha512(string_agg(" +
-          args
-            .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
-            .join(" || ") +
-          ", ',')::text::bytea), 'hex')",
+    getQuery: ({ args, tableAliasRaw: tableAlias, aggregateFilter, aggregateOrderBy }) => {
+      const stringAgg = getAggregateQuery(
+        "string_agg",
+        args
+          .map((fname) => "COALESCE( " + asNameAlias(fname, tableAlias) + ", '' )")
+          .join(" || ") + ", ','",
+        aggregateFilter,
+        aggregateOrderBy,
       );
-      return q;
+      return pgp.as.format(`encode(sha512(${stringAgg}::text::bytea), 'hex')`);
     },
   },
 ];

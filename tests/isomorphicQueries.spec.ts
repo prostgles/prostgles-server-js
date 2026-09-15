@@ -12,6 +12,7 @@ import {
   innerJoin,
   leftJoin,
   pickKeys,
+  type AnyObject,
   type DBHandler,
   type SQLHandler,
 } from "prostgles-types";
@@ -298,6 +299,83 @@ export const isomorphicQueries = async (
       await sub2.unsubscribe();
     });
 
+    await test("Aggregate subscription tracks FILTER and ORDER BY dependencies", async () => {
+      const ids = [501, 502];
+      await db.various.delete!({ id: { $in: ids } });
+      await db.various.insert!([
+        { id: ids[0], name: "included", added: "2020-01-01" },
+        { id: ids[1], name: "excluded", added: "2021-01-01" },
+      ]);
+
+      const results: AnyObject[] = [];
+      const sub = await db.various.subscribe!(
+        { id: { $in: ids } },
+        {
+          select: {
+            ids: {
+              $array_agg: ["id"],
+              $filter: { $filter: [{ $upper: ["name"] }, "=", "INCLUDED"] },
+              $orderBy: { added: 1 },
+            },
+            count: {
+              $count: [],
+              $filter: {
+                $term_highlight: [["name"], "included", { returnType: "boolean" }],
+              },
+            },
+          },
+        },
+        ([result]) => {
+          if (result) results.push(result);
+        },
+      );
+
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { ids: [ids[0]], count: "1" });
+
+      await db.various.update!({ id: ids[1] }, { name: "included" });
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { ids, count: "2" });
+
+      await db.various.update!({ id: ids[0] }, { added: "2022-01-01" });
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), {
+        ids: ids.slice().reverse(),
+        count: "2",
+      });
+
+      await sub.unsubscribe();
+      await db.various.delete!({ id: { $in: ids } });
+    });
+
+    await test("Subscription tracks non-selected ORDER BY columns", async () => {
+      const ids = [511, 512];
+      await db.various.delete!({ id: { $in: ids } });
+      await db.various.insert!([
+        { id: ids[0], name: "first", added: "2020-01-01" },
+        { id: ids[1], name: "second", added: "2021-01-01" },
+      ]);
+
+      const results: AnyObject[] = [];
+      const sub = await db.various.subscribe!(
+        { id: { $in: ids } },
+        { select: { name: 1 }, orderBy: { added: 1 }, limit: 1 },
+        ([result]) => {
+          if (result) results.push(result);
+        },
+      );
+
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { name: "first" });
+
+      await db.various.update!({ id: ids[1] }, { added: "2019-01-01" });
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { name: "second" });
+
+      await sub.unsubscribe();
+      await db.various.delete!({ id: { $in: ids } });
+    });
+
     const json = {
       a: true,
       arr: "2",
@@ -421,7 +499,7 @@ export const isomorphicQueries = async (
       await db.files.update!({ id: original.id }, newFile);
 
       const newF = await db.files.findOne!({ id: original.id });
-      const newFileStr = fs.readFileSync(fileFolder + newF.storage_key).toString("utf8");
+      const newFileStr = fs.readFileSync(fileFolder + newF?.storage_key).toString("utf8");
       assert.equal(newStr, newFileStr);
 
       assert.equal(newF?.original_name, newFile.original_name);
@@ -683,7 +761,7 @@ export const isomorphicQueries = async (
           select: {
             h: { $ts_headline_simple: ["name", { plainto_tsquery: "abc81" }] },
             hh: { $ts_headline: ["name", "abc81"] },
-            added: "$year",
+            added: "$year" as "$max",
             addedY: { $date: ["added"] },
           },
         },
@@ -695,7 +773,7 @@ export const isomorphicQueries = async (
           select: {
             h: { $ts_headline_simple: ["name", { plainto_tsquery: "abc81" }] },
             hh: { $ts_headline: ["name", "abc81"] },
-            added: "$year",
+            added: "$year" as "$max",
             addedY: { $date: ["added"] },
           },
         },
@@ -1294,6 +1372,25 @@ export const isomorphicQueries = async (
         { name: "b", count: "1" },
       ]);
     });
+    await test("Aggregate FILTER and ORDER BY", async () => {
+      const res = await db.items.findOne!(
+        {},
+        {
+          select: {
+            count: { $count: [], $filter: { name: "a" }, $orderBy: { id: -1 } },
+            names: {
+              $array_agg: ["name"],
+              $filter: { name: { $in: ["a", "b"] } },
+              $orderBy: { id: -1 },
+            },
+          },
+        },
+      );
+      assert.deepStrictEqual(res, {
+        count: "2",
+        names: ["b", "a", "a"],
+      });
+    });
     await test("Column alias func", async () => {
       const res = await db.items.find!(
         {},
@@ -1345,13 +1442,16 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(fg, { id: 1, name: "a", items3: [{ name: "A" }] });
 
       // Date utils
-      const Mon = await db.items4.findOne!({ name: "abc" }, { select: { added: "$Mon" } });
+      const Mon = await db.items4.findOne!(
+        { name: "abc" },
+        { select: { added: "$Mon" as "$max" } },
+      );
       assert.deepStrictEqual(Mon, { added: "Dec" });
 
       // Date + agg
       const MonAgg = await db.items4.find!(
         { name: "abc" },
-        { select: { added: "$Mon", public: "$count" } },
+        { select: { added: "$Mon" as "$max", public: "$count" } },
       );
       assert.deepStrictEqual(MonAgg, [{ added: "Dec", public: "2" }]);
 
@@ -1654,9 +1754,39 @@ export const isomorphicQueries = async (
         { select: { id: 1, items2: { name: "$max" } } },
       );
       assert.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
+
+      const nestedAggregateRows = await db.items2.insert!(
+        [
+          { items_id: 1, name: "a" },
+          { items_id: 1, name: "a" },
+          { items_id: 1, name: "a" },
+        ],
+        { returning: "*" },
+      );
+      const includedIds = nestedAggregateRows.slice(0, 2).map(({ id }) => id);
+      const aggOptionsJoined = await db.items.findOne!(
+        { id: 1 },
+        {
+          select: {
+            id: 1,
+            items2Agg: leftJoin("items2", {}, {
+              ids: {
+                $array_agg: ["id"],
+                $filter: { id: { $in: includedIds } },
+                $orderBy: { id: -1 },
+              },
+            }),
+          },
+        },
+      );
+      assert.deepStrictEqual(aggOptionsJoined, {
+        id: 1,
+        items2Agg: [{ ids: includedIds.slice().reverse() }],
+      });
+      await db.items2.delete!({ id: { $in: nestedAggregateRows.map(({ id }) => id) } });
     });
 
-    /* $rowhash -> Custom column that returms md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
+    /* $rowhash -> Custom column that returns md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
     await test("$rowhash example", async () => {
       const rowhash = await db.items.findOne!({}, { select: { $rowhash: 1, "*": 1 } });
       const f = { $rowhash: rowhash?.$rowhash };
@@ -1955,6 +2085,44 @@ export const isomorphicQueries = async (
           },
         );
       });
+    });
+
+    await test("Aggregate FILTER registers joined dependency triggers", async () => {
+      const tr1Id = 701;
+      await db.tr2.delete!({ tr1_id: tr1Id });
+      await db.tr1.delete!({ id: tr1Id });
+      await db.tr1.insert!({ id: tr1Id, t1: "aggregate-filter-root" });
+
+      const results: AnyObject[] = [];
+      const sub = await db.tr1.subscribe!(
+        { id: tr1Id },
+        {
+          select: {
+            count: {
+              $count: [],
+              $filter: {
+                $existsJoined: {
+                  tr2: { t1: "aggregate-filter-related" },
+                },
+              },
+            },
+          },
+        },
+        ([result]) => {
+          if (result) results.push(result);
+        },
+      );
+
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { count: "0" });
+
+      await db.tr2.insert!({ tr1_id: tr1Id, t1: "aggregate-filter-related" });
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), { count: "1" });
+
+      await sub.unsubscribe();
+      await db.tr2.delete!({ tr1_id: tr1Id });
+      await db.tr1.delete!({ id: tr1Id });
     });
 
     await test("Nested sort by computed col", async () => {

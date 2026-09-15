@@ -34,6 +34,8 @@ export const parseComplexFilter = ({
   allowed_colnames,
   columns,
 }: Args) => {
+  const columnsUsed: string[] = [];
+
   /**
    * { $funcName: [arg1, arg2] }
    * { $column: "column_name" }
@@ -45,8 +47,9 @@ export const parseComplexFilter = ({
         throw `expecting: \n  { $column: "column_name" } received:\n ${JSON.stringify(funcData)}`;
       }
       if (!allowed_colnames.includes(column)) {
-        throw `Dissallowed or Invalid column ${column}. Allowed columns: ${allowed_colnames}`;
+        throw `Disallowed or Invalid column ${column}. Allowed columns: ${allowed_colnames}`;
       }
+      columnsUsed.push(column);
       return asNameAlias(column, tableAliasRaw);
     }
     const { funcName, args } = parseFunctionObject(funcData);
@@ -56,6 +59,8 @@ export const parseComplexFilter = ({
       functions: FUNCTIONS,
       allowedFields: allowed_colnames,
     });
+    const fields = funcDef.getFields(args);
+    columnsUsed.push(...(fields === "*" ? allowed_colnames : fields));
     return funcDef.getQuery({
       args,
       tableAliasRaw,
@@ -108,5 +113,8 @@ export const parseComplexFilter = ({
     result += ` ${sqlOperand} ${rightVal}`;
   }
 
-  return result;
+  return {
+    condition: result,
+    columnsUsed: Array.from(new Set(columnsUsed)),
+  };
 };

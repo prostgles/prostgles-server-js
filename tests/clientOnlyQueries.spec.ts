@@ -418,16 +418,16 @@ export const clientOnlyQueries = async (
       if (missingTbl) {
         throw `${missingTbl} is missing from tableSchema: ${JSON.stringify(tableSchema)}`;
       }
-      const missingscTbl = tableSchema.find((t) => !dbTables.includes(t.name));
-      if (missingscTbl) {
-        throw `${JSON.stringify([missingscTbl.name, missingscTbl.publishInfo])} is missing from db (${dbTables.join(", ")})`;
+      const missingSchemaTable = tableSchema.find((t) => !dbTables.includes(t.name));
+      if (missingSchemaTable) {
+        throw `${JSON.stringify([missingSchemaTable.name, missingSchemaTable.publishInfo])} is missing from db (${dbTables.join(", ")})`;
       }
       await Promise.all(
         tableSchema.map(async ({ name, columns, ...otherInfo }) => {
           const cols = await db[name]?.getColumns?.();
           const info = await db[name]?.getInfo?.();
           assert.deepStrictEqual(columns, cols);
-          assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info));
+          assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info!));
         }),
       );
     });
@@ -669,6 +669,26 @@ export const clientOnlyQueries = async (
         { id: 1, public: "public data" },
         { id: 2, public: "public data" },
       ]);
+
+      const aggregate = await db.items4.findOne!(
+        {},
+        {
+          select: {
+            count: { $count: [], $filter: { name: "abc" } },
+            values: { $array_agg: ["public"], $orderBy: { added: 1 } },
+          },
+        },
+      );
+      assert.deepStrictEqual(aggregate, {
+        count: "2",
+        values: ["public data", "public data"],
+      });
+
+      const orderByError = await db.items4.findOne!(
+        {},
+        { select: { values: { $array_agg: ["public"], $orderBy: { public: 1 } } } },
+      ).catch((error) => error);
+      assert.match(orderByError.message ?? String(orderByError), /invalid\/disallowed/i);
 
       const cols = await db.insert_rules.getColumns!();
       assert.equal(

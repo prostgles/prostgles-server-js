@@ -1,7 +1,13 @@
 import type { SelectParams } from "prostgles-types";
-import { asName, isEmpty, omitKeys } from "prostgles-types";
+import { asName, isEmpty, isObject, omitKeys } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
-import type { Filter, LocalParams, PGIdentifier, ValidatedTableRules } from "../DboBuilder";
+import {
+  prepareOrderByQuery,
+  type Filter,
+  type LocalParams,
+  type PGIdentifier,
+  type ValidatedTableRules,
+} from "../DboBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { parseJoinPath } from "../ViewHandler/parseJoinPath";
 import { prepareSortItems } from "../ViewHandler/prepareSortItems";
@@ -21,22 +27,31 @@ export const getNewQuery = async (
 ): Promise<NewQuery> => {
   const { columns } = viewHandler;
 
-  if (localParams?.isRemoteRequest && !tableRules?.select?.fields) {
+  const selectRule = tableRules?.select;
+  if (tableRules && !selectRule?.fields) {
     throw `INTERNAL ERROR: publish.${viewHandler.name}.select.fields rule missing`;
   }
 
+  /** Only missing tableRules means this is an unrestricted local query */
   const allowedOrderByFields =
-    !tableRules ?
+    !selectRule ?
       viewHandler.column_names.slice(0)
-    : viewHandler.parseFieldFilter(tableRules.select?.orderByFields ?? tableRules.select?.fields);
+    : viewHandler.parseFieldFilter(selectRule.orderByFields);
   const allowedSelectFields =
-    !tableRules ?
+    !selectRule ?
       viewHandler.column_names.slice(0)
-    : viewHandler.parseFieldFilter(tableRules.select?.fields);
+    : viewHandler.parseFieldFilter(selectRule.fields);
+  const allowedFilterFields =
+    !selectRule ?
+      viewHandler.column_names.slice(0)
+    : viewHandler.parseFieldFilter(selectRule.filterFields);
 
   const joinQueries: NewQueryJoin[] = [];
 
   const { select: userSelect = "*" } = selectParams;
+  const aggregateTableAlias =
+    selectParams.joinExpressionAlias ??
+    ({ raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS } satisfies PGIdentifier);
 
   const selectItemBuilder = new SelectItemBuilder({
     allowedFields: allowedSelectFields,
@@ -46,6 +61,39 @@ export const getNewQuery = async (
     functions: FUNCTIONS,
     allFields: viewHandler.column_names.slice(0),
     columns,
+    parseAggregateOptions: async ({ $filter, $orderBy }) => {
+      if ($filter !== undefined && !isObject($filter)) {
+        throw `Invalid aggregate $filter. Expecting an object`;
+      }
+      const filterInfo =
+        $filter === undefined ? undefined : (
+          await prepareWhere(viewHandler, {
+            filter: $filter,
+            select: undefined,
+            filterFields: allowedFilterFields,
+            tableAlias: aggregateTableAlias,
+            localParams,
+            addWhere: false,
+            tableRule: tableRules,
+          })
+        );
+      const orderByItems = prepareSortItems(
+        $orderBy,
+        allowedOrderByFields,
+        aggregateTableAlias,
+        [],
+        [],
+      );
+      return {
+        filter: filterInfo?.condition,
+        orderBy: prepareOrderByQuery(orderByItems, aggregateTableAlias.raw)[0],
+        dependencyFields: [
+          ...(filterInfo?.columnsUsed ?? []),
+          ...orderByItems.map(({ key }) => key),
+        ],
+        dependencyExists: filterInfo?.exists ?? [],
+      };
+    },
   });
 
   await selectItemBuilder.parseUserSelectWithJoins(
@@ -151,9 +199,9 @@ export const getNewQuery = async (
         ...omitKeys(commonWhereParams, ["forcedFilter", "selectParams"]),
         filter: selectParams.having,
         tableAlias:
-          selectParams.joinExpressionAlias ? source.alias : (
-            { raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS }
-          ),
+          selectParams.joinExpressionAlias ?
+            source.alias
+          : { raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS },
         isHaving: true,
       })
     );

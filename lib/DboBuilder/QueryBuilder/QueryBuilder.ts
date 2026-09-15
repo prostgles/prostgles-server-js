@@ -4,13 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type {
+  AnyObject,
   ColumnInfo,
+  OrderBy,
   PG_COLUMN_UDT_DATA_TYPE,
   Select,
   ValidatedColumnInfo,
 } from "prostgles-types";
-import { getKeys, isEmpty, isObject, postgresToTsType } from "prostgles-types";
-import type { PGIdentifier, SortItem } from "../DboBuilder";
+import { getKeys, includes, isEmpty, isObject, postgresToTsType } from "prostgles-types";
+import type { ExistsFilterConfig, PGIdentifier, SortItem } from "../DboBuilder";
 
 import type { Awaitable } from "../../PublishParser/publishTypesAndUtils";
 import { asNameAlias } from "../../utils/asNameAlias";
@@ -30,6 +32,8 @@ export type SelectItem = {
   tsDataType?: ValidatedColumnInfo["tsDataType"];
   alias: string;
   selected: boolean;
+  dependencyFields?: string[];
+  dependencyExists?: ExistsFilterConfig[];
 } & (
   | {
       type: "column";
@@ -87,6 +91,36 @@ export const parseFunctionObject = (funcData: unknown): { funcName: string; args
   return { funcName, args };
 };
 
+type AggregateOptions = {
+  $filter?: AnyObject;
+  $orderBy?: OrderBy;
+};
+
+type ParsedAggregateOptions = {
+  filter?: string;
+  orderBy?: string;
+  dependencyFields: string[];
+  dependencyExists: ExistsFilterConfig[];
+};
+
+const aggregateOptionKeys = ["$filter", "$orderBy"] as const;
+const parseSelectFunctionObject = (funcData: Record<string, unknown>) => {
+  const functionData = Object.fromEntries(
+    Object.entries(funcData).filter(([key]) => !includes(aggregateOptionKeys, key)),
+  );
+  return {
+    ...parseFunctionObject(functionData),
+    aggregateOptions: {
+      ...(funcData.$filter !== undefined && {
+        $filter: funcData.$filter as AnyObject,
+      }),
+      ...(funcData.$orderBy !== undefined && {
+        $orderBy: funcData.$orderBy as OrderBy,
+      }),
+    } satisfies AggregateOptions,
+  };
+};
+
 export class SelectItemBuilder {
   select: SelectItemValidated[] = [];
   private allFields: string[];
@@ -97,6 +131,7 @@ export class SelectItemBuilder {
   private functions: FunctionSpec[];
   private allowedFieldsIncludingComputed: string[];
   private columns: ColumnInfo[];
+  private parseAggregateOptions?: (options: AggregateOptions) => Promise<ParsedAggregateOptions>;
 
   constructor(params: {
     allowedFields: string[];
@@ -106,6 +141,7 @@ export class SelectItemBuilder {
     allFields: string[];
     isView: boolean;
     columns: ColumnInfo[];
+    parseAggregateOptions?: (options: AggregateOptions) => Promise<ParsedAggregateOptions>;
   }) {
     this.allFields = params.allFields;
     this.allowedFields = params.allowedFields;
@@ -113,6 +149,7 @@ export class SelectItemBuilder {
     this.computedFields = params.computedFields;
     this.functions = params.functions;
     this.columns = params.columns;
+    this.parseAggregateOptions = params.parseAggregateOptions;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(
       this.computedFields.map((cf) => cf.name),
     );
@@ -164,7 +201,12 @@ export class SelectItemBuilder {
     this.select.push({ ...item, fields });
   };
 
-  private addFunction = (func: FunctionSpec | string, args: any[], alias: string) => {
+  private addFunction = (
+    func: FunctionSpec | string,
+    args: any[],
+    alias: string,
+    aggregateOptions: AggregateOptions = {},
+  ): void | Promise<void> => {
     const funcDef = parseFunction({
       func,
       args,
@@ -172,6 +214,27 @@ export class SelectItemBuilder {
       allowedFields: this.allowedFieldsIncludingComputed,
     });
 
+    if (Object.keys(aggregateOptions).length) {
+      if (funcDef.type !== "aggregation") {
+        throw `Aggregate options $filter and $orderBy are only allowed on aggregate functions`;
+      }
+      if (!this.parseAggregateOptions) {
+        throw "Aggregate options are not supported in this query";
+      }
+      return this.parseAggregateOptions(aggregateOptions).then((parsedOptions) => {
+        this.addFunctionItem(funcDef, args, alias, parsedOptions);
+      });
+    }
+
+    this.addFunctionItem(funcDef, args, alias);
+  };
+
+  private addFunctionItem = (
+    funcDef: FunctionSpec,
+    args: any[],
+    alias: string,
+    aggregateOptions?: ParsedAggregateOptions,
+  ) => {
     const fieldFilter = funcDef.getFields(args);
     this.addItem({
       type: funcDef.type,
@@ -184,11 +247,15 @@ export class SelectItemBuilder {
           args,
           tableAliasRaw: tableAlias,
           ctidField: undefined,
+          aggregateFilter: aggregateOptions?.filter,
+          aggregateOrderBy: aggregateOptions?.orderBy,
 
           /* CTID not available in AFTER trigger */
           // ctidField: this.isView? undefined : "ctid"
         }),
       selected: true,
+      dependencyFields: aggregateOptions?.dependencyFields,
+      dependencyExists: aggregateOptions?.dependencyExists,
     });
   };
 
@@ -204,7 +271,7 @@ export class SelectItemBuilder {
           singleColArg: false,
           getFields: (_args: any[]) => [],
         };
-        this.addFunction(cf, [], compCol.name);
+        void this.addFunction(cf, [], compCol.name);
         return;
       }
     }
@@ -271,14 +338,16 @@ export class SelectItemBuilder {
     } else {
       await Promise.all(
         selectKeys.map(async (key) => {
-          const val: unknown = userSelect[key as keyof typeof userSelect];
+          const userSelectValue: unknown = userSelect[key as keyof typeof userSelect];
           const throwErr: (message: string) => never = (message) => {
             console.trace(message);
-            throw "Unexpected select -> " + JSON.stringify({ [key]: val }) + "\n" + message;
+            throw (
+              "Unexpected select -> " + JSON.stringify({ [key]: userSelectValue }) + "\n" + message
+            );
           };
 
           /* Included fields */
-          if ([1, true].includes(val as number | boolean)) {
+          if (userSelectValue === 1 || userSelectValue === true) {
             if (key === "*") {
               this.allowedFields.map((key) => this.addColumn(key, true));
             } else {
@@ -286,18 +355,26 @@ export class SelectItemBuilder {
             }
 
             /* Aggregations and functions */
-          } else if (typeof val === "string" || isObject(val)) {
+          } else if (typeof userSelectValue === "string" || isObject(userSelectValue)) {
+            const functionEntries =
+              isObject(userSelectValue) ?
+                Object.entries(userSelectValue).filter(
+                  ([key]) => !includes(aggregateOptionKeys, key),
+                )
+              : [];
             /* Function shorthand notation
                 { id: "$max" } === { id: { $max: ["id"] } } === SELECT MAX(id) AS id 
               */
             if (
-              (typeof val === "string" && val !== "*") ||
-              (isObject(val) &&
-                Object.keys(val).length === 1 &&
-                Array.isArray(Object.values(val)[0]))
+              (typeof userSelectValue === "string" && userSelectValue !== "*") ||
+              (isObject(userSelectValue) &&
+                functionEntries.length === 1 &&
+                Array.isArray(functionEntries[0]![1]))
             ) {
-              let funcName: string | undefined, args: any[] | undefined;
-              if (typeof val === "string") {
+              let funcName: string | undefined,
+                args: any[] | undefined,
+                aggregateOptions: AggregateOptions = {};
+              if (typeof userSelectValue === "string") {
                 /* Shorthand notation -> it is expected that the key is the column name used as the only argument */
                 try {
                   this.checkField(key, true);
@@ -306,22 +383,22 @@ export class SelectItemBuilder {
                     ` Shorthand function notation error: the specified column ( ${key} ) is invalid or disallowed. \n Use correct column name or full aliased function notation, e.g.: -> { alias: { $func_name: ["column_name"] } } `,
                   );
                 }
-                funcName = val;
+                funcName = userSelectValue;
                 args = [key];
 
                 /** Function full notation { $funcName: ["colName", ...args] } */
               } else {
-                ({ funcName, args } = parseFunctionObject(val));
+                ({ funcName, args, aggregateOptions } = parseSelectFunctionObject(userSelectValue));
               }
 
-              this.addFunction(funcName, args, key);
+              await this.addFunction(funcName, args, key, aggregateOptions);
 
               /* Join */
             } else {
               if (!joinParse) {
                 throw "Joins disallowed";
               }
-              const joinSelect = val;
+              const joinSelect = userSelectValue;
 
               const parsedJoin = parseJoinSelect(joinSelect);
 

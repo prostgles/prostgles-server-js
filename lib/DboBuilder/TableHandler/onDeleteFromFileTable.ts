@@ -36,32 +36,33 @@ export const onDeleteFromFileTable = async (
 
   const fileIds =
     config.versioning ?
-      ((await getFileTableHandler(dbx, config).find(filterOpts.filter, {
+      await getFileTableHandler(dbx, config).find(filterOpts.filter, {
         select: { id: 1 },
         limit: null,
-      })) as { id: string }[])
+      })
     : [];
   const versionFiles =
     fileIds.length ?
-      ((await getFileRevisionsTableHandler(dbx, config).find(
+      await getFileRevisionsTableHandler(dbx, config).find(
         { file_id: { $in: fileIds.map(({ id }) => id) } },
         { select: { storage_key: 1 }, limit: null },
-      )) as { storage_key: string }[])
+      )
     : [];
 
-  const files = await t.any<Record<string, unknown> & { _prostgles_storage_key: string }>(
+  const KEY = "_prostgles_storage_key" as const;
+  const files = await t.any<Record<string, unknown> & { [KEY]: string }>(
     `DELETE FROM ${asName(tableName)} ${filterOpts.where}
      ${returningQuery ? `${returningQuery},` : "RETURNING"}
-     COALESCE(storage_key, id) AS _prostgles_storage_key`,
+     COALESCE(storage_key, id) AS ${KEY}`,
   );
   const storageKeys = new Set([
     ...versionFiles.map(({ storage_key }) => storage_key),
-    ...files.map(({ _prostgles_storage_key }) => _prostgles_storage_key),
+    ...files.map((row) => row[KEY]),
   ]);
   for (const storageKey of storageKeys) {
     onCommit(({ db }) => deleteUnreferencedFile(db, config, storageKey));
   }
-  const result = files.map(({ _prostgles_storage_key, ...row }) => row);
+  const result = files.map(({ [KEY]: _, ...row }) => row);
   if (!returningQuery) return undefined;
   return (isOneOrNone ? result[0] : result) as AnyObject[] | undefined;
 };

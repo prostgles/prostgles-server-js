@@ -45,7 +45,7 @@ export async function addSub(
     throw "addSub: cannot have socket AND func";
   }
 
-  const channel_name = `${this.socketChannelPreffix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(selectParams)}.m.sub`;
+  const channel_name = `${this.socketChannelPrefix}.${table_name}.${JSON.stringify(filter)}.${JSON.stringify(selectParams)}.m.sub`;
   const mainTrigger = {
     table_name: table_name,
     condition: parseCondition(condition),
