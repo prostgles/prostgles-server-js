@@ -3,7 +3,10 @@ import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { DB_GENERATED_NAMES } from "./constants";
 
 /** Permissions compiled from publish profiles at startup. */
-export type ClientSchemaProfiles = Record<string, { tableSchema: DBSchemaTable[] }>;
+export type ClientSchemaProfiles = Record<
+  string,
+  { tableSchema: DBSchemaTable[]; userTypes: readonly string[] | string[] }
+>;
 
 export const getClientDBGeneratedSchemas = (
   profiles: ClientSchemaProfiles,
@@ -95,6 +98,14 @@ export const getClientDBGeneratedSchemas = (
   return [
     "/** Publish access profiles. Row types retain the database schema; runtime permissions still apply. */",
     ...entries.map(([name, schema]) => generate(name, [schema])),
+    `export type ${DB_GENERATED_NAMES.CLIENT_SCHEMAS} = [\n${entries
+      .map(
+        ([name, { userTypes }]) =>
+          `  { userType: ${userTypes
+            .map((userType) => JSON.stringify(userType))
+            .join(" | ")}; schema: ${name} },`,
+      )
+      .join("\n")}\n];`,
     "/** Permissive write inputs across all supplied profiles; tables missing from a profile are optional. */",
     generate(
       DB_GENERATED_NAMES.CLIENT_SCHEMA,

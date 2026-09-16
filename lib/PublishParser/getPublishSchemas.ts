@@ -17,14 +17,17 @@ export const getPublishSchemas = async (
   const { tablesOrViews = [] } = publishParser.prostgles.dboBuilder;
   const profiles: ClientSchemaProfiles = fromEntries(
     await Promise.all(
-      entries.map(async ({ name, publish }) => {
+      entries.map(async ({ name, publish, userTypes }) => {
         const resolvedPublishObject = getPublishedObjectFromResult(
           publish,
           tablesOrViews,
           undefined,
           "schemaGeneration",
         );
-        const tableNames = getPublishedTableNames(publishParser, resolvedPublishObject);
+        const tableNames = getPublishedTableNames(
+          publishParser,
+          resolvedPublishObject,
+        );
         const tableSchema: DBSchemaTable[] = [];
         for (const tableName of tableNames) {
           const rules = await publishParser.getTableRules({
@@ -39,10 +42,15 @@ export const getPublishSchemas = async (
           tableSchema.push({
             ...getRawInfo.call(table, undefined, rules),
             name: tableName,
-            columns: await getRawColumns.call(table, undefined, undefined, rules),
+            columns: await getRawColumns.call(
+              table,
+              undefined,
+              undefined,
+              rules,
+            ),
           });
         }
-        return [name, { tableSchema }];
+        return [name, { tableSchema, userTypes }];
       }),
     ),
   );

@@ -4,19 +4,27 @@ import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 
-function prostgles<S = void, SUser extends SessionUser = SessionUser, Context = undefined>(
-  params: ProstglesInitOptions<S, SUser, Context>,
-) {
+function prostgles<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  Context = undefined,
+  ClientSchema = S,
+>(params: ProstglesInitOptions<S, SUser, Context>) {
   const prgl = new Prostgles(params as unknown as ProstglesInitOptions<void, SessionUser, any>);
   return prgl.init(params.onReady as unknown as OnReadyCallbackBasic, {
     type: "init",
-  }) as unknown as Promise<InitResult<S, SUser, Context>>;
+  }) as unknown as Promise<InitResult<S, SUser, Context, ClientSchema>>;
 }
 
 /** Creates a schema-bound Prostgles initializer while allowing context inference. */
-export const createProstgles = <S = void, SUser extends SessionUser = SessionUser>() => {
-  return <Context = undefined>(params: ProstglesInitOptions<S, SUser, Context>) =>
-    prostgles<S, SUser, Context>(params);
+export const createProstgles = <
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  ClientSchema = S,
+>() => {
+  return <Context = undefined>(
+    params: ProstglesInitOptions<S, SUser, Context>,
+  ) => prostgles<S, SUser, Context, ClientSchema>(params);
 };
 export * from "./PublishParser/defineServerFunction";
 export * from "./Auth/AuthTypes";

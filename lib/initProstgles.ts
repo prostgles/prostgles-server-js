@@ -103,7 +103,12 @@ export type OnReadyCallbackBasic = (
   update: (newOpts: UpdatableOptions<void, SessionUser, any>, force?: true) => Promise<void>,
 ) => void | Promise<void>;
 
-export type InitResult<S = void, SUser extends SessionUser = SessionUser, Context = undefined> = {
+export type InitResult<
+  S = void,
+  SUser extends SessionUser = SessionUser,
+  Context = undefined,
+  ClientSchema = S,
+> = {
   db: DBOFullyTyped<S>;
   context: Context;
   sql: SQLHandler;
@@ -118,12 +123,13 @@ export type InitResult<S = void, SUser extends SessionUser = SessionUser, Contex
   getSchema: typeof DboBuilder.prototype.getSchema;
   reWriteDBSchema: () => Promise<void>;
   update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>;
-  restart: () => Promise<InitResult<S, SUser, Context>>;
+  restart: () => Promise<InitResult<S, SUser, Context, ClientSchema>>;
   options: ProstglesInitOptions<S, SUser, Context>;
-  getClientDBHandlers: (
+  /** Uses the configured client schema by default and accepts a publish-profile schema override. */
+  getClientDBHandlers: <NarrowedClientSchema = ClientSchema>(
     clientReq: AuthClientRequest,
     scope: PermissionScope | undefined,
-  ) => ReturnType<typeof getClientHandlers<S>>;
+  ) => ReturnType<typeof getClientHandlers<NarrowedClientSchema>>;
 
   getFieldsWithTypes: typeof DboBuilder.prototype.getDetailedFieldInfo;
 };
@@ -327,8 +333,10 @@ export const initProstgles = async function (
         await sleep(1000);
         return true;
       },
-      getClientDBHandlers: (clientReq: AuthClientRequest, scope: PermissionScope | undefined) =>
-        getClientHandlers(this, clientReq, scope),
+      getClientDBHandlers: <ClientSchema = void>(
+        clientReq: AuthClientRequest,
+        scope: PermissionScope | undefined,
+      ) => getClientHandlers<ClientSchema>(this, clientReq, scope),
     };
 
     return initResult;

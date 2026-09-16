@@ -82,11 +82,15 @@ export const testClientSchemaTypes = async (db: DB) => {
                   },
                   update: {
                     fields: ["body", "note", "created_by", "synced"],
-                    forcedData: { created_by: userIdContextValue as unknown as string },
+                    forcedData: {
+                      created_by: userIdContextValue as unknown as string,
+                    },
                   },
                   insert: {
                     fields: { internal: 0 },
-                    forcedData: { created_by: userIdContextValue as unknown as string },
+                    forcedData: {
+                      created_by: userIdContextValue as unknown as string,
+                    },
                   },
                 },
               },
@@ -122,9 +126,9 @@ export const testClientSchemaTypes = async (db: DB) => {
         checkTypes(
           tsSchema,
           `
-        import type { TableHandler, InsertDataWithNested } from "prostgles-types";
+        import type { TableHandler, InsertDataWithNested, ClientSchemaFor } from "prostgles-types";
         import type { DBHandlerClient } from "prostgles-client";
-        import type { DBOFullyTypedClient } from "../server/node_modules/prostgles-server";
+        import type { DBOFullyTypedClient, InitResult, SessionUser } from "../server/node_modules/prostgles-server";
         import type { RestrictedFunctionContext, UnrestrictedFunctionContext } from "../server/node_modules/prostgles-server/dist/PublishParser/defineServerFunction";
         import type { getClientHandlers } from "../server/node_modules/prostgles-server/dist/WebsocketAPI/getClientHandlers";
         type Name = "${tableName}";
@@ -139,7 +143,15 @@ export const testClientSchemaTypes = async (db: DB) => {
         declare const unrestricted: UnrestrictedFunctionContext<DBGeneratedSchema>;
         declare const serverClient: DBOFullyTypedClient<ClientDBSchema>;
         declare const handlers: Awaited<ReturnType<typeof getClientHandlers<GuestDBSchema>>>;
+        declare const instance: InitResult<DBGeneratedSchema, SessionUser, undefined, ClientDBSchema>;
+        declare const guestClientSchema: ClientSchemaFor<"guest">;
+        guestClientSchema satisfies GuestDBSchema;
         async () => {
+          const combinedHandlers = await instance.getClientDBHandlers(null as never, undefined);
+          const guestHandlers = await instance.getClientDBHandlers<GuestDBSchema>(null as never, undefined);
+          await combinedHandlers.clientDb["client_schema_types.private_table"]?.find();
+          // @ts-expect-error the guest profile does not publish private_table
+          await guestHandlers.clientDb["client_schema_types.private_table"].find();
           const restrictedRow = await restricted.dbo["${tableName}"].insert({ body: "hello" }, { returning: "*" });
           restrictedRow.created_by satisfies string;
           await handlers.clientDb["${tableName}"].update({}, { body: "changed" });
@@ -262,8 +274,11 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(updated![0].body, "updated");
         assert.equal(updated![0].created_by, "user-guest");
         assert.equal(
-          (await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({ id: inserted.id }))
-            .created_by,
+          (
+            await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({
+              id: inserted.id,
+            })
+          ).created_by,
           "user-guest",
         );
         await assert.rejects(
@@ -295,6 +310,10 @@ export const testClientSchemaTypes = async (db: DB) => {
           ],
           [
             [{ name: "ClientDBSchema", userTypes: ["guest"], publish: null }],
+            /Invalid client schema name/,
+          ],
+          [
+            [{ name: "ClientSchemas", userTypes: ["guest"], publish: null }],
             /Invalid client schema name/,
           ],
           [

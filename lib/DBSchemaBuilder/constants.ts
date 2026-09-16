@@ -3,4 +3,5 @@ export const DB_GENERATED_NAMES = {
   SCHEMA_OUTPUT: "DBSchema",
   SCHEMA_INPUT: "DBSchemaForInsert",
   CLIENT_SCHEMA: "ClientDBSchema",
+  CLIENT_SCHEMAS: "ClientSchemas",
 } as const;
