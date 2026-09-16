@@ -1,6 +1,7 @@
 import type { DBSchemaTable, TableSchema } from "prostgles-types";
 import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import { DB_GENERATED_NAMES } from "./constants";
+import { FILE_SCHEMA_KEYS } from "../DboBuilder/TableHandler/uploadFile";
 
 /** Permissions compiled from publish profiles at startup. */
 export type ClientSchemaProfiles = Record<
@@ -34,6 +35,14 @@ export const getClientDBGeneratedSchemas = (
         if (!published.some(Boolean)) return [];
         const inserting = published.filter((t) => t?.publishInfo.insert);
         const tableType = `${DB_GENERATED_NAMES.SCHEMA}[${JSON.stringify(table.name)}]`;
+        const fileWriteExcluded = table.columns
+          .filter((column) => !FILE_SCHEMA_KEYS.some((key) => key === column.name))
+          .map((column) => `${JSON.stringify(column.name)}?: never`)
+          .sort();
+        const fileWriteInput =
+          published.some((t) => t?.isFileTable) ?
+            `Pick<${tableType}["columns"], ${FILE_SCHEMA_KEYS.map((v) => JSON.stringify(v)).join(" | ")}> & { ${fileWriteExcluded.join("; ")} }`
+          : undefined;
         const required: string[] = [];
         const optional: string[] = [];
         const excluded: string[] = [];
@@ -54,13 +63,15 @@ export const getClientDBGeneratedSchemas = (
         }
         const input =
           !inserting.length ? "never" : (
-            [
+            (fileWriteInput ??
+            ([
               required.length ? `Pick<${tableType}["columns"], ${keys(required)}>` : "",
               optional.length ? `Partial<Pick<${tableType}["columns"], ${keys(optional)}>>` : "",
               excluded.length ? `{ ${excluded.join("; ")} }` : "",
             ]
               .filter(Boolean)
-              .join(" & ") || "Record<string, never>"
+              .join(" & ") ||
+              "Record<string, never>"))
           );
         const updating = published.filter((t) => t?.publishInfo.update);
         const updateAllowed = table.columns
@@ -75,14 +86,16 @@ export const getClientDBGeneratedSchemas = (
           .sort();
         const updateInput =
           !updating.length ? "never" : (
-            [
+            (fileWriteInput ??
+            ([
               updateAllowed.length ?
                 `Partial<Pick<${tableType}["columns"], ${keys(updateAllowed)}>>`
               : "",
               updateExcluded.length ? `{ ${updateExcluded.join("; ")} }` : "",
             ]
               .filter(Boolean)
-              .join(" & ") || "Record<string, never>"
+              .join(" & ") ||
+              "Record<string, never>"))
           );
         const optionalTable = published.every(Boolean) ? "" : " optional: true;";
         return [

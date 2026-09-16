@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getJSONBObjectSchemaValidationError, type JSONB } from "prostgles-types";
+import { getJSONBObjectSchemaValidationError, getKeys, type JSONB } from "prostgles-types";
 import type { FileTableConfig } from "../../ProstglesTypes";
 import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import { getValidatedFileType } from "../../StorageClient/getValidatedFileType";
@@ -17,6 +17,8 @@ const FILE_SCHEMA = {
   original_last_modified: { type: "string", optional: true },
   data: "Blob",
 } as const;
+
+export const FILE_SCHEMA_KEYS = getKeys(FILE_SCHEMA);
 
 type AssertFileObjectValid = (row: any) => asserts row is JSONB.GetObjectType<typeof FILE_SCHEMA>;
 
