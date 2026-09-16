@@ -1,4 +1,4 @@
-## delete<span style="opacity: 0.6;">(filter?: FullFilter, params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, T, S&gt;[]&gt;</span>
+## delete<span style="opacity: 0.6;">(filter?: FullFilter, params?: SelectParams): Promise&lt;GetReturningReturnType&lt;P, TableHandlerData&lt;S, TName&gt;, TableHandlerSchema&lt;S&gt;&gt;[]&gt;</span>
 Deletes records from the table based on the specified filter criteria.
 - If no filter is provided, all records may be deleted (use with caution).
 #### Parameters

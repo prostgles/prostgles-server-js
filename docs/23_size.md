@@ -1,4 +1,4 @@
-## size<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): Promise&lt;string&gt;</span>
+## size<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): Promise&lt;number&gt;</span>
 Returns result size in bits
 #### Parameters
 
@@ -88,4 +88,4 @@ Returns result size in bits
         
         [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 #### Return type
-#### <span style="color: green;">string</span>
+#### <span style="color: green;">number</span>

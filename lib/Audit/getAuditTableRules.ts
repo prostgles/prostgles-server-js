@@ -30,15 +30,15 @@ export const getAuditTableRules = async function (
     return auditTablePublishRules;
   }
 
-  const auditedTableNames = Object.keys(audit.tables).filter(
-    (tableName) => canSelect(resolvedPublishObject?.[tableName]) || this.dbo[tableName]?.is_media,
+  const auditedTableEntries = Object.entries(audit.tables).filter(
+    ([tableName]) => canSelect(resolvedPublishObject?.[tableName]) || this.dbo[tableName]?.is_media,
   );
 
   const auditTableHandler = this.dbo[audit.tableName]!;
 
   const auditedTableRules = (
     await Promise.all(
-      auditedTableNames.map(async (tableName) => {
+      auditedTableEntries.map(async ([tableName, { idColumns, excludeColumns }]) => {
         const tableHandler = this.dbo[tableName];
         if (!tableHandler) return;
 
@@ -59,11 +59,11 @@ export const getAuditTableRules = async function (
           additionalForcedCondition: await getSourceAuditCondition(
             tableHandler,
             rules.select.forcedFilter,
-            audit.tables[tableName]!.excludeColumns,
+            excludeColumns,
           ),
           tableColumnOverrides: getAuditRowColumnOverrides(
             tableHandler.parseFieldFilter(rules.select.fields),
-            audit.tables[tableName]!.idColumns,
+            idColumns,
           ),
         };
       }),

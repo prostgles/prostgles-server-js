@@ -1,4 +1,4 @@
-## update<span style="opacity: 0.6;">(filter: FullFilter, newData: Partial, params?: SelectParams): Promise&lt;UpdateReturnType&lt;P, T, S&gt; | undefined&gt;</span>
+## update<span style="opacity: 0.6;">(filter: FullFilter, newData: GetUpdateData, params?: SelectParams): Promise&lt;UpdateReturnType&lt;P, TableHandlerData&lt;S, TName&gt;, TableHandlerSchema&lt;S&gt;&gt; | undefined&gt;</span>
 Updates a record in the table based on the specified filter criteria
 - Use { multi: false } to ensure no more than one row is updated
 #### Parameters
@@ -16,9 +16,7 @@ Updates a record in the table based on the specified filter criteria
            '1 year'
          ]
       }`
-  - **newData** <span style="color: red">required</span> <span style="color: green;">Partial</span>
-
-    Make all properties in T optional
+  - **newData** <span style="color: red">required</span> <span style="color: green;">GetUpdateData</span>
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 
@@ -92,4 +90,4 @@ Updates a record in the table based on the specified filter criteria
         
         [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 #### Return type
-#### <span style="color: green;">UpdateReturnType&lt;P, T, S&gt; | undefined</span>
+#### <span style="color: green;">UpdateReturnType&lt;P, TableHandlerData&lt;S, TName&gt;, TableHandlerSchema&lt;S&gt;&gt; | undefined</span>

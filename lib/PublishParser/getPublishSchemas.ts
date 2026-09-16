@@ -22,6 +22,7 @@ export const getPublishSchemas = async (
           publish,
           tablesOrViews,
           undefined,
+          "schemaGeneration",
         );
         const tableNames = getPublishedTableNames(publishParser, resolvedPublishObject);
         const tableSchema: DBSchemaTable[] = [];

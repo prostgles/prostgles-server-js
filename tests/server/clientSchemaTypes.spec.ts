@@ -74,7 +74,12 @@ export const testClientSchemaTypes = async (db: DB) => {
               userTypes: ["guest", "member"],
               publish: {
                 [tableName]: {
-                  select: "*",
+                  select: {
+                    fields: "*",
+                    forcedFilter: {
+                      created_by: userIdContextValue as unknown as string,
+                    },
+                  },
                   update: {
                     fields: ["body", "note", "created_by", "synced"],
                     forcedData: { created_by: userIdContextValue as unknown as string },

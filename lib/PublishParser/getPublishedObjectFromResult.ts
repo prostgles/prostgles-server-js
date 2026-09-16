@@ -18,6 +18,7 @@ export const getPublishedObjectFromResult = (
   publish: PublishedResult | undefined,
   tablesOrViews: TableSchema[],
   publishParams: PublishParams | undefined,
+  contextReplacementMode: "runtime" | "schemaGeneration" = "runtime",
 ): PublishObject => {
   if (!publish) return {};
   if (publish === "*") {
@@ -52,14 +53,18 @@ export const getPublishedObjectFromResult = (
     );
   }
 
-  return replaceContextPlaceholders(publish, publishParams);
+  return replaceContextPlaceholders(publish, publishParams, contextReplacementMode);
 };
 
-const replaceContextPlaceholders = <T>(publish: T, publishParams: PublishParams | undefined): T => {
+const replaceContextPlaceholders = <T>(
+  publish: T,
+  publishParams: PublishParams | undefined,
+  mode: "runtime" | "schemaGeneration",
+): T => {
   const context = { user: publishParams?.user };
-  if (!publishParams) return publish;
+  if (!publishParams && mode === "runtime") return publish;
   if (isArray(publish)) {
-    return publish.map((item) => replaceContextPlaceholders(item, publishParams)) as T;
+    return publish.map((item) => replaceContextPlaceholders(item, publishParams, mode)) as T;
   }
   if (isObject(publish) && isPlainObject(publish)) {
     const { data } = getJSONBSchemaValidationError(
@@ -75,6 +80,7 @@ const replaceContextPlaceholders = <T>(publish: T, publishParams: PublishParams 
     );
     if (data) {
       data satisfies PublishContextValue;
+      if (mode === "schemaGeneration") return null as T;
       const { objectName, objectPropertyName } = data["$prostglesContext"];
       const contextObject = getProperty(context, objectName);
       if (!contextObject) {
@@ -91,7 +97,7 @@ const replaceContextPlaceholders = <T>(publish: T, publishParams: PublishParams 
     return Object.fromEntries(
       Object.entries(publish).map(([key, value]) => [
         key,
-        replaceContextPlaceholders(value, publishParams),
+        replaceContextPlaceholders(value, publishParams, mode),
       ]),
     ) as T;
   }

@@ -1,4 +1,4 @@
-## findOne<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): Promise&lt;SelectReturnType&lt;S, P, T, false&gt; | undefined&gt;</span>
+## findOne<span style="opacity: 0.6;">(filter?: FullFilter, selectParams?: SelectParams): Promise&lt;SelectReturnType&gt;</span>
 Retrieves a record from the view/table
 #### Parameters
 
@@ -88,4 +88,4 @@ Retrieves a record from the view/table
         
         [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 #### Return type
-#### <span style="color: green;">SelectReturnType&lt;S, P, T, false&gt; | undefined</span>
+#### <span style="color: green;">SelectReturnType</span>

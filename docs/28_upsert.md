@@ -1,4 +1,4 @@
-## upsert<span style="opacity: 0.6;">(filter: FullFilter, newData: Partial, params?: SelectParams): Promise&lt;UpdateReturnType&lt;P, T, S&gt; | undefined&gt;</span>
+## upsert<span style="opacity: 0.6;">(filter: FullFilter, newData: UpsertDataToPGCastLax, params?: SelectParams): Promise&lt;GetReturningReturnType&gt;</span>
 Inserts or updates a record in the table.
 - If a record matching the `filter` exists, it updates the record.
 - If no matching record exists, it inserts a new record.
@@ -17,9 +17,7 @@ Inserts or updates a record in the table.
            '1 year'
          ]
       }`
-  - **newData** <span style="color: red">required</span> <span style="color: green;">Partial</span>
-
-    Make all properties in T optional
+  - **newData** <span style="color: red">required</span> <span style="color: green;">UpsertDataToPGCastLax</span>
   - **params** <span style="color: grey">optional</span> <span style="color: green;">SelectParams</span>
     - **limit** <span style="color: grey">optional</span> <span style="color: green;">number | null | undefined</span>
 
@@ -93,4 +91,4 @@ Inserts or updates a record in the table.
         
         [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 #### Return type
-#### <span style="color: green;">UpdateReturnType&lt;P, T, S&gt; | undefined</span>
+#### <span style="color: green;">GetReturningReturnType</span>
