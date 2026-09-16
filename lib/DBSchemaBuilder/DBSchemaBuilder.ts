@@ -1,18 +1,17 @@
-import type { AnyObject, DBSchema, TableHandler } from "prostgles-types";
+import type { DBSchema, TableHandler } from "prostgles-types";
 import type { TX } from "../DboBuilder/DboBuilderTypes";
 import type { PublishAllOrNothing, PublishTableRule } from "../PublishParser/PublishParser";
 import { type PublishObject } from "../PublishParser/PublishParser";
 
 export type ServerTableHandler<
-  T extends AnyObject = AnyObject,
-  Schema extends DBSchema | void = void,
-  TName extends PropertyKey = never,
-> = TableHandler<T, Schema, TName> & { isView: boolean };
+  Schema extends DBSchema = DBSchema,
+  TName extends keyof Schema = keyof Schema,
+> = TableHandler<Schema, TName> & { isView: boolean };
 
 export type DBTableHandlersFromSchema<Schema = void> =
   Schema extends DBSchema ?
     {
-      [tov_name in keyof Schema]: ServerTableHandler<Schema[tov_name]["columns"], Schema, tov_name>;
+      [tov_name in keyof Schema]: ServerTableHandler<Schema, tov_name>;
     }
   : Record<string, Partial<ServerTableHandler>>;
 
@@ -32,7 +31,7 @@ export type DBOFullyTypedClient<Schema = void> =
   Schema extends DBSchema ?
     {
       [TName in keyof Schema]:
-        | TableHandler<Schema[TName]["columns"], Schema, TName>
+        | TableHandler<Schema, TName>
         | (Schema[TName] extends { optional: true } ? undefined : never);
     }
   : Record<string, Partial<TableHandler>>;

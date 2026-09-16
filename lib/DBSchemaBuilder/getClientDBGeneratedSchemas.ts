@@ -74,7 +74,7 @@ export const getClientDBGeneratedSchemas = (
           !updating.length ? "never" : (
             [
               updateAllowed.length ?
-                `Partial<import("prostgles-types").UpsertDataToPGCast<Pick<${tableType}["columns"], ${keys(updateAllowed)}>>>`
+                `Partial<Pick<${tableType}["columns"], ${keys(updateAllowed)}>>`
               : "",
               updateExcluded.length ? `{ ${updateExcluded.join("; ")} }` : "",
             ]

@@ -103,6 +103,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           onReady: () => {},
         });
         const { tsSchema } = await instance.getTSSchema();
+        assert.doesNotMatch(tsSchema, /\bimport(?:\s|\()/);
         assert.equal(
           readFileSync(
             path.resolve(`debug/client-schema-types/${DB_GENERATED_NAMES.SCHEMA}.ts`),
@@ -122,11 +123,11 @@ export const testClientSchemaTypes = async (db: DB) => {
         import type { RestrictedFunctionContext, UnrestrictedFunctionContext } from "../server/node_modules/prostgles-server/dist/PublishParser/defineServerFunction";
         import type { getClientHandlers } from "../server/node_modules/prostgles-server/dist/WebsocketAPI/getClientHandlers";
         type Name = "${tableName}";
-        declare const guest: TableHandler<GuestDBSchema[Name]["columns"], GuestDBSchema, Name>;
-        declare const admin: TableHandler<AdminDBSchema[Name]["columns"], AdminDBSchema, Name>;
-        declare const combined: TableHandler<ClientDBSchema[Name]["columns"], ClientDBSchema, Name>;
-        declare const server: TableHandler<${DB_GENERATED_NAMES.SCHEMA}[Name]["columns"], ${DB_GENERATED_NAMES.SCHEMA}, Name>;
-        declare const viewer: TableHandler<ViewerDBSchema[Name]["columns"], ViewerDBSchema, Name>;
+        declare const guest: TableHandler<GuestDBSchema, Name>;
+        declare const admin: TableHandler<AdminDBSchema, Name>;
+        declare const combined: TableHandler<ClientDBSchema, Name>;
+        declare const server: TableHandler<${DB_GENERATED_NAMES.SCHEMA}, Name>;
+        declare const viewer: TableHandler<ViewerDBSchema, Name>;
         declare const client: DBHandlerClient<ClientDBSchema>;
         declare const adminClient: DBHandlerClient<AdminDBSchema>;
         declare const restricted: RestrictedFunctionContext<GuestDBSchema>;
@@ -153,6 +154,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           });
 
           await client["${tableName}"].update({}, { body: "changed" });
+          await guest.update({}, { body: 123 });
           // @ts-expect-error table is absent for guests and viewers
           await client["client_schema_types.private_table"].find();
           await client["client_schema_types.private_table"]?.find();

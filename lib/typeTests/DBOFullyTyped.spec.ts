@@ -56,7 +56,7 @@ void describe("DBOFullyTyped test", async () => {
       //@ts-expect-error
       r[0]?.bad_col;
 
-      const tr2 = {} as TableHandler<DBSchema2["tr2"]["columns"], DBSchema2>;
+      const tr2 = {} as TableHandler<DBSchema2, "tr2">;
       void tr2.find(
         {},
         {

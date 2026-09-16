@@ -1,4 +1,4 @@
-import type { TableHandler } from "prostgles-types";
+import type { TableHandler, TableHandlerForColumns } from "prostgles-types";
 import type { TableHandlers } from "../DboBuilder/DboBuilder";
 import type { FileTableConfig } from "../ProstglesTypes";
 import type {
@@ -24,14 +24,14 @@ export const isFileVersionTable = (
   Boolean(config?.versioning && getFileVersionTableName(config) === tableName);
 
 export const getFileTableHandler = (dbo: TableHandlers, config: FileTableConfig) => {
-  const handler = dbo[config.tableName] as TableHandler<FileTableRow> | undefined;
+  const handler = dbo[config.tableName] as TableHandlerForColumns<FileTableRow> | undefined;
   if (!handler) throw new Error(`File table not found: ${config.tableName}`);
   return handler;
 };
 
 export const getFileRevisionsTableHandler = (dbo: TableHandlers, config: FileTableConfig) => {
   const handler = dbo[getFileVersionTableName(config)] as
-    TableHandler<FileVersionTableRow, FileVersionTableSchema, "fileVersions"> | undefined;
+    TableHandler<FileVersionTableSchema, "fileVersions"> | undefined;
   if (!handler) throw new Error(`File table not found: ${config.tableName}`);
   return handler;
 };

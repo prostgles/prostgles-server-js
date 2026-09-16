@@ -45,7 +45,11 @@ export type {
   InitResult,
   OnReadyParams,
 } from "./initProstgles";
-export type { ProstglesInitOptions } from "./ProstglesTypes";
+export type {
+  FileTableConfig,
+  ProstglesInitOptions,
+  TableConfigMigrations,
+} from "./ProstglesTypes";
 export type * from "./TableConfig/TableConfigTypes";
 export type * from "./Audit/AuditTypes";
 export type * from "./TableHooks/TableHooks";
