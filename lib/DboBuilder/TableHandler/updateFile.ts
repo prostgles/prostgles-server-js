@@ -61,12 +61,12 @@ const getFileUpdateId = (filter: AnyObject): string => {
     filter,
     "filter",
     undefined,
-    { allowExtraProperties: false },
+    { allowExtraProperties: true },
   );
   const existingMediaId = validFilter?.id;
   if (!existingMediaId) {
     throw new Error(
-      `Updating the file table with file data can only be done by providing a single id filter. E.g. { id: "9ea4e23c-2b1a-4e33-8ec0-c15919bb45ec" } `,
+      `Updating the file table with file data can only be done by providing a filter that contains "id" and targets a single row`,
     );
   }
 

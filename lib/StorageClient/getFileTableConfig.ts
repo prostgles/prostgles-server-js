@@ -1,4 +1,4 @@
-import { asName, omitKeys } from "prostgles-types";
+import { asName, getKeys, isEmpty, omitKeys, pickKeys } from "prostgles-types";
 import { md5 } from "prostgles-types/dist/md5";
 import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
@@ -58,6 +58,7 @@ export const getFileTableConfig = (
     ...FILE_TABLE_COLUMN_DEFINITIONS,
     ...(fileTable.versioning && FILE_TABLE_VERSION_COLUMN_DEFINITIONS),
   };
+  const fileColumnDefinitionsColumnNames = getKeys(fileColumnDefinitions);
   const userFileTableConfig = tableConfig?.[fileTableName];
   if (userFileTableConfig) {
     if ("isLookupTable" in userFileTableConfig) {
@@ -144,7 +145,7 @@ export const getFileTableConfig = (
             update: 1,
           },
           validate: async ({
-            data: insertData,
+            data: insertOrUpdateData,
             localParams,
             command,
             filter,
@@ -154,9 +155,20 @@ export const getFileTableConfig = (
           }) => {
             const tableHandler = dbx[fileTableName];
             if (!tableHandler) throw "Storage tableHandler not found";
-            assertFileObjectValid(insertData);
+            const fileData = pickKeys(insertOrUpdateData, fileColumnDefinitionsColumnNames);
 
-            const { data: dataBlob, original_name, id, original_last_modified = null } = insertData;
+            /**
+             * File table config can be extended with extra columns.
+             * Allow updates that only target those columns without affecting the core file data
+             */
+            const extraData = omitKeys(insertOrUpdateData, fileColumnDefinitionsColumnNames);
+
+            if (command === "update" && isEmpty(fileData)) {
+              return;
+            }
+            assertFileObjectValid(fileData);
+
+            const { data: dataBlob, original_name, id, original_last_modified = null } = fileData;
             const data = dataBlob as unknown as Buffer;
             if (command === "update") {
               const { newData } = await updateFile(tableHandler, fileTable, {
@@ -169,7 +181,7 @@ export const getFileTableConfig = (
                 original_last_modified,
               });
               return {
-                row: newData,
+                row: { ...newData, ...extraData },
                 hookContext: {
                   data,
                 },
@@ -187,7 +199,7 @@ export const getFileTableConfig = (
             });
 
             return {
-              row: media,
+              row: { ...media, ...extraData },
               hookContext: {
                 data,
               },

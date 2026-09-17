@@ -94,6 +94,29 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         assert.equal(await updated.text(), "updated");
       });
 
+      await t.test("custom columns do not require or interfere with file data", async () => {
+        const count = uploads;
+        const metadataUpdatePayload = { metadata: { description: "metadata-only update" } };
+        await files.update({ id: original.id }, metadataUpdatePayload);
+        original = await files.findOne({ id: original.id });
+        assert.deepEqual(original.metadata, metadataUpdatePayload.metadata);
+        assert.equal(read(original), "updated");
+        assert.equal(uploads, count);
+
+        const metadataReplacementPayload = { metadata: { description: "replacement update" } };
+        await files.update(
+          { id: original.id },
+          {
+            ...fileData("updated"),
+            ...metadataReplacementPayload,
+          },
+        );
+        original = await files.findOne({ id: original.id });
+        assert.deepEqual(original.metadata, metadataReplacementPayload.metadata);
+        assert.equal(read(original), "updated");
+        assert.equal(uploads, count + 1);
+      });
+
       await t.test("filtered updates and failed validation preserve storage", async () => {
         const count = uploads;
         const rules = {
