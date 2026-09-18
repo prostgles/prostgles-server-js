@@ -24,7 +24,6 @@ import type {
 import { QueryStreamer } from "./runSql/QueryStreamer";
 import { TableHandler } from "./TableHandler/TableHandler";
 import type { JoinPaths } from "./ViewHandler/ViewHandler";
-import { parseJoinPath } from "./ViewHandler/parseJoinPath";
 import type { PGConstraint } from "./dboBuilderUtils";
 import {
   getCanExecute,
@@ -198,7 +197,7 @@ export class DboBuilder {
 
   _joins?: Join[];
   get joins(): Join[] {
-    return clone(this._joins ?? []).filter((j) => j.tables[0] !== j.tables[1]);
+    return clone(this._joins ?? []);
   }
 
   set joins(j: Join[]) {
@@ -406,20 +405,6 @@ export class DboBuilder {
     target: string,
   ): JoinPaths[number] | undefined => {
     const source = viewHandler.name;
-    if (source === target) {
-      parseJoinPath({
-        rawPath: target,
-        rootTable: source,
-        viewHandler,
-      });
-
-      return {
-        t1: source,
-        t2: target,
-        path: [source],
-      };
-    }
-
     const jp = this.shortestJoinPaths.find((jp) => jp.t1 === source && jp.t2 === target);
     return jp;
   };

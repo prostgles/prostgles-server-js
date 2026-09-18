@@ -5,7 +5,6 @@ import type {
   MaybePromise,
   StrictUnion,
 } from "prostgles-types";
-import type { JoinInfo } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
 import type { SyncConfig } from "../PublishParser/PublishParser";
 
@@ -154,20 +153,6 @@ type ReferencedColumn = BaseColumnTypes & {
   };
 };
 
-type JoinDef = {
-  sourceTable: string;
-  targetTable: string;
-  on: JoinInfo["paths"][number]["on"];
-};
-
-/**
- * Used in specifying a join path to a table. This column name can then be used in select
- */
-type NamedJoinColumn = {
-  label?: string;
-  joinDef: JoinDef[];
-};
-
 type Enum<T extends string | number = any> = {
   enum: T[] | readonly T[];
   nullable?: boolean;
@@ -177,7 +162,6 @@ type Enum<T extends string | number = any> = {
 export type ColumnConfig<LANG_IDS = { en: 1 }> =
   | string
   | StrictUnion<
-      | NamedJoinColumn
       | MediaColumn
       | (BaseColumn<LANG_IDS> &
           (SQLDefColumn | ReferencedColumn | TextColumn | JSONBColumnDef | Enum))
@@ -185,7 +169,6 @@ export type ColumnConfig<LANG_IDS = { en: 1 }> =
 
 export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
   sql: string | (BaseColumn<LANG_IDS> & SQLDefColumn);
-  join: BaseColumn<LANG_IDS> & NamedJoinColumn;
   media: BaseColumn<LANG_IDS> & MediaColumn;
   referenced: BaseColumn<LANG_IDS> & ReferencedColumn;
   text: BaseColumn<LANG_IDS> & TextColumn;

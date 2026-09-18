@@ -51,7 +51,7 @@ export class ViewHandler {
   tsColumnDefs: string[] = [];
   joins: Join[];
   joinGraph?: Graph;
-  joinPaths?: JoinPaths;
+  joinPaths: JoinPaths;
   dboBuilder: DboBuilder;
   config: TableDefinition<any> | undefined;
   hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
@@ -84,7 +84,7 @@ export class ViewHandler {
     config: TableDefinition<any> | undefined;
     hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
-    joinPaths?: JoinPaths;
+    joinPaths: JoinPaths;
   }) {
     this.config = config;
     this.hooks = hooks;

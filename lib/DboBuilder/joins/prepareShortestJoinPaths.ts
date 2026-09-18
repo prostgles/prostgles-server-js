@@ -15,19 +15,18 @@ type Result = {
 };
 
 export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
-  if (!dboBuilder.prostgles.opts.joins) {
+  const { joins: joinConfigFromOpts } = dboBuilder.prostgles.opts;
+  if (!joinConfigFromOpts) {
     return {
       joins: [],
       shortestJoinPaths: [],
     };
   }
-
-  let joinConfig = dboBuilder.prostgles.opts.joins;
-  if (Array.isArray(joinConfig)) {
-    joinConfig.forEach((join, index, configured) => {
+  if (Array.isArray(joinConfigFromOpts)) {
+    joinConfigFromOpts.forEach((join, index, configured) => {
       const duplicate = configured
         .slice(0, index)
-        .some((existing) => isEqual(existing.tables.toSorted(), join.tables.toSorted()));
+        .some((existing) => sortedArraysMatch(existing.tables, join.tables));
       if (duplicate) {
         throw new Error(
           `Duplicate configured join for table pair ${JSON.stringify(join.tables)}. Combine conditions in a single Join.on.`,
@@ -35,9 +34,12 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
       }
     });
   }
+
   if (!dboBuilder.tablesOrViews) {
     throw new Error("Could not create join config. this.tablesOrViews missing");
   }
+
+  let joinConfig = joinConfigFromOpts;
 
   // The initial DBO is needed by tableConfig before its tables/columns exist.
   // Defer only joins that cannot be resolved yet; the final rebuild validates all.
@@ -57,6 +59,7 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
       }),
     );
   }
+
   const inferredJoins = getInferredJoins(dboBuilder.tablesOrViews);
   if (joinConfig === "inferred") {
     joinConfig = inferredJoins;
@@ -69,7 +72,14 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
         JSON.stringify(joinConfig),
     );
   }
-  const joins = JSON.parse(JSON.stringify(joinConfig)) as Join[];
+  const joins = structuredClone(joinConfig).map((join) => {
+    if (join.tables[0] !== join.tables[1]) return join;
+
+    return {
+      ...join,
+      on: getUniqueJoinConditions([...join.on, ...reverseJoinOn(join.on)]),
+    };
+  });
 
   // Validate joins
   try {
@@ -136,7 +146,13 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
     joinGraph[t2][t1] = 1;
   });
   const tables = Array.from(new Set(joins.flatMap((t) => t.tables)));
-  const shortestJoinPaths: JoinPaths = [];
+  const shortestJoinPaths: JoinPaths = joins
+    .filter(({ tables: [t1, t2] }) => t1 === t2)
+    .map(({ tables: [table] }) => ({
+      t1: table,
+      t2: table,
+      path: [table, table],
+    }));
   tables.forEach((t1) => {
     tables.forEach((t2) => {
       /** Prevent recursion */
@@ -182,18 +198,13 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
 const mergeJoins = (inferred: Join[], configured: Join[]): Join[] => {
   const joins = [...inferred];
   configured.forEach((join) => {
-    const index = joins.findIndex((existing) =>
-      isEqual(existing.tables.toSorted(), join.tables.toSorted()),
-    );
+    const index = joins.findIndex((existing) => sortedArraysMatch(existing.tables, join.tables));
     const existing = joins[index];
     const previousOn =
       !existing || join.override ? []
       : existing.tables[0] === join.tables[0] ? existing.on
       : reverseJoinOn(existing.on);
-    const on = [...previousOn, ...join.on].filter(
-      (condition, index, conditions) =>
-        conditions.findIndex((candidate) => isEqual(candidate, condition)) === index,
-    );
+    const on = getUniqueJoinConditions([...previousOn, ...join.on]);
     const merged = { ...join, on };
     if (existing) {
       joins[index] = merged;
@@ -203,3 +214,9 @@ const mergeJoins = (inferred: Join[], configured: Join[]): Join[] => {
   });
   return joins;
 };
+
+const getUniqueJoinConditions = (conditions: Join["on"]): Join["on"] =>
+  conditions.filter(
+    (condition, index) =>
+      conditions.findIndex((candidate) => isEqual(candidate, condition)) === index,
+  );

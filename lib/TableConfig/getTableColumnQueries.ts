@@ -57,10 +57,7 @@ export const getTableColumnQueries = async ({
     }
   }
 
-  const columns = getObjectEntries(tableConf.columns).filter(([_, colDef]) => {
-    /** Exclude NamedJoinColumn  */
-    return typeof colDef === "string" || !("joinDef" in colDef);
-  });
+  const columns = getObjectEntries(tableConf.columns);
 
   const columnDefinitions: { name: string; def: string }[] = [];
 

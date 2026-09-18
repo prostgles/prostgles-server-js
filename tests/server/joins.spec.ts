@@ -79,4 +79,101 @@ export const testJoins = async (db: DB) => {
       await db.none("DROP SCHEMA join_merge_test CASCADE");
     }
   });
+
+  await test("custom self joins use configured paths and override inferred joins", async () => {
+    await db.none(`
+      CREATE SCHEMA custom_self_join_test;
+      CREATE TABLE custom_self_join_test.members (
+        id int PRIMARY KEY,
+        project_id int NOT NULL,
+        discipline_id text NOT NULL,
+        user_id int NOT NULL,
+        role text NOT NULL
+      );
+      INSERT INTO custom_self_join_test.members VALUES
+        (1, 1, 'drainage', 10, 'manager'),
+        (2, 1, 'drainage', 20, 'viewer'),
+        (3, 1, 'ecology', 20, 'viewer');
+
+      CREATE TABLE custom_self_join_test.managed_members (
+        id int PRIMARY KEY,
+        manager_id int REFERENCES custom_self_join_test.managed_members(id),
+        project_id int NOT NULL,
+        user_id int NOT NULL,
+        role text NOT NULL
+      );
+      INSERT INTO custom_self_join_test.managed_members VALUES
+        (1, NULL, 3, 20, 'viewer'),
+        (2, 1, 3, 20, 'viewer'),
+        (3, NULL, 1, 10, 'manager');
+    `);
+    const on = { project_id: "project_id", discipline_id: "discipline_id" };
+    const overrideOn = { project_id: "id" };
+    const instance = await prostgles({
+      dbConnection: {
+        ...getConnectionDetails(db),
+        options: "-c search_path=custom_self_join_test,public",
+      } as unknown as ProstglesInitOptions["dbConnection"],
+      schemaFilter: { custom_self_join_test: 1 },
+      joins: [
+        {
+          tables: ["members", "members"],
+          on: [on],
+          type: "many-many",
+        },
+        {
+          tables: ["managed_members", "managed_members"],
+          on: [overrideOn],
+          type: "many-many",
+          override: true,
+        },
+      ],
+      onReady: () => {},
+    });
+    try {
+      const members = instance.db.members!;
+      const rows = await members.find!(
+        {
+          $existsJoined: {
+            path: [{ table: "members", on: [on] }],
+            filter: { user_id: 10, role: "manager" },
+          },
+        },
+        { select: ["id"], orderBy: "id" },
+      );
+      assert.deepEqual(rows, [{ id: 1 }, { id: 2 }]);
+      assert.deepEqual(
+        await members.find!(
+          { $existsJoined: { members: { user_id: 10, role: "manager" } } },
+          { select: ["id"], orderBy: "id" },
+        ),
+        rows,
+      );
+
+      const managedMembers = instance.db.managed_members!;
+      assert.deepEqual(
+        await managedMembers.find!(
+          {
+            $existsJoined: {
+              path: [{ table: "managed_members", on: [overrideOn] }],
+              filter: { user_id: 10, role: "manager" },
+            },
+          },
+          { select: ["id"], orderBy: "id" },
+        ),
+        [{ id: 1 }, { id: 2 }],
+      );
+      await assert.rejects(() =>
+        managedMembers.find!({
+          $existsJoined: {
+            path: [{ table: "managed_members", on: [{ manager_id: "id" }] }],
+            filter: {},
+          },
+        }),
+      );
+    } finally {
+      await instance.destroy();
+      await db.none("DROP SCHEMA custom_self_join_test CASCADE");
+    }
+  });
 };

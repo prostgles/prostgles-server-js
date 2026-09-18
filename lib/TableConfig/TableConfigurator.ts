@@ -1,6 +1,5 @@
 import type { ColumnInfo } from "prostgles-types";
 import { isObject } from "prostgles-types";
-import type { JoinInfo } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
 import {
   DEFAULT_SYNC_BATCH_SIZE,
@@ -128,31 +127,6 @@ export class TableConfigurator {
       if (max !== undefined && value !== undefined && value > max)
         throw `${params.col} must be less than ${max}`;
     }
-  };
-
-  getJoinInfo = (sourceTable: string, targetTable: string): JoinInfo | undefined => {
-    const sourceTableConfig = this.config[sourceTable];
-    if (sourceTableConfig && "columns" in sourceTableConfig) {
-      const targetColConfig = sourceTableConfig.columns?.[targetTable];
-      if (targetColConfig) {
-        if (isObject(targetColConfig) && "joinDef" in targetColConfig) {
-          if (!targetColConfig.joinDef) throw "targetColConfig.joinDef missing";
-          const { joinDef } = targetColConfig;
-          const res: JoinInfo = {
-            expectOne: false,
-            paths: joinDef.map(({ sourceTable, targetTable: table, on }) => ({
-              source: sourceTable,
-              target: targetTable,
-              table,
-              on,
-            })),
-          };
-
-          return res;
-        }
-      }
-    }
-    return undefined;
   };
 
   prevInitQueryHistory?: string[];

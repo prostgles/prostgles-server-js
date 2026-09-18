@@ -67,7 +67,7 @@ export class TableHandler extends ViewHandler {
     config: TableDefinition<any> | undefined;
     hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
-    joinPaths?: JoinPaths;
+    joinPaths: JoinPaths;
   }) {
     super({ db, tableOrViewInfo, dboBuilder, config, hooks, tx, joinPaths });
 
