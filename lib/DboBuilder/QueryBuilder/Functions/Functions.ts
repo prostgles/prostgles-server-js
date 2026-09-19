@@ -753,6 +753,21 @@ export const FUNCTIONS: FunctionSpec[] = [
     }),
   ),
 
+  asFunction({
+    name: "$array_element",
+    type: "function",
+    description: ` :[column_name, index] -> get an array element using PostgreSQL's 1-based index`,
+    numArgs: 2,
+    singleColArg: false,
+    getFields: ([columnName]) => [columnName],
+    getQuery: ({ args: [columnName, index], tableAliasRaw: tableAlias }) => {
+      if (!Number.isInteger(index) || index < 1) {
+        throw new Error("$array_element index must be a positive integer");
+      }
+      return `${asNameAlias(columnName, tableAlias)}[${asValue(index)}]`;
+    },
+  }),
+
   /* Aggs */
   ...["max", "min", "count", "avg", "json_agg", "jsonb_agg", "string_agg", "array_agg", "sum"].map(
     (aggName) =>

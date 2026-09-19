@@ -748,6 +748,23 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(resVl, ["a", "a", "b"]);
     });
 
+    await test("PostgreSQL array element", async () => {
+      const id = -100;
+      await db.items.insert!({ id, name: "array element", h: ["a1", "a2"] });
+      const result = await (async () => {
+        try {
+          return await db.items.findOne!(
+            { id },
+            { select: { second: { $array_element: ["h", 2] } } },
+          );
+        } finally {
+          await db.items.delete!({ id });
+        }
+      })();
+
+      assert.deepStrictEqual(result, { second: "a2" });
+    });
+
     /**
      * TODO -> ADD ALL FILTER TYPES
      */
@@ -1769,13 +1786,17 @@ export const isomorphicQueries = async (
         {
           select: {
             id: 1,
-            items2Agg: leftJoin("items2", {}, {
-              ids: {
-                $array_agg: ["id"],
-                $filter: { id: { $in: includedIds } },
-                $orderBy: { id: -1 },
+            items2Agg: leftJoin(
+              "items2",
+              {},
+              {
+                ids: {
+                  $array_agg: ["id"],
+                  $filter: { id: { $in: includedIds } },
+                  $orderBy: { id: -1 },
+                },
               },
-            }),
+            ),
           },
         },
       );
