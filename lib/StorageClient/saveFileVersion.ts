@@ -4,7 +4,11 @@ import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { FileTableConfig } from "../ProstglesTypes";
 import type { OnCommit } from "../PublishParser/publishTypesAndUtils";
 import { deleteUnreferencedFile } from "./deleteUnreferencedFile";
-import type { FileTableRow, FileVersionTableInsertRow } from "./fileTableDefinitions";
+import {
+  FILE_VERSION_TABLE_COLUMN_DEFINITIONS,
+  type FileTableRow,
+  type FileVersionTableInsertRow,
+} from "./fileTableDefinitions";
 import { getFileRevisionsTableHandler, getFileTableHandler } from "./fileVersionUtils";
 import { getFileStorageKey } from "./getFileStorageKey";
 
@@ -28,6 +32,15 @@ export const saveFileVersion = async (
       conflictColumns: ["file_id", "version"],
     },
   });
+  const customColumns = versionColumns.filter(
+    (column) => !Object.hasOwn(FILE_VERSION_TABLE_COLUMN_DEFINITIONS, column),
+  );
+  if (customColumns.length) {
+    await (versions as TableHandler).update(
+      { file_id: row.id, version },
+      pickKeys(row, customColumns as (keyof FileTableRow)[]),
+    );
+  }
 
   const { maxVersions } = config.versioning;
   if (maxVersions === undefined) return;

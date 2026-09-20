@@ -47,11 +47,16 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
       fileVersions.find(
         { file_id: fileId },
         {
-          select: { version: 1, storage_key: 1 },
           orderBy: "version",
           limit: null,
         },
-      ) as Promise<{ version: number; storage_key: string }[]>;
+      ) as Promise<
+        (Record<string, unknown> & {
+          version: number;
+          storage_key: string;
+          metadata: { description: string } | null;
+        })[]
+      >;
     const hooks = files.dboBuilder.prostgles.opts.tableHooks!.files!;
     const originalHooks = hooks.afterEach;
     hooks.afterEach = [
@@ -96,12 +101,21 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
 
       await t.test("custom columns do not require or interfere with file data", async () => {
         const count = uploads;
+        const versionsBeforeMetadataUpdate = await versions(original.id);
         const metadataUpdatePayload = { metadata: { description: "metadata-only update" } };
         await files.update({ id: original.id }, metadataUpdatePayload);
         original = await files.findOne({ id: original.id });
         assert.deepEqual(original.metadata, metadataUpdatePayload.metadata);
         assert.equal(read(original), "updated");
         assert.equal(uploads, count);
+        const versionsAfterMetadataUpdate = await versions(original.id);
+        assert.deepEqual(
+          versionsAfterMetadataUpdate,
+          versionsBeforeMetadataUpdate.map((fileVersion) => {
+            if (fileVersion.version !== original.version) return fileVersion;
+            return { ...fileVersion, metadata: metadataUpdatePayload.metadata };
+          }),
+        );
 
         const metadataReplacementPayload = { metadata: { description: "replacement update" } };
         await files.update(
@@ -115,6 +129,12 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         assert.deepEqual(original.metadata, metadataReplacementPayload.metadata);
         assert.equal(read(original), "updated");
         assert.equal(uploads, count + 1);
+        const versionsAfterReplacement = await versions(original.id);
+        assert.deepEqual(versionsAfterReplacement.slice(0, -1), versionsAfterMetadataUpdate);
+        assert.deepEqual(
+          versionsAfterReplacement.at(-1)?.metadata,
+          metadataReplacementPayload.metadata,
+        );
       });
 
       await t.test("filtered updates and failed validation preserve storage", async () => {
