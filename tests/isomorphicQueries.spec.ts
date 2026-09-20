@@ -1448,7 +1448,7 @@ export const isomorphicQueries = async (
         {},
         { select: { public: 1, p_5: { $left: ["public", 3] } } },
       );
-      assert.equal(f?.p_5.length, 3);
+      assert.equal(f?.p_5?.length, 3);
       assert.equal(f?.p_5, f.public.substr(0, 3));
 
       // Nested function
@@ -1772,7 +1772,7 @@ export const isomorphicQueries = async (
       );
       assert.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
 
-      const nestedAggregateRows = await db.items2.insert!(
+      const nestedAggregateRows = await db.items2.insertMany!(
         [
           { items_id: 1, name: "a" },
           { items_id: 1, name: "a" },

@@ -60,7 +60,7 @@ export type ServerFunctionContextMarker<
   SUser extends SessionUser,
   Context = undefined,
 > = {
-  [serverFunctionContext]?: [S, SUser, Context];
+  [serverFunctionContext]?: [S, SUser, [Context] extends [undefined] ? never : Context];
 };
 
 type DefineFunctionArgs<

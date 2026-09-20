@@ -4,6 +4,7 @@ import {
   createFunctionGroupDefiner,
   createFunctionGroupDefinerWithContext,
   createFunctionsDefiner,
+  createFunctionsDefinerWithContext,
 } from "./defineServerFunction";
 import type { TableHooks } from "../TableHooks/TableHooks";
 import { createProstgles } from "../index";
@@ -70,6 +71,7 @@ void describe("defineFunction type test", async () => {
     defineContextFunctions({
       userFilter: { type: "public" },
       functions: {
+        ...functions,
         getContextItem: defineFunction({
           run: (_args, { context, dbo }) => {
             void dbo.items.find();
@@ -77,6 +79,20 @@ void describe("defineFunction type test", async () => {
           },
         }),
       },
+    });
+
+    const otherContextFunctions = createFunctionsDefinerWithContext<
+      TestSchema,
+      { otherService: string }
+    >()({
+      getOtherContextItem: defineFunction({
+        run: (_args, { context }) => context.otherService,
+      }),
+    });
+    defineContextFunctions({
+      userFilter: { type: "public" },
+      // @ts-expect-error Context-dependent functions must use the configured context.
+      functions: otherContextFunctions,
     });
 
     const contextualHooks: TableHooks<TestSchema, AppContext> = {
@@ -101,6 +117,7 @@ void describe("defineFunction type test", async () => {
         createContext: () => ({
           serviceManager: { getService: (name: string) => name },
         }),
+        functions: { test: group },
         onReady: ({ context }) => {
           context.serviceManager.getService("documents");
         },
