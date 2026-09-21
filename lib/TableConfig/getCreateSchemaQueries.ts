@@ -4,6 +4,7 @@ import type { DB } from "../initProstgles";
 import type { ProstglesInitOptions, TableConfigMigrations } from "../ProstglesTypes";
 import { fetchTableConstraints } from "./fetchTableConstraints";
 import type { TableConfig } from "./TableConfigTypes";
+import { getTableConfigVersion } from "./getTableConfigVersion";
 export type RequiredUndefined<T> = {
   [K in keyof Required<T>]: T[K];
 };
@@ -62,10 +63,10 @@ const getMigration = async (
   { version, onMigrate }: Pick<TableConfigMigrations, "version" | "onMigrate">,
   file_table_queries: string,
 ) => {
-  const maxVersion = Number(
-    (await db.oneOrNone<{ v: string }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))?.v,
+  const latestVersion = getTableConfigVersion(
+    (await db.oneOrNone<{ v: string | null }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))
+      ?.v,
   );
-  const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
   if (latestVersion === version) {
     const isLatest = (

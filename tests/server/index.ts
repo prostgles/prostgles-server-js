@@ -118,6 +118,12 @@ function dd() {
       }
     },
     tableConfig: testTableConfig,
+    tableConfigMigrations: {
+      version: 1,
+      onMigrate: () => {
+        throw new Error("onMigrate must not run for a fresh schema");
+      },
+    },
     tableHooks: testTableHooks,
     testRulesOnConnect: true,
     fileTable: {

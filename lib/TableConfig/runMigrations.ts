@@ -2,6 +2,7 @@ import type pgPromise from "pg-promise";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 import { fetchTableConstraints } from "./fetchTableConstraints";
+import { getTableConfigVersion } from "./getTableConfigVersion";
 
 export async function runMigrations(
   t: pgPromise.ITask<{}>,
@@ -9,26 +10,35 @@ export async function runMigrations(
     tableConfigMigrations,
     tableConfig,
   }: Pick<ProstglesInitOptions, "tableConfigMigrations" | "tableConfig">,
-  { asName }: { asName: (name: string) => string }
+  { asName }: { asName: (name: string) => string },
 ) {
   if (!tableConfigMigrations) return;
 
   const { onMigrate, version, versionTableName = "schema_version" } = tableConfigMigrations;
   await t.any(`
-      /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-      CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL)
-    `);
+    /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
+    CREATE TABLE IF NOT EXISTS ${asName(versionTableName)}(
+      id NUMERIC PRIMARY KEY, 
+      table_config JSONB NOT NULL
+    )
+  `);
   const migrations = { version, table: versionTableName };
-  const maxVersion = Number(
-    (await t.oneOrNone<{ v: string }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))?.v
+  const latestVersion = getTableConfigVersion(
+    (
+      await t.oneOrNone<{ v: string | null }>(
+        `SELECT MAX(id) as v FROM ${asName(versionTableName)}`,
+      )
+    )?.v,
   );
-  const latestVersion = Number.isFinite(maxVersion) ? maxVersion : undefined;
 
   if (latestVersion === version) {
     const isLatest = (
       await t.oneOrNone<{ v: string | null }>(
-        `SELECT table_config = \${table_config} as v FROM ${asName(versionTableName)} WHERE id = \${version}`,
-        { version, table_config: tableConfig }
+        `
+        SELECT table_config = \${tableConfig} as v 
+        FROM ${asName(versionTableName)} 
+        WHERE id = \${version}`,
+        { version, tableConfig },
       )
     )?.v;
     if (isLatest) {

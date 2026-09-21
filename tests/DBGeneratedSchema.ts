@@ -281,6 +281,13 @@ export type DBGeneratedSchema = {
     };
     referencedBy: {"rec":["recf"]};
   };
+  schema_version: {
+    columns: {
+      id: number | string;
+      table_config: any;
+    };
+    
+  };
   self_join: {
     columns: {
       id?: number;
