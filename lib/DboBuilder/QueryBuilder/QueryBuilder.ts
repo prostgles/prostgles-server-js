@@ -5,6 +5,7 @@
 
 import type {
   AnyObject,
+  CaseSelect,
   ColumnInfo,
   OrderBy,
   PG_COLUMN_UDT_DATA_TYPE,
@@ -103,6 +104,15 @@ type ParsedAggregateOptions = {
   dependencyExists: ExistsFilterConfig[];
 };
 
+const CASE_SELECT_KEYS = ["$case", "$else"] as const satisfies readonly (keyof CaseSelect)[];
+const [CASE_KEY, ELSE_KEY] = CASE_SELECT_KEYS;
+
+type ParsedCaseExpression = {
+  query: string;
+  dependencyFields: string[];
+  dependencyExists: ExistsFilterConfig[];
+};
+
 const aggregateOptionKeys = ["$filter", "$orderBy"] as const;
 const parseSelectFunctionObject = (funcData: Record<string, unknown>) => {
   const functionData = Object.fromEntries(
@@ -132,6 +142,7 @@ export class SelectItemBuilder {
   private allowedFieldsIncludingComputed: string[];
   private columns: ColumnInfo[];
   private parseAggregateOptions?: (options: AggregateOptions) => Promise<ParsedAggregateOptions>;
+  private parseCaseExpression?: (expression: CaseSelect) => Promise<ParsedCaseExpression>;
 
   constructor(params: {
     allowedFields: string[];
@@ -142,6 +153,7 @@ export class SelectItemBuilder {
     isView: boolean;
     columns: ColumnInfo[];
     parseAggregateOptions?: (options: AggregateOptions) => Promise<ParsedAggregateOptions>;
+    parseCaseExpression?: (expression: CaseSelect) => Promise<ParsedCaseExpression>;
   }) {
     this.allFields = params.allFields;
     this.allowedFields = params.allowedFields;
@@ -150,6 +162,7 @@ export class SelectItemBuilder {
     this.functions = params.functions;
     this.columns = params.columns;
     this.parseAggregateOptions = params.parseAggregateOptions;
+    this.parseCaseExpression = params.parseCaseExpression;
     this.allowedFieldsIncludingComputed = this.allowedFields.concat(
       this.computedFields.map((cf) => cf.name),
     );
@@ -291,6 +304,43 @@ export class SelectItemBuilder {
     });
   };
 
+  private addCaseExpression = async (value: Record<string, unknown>, alias: string) => {
+    if (!this.parseCaseExpression) {
+      throw "CASE expressions are not supported in this query";
+    }
+
+    const invalidKey = Object.keys(value).find((key) => !includes(CASE_SELECT_KEYS, key));
+    if (invalidKey) {
+      throw `Invalid CASE expression option: ${invalidKey}`;
+    }
+
+    const caseBranches = value[CASE_KEY];
+    if (!Array.isArray(caseBranches) || !caseBranches.length) {
+      throw "A CASE expression must contain at least one [condition, result] branch";
+    }
+
+    const branches = caseBranches.map((branch) => {
+      if (!Array.isArray(branch) || branch.length !== 2 || !isObject(branch[0])) {
+        throw "Each CASE branch must be a [condition, result] tuple";
+      }
+      return [branch[0], branch[1]] satisfies CaseSelect[typeof CASE_KEY][number];
+    });
+    const caseExpression = {
+      [CASE_KEY]: branches,
+      ...(Object.hasOwn(value, ELSE_KEY) ? { [ELSE_KEY]: value[ELSE_KEY] } : {}),
+    } satisfies CaseSelect;
+    const parsed = await this.parseCaseExpression(caseExpression);
+    this.addItem({
+      type: "function",
+      alias,
+      fields: [],
+      getQuery: () => parsed.query,
+      selected: true,
+      dependencyFields: parsed.dependencyFields,
+      dependencyExists: parsed.dependencyExists,
+    });
+  };
+
   parse = async (
     userSelect: Select,
     joinParse?: (key: string, parsedJoin: ParsedJoin) => Awaitable<void>,
@@ -356,6 +406,11 @@ export class SelectItemBuilder {
 
             /* Aggregations and functions */
           } else if (typeof userSelectValue === "string" || isObject(userSelectValue)) {
+            if (isObject(userSelectValue) && CASE_KEY in userSelectValue) {
+              await this.addCaseExpression(userSelectValue, key);
+              return;
+            }
+
             const functionEntries =
               isObject(userSelectValue) ?
                 Object.entries(userSelectValue).filter(

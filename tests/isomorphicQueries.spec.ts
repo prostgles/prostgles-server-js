@@ -13,6 +13,7 @@ import {
   leftJoin,
   pickKeys,
   type AnyObject,
+  type CaseSelect,
   type DBHandler,
   type SQLHandler,
 } from "prostgles-types";
@@ -342,6 +343,60 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(results.at(-1), {
         ids: ids.slice().reverse(),
         count: "2",
+      });
+
+      await sub.unsubscribe();
+      await db.various.delete!({ id: { $in: ids } });
+    });
+
+    await test("CASE select and subscription dependencies", async () => {
+      const ids = [503, 504];
+      await db.various.delete!({ id: { $in: ids } });
+      await db.various.insert!([
+        { id: ids[0], name: "first" },
+        { id: ids[1], name: "second" },
+      ]);
+
+      const caseSelect = {
+        label: {
+          $case: [
+            [{ name: "first" }, "it's first"],
+            [{ name: "second" }, "second"],
+          ],
+          $else: "other",
+        },
+        nullable: {
+          $case: [[{ name: "missing" }, "found"]],
+        },
+      } satisfies Record<string, CaseSelect>;
+      const rows = await db.various.find!(
+        { id: { $in: ids } },
+        { select: caseSelect, orderBy: { id: 1 } },
+      );
+      assert.deepStrictEqual(rows, [
+        { label: "it's first", nullable: null },
+        { label: "second", nullable: null },
+      ]);
+
+      const results: AnyObject[] = [];
+      const sub = await db.various.subscribe!(
+        { id: ids[0] },
+        { select: caseSelect },
+        ([result]) => {
+          if (result) results.push(result);
+        },
+      );
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), {
+        label: "it's first",
+        nullable: null,
+      });
+
+      await db.various.update!({ id: ids[0] }, { name: "changed" });
+      await tout(300);
+      assert.deepStrictEqual(results.at(-1), {
+        label: "other",
+        nullable: null,
       });
 
       await sub.unsubscribe();

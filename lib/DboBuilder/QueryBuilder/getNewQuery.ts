@@ -1,8 +1,9 @@
-import type { SelectParams } from "prostgles-types";
+import type { AnyObject, SelectParams } from "prostgles-types";
 import { asName, isEmpty, isObject, omitKeys } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   prepareOrderByQuery,
+  pgp,
   type Filter,
   type LocalParams,
   type PGIdentifier,
@@ -49,9 +50,24 @@ export const getNewQuery = async (
   const joinQueries: NewQueryJoin[] = [];
 
   const { select: userSelect = "*" } = selectParams;
-  const aggregateTableAlias =
+  const selectExpressionAlias =
     selectParams.joinExpressionAlias ??
     ({ raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS } satisfies PGIdentifier);
+
+  const parseExpressionFilter = (filter: AnyObject, errorPrefix: string) => {
+    if (!isObject(filter)) {
+      throw `Invalid ${errorPrefix}. Expecting an object`;
+    }
+    return prepareWhere(viewHandler, {
+      filter,
+      select: undefined,
+      filterFields: allowedFilterFields,
+      tableAlias: selectExpressionAlias,
+      localParams,
+      addWhere: false,
+      tableRule: tableRules,
+    });
+  };
 
   const selectItemBuilder = new SelectItemBuilder({
     allowedFields: allowedSelectFields,
@@ -62,36 +78,48 @@ export const getNewQuery = async (
     allFields: viewHandler.column_names.slice(0),
     columns,
     parseAggregateOptions: async ({ $filter, $orderBy }) => {
-      if ($filter !== undefined && !isObject($filter)) {
-        throw `Invalid aggregate $filter. Expecting an object`;
-      }
       const filterInfo =
         $filter === undefined ? undefined : (
-          await prepareWhere(viewHandler, {
-            filter: $filter,
-            select: undefined,
-            filterFields: allowedFilterFields,
-            tableAlias: aggregateTableAlias,
-            localParams,
-            addWhere: false,
-            tableRule: tableRules,
-          })
+          await parseExpressionFilter($filter, "aggregate $filter")
         );
       const orderByItems = prepareSortItems(
         $orderBy,
         allowedOrderByFields,
-        aggregateTableAlias,
+        selectExpressionAlias,
         [],
         [],
       );
       return {
         filter: filterInfo?.condition,
-        orderBy: prepareOrderByQuery(orderByItems, aggregateTableAlias.raw)[0],
+        orderBy: prepareOrderByQuery(orderByItems, selectExpressionAlias.raw)[0],
         dependencyFields: [
           ...(filterInfo?.columnsUsed ?? []),
           ...orderByItems.map(({ key }) => key),
         ],
         dependencyExists: filterInfo?.exists ?? [],
+      };
+    },
+    parseCaseExpression: async (caseExpression) => {
+      const parsedBranches = await Promise.all(
+        caseExpression.$case.map(async ([condition, result]) => {
+          const filterInfo = await parseExpressionFilter(condition, "CASE condition");
+          if (!filterInfo.condition) {
+            throw "CASE conditions cannot be empty";
+          }
+          return {
+            query: `WHEN ${filterInfo.condition} THEN ${pgp.as.format("$1", [result])}`,
+            filterInfo,
+          };
+        }),
+      );
+      return {
+        query: `CASE ${parsedBranches.map(({ query }) => query).join(" ")}${
+          Object.hasOwn(caseExpression, "$else") ?
+            ` ELSE ${pgp.as.format("$1", [caseExpression.$else])}`
+          : ""
+        } END`,
+        dependencyFields: parsedBranches.flatMap(({ filterInfo }) => filterInfo.columnsUsed),
+        dependencyExists: parsedBranches.flatMap(({ filterInfo }) => filterInfo.exists),
       };
     },
   });
