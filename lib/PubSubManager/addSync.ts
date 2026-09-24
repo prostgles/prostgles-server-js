@@ -40,7 +40,6 @@ export async function addSync(
       /* Only a sync per socket per table/condition/select allowed */
       const existing = find(this.syncs, { socket_id: socket.id, channel_name: channelName });
       if (existing) {
-        console.warn("addSync: Client tried to create a duplicate sync", existing.channel_name);
         return existing;
       }
 
@@ -112,10 +111,9 @@ export async function addSync(
         cb(null, { res: "ok" });
       });
 
+      this.syncs.push(newSync);
       return newSync;
     };
-
-    const newSync = upsertSync();
 
     await this.addTrigger(
       { table_name, condition: conditionParsed, tracked_columns: undefined },
@@ -123,7 +121,8 @@ export async function addSync(
       socket,
     );
 
-    this.syncs.push(newSync);
+    // Check and register without yielding so concurrent attachments share one sync.
+    const newSync = upsertSync();
     return { channelName, newSync };
   });
 

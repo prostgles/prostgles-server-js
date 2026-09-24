@@ -146,7 +146,7 @@ export type CachedSession = {
   __prglCache?: Map<string, CachedSessionData>;
 };
 
-export type PRGLIOSocket = Socket & {
+export type ClientSocketWithCachedData = Socket & {
   readonly id: string;
 
   readonly handshake: {

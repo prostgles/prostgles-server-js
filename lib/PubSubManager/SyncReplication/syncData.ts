@@ -4,6 +4,7 @@ import { WAL } from "prostgles-types/dist/WAL";
 import type { PubSubManager, SyncParams } from "../PubSubManager";
 import { getSyncUtilFunctions } from "./getSyncUtilFunctions";
 import type { EventTypes } from "../../Logging";
+import { logSyncError } from "./logSyncError";
 
 export type ClientSyncInfo = Partial<{
   c_fr: AnyObject;
@@ -45,7 +46,26 @@ export type ClientExpressData = ClientSyncInfo & {
 /**
  * Server or client requested data sync
  */
-export async function syncData(
+export function syncData(
+  this: PubSubManager,
+  sync: SyncParams,
+  clientData: ClientExpressData | undefined,
+  source: "trigger" | "client",
+) {
+  const run = () =>
+    runSyncData.call(this, sync, clientData, source).catch(async (error) => {
+      if (this.sockets.get(sync.socket_id)?.connected) {
+        await logSyncError(this, sync, source, error);
+      }
+      throw error;
+    });
+  const queued = (sync.syncQueue ?? Promise.resolve()).then(run);
+  // Report failures to the caller while allowing the next request to run.
+  sync.syncQueue = queued.catch(() => undefined);
+  return queued;
+}
+
+async function runSyncData(
   this: PubSubManager,
   sync: SyncParams,
   clientData: ClientExpressData | undefined,
@@ -111,8 +131,12 @@ export async function syncData(
       sync.is_syncing = true;
     },
     onSend: async (data) => {
-      const res = await upsertData(data, "WAL");
-      return res;
+      try {
+        return await upsertData(data, "WAL");
+      } catch (error) {
+        await logSyncError(this, sync, "WAL", error);
+        throw error;
+      }
     },
     onSendEnd: (batch, _, error) => {
       if (error === undefined) {
@@ -164,36 +188,36 @@ export async function syncData(
   }
 
   sync.is_syncing = true;
+  try {
+    let from_synced = null;
 
-  // from synced does not make sense. It should be sync.lr only!!!
-  let from_synced = null;
+    /** Client runs must reconcile the client's snapshot after reattachment. */
+    if (sync.lr && !clientData) {
+      const { s_lr } = await getServerRowInfo();
 
-  /** Sync was already synced */
-  if (sync.lr) {
-    const { s_lr } = await getServerRowInfo();
-
-    /* Make sure trigger is not firing on freshly synced data */
-    if (!rowsFullyMatch(sync.lr, s_lr)) {
-      from_synced = Number(sync.lr[synced_field]);
-      await logSyncData("sync.lr");
+      /* Make sure trigger is not firing on freshly synced data */
+      if (!rowsFullyMatch(sync.lr, s_lr)) {
+        from_synced = Number(sync.lr[synced_field]);
+        await logSyncData("sync.lr");
+      } else {
+        await logSyncData("rowsFullyMatch");
+      }
     } else {
-      await logSyncData("rowsFullyMatch");
+      await logSyncData("getLastSynced(clientData).start");
+      from_synced = await getLastSynced(clientData);
+      await logSyncData("getLastSynced(clientData).end");
     }
-  } else {
-    await logSyncData("getLastSynced(clientData).start");
-    from_synced = await getLastSynced(clientData);
-    await logSyncData("getLastSynced(clientData).end");
+
+    if (from_synced !== null) {
+      await logSyncData("syncBatch.start");
+      await syncBatch(from_synced);
+      await logSyncData("syncBatch.end");
+    } else {
+      await logSyncData("nothingToSync");
+    }
+
+    await pushData({ state: "synced" });
+  } finally {
+    sync.is_syncing = false;
   }
-
-  if (from_synced !== null) {
-    await logSyncData("syncBatch.start");
-    await syncBatch(from_synced);
-    await logSyncData("syncBatch.end");
-  } else {
-    await logSyncData("nothingToSync");
-  }
-
-  await pushData({ state: "synced" });
-
-  sync.is_syncing = false;
 }

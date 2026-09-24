@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { CHANNELS } from "prostgles-types";
 import prostgles, { defineFunction, getLocalStorageClient } from "prostgles-server";
 import { withUserRLS } from "prostgles-server/dist/DboBuilder/DboBuilder";
 import { testPublishTypes } from "./publishTypeCheck";
@@ -30,6 +31,7 @@ import type { DBOFullyTyped } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs: unknown[] = [];
+const replicationErrors: unknown[] = [];
 
 export const log = (msg: string, extra?: any, trace?: boolean) => {
   const msgs = msg.includes("show-logs") ? logs : ["(server): " + msg, extra].filter((v) => v);
@@ -40,6 +42,7 @@ export const log = (msg: string, extra?: any, trace?: boolean) => {
   }
 };
 const stopTest = (err?: unknown) => {
+  err ??= replicationErrors.length ? replicationErrors : undefined;
   log("Stopping server ...");
   if (err) {
     console.trace(err);
@@ -113,6 +116,9 @@ function dd() {
     onLog: async (ev) => {
       logs.push(ev);
       logs = logs.slice(-10);
+      if (ev.type === "sync" && ev.command === "replicationError") {
+        replicationErrors.push(ev);
+      }
       if (ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect") {
         // log("onLog", ev);
       }
@@ -158,6 +164,9 @@ function dd() {
           if (typeof data === "string" && data.includes("show-logs")) {
             log(data);
           }
+        });
+        socket.on("reattach-syncs", () => {
+          socket.emit(CHANNELS.SCHEMA, socket.prostgles!.values().next().value);
         });
         socket.on("stop-test", async (err, cb) => {
           cb();

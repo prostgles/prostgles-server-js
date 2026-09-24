@@ -1,7 +1,7 @@
-import type { PRGLIOSocket } from "../../DboBuilder/DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../../DboBuilder/DboBuilderTypes";
 import type { ExpressReq, LoginClientInfo } from "../AuthTypes";
 type ClientReq =
-  | { socket: PRGLIOSocket; httpReq?: undefined }
+  | { socket: ClientSocketWithCachedData; httpReq?: undefined }
   | { httpReq: ExpressReq; socket?: undefined };
 export const getClientRequestIPsInfo = <T extends ClientReq>(req: T): LoginClientInfo => {
   if (req.httpReq) {

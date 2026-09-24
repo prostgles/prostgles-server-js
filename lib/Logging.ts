@@ -44,6 +44,11 @@ export namespace EventTypes {
       syncParams: SyncParams;
     } & (
       | {
+          command: "replicationError";
+          source: "client" | "trigger" | "WAL";
+          error: unknown;
+        }
+      | {
           command: "syncData";
           source: "client" | "trigger";
           lr: string;

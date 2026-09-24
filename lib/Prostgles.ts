@@ -13,7 +13,7 @@ import type { ProstglesInitOptions } from "./ProstglesTypes";
 import { RestApi } from "./RestApi";
 import { TableConfigurator } from "./TableConfig/TableConfigurator";
 
-import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
+import type { ClientSocketWithCachedData } from "./DboBuilder/DboBuilder";
 import { DBHandlerServer, DboBuilder } from "./DboBuilder/DboBuilder";
 export { DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
@@ -401,7 +401,7 @@ export class Prostgles {
 
   init = initProstgles.bind(this);
 
-  connectedSockets: PRGLIOSocket[] = [];
+  connectedSockets: ClientSocketWithCachedData[] = [];
   setupSocketIO() {
     this.checkDb();
 

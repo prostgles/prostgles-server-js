@@ -2,12 +2,12 @@ import type { AnyObject, SocketFunctionCall } from "prostgles-types";
 import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles, TABLE_METHODS } from "../Prostgles";
 import { runClientMethod, runClientRequest } from "../runClientRequest";
 
-export async function onSocketConnected(this: Prostgles, socket: PRGLIOSocket) {
+export async function onSocketConnected(this: Prostgles, socket: ClientSocketWithCachedData) {
   const isDestroyed = () => this.destroyed;
   if (isDestroyed()) {
     console.log("Socket connected to destroyed instance");

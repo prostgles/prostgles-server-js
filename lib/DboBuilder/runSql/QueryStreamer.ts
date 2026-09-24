@@ -6,14 +6,14 @@ import type { BasicCallback } from "../../PubSubManager/PubSubManager";
 import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
 import type { DB } from "../../initProstgles";
 import type { DboBuilder } from "../DboBuilder";
-import type { PRGLIOSocket } from "../DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../DboBuilderTypes";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
 import { getDetailedFieldInfo } from "./runSqlUtils";
 import { getConnectionDetails } from "./getAdminClient";
 const Cursor = require("pg-cursor") as typeof CursorType;
 
 type ClientStreamedRequest = {
-  socket: PRGLIOSocket;
+  socket: ClientSocketWithCachedData;
   query: string;
   options: SQLOptions | undefined;
   persistConnection?: boolean;

@@ -48,13 +48,10 @@ type ClientTestSpecV2 = (args: {
   tableSchema: DBSchemaTable[];
   isReconnect?: boolean;
   auth: AuthHandler;
-  reconnectSocket: () => Promise<void>;
+  reconnectSocket: (reattachOnly?: boolean) => Promise<void>;
 }) => Promise<void>;
 
 let reconnectReadyResolve: () => void;
-const reconnectReady = new Promise<void>((resolve) => {
-  reconnectReadyResolve = resolve;
-});
 
 const tests: Record<string, ClientTestSpecV2> = {
   main: async ({ db, sql, methods, tableSchema, auth, reconnectSocket }) => {
@@ -128,7 +125,7 @@ try {
       },
       onReady: async ({ db, sql, methods, tableSchema, auth, isReconnect }) => {
         log(`TEST_NAME: ${TEST_NAME} Started`);
-        if (isReconnect) {
+        if (reconnectReadyResolve) {
           reconnectReadyResolve();
           return;
         }
@@ -156,9 +153,16 @@ try {
             tableSchema,
             auth,
             isReconnect,
-            reconnectSocket: async () => {
-              socket.io.engine.close();
-              await reconnectReady;
+            reconnectSocket: async (reattachOnly = false) => {
+              const ready = new Promise<void>((resolve) => {
+                reconnectReadyResolve = resolve;
+              });
+              if (reattachOnly) {
+                socket.emit("reattach-syncs");
+              } else {
+                socket.io.engine.close();
+              }
+              await ready;
             },
           });
 

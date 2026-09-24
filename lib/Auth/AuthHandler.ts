@@ -1,6 +1,6 @@
 import type { AnyObject } from "prostgles-types";
 import { CHANNELS, getProperty, isDefined } from "prostgles-types";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilder";
+import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilder";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
 import type { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
@@ -226,7 +226,7 @@ export class AuthHandler {
   getSidAndUserFromRequest = getSidAndUserFromRequest.bind(this);
 
   isNonExpiredSocketSession = (
-    socket: PRGLIOSocket,
+    socket: ClientSocketWithCachedData,
     session: BasicSession | undefined,
   ): boolean => {
     const hasExpired = Boolean(session && session.expires <= Date.now());

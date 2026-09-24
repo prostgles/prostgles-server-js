@@ -2,7 +2,7 @@ import type { PrglNotifListener } from "./PostgresNotifListenManager";
 import { PostgresNotifListenManager } from "./PostgresNotifListenManager";
 import type { DB, PGP } from "./Prostgles";
 import { getKeys, CHANNELS } from "prostgles-types";
-import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
+import type { ClientSocketWithCachedData } from "./DboBuilder/DboBuilder";
 
 export class DBEventsManager {
   notifies: {
@@ -65,7 +65,7 @@ export class DBEventsManager {
 
   async addNotify(
     query: string,
-    socket?: PRGLIOSocket,
+    socket?: ClientSocketWithCachedData,
     func?: any
   ): Promise<{
     socketChannel: string;
@@ -142,7 +142,7 @@ export class DBEventsManager {
     };
   }
 
-  removeNotify(channel?: string, socket?: PRGLIOSocket, func?: any) {
+  removeNotify(channel?: string, socket?: ClientSocketWithCachedData, func?: any) {
     const notifChannel = channel && this.notifies[channel];
     if (notifChannel) {
       if (socket) {
@@ -163,7 +163,7 @@ export class DBEventsManager {
     }
   }
 
-  addNotice(socket: PRGLIOSocket) {
+  addNotice(socket: ClientSocketWithCachedData) {
     if (!socket.id) throw "Expecting a socket obj with id";
 
     if (!this.notice.sockets.find((s) => s.id === socket.id)) {
@@ -180,7 +180,7 @@ export class DBEventsManager {
     return { socketChannel, socketUnsubChannel };
   }
 
-  removeNotice(socket: PRGLIOSocket) {
+  removeNotice(socket: ClientSocketWithCachedData) {
     if (!socket.id) throw "Expecting a socket obj with id";
     this.notice.sockets = this.notice.sockets.filter((s) => s.id !== socket.id);
   }

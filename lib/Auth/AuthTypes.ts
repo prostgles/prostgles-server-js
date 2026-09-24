@@ -24,7 +24,7 @@ import type {
   UserLike,
 } from "prostgles-types";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
 import { GET_AUTH_ROUTE } from "./AuthHandler";
@@ -52,7 +52,7 @@ export type BasicSession = {
   onExpiration: "redirect" | "show_error";
 };
 
-type SocketClientRequest = { socket: PRGLIOSocket; httpReq?: undefined };
+type SocketClientRequest = { socket: ClientSocketWithCachedData; httpReq?: undefined };
 type HttpClientRequest = {
   httpReq: ExpressReq;
   res: ExpressRes;

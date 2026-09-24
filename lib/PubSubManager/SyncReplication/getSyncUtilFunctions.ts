@@ -6,7 +6,7 @@ import {
   type AnyObject,
   type SyncBatchParams,
 } from "prostgles-types";
-import type { LocalParams, PRGLIOSocket } from "../../DboBuilder/DboBuilder";
+import type { LocalParams, ClientSocketWithCachedData } from "../../DboBuilder/DboBuilder";
 import type { TableHandler } from "../../DboBuilder/TableHandler/TableHandler";
 import { getSyncOrderByAndFields } from "./getSyncOrderByAndFields";
 import type { PubSubManager, SyncParams } from "../PubSubManager";
@@ -21,7 +21,7 @@ import { log } from "../PubSubManagerUtils";
 import type { EventTypes } from "../../Logging";
 
 type Args = {
-  socket: PRGLIOSocket;
+  socket: ClientSocketWithCachedData;
   tableHandler: TableHandler;
   sync: SyncParams;
   pubSubManager: PubSubManager;
@@ -389,12 +389,7 @@ export const getSyncUtilFunctions = ({
         return;
       }
       if (sync.lr?.[synced_field] && +sync.lr[synced_field] > +lastRow[synced_field]) {
-        console.error(
-          {
-            syncIssue: "sync.lr[synced_field] is greater than lastRow[synced_field]",
-          },
-          sync.table_name,
-        );
+        return;
       }
       sync.lr = lastRow;
     },

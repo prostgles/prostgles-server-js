@@ -16,7 +16,7 @@ import type { TableConfig } from "./TableConfig/TableConfigTypes";
 import type { TableHooks } from "./TableHooks/TableHooks";
 import type { ResolvedAuditConfig, SchemaConfigAudit } from "./Audit/AuditTypes";
 
-import type { PRGLIOSocket } from "./DboBuilder/DboBuilder";
+import type { ClientSocketWithCachedData } from "./DboBuilder/DboBuilder";
 
 import type e from "express";
 import type pgPromise from "pg-promise";
@@ -248,14 +248,14 @@ export type ProstglesInitOptions<
    * Use for connection verification. Will disconnect socket on any errors
    */
   onSocketConnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
+    args: AuthRequestParams<S, SUser> & { socket: ClientSocketWithCachedData },
   ) => void | Promise<void>;
 
   /**
    * Called when a socket disconnects
    */
   onSocketDisconnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: PRGLIOSocket },
+    args: AuthRequestParams<S, SUser> & { socket: ClientSocketWithCachedData },
   ) => void | Promise<void>;
 
   /**

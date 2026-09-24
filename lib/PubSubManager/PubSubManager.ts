@@ -7,7 +7,7 @@ import type {
   DBHandlerServer,
   DboBuilder,
   LocalParams,
-  PRGLIOSocket,
+  ClientSocketWithCachedData,
 } from "../DboBuilder/DboBuilder";
 import type { PostgresNotifListenManager } from "../PostgresNotifListenManager";
 import type { DB } from "../Prostgles";
@@ -60,12 +60,13 @@ export type SyncParams = {
   throttle?: number;
   lr?: AnyObject;
   is_syncing: boolean;
+  syncQueue?: Promise<void>;
   handlers: ReturnType<(typeof ReplicationProtocol)["getServerHandlers"]>;
   localParams: LocalParams;
 };
 
 export type AddSyncParams = SyncTableInfo & {
-  socket: PRGLIOSocket;
+  socket: ClientSocketWithCachedData;
   table_info: TableSchema;
   table_rules: ParsedTableRule;
   allow_delete?: boolean;
@@ -120,7 +121,7 @@ export type SubscriptionParams = {
   subscribeOptions: SubscribeOptions;
 
   onData?: OnData;
-  socket: PRGLIOSocket | undefined;
+  socket: ClientSocketWithCachedData | undefined;
   localParams?: LocalParams;
 
   lastPushed: number;
@@ -196,7 +197,7 @@ export class PubSubManager {
    * Updated through refreshTriggers()
    */
   _triggers: PubSubManagerTriggers = new Map();
-  sockets: Map<string, PRGLIOSocket> = new Map();
+  sockets: Map<string, ClientSocketWithCachedData> = new Map();
 
   subs: Subscription[] = [];
   syncs: SyncParams[] = [];
@@ -266,7 +267,7 @@ export class PubSubManager {
 
   removeSubscription = (
     channelName: string,
-    subInfo: { type: "local"; onData: OnData } | { type: "ws"; socket: PRGLIOSocket },
+    subInfo: { type: "local"; onData: OnData } | { type: "ws"; socket: ClientSocketWithCachedData },
   ) => {
     const matchingSubIdx = this.subs.findIndex(
       (s) =>
@@ -364,7 +365,7 @@ export class PubSubManager {
 
   pushSubData = pushSubData.bind(this);
 
-  upsertSocket(socket: PRGLIOSocket | undefined) {
+  upsertSocket(socket: ClientSocketWithCachedData | undefined) {
     if (socket && !this.sockets.get(socket.id)) {
       this.sockets.set(socket.id, socket);
       socket.on("disconnect", () => {

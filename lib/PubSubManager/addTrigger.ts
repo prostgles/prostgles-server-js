@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 import { asName, pickKeys, tryCatchV2 } from "prostgles-types";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { ViewSubscriptionOptions } from "./PubSubManager";
 import { type PubSubManager } from "./PubSubManager";
@@ -16,7 +16,7 @@ export async function addTrigger(
   this: PubSubManager,
   params: AddTriggerParams,
   viewOptions: ViewSubscriptionOptions | undefined,
-  socket: PRGLIOSocket | undefined,
+  socket: ClientSocketWithCachedData | undefined,
 ) {
   const addedTrigger = await tryCatchV2(async () => {
     const { table_name } = { ...params };

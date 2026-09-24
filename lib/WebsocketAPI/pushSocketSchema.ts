@@ -1,9 +1,9 @@
 import { CHANNELS, getSerialisableError, type SQLRequest } from "prostgles-types";
-import type { PRGLIOSocket } from "../DboBuilder/DboBuilderTypes";
+import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import type { Prostgles } from "../Prostgles";
 import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
-export async function pushSocketSchema(this: Prostgles, socket: PRGLIOSocket) {
+export async function pushSocketSchema(this: Prostgles, socket: ClientSocketWithCachedData) {
   const isDestroyed = () => this.destroyed;
   if (isDestroyed()) return;
   try {

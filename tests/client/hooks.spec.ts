@@ -7,7 +7,7 @@ import { renderReactHook, renderReactHookManual } from "./renderReactHook";
 
 export const clientHooks = async (
   db: DBHandlerClient,
-  reconnectSocket: () => Promise<void>,
+  reconnectSocket: (reattachOnly?: boolean) => Promise<void>,
 ) => {
   let reconnectTestError: unknown;
   const resultLoading = { data: undefined, isLoading: true, error: undefined };
@@ -320,7 +320,7 @@ export const clientHooks = async (
       }
     });
 
-    await test("useSync receives inserts after a socket reconnect", async () => {
+    await test("concurrent useSync hooks receive inserts after reattachment and reconnect", async () => {
       const y = 999_999;
       const filter = { y };
       const options = { handlesOnData: false } as const;
@@ -329,41 +329,47 @@ export const clientHooks = async (
           { id: number; x: number; y: number },
           { handlesOnData: false }
         >(filter, options);
+      const usePlanes = () => [usePlane(), usePlane()];
 
       await db.planes.delete!(filter);
-      await db.planes.insert!({ id: 999_998, x: 101, y });
+      // Exceed the default 50-row snapshot and give the cursor distinct timestamps.
+      const start = Date.now() - 1000;
+      await db.planes.insert!(
+        Array.from({ length: 101 }, (_, index) => ({
+          id: 999_000 + index,
+          x: 1 + index,
+          y,
+          last_updated: start + index,
+        })),
+      );
 
-      const beforeReconnect = await renderReactHookManual({
-        hook: usePlane,
+      const rendered = await renderReactHookManual({
+        hook: usePlanes,
         initialProps: [],
       });
 
       try {
-        await waitFor(() =>
-          beforeReconnect.getResults().at(-1)?.data?.some(({ x }) => x === 101),
-        );
-        beforeReconnect.unmount();
+        const allSyncsHaveX = (x: number, count: number) =>
+          rendered
+            .getResults()
+            .at(-1)
+            ?.every(({ data }) =>
+              data?.length === count && data.some((plane) => plane.x === x),
+            );
+        await waitFor(() => Boolean(allSyncsHaveX(101, 101)));
+
+        await reconnectSocket(true);
+        await db.planes.insert!({ id: 999_999, x: 102, y });
+        await waitFor(() => Boolean(allSyncsHaveX(102, 102)));
 
         await reconnectSocket();
-        await db.planes.insert!({ id: 999_999, x: 102, y });
-
-        const afterReconnect = await renderReactHookManual({
-          hook: usePlane,
-          initialProps: [],
-        });
-        try {
-          await waitFor(
-            () => afterReconnect.getResults().at(-1)?.data?.some(({ x }) => x === 102),
-          );
-        } finally {
-          afterReconnect.unmount();
-        }
+        await db.planes.insert!({ id: 1_000_000, x: 103, y });
+        await waitFor(() => Boolean(allSyncsHaveX(103, 103)));
       } catch (error) {
         reconnectTestError = error;
         throw error;
       } finally {
-        beforeReconnect.unmount();
-        await db.planes.delete!(filter);
+        rendered.unmount();
       }
     });
   });
