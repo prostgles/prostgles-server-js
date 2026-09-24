@@ -148,7 +148,11 @@ export const getConstraints = async (
   );
 };
 
-export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): string[] => {
+export const prepareOrderByQuery = (
+  items: SortItem[],
+  tableAlias?: string,
+  getExpression?: (key: string) => string | undefined,
+): string[] => {
   if (!items.length) return [];
   return [
     "ORDER BY " +
@@ -159,7 +163,8 @@ export const prepareOrderByQuery = (items: SortItem[], tableAlias?: string): str
           if (d.type === "query" && d.nested) {
             return d.fieldQuery;
           }
-          return `${asNameAlias(d.key, tableAlias)} ${orderType} ${nullOrder}`;
+          const expression = getExpression?.(d.key) ?? asNameAlias(d.key, tableAlias);
+          return `${expression} ${orderType} ${nullOrder}`;
         })
         .join(", "),
   ];

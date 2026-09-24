@@ -2202,14 +2202,16 @@ export const isomorphicQueries = async (
     });
 
     await test("Nested sort by computed col", async () => {
-      const getSorted = (asc = false, badKey = false) =>
+      const getSorted = (asc = false, badKey = false, limited = false) =>
         db.tr1.find!(
           {},
           {
             select: {
               "*": 1,
               tr2: {
-                maxId: { $max: ["id"] },
+                $leftJoin: "tr2",
+                select: { maxId: { $max: ["id"] } },
+                ...(limited && { limit: 1, orderBy: [{ key: "maxId", asc, nulls: "last" }] }),
               },
             },
             orderBy: {
@@ -2226,6 +2228,8 @@ export const isomorphicQueries = async (
           .reverse(),
         sortedDesc.map((d) => d.tr2[0].maxId),
       );
+      assert.deepStrictEqual(await getSorted(true, false, true), sortedAsc);
+      assert.deepStrictEqual(await getSorted(false, false, true), sortedDesc);
       const sortedDescBad = await getSorted(false, true).catch((e) => e);
       assert.equal(
         sortedDescBad.message,

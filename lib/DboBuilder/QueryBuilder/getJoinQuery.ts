@@ -94,7 +94,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
       paths.length === 1 ? targetTableAliasRaw : undefined,
     ).rawAlias,
     _joinFields: firstJoinTableJoinFields,
-    jsonAggSort,
   });
 
   const joinType = q2.isLeftJoin ? "LEFT" : "INNER";
@@ -286,7 +285,6 @@ type GetSelectFieldsArgs = {
   q: NewQueryJoin;
   firstJoinTableAlias: string;
   _joinFields: string[];
-  jsonAggSort: string;
 };
 
 export type SelectItemNested = SelectItemValidated & {
@@ -297,7 +295,6 @@ const getNestedSelectFields = ({
   q,
   firstJoinTableAlias,
   _joinFields,
-  jsonAggSort,
 }: GetSelectFieldsArgs) => {
   const targetTableAlias = q.tableAlias || q.table;
 
@@ -325,7 +322,11 @@ const getNestedSelectFields = ({
 
   const getQuery = (tableAlias?: string) => {
     const partitionBy = `PARTITION BY ${requiredJoinFields.map((f) => asNameAlias(f, tableAlias)).join(", ")}`;
-    return `ROW_NUMBER() OVER(${partitionBy} ${jsonAggSort}) AS ${NESTED_ROWID_FIELD_NAME}`;
+    // Output aliases are not available inside a window expression in this SELECT.
+    const orderBy = prepareOrderByQuery(q.orderByItems, targetTableAlias.raw, (key) =>
+      selectedFields.find((field) => field.alias === key)?.getQuery(targetTableAlias.raw),
+    ).join(", ");
+    return `ROW_NUMBER() OVER(${partitionBy} ${orderBy}) AS ${NESTED_ROWID_FIELD_NAME}`;
   };
 
   if (q.limit) {

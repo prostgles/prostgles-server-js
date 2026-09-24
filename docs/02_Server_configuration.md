@@ -90,11 +90,11 @@
      throw new Error("rollback");
    })
   ```
-- **onSocketConnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
+- **onSocketConnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: ClientSocketWithCachedData; }) =&gt; void | Promise&lt;void&gt;</span>
 
   Called when a socket connects
   Use for connection verification. Will disconnect socket on any errors
-- **onSocketDisconnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: PRGLIOSocket; }) =&gt; void | Promise&lt;void&gt;</span>
+- **onSocketDisconnect** <span style="color: grey">optional</span> <span style="color: green;">(args: AuthRequestParams&lt;S, SUser&gt; & { socket: ClientSocketWithCachedData; }) =&gt; void | Promise&lt;void&gt;</span>
 
   Called when a socket disconnects
 - **auth** <span style="color: grey">optional</span> <span style="color: green;">AuthConfig</span>
