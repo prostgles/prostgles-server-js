@@ -18,7 +18,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
-    await testSchemaTypes(db);
+    await testSchemaTypes(db, pgDb);
     await testClientSchemaTypes(pgDb);
     await testFileStorage(db, pgDb);
     await testJoins(pgDb);

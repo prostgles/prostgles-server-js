@@ -3,9 +3,133 @@ import { strict as assert } from "node:assert";
 import { getDBGeneratedSchema } from "prostgles-server/dist/DBSchemaBuilder/getDBGeneratedSchema";
 import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfigTypes";
 import type { DBHandlerServer } from "prostgles-server";
+import type { DB } from "prostgles-server/dist/Prostgles";
+import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableConfig/TableRowFromColumnDefinitions";
 import { testTableConfig } from "./testTableConfig";
 
-export const testSchemaTypes = async (db: DBHandlerServer) => {
+export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
+  await test("column definition row types support SQL aliases, arrays and generated columns", async () => {
+    const columns = {
+      int: "INT NOT NULL",
+      int2: "int2 not null",
+      int4: "  InT4\tNoT\nNuLl  ",
+      int8: "INT8 NOT NULL",
+      smallint: "SMALLINT NOT NULL",
+      integer: "INTEGER NOT NULL",
+      bigint: "BIGINT NOT NULL",
+      real: "REAL NOT NULL",
+      float: "FLOAT(24) NOT NULL",
+      float4: "FLOAT4 NOT NULL",
+      float8: "FLOAT8 NOT NULL",
+      double: "DOUBLE  PRECISION NOT NULL",
+      numeric: "NUMERIC(8, 2) NOT NULL",
+      decimal: "DECIMAL NOT NULL",
+      dec: "DEC NOT NULL",
+      bool: "bool not null",
+      boolean: "BOOLEAN NOT NULL",
+      json: "JSON NOT NULL",
+      jsonb: "JSONB NOT NULL",
+      bytes: "bytea not null",
+      ints: "INT[] NOT NULL",
+      matrix: "INTEGER[2][2] NOT NULL",
+      bools: "BOOLEAN ARRAY NOT NULL",
+      decimals: "NUMERIC(8, 2) ARRAY[2] NOT NULL",
+      words: "VARCHAR(20)[] NOT NULL",
+      nullable: "INT",
+      smallserial: "smallserial",
+      serial2: "SERIAL2",
+      serial: "serial",
+      serial4: "SERIAL4",
+      bigserial: "BIGSERIAL",
+      serial8: "SERIAL8",
+      identity: "int generated always as identity primary key",
+      generated: "int generated always as (int + 1) stored",
+      defaulted: "int default 42",
+      quoted: "text check (quoted <> 'DEFAULT SERIAL NOT NULL')",
+    } as const;
+    type Row = TableRowFromColumnDefinitions<typeof columns>;
+    const row: Row = {
+      int: 1,
+      int2: 2,
+      int4: 4,
+      int8: 8,
+      smallint: 2,
+      integer: 4,
+      bigint: 8,
+      real: 1.5,
+      float: 1.5,
+      float4: 1.5,
+      float8: 1.5,
+      double: 1.5,
+      numeric: 1.25,
+      decimal: 1.25,
+      dec: 1.25,
+      bool: true,
+      boolean: false,
+      json: { a: 1 },
+      jsonb: { b: 2 },
+      bytes: Buffer.from("hello"),
+      ints: [1, null, 3],
+      matrix: [
+        [1, 2],
+        [3, 4],
+      ],
+      bools: [true, false],
+      decimals: [1.25, null],
+      words: ["a", "b"],
+      nullable: null,
+      quoted: "ok",
+    };
+    // @ts-expect-error INT columns must reject strings.
+    const invalidInt: Row["int"] = "1";
+    // @ts-expect-error BOOL columns must reject strings.
+    const invalidBool: Row["bool"] = "true";
+    // @ts-expect-error Array columns must reject scalars.
+    const invalidArray: Row["ints"] = 1;
+    // @ts-expect-error Quoted keywords must not make a column optional.
+    const missingQuoted: Pick<Row, "quoted"> = {};
+    const serial8: Row["serial8"] = "1";
+    const customType: TableRowFromColumnDefinitions<{ value: "integer_custom NOT NULL" }> = {
+      value: "text",
+    };
+    const interval: TableRowFromColumnDefinitions<{ value: "INTERVAL NOT NULL" }> = {
+      value: "1 day",
+    };
+    void [invalidInt, invalidBool, invalidArray, missingQuoted, serial8, customType, interval];
+
+    await pgDb.tx(async (tx) => {
+      await tx.none(`CREATE TEMP TABLE column_definition_types (
+        ${Object.entries(columns)
+          .map(([name, definition]) => `"${name}" ${definition}`)
+          .join(",\n")}
+      ) ON COMMIT DROP`);
+      const keys = Object.keys(row);
+      const result = await tx.one(
+        `INSERT INTO column_definition_types (
+        ${keys.map((key) => `"${key}"`).join(", ")}
+      ) VALUES (${keys.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+        Object.values(row),
+      );
+      assert.deepEqual(result, {
+        ...row,
+        int8: "8",
+        bigint: "8",
+        numeric: "1.25",
+        decimal: "1.25",
+        dec: "1.25",
+        smallserial: 1,
+        serial2: 1,
+        serial: 1,
+        serial4: 1,
+        bigserial: "1",
+        serial8: "1",
+        identity: 1,
+        generated: 2,
+        defaulted: 42,
+      });
+    });
+  });
+
   await test("lookup types propagate through database references while preserving overrides", () => {
     const tablesOrViews = db.uuid_text.dboBuilder.getSchema();
     const lookupType = 'null | "a" | "b"';
