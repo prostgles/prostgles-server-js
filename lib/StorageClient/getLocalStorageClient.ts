@@ -23,7 +23,7 @@ export type LocalConfig = {
   minFreeBytes?: number;
 };
 
-export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageClient => {
+export const getLocalStorageClient = (localConfig: LocalConfig) => {
   const { localFolderPath, minFreeBytes = 100 * 1024 * 1024 } = localConfig; // Default 100MB
 
   // Helper to ensure we have enough free disk space (Requires Node >= 18.17.0)
@@ -103,5 +103,5 @@ export const getLocalStorageClient = (localConfig: LocalConfig): LocalStorageCli
         }
       }
     },
-  };
+  } satisfies LocalStorageClient;
 };
