@@ -79,6 +79,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           ["user-guest", { id: "user-guest", type: "guest" }],
           ["user-admin", { id: "user-admin", type: "admin" }],
         ]);
+        let networkAuthCalls = 0;
         instance = await prostgles({
           dbConnection: {
             ...getConnectionDetails(db),
@@ -104,7 +105,13 @@ export const testClientSchemaTypes = async (db: DB) => {
           publishRawSQL: ({ user }) => user?.type === "admin",
           auth: {
             sidKeyName: "token",
-            getUser: (sid) => {
+            onUseOrSocketConnected: (_sid, _client, reqInfo) => {
+              networkAuthCalls++;
+              assert(reqInfo.socket ? reqInfo.socket.handshake : reqInfo.httpReq.headers);
+            },
+            getUser: (sid, _dbo, _db, _client, reqInfo) => {
+              networkAuthCalls++;
+              assert(reqInfo.socket ? reqInfo.socket.handshake : reqInfo.httpReq.headers);
               if (!sid) return undefined;
               return {
                 user: { id: `user-${sid}`, type: sid },
@@ -380,6 +387,8 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
         await t.test("server user handlers enforce permissions and reject client impersonation", async () => {
           assert(instance);
+          assert(networkAuthCalls > 0);
+          const networkAuthCallsBefore = networkAuthCalls;
           const admin = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
           assert.equal(typeof admin.clientDb[privateTableName]!.find, "function");
           assert.deepEqual(await admin.clientDb[privateTableName]!.find!(), []);
@@ -402,6 +411,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           assert.equal("insert" in scoped.clientDb[tableName]!, false);
           assert.equal(await scoped.withClientDbTx((tx) => tx[tableName]!.count!()), 1);
           assert.throws(() => scoped.clientSql("SELECT 1"), /PermissionScope/);
+          assert.equal(networkAuthCalls, networkAuthCallsBefore);
 
           for (const userId of ["missing", "", undefined, 1, { $ne: null }]) {
             await assert.rejects(async () =>

@@ -60,7 +60,8 @@ type HttpClientRequest = {
   res: ExpressRes;
   socket?: undefined;
 };
-export type AuthClientRequest = SocketClientRequest | HttpClientRequest | ServerSideRequest;
+export type NetworkClientRequest = SocketClientRequest | HttpClientRequest;
+export type AuthClientRequest = NetworkClientRequest | ServerSideRequest;
 
 export type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
@@ -296,18 +297,19 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   sidKeyName?: string;
 
   /**
-   * Awaited before any auth actions.
+   * Awaited before HTTP/socket auth actions.
    * If session is returned then will set cookie and redirect
    * Failure will stop the auth process
    */
   onUseOrSocketConnected?: (
     sid: string | undefined,
     client: LoginClientInfo,
-    reqInfo: AuthClientRequest,
+    reqInfo: NetworkClientRequest,
   ) => Awaitable<void | { error: string; httpCode: 400 | 401 | 403 } | { session: BasicSession }>;
 
   /**
    * Required to allow self-managed or managed (by setting up loginSignupConfig) authentication.
+   * HTTP/socket requests only; server-side userId requests use findUser.
    * Used in:
    * - publish - userData and/or sid (in testing) are passed to the publish function
    * - auth.expressConfig.use - express middleware to get user data and
@@ -319,11 +321,11 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
     dbo: DBOFullyTyped<S>,
     db: DB,
     client: LoginClientInfo,
-    reqInfo: AuthClientRequest,
+    reqInfo: NetworkClientRequest,
   ) => Awaitable<AuthResultOrError<SUser>>;
 
   /**
-   * Used in functions
+   * Used in functions and server-side userId requests.
    */
   findUser: (
     userFilter: FullFilter<void, void>,
