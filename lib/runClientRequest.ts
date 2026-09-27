@@ -15,6 +15,7 @@ import { canRunSQL } from "./DboBuilder/runSql/runSQL";
 import type { Prostgles } from "./Prostgles";
 import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
+import { getAbortSignalKeys } from "./DboBuilder/ViewHandler/getDbHandlerWithAbort";
 
 const TABLE_METHODS = {
   find: 1,
@@ -104,9 +105,12 @@ export const runClientRequest = async function (
     );
   }
 
-  const tableHandler = transactionHandlers ?
-    (Object.hasOwn(transactionHandlers, tableName) ? transactionHandlers[tableName] : undefined)
-  : this.dboBuilder.dboMap.get(tableName);
+  const tableHandler =
+    transactionHandlers ?
+      Object.hasOwn(transactionHandlers, tableName) ?
+        transactionHandlers[tableName]
+      : undefined
+    : this.dboBuilder.dboMap.get(tableName);
   if (!tableHandler) {
     throw `tableName ${tableName} is invalid or not allowed`;
   }
@@ -123,7 +127,7 @@ export const runClientRequest = async function (
     scope,
   });
 
-  const sessionUser = getSessionUser(clientInfo);
+  const sessionUser = getSessionUser(clientInfo, this.opts.auth?.sessionFields);
   const localParams: LocalParams = {
     clientReq,
     isRemoteRequest: { user: sessionUser, clientInfo },
@@ -155,7 +159,6 @@ export const runClientRequest = async function (
       scope,
     );
 
-    tableHandler.abortRequests.add(validation.data.param1.abortSignalId);
     return tableHandler.abortRemoteQuery(validation.data.param1.abortSignalId, localParams);
   } else {
     this.publishParser.validateRequestRule(

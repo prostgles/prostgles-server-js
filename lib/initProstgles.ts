@@ -19,6 +19,17 @@ import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfigur
 import { sleep } from "./utils/utils";
 import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
 import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
+import { createServerSideRequest } from "./Auth/utils/serverSideRequest";
+
+type ClientDBHandlerRequest =
+  | AuthClientRequest
+  | {
+      /** Trusted server-only identity, resolved through auth.findUser on every operation. */
+      userId: string;
+      socket?: never;
+      httpReq?: never;
+      res?: never;
+    };
 
 /**
  * Database connection details
@@ -125,9 +136,12 @@ export type InitResult<
   update: (newOpts: UpdatableOptions<S, SUser, Context>, force?: true) => Promise<void>;
   restart: () => Promise<InitResult<S, SUser, Context, ClientSchema>>;
   options: ProstglesInitOptions<S, SUser, Context>;
-  /** Uses the configured client schema by default and accepts a publish-profile schema override. */
+  /**
+   * Uses the configured client schema by default and accepts a publish-profile schema override.
+   * Only pass userId from trusted server code; never forward client-supplied input here.
+   */
   getClientDBHandlers: <NarrowedClientSchema = ClientSchema>(
-    clientReq: AuthClientRequest,
+    clientReq: ClientDBHandlerRequest,
     scope: PermissionScope | undefined,
   ) => ReturnType<typeof getClientHandlers<NarrowedClientSchema>>;
 
@@ -333,10 +347,22 @@ export const initProstgles = async function (
         await sleep(1000);
         return true;
       },
-      getClientDBHandlers: <ClientSchema = void>(
-        clientReq: AuthClientRequest,
+      getClientDBHandlers: async <ClientSchema = void>(
+        clientReq: ClientDBHandlerRequest,
         scope: PermissionScope | undefined,
-      ) => getClientHandlers<ClientSchema>(this, clientReq, scope),
+      ) => {
+        if ("userId" in clientReq) {
+          if ("socket" in clientReq || "httpReq" in clientReq || "res" in clientReq) {
+            throw new Error("userId cannot be combined with a client request");
+          }
+          return getClientHandlers<ClientSchema>(
+            this,
+            createServerSideRequest(this, clientReq.userId),
+            scope,
+          );
+        }
+        return getClientHandlers<ClientSchema>(this, clientReq, scope);
+      },
     };
 
     return initResult;

@@ -2,12 +2,16 @@ import type { DB } from "../../initProstgles";
 import { QUERY_ID_PREFIX, type LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
 import type pgPromise from "pg-promise";
+import { getServerSideUserId } from "../../Auth/utils/serverSideRequest";
+import type { Prostgles } from "../../Prostgles";
 
-export function getDbHandlerWithAbort(
-  this: ViewHandler,
+type Params = { abortSignal: AbortSignal | undefined; abortSignalId: string | undefined };
+
+export const getDbHandlerWithAbort = (
+  viewHandler: ViewHandler,
   localParams: LocalParams | undefined,
-  params: { abortSignal: AbortSignal | undefined; abortSignalId: string | undefined },
-): Pick<DB | pgPromise.ITask<{}>, "any" | "one" | "many" | "manyOrNone" | "none" | "oneOrNone"> {
+  params: Params,
+): Pick<DB | pgPromise.ITask<{}>, "any" | "one" | "many" | "manyOrNone" | "none" | "oneOrNone"> => {
   if (params.abortSignal && params.abortSignalId) {
     throw new Error("Cannot provide both abortSignal and abortSignalId");
   }
@@ -16,28 +20,29 @@ export function getDbHandlerWithAbort(
     throw new Error("Query aborted before execution");
   }
 
-  const abortSignal =
-    params.abortSignal ?? AbortSignal.timeout(localParams?.clientReq ? 7_000 : 120_000);
-  const abortSignalId = params.abortSignalId ?? crypto.randomUUID();
-
-  if (this.activeQueries.has(abortSignalId)) {
-    throw new Error(
-      `A query with abortSignalId ${params.abortSignalId} is already active. Ensure that each query has a unique abortSignalId.`,
-    );
+  if (params.abortSignal !== undefined && !(params.abortSignal instanceof AbortSignal)) {
+    throw new Error("abortSignal must be an instance of AbortSignal");
   }
-  const handler = this.getTransaction(localParams)?.t ?? this.db;
-  const { adminClient } = this.dboBuilder.prostgles;
+
+  const { clientReq } = localParams ?? {};
+  const abortSignal = params.abortSignal ?? AbortSignal.timeout(clientReq ? 7_000 : 120_000);
+  const { prostgles } = viewHandler.dboBuilder;
+  const handler = viewHandler.getTransaction(localParams)?.t ?? viewHandler.db;
+  const { adminClient } = prostgles;
   if (!adminClient) {
     throw new Error(
       "adminClient not available. Ensure prostgles.adminClient is initialized before using abortable queries.",
     );
   }
-  const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError(localParams?.clientReq);
-  if (!sid && localParams?.clientReq) {
+
+  const signalKeys = getAbortSignalKeys(prostgles, params, localParams);
+  const { abortSignalKey } = signalKeys;
+  if (viewHandler.activeQueries.has(abortSignalKey)) {
     throw new Error(
-      "Cannot get SID from client request. Ensure that the client is authenticated before using abortable queries.",
+      `A query with abortSignalId ${params.abortSignalId} is already active. Ensure that each query has a unique abortSignalId.`,
     );
   }
+
   const withAbortQuery = <Args extends unknown[], R extends Promise<any>>(
     func: (query: string, ...args: Args) => R,
   ) => {
@@ -52,16 +57,17 @@ export function getDbHandlerWithAbort(
       }
 
       const abort = () => {
-        void this._log({
-          data: { query, abortSignalId },
+        void viewHandler._log({
+          data: { query, abortSignalId: signalKeys.abortSignalId },
           command: "abort",
           localParams,
-          duration: Date.now() - (this.activeQueries.get(abortSignalId)?.start ?? Date.now()),
+          duration:
+            Date.now() - (viewHandler.activeQueries.get(abortSignalKey)?.start ?? Date.now()),
           error: new Error("Query aborted"),
         });
         /** Only terminate if there is exactly one matching query with a query id prefix */
 
-        this.abortRequests.delete(abortSignalId);
+        viewHandler.abortRequests.delete(abortSignalKey);
         void adminClient
           .query(
             `
@@ -71,17 +77,18 @@ export function getDbHandlerWithAbort(
             `,
             [`${queryIdPrefix}%`],
           )
-          .catch((err) => {
+          .catch((_err) => {
             // ignore error
           });
       };
 
-      if (this.abortRequests.has(abortSignalId)) {
-        this.abortRequests.delete(abortSignalId);
-        throw new Error(`Abort requested`);
+      if (viewHandler.abortRequests.has(abortSignalKey)) {
+        viewHandler.abortRequests.delete(abortSignalKey);
+        throw new Error("Abort already requested");
       }
 
-      this.activeQueries.set(abortSignalId, {
+      const sid = prostgles.authHandler.getSIDNoError(clientReq);
+      viewHandler.activeQueries.set(abortSignalKey, {
         query,
         start: Date.now(),
         sid,
@@ -91,8 +98,8 @@ export function getDbHandlerWithAbort(
       abortSignal.addEventListener("abort", abort);
       return func(query, ...args).finally(() => {
         abortSignal.removeEventListener("abort", abort);
-        this.activeQueries.delete(abortSignalId);
-        this.abortRequests.delete(abortSignalId);
+        viewHandler.activeQueries.delete(abortSignalKey);
+        viewHandler.abortRequests.delete(abortSignalKey);
       });
     };
   };
@@ -105,4 +112,40 @@ export function getDbHandlerWithAbort(
     none: withAbortQuery(handler.none.bind(handler)),
     many: withAbortQuery(handler.many.bind(handler)),
   };
-}
+};
+
+export const getAbortSignalKeys = (
+  prostgles: Prostgles,
+  params: Pick<Params, "abortSignalId">,
+  localParams: LocalParams | undefined,
+) => {
+  const clientIdentifier = (() => {
+    const { clientReq } = localParams ?? {};
+    if (!clientReq) {
+      if (params.abortSignalId !== undefined) {
+        throw new Error(
+          "abortSignalId must not be provided for local requests. Use abortSignal instead.",
+        );
+      }
+      return ["<local-request>", "local"];
+    }
+    const sid = prostgles.authHandler.getSIDNoError(clientReq);
+    if (sid) return [sid, "sid"];
+    const userId = getServerSideUserId(prostgles, clientReq);
+    if (userId) return [userId, "userId"];
+    throw new Error(
+      "Cannot get SID or userId from client request. Ensure that the client is authenticated before using abortable queries.",
+    );
+  })();
+  const abortSignalId = params.abortSignalId ?? crypto.randomUUID();
+
+  const MAX_LENGTH = 36;
+  if (abortSignalId.length > MAX_LENGTH) {
+    throw new Error(`abortSignalId length must not exceed ${MAX_LENGTH} characters`);
+  }
+  const abortSignalKey = JSON.stringify([...clientIdentifier, abortSignalId]);
+  return {
+    abortSignalId,
+    abortSignalKey,
+  };
+};

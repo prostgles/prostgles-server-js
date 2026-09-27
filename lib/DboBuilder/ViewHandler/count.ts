@@ -9,6 +9,7 @@ import {
 import type { ViewHandler } from "./ViewHandler";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import type { Param3 } from "./find";
+import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 
 export async function count(
   this: ViewHandler,
@@ -59,7 +60,7 @@ export async function count(
         return queryToReturn as unknown[];
       }
 
-      const handler = this.getDbHandlerWithAbort(localParams, {
+      const handler = getDbHandlerWithAbort(this, localParams, {
         abortSignal: selectParams?.abortSignal,
         abortSignalId: param3?.abortSignalId,
       });

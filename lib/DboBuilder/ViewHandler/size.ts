@@ -9,6 +9,7 @@ import {
 import type { ViewHandler } from "./ViewHandler";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import type { Param3 } from "./find";
+import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 export async function size(
   this: ViewHandler,
   _filter?: Filter,
@@ -62,7 +63,7 @@ export async function size(
         return queryToReturn as unknown[];
       }
 
-      const handler = this.getDbHandlerWithAbort(localParams, {
+      const handler = getDbHandlerWithAbort(this, localParams, {
         abortSignal: selectParams?.abortSignal,
         abortSignalId: param3?.abortSignalId,
       });

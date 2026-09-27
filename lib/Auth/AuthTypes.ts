@@ -29,6 +29,7 @@ import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
 import { GET_AUTH_ROUTE } from "./AuthHandler";
+import type { ServerSideRequest } from "./utils/serverSideRequest";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -59,7 +60,7 @@ type HttpClientRequest = {
   res: ExpressRes;
   socket?: undefined;
 };
-export type AuthClientRequest = SocketClientRequest | HttpClientRequest;
+export type AuthClientRequest = SocketClientRequest | HttpClientRequest | ServerSideRequest;
 
 export type ThirdPartyProviders = {
   facebook?: Pick<FacebookStrategy, "clientID" | "clientSecret"> & {
@@ -245,10 +246,6 @@ export type SessionUser<
   isAnonymous?: boolean;
 
   /**
-   * Controls which fields from user are available in postgres session variable
-   */
-  sessionFields?: FieldFilter<ServerUser>;
-  /**
    * User data sent to the authenticated client
    */
   clientUser: ClientUser;
@@ -258,7 +255,7 @@ type AllNeverAndOptional<T> = {
   [P in keyof T]?: never;
 };
 export type AuthResultWithSID<SU = SessionUser> =
-  | (SU & { sid: string; error?: undefined; preferredLogin?: undefined })
+  | (SU & { sid: string | undefined; error?: undefined; preferredLogin?: undefined })
   | (AllNeverAndOptional<SU> & {
       sid: string | undefined;
       error?: AuthResponse.AuthFailure;
@@ -332,6 +329,12 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
     userFilter: FullFilter<void, void>,
     dbo: DBOFullyTyped<S>,
   ) => Awaitable<SUser["user"] | undefined>;
+
+  /**
+   * Controls which fields from user are available in postgres session variable.
+   * "id" and "type" are always included.
+   */
+  sessionFields?: FieldFilter<SUser["user"]>;
 
   /**
    * Will setup auth routes

@@ -14,6 +14,7 @@ import prostgles, {
   type PublishContextValue,
 } from "prostgles-server";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
+import type { ViewHandler } from "prostgles-server/dist/DboBuilder/ViewHandler/ViewHandler";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import { CHANNELS, type AnyObject, type ClientSchema } from "prostgles-types";
 import { Server } from "socket.io";
@@ -25,7 +26,15 @@ export const testClientSchemaTypes = async (db: DB) => {
     "client publish profiles compile at startup and follow user types",
     { timeout: 30000 },
     async (t) => {
-      const http = createServer();
+      const app = express();
+      app.use(express.json());
+      app.use((req, _res, next) => {
+        req.cookies = Object.fromEntries(
+          (req.headers.cookie?.split(";") ?? []).map((cookie) => cookie.trim().split("=")),
+        );
+        next();
+      });
+      const http = createServer(app);
       const io = new Server(http);
       const sockets: Socket[] = [];
       let instance:
@@ -66,6 +75,10 @@ export const testClientSchemaTypes = async (db: DB) => {
         const userIdContextValue = {
           $prostglesContext: { objectName: "user", objectPropertyName: "id" },
         } as const satisfies PublishContextValue<{ user: { id: string } }>;
+        const serverUsers = new Map([
+          ["user-guest", { id: "user-guest", type: "guest" }],
+          ["user-admin", { id: "user-admin", type: "admin" }],
+        ]);
         instance = await prostgles({
           dbConnection: {
             ...getConnectionDetails(db),
@@ -87,6 +100,8 @@ export const testClientSchemaTypes = async (db: DB) => {
             }),
           },
           io,
+          restApi: { expressApp: app, path: "/api" },
+          publishRawSQL: ({ user }) => user?.type === "admin",
           auth: {
             sidKeyName: "token",
             getUser: (sid) => {
@@ -97,7 +112,8 @@ export const testClientSchemaTypes = async (db: DB) => {
               };
             },
             findUser: (filter) =>
-              (
+              "id" in filter && typeof filter.id === "string" ? serverUsers.get(filter.id)
+              : (
                 "$and" in filter &&
                 filter.$and?.every((condition: AnyObject) => condition.id === "user-guest")
               ) ?
@@ -211,8 +227,8 @@ export const testClientSchemaTypes = async (db: DB) => {
         declare const guestClientSchema: ClientSchemaFor<ClientSchemas, "guest">;
         guestClientSchema satisfies GuestDBSchema;
         async () => {
-          const combinedHandlers = await instance.getClientDBHandlers(null as never, undefined);
-          const guestHandlers = await instance.getClientDBHandlers<GuestDBSchema>(null as never, undefined);
+          const combinedHandlers = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+          const guestHandlers = await instance.getClientDBHandlers<GuestDBSchema>({ userId: "user-guest" }, undefined);
           await combinedHandlers.clientDb["${privateTableName}"]?.find();
           // @ts-expect-error the guest profile does not publish private_table
           await guestHandlers.clientDb["${privateTableName}"].find();
@@ -336,7 +352,9 @@ export const testClientSchemaTypes = async (db: DB) => {
           const socket = createClient(`http://127.0.0.1:${address.port}`, {
             transports: ["websocket"],
             reconnection: false,
-            query: role ? { token: role } : {},
+            query: { ...(role ? { token: role } : {}), userId: "user-admin" },
+            auth: { userId: "user-admin" },
+            extraHeaders: { userId: "user-admin", cookie: "userId=user-admin" },
           });
           sockets.push(socket);
           profiles[name] = await new Promise<ClientSchema>((resolve, reject) => {
@@ -360,6 +378,113 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(typeof handlers.clientDb[tableName]!.upsert, "function");
         assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
+        await t.test("server user handlers enforce permissions and reject client impersonation", async () => {
+          assert(instance);
+          const admin = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+          assert.equal(typeof admin.clientDb[privateTableName]!.find, "function");
+          assert.deepEqual(await admin.clientDb[privateTableName]!.find!(), []);
+          assert.equal(await admin.clientSql("SELECT 1", [], { returnType: "value" }), 1);
+          const guest = await instance.getClientDBHandlers({ userId: "user-guest" }, undefined);
+          assert.equal(privateTableName in guest.clientDb, false);
+          const row = await guest.withClientDbTx((tx) =>
+            tx[tableName]!.insert!({ body: "server-user" }, { returning: "*" }),
+          );
+          assert.equal(row.created_by, "user-guest");
+          assert.equal(await guest.clientDb[tableName]!.count!({ id: row.id }), 1);
+          await assert.rejects(guest.clientSql("SELECT 1"));
+          await assert.rejects(() => guest.clientMethods.transactionTest!.run({ fail: true }) as any);
+          assert.equal(await guest.clientDb[tableName]!.count!({ body: "function-rollback" }), 0);
+          const scoped = await instance.getClientDBHandlers(
+            { userId: "user-admin" },
+            { tables: { [tableName]: { select: { forcedFilter: { id: row.id } } } } },
+          );
+          assert.deepEqual(Object.keys(scoped.clientDb), [tableName]);
+          assert.equal("insert" in scoped.clientDb[tableName]!, false);
+          assert.equal(await scoped.withClientDbTx((tx) => tx[tableName]!.count!()), 1);
+          assert.throws(() => scoped.clientSql("SELECT 1"), /PermissionScope/);
+
+          for (const userId of ["missing", "", undefined, 1, { $ne: null }]) {
+            await assert.rejects(async () =>
+              instance!.getClientDBHandlers({ userId: userId as string }, undefined),
+            );
+          }
+          await assert.rejects(async () => instance!.getClientDBHandlers(
+            // @ts-expect-error Explicit identity cannot be combined with a network request.
+            { userId: "user-admin", socket: serverSocket },
+            undefined,
+          ), /userId cannot be combined/);
+
+          const socketError = await new Promise((resolve) => {
+            sockets[0]!.emit(CHANNELS.DEFAULT, {
+              tableName: privateTableName,
+              command: "find",
+              userId: "user-admin",
+              clientReq: { userId: "user-admin" },
+            }, (error: unknown) => resolve(error));
+          });
+          assert(socketError);
+          for (const token of ["guest", undefined]) {
+            const headers = {
+              "content-type": "application/json",
+              userId: "user-admin",
+              cookie: "userId=user-admin",
+              ...(token ? { authorization: `Bearer ${Buffer.from(token).toString("base64")}` } : {}),
+            };
+            const response = await fetch(`http://127.0.0.1:${address.port}/api/schema?userId=user-admin`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ userId: "user-admin", clientReq: { userId: "user-admin" } }),
+            });
+            const schema = await response.json() as ClientSchema;
+            assert.equal(response.status, 200, JSON.stringify(schema));
+            assert.equal(schema.rawSQL, false);
+            assert.equal(schema.tableSchema.some((table) => table.name === privateTableName), false);
+            const denied = await fetch(`http://127.0.0.1:${address.port}/api/db/${privateTableName}/find?userId=user-admin`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify([{}, {}, { userId: "user-admin" }]),
+            });
+            assert.equal(denied.status, 400);
+          }
+
+          serverUsers.set("user-admin", { id: "user-admin", type: "guest" });
+          await assert.rejects(admin.clientDb[privateTableName]!.find!());
+          await assert.rejects(admin.clientSql("SELECT 1"));
+          assert.equal(await admin.clientDb[tableName]!.count!({ id: row.id }), 0);
+          serverUsers.delete("user-admin");
+          await assert.rejects(admin.clientDb[tableName]!.find!(), /User not found/);
+          serverUsers.set("user-admin", { id: "wrong-id", type: "admin" });
+          await assert.rejects(
+            instance.getClientDBHandlers({ userId: "user-admin" }, undefined),
+            /User not found/,
+          );
+          serverUsers.set("user-admin", { id: "user-admin", type: "admin" });
+          await instance.db[tableName]!.delete!({ id: row.id });
+        });
+        await t.test("a rejected guest abort cannot cancel a later server-user query", async () => {
+          assert(instance);
+          const admin = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+          const abortSignalId = randomUUID();
+          // The third wire argument supplies the cancellation ID used by the query handler.
+          const findWithAbort = admin.clientDb[tableName]!.find! as ViewHandler["find"];
+          const find = () => findWithAbort({}, {}, { abortSignalId });
+          await find();
+
+          // No query is active. This guest must not reserve the ID for another caller.
+          const guestSocket = sockets[0]!;
+          const abortError = await new Promise((resolve) => {
+            guestSocket.emit(CHANNELS.DEFAULT, {
+              tableName,
+              command: "abort",
+              param1: { command: "find", abortSignalId },
+            }, (error: unknown) => resolve(error));
+          });
+          assert(abortError, "Aborting a nonexistent query must be rejected");
+          await assert.doesNotReject(
+            find,
+            "A rejected guest abort must not leave a pending cancellation for the admin",
+          );
+        });
         const viewerSocket = io.sockets.sockets.get(sockets[2]!.id!);
         assert(viewerSocket);
         const viewerHandlers = await instance.getClientDBHandlers(
@@ -569,6 +694,16 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         await instance.update({ publish: originalPublish });
         assert.equal((await instance.getTSSchema()).tsSchema, tsSchema);
+        await t.test("server user handlers require configured authentication", async () => {
+          assert(instance);
+          const handlers = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+          await instance.update({ auth: undefined });
+          await assert.rejects(handlers.clientDb[privateTableName]!.find!(), /auth.findUser/);
+          await assert.rejects(
+            instance.getClientDBHandlers({ userId: "user-admin" }, undefined),
+            /auth.findUser/,
+          );
+        });
       } finally {
         sockets.forEach((socket) => socket.disconnect());
         await instance?.destroy();

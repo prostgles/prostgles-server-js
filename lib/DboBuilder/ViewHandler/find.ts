@@ -13,6 +13,7 @@ import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import { validateSelectParams } from "./validateSelectParams";
 import type { ViewHandler } from "./ViewHandler";
+import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
 
 export type Param3 = {
   abortSignalId?: string;
@@ -102,7 +103,7 @@ export const find = async function (
 
     const query = queryWithRLS;
     const isOneOrNone = returnType === "row" || returnType === "value";
-    const dbHandler = this.getDbHandlerWithAbort(localParams, {
+    const dbHandler = getDbHandlerWithAbort(this, localParams, {
       abortSignal,
       abortSignalId: param3?.abortSignalId,
     });

@@ -14,10 +14,9 @@ void describe("getSessionUser", async () => {
         secret: "hidden",
       },
       clientUser: { id: "user-1", type: "admin" },
-      sessionFields: ["tenant_id"],
-    } as AuthResultWithSID;
+    } satisfies AuthResultWithSID;
 
-    assert.deepEqual(getSessionUser(clientInfo), {
+    assert.deepEqual(getSessionUser(clientInfo, ["tenant_id"]), {
       tenant_id: 42,
       id: "user-1",
       type: "admin",
@@ -29,10 +28,9 @@ void describe("getSessionUser", async () => {
       sid: "sid",
       user: { id: "user-1", type: "admin", tenant_id: 42, secret: "hidden" },
       clientUser: { id: "user-1", type: "admin" },
-      sessionFields: { secret: false },
-    } as AuthResultWithSID;
+    } satisfies AuthResultWithSID;
 
-    assert.deepEqual(getSessionUser(clientInfo), {
+    assert.deepEqual(getSessionUser(clientInfo, { secret: false }), {
       id: "user-1",
       type: "admin",
       tenant_id: 42,

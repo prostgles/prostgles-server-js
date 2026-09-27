@@ -25,7 +25,7 @@ import { getColumns } from "../getColumns";
 import type { Graph } from "../joins/shortestPath";
 import { count } from "./count";
 import { find, type Param3 } from "./find";
-import { getDbHandlerWithAbort } from "./getDbHandlerWithAbort";
+import { getAbortSignalKeys } from "./getDbHandlerWithAbort";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
 import { size } from "./size";
@@ -121,20 +121,21 @@ export class ViewHandler {
   };
 
   abortRemoteQuery = (abortSignalId: string, localParams: LocalParams) => {
-    const sid = this.dboBuilder.prostgles.authHandler.getSIDNoError(localParams.clientReq);
-    if (!sid) {
-      throw new Error(
-        "Cannot get SID from client request. Ensure that the client is authenticated before using abortable queries.",
-      );
-    }
-    const abortableQuery = this.activeQueries.get(abortSignalId);
-    if (!abortableQuery || abortableQuery.sid !== sid) {
+    const abortSignalKeys = getAbortSignalKeys(
+      this.dboBuilder.prostgles,
+      { abortSignalId },
+      localParams,
+    );
+
+    const abortableQuery = this.activeQueries.get(abortSignalKeys.abortSignalKey);
+    if (!abortableQuery) {
       throw new Error(
         `No active query found with abortSignalId ${abortSignalId}. Ensure that the query was initiated with the correct abortSignalId.`,
       );
     }
+    this.abortRequests.add(abortSignalKeys.abortSignalKey);
     abortableQuery.abort();
-    this.abortRequests.delete(abortSignalId);
+    this.abortRequests.delete(abortSignalKeys.abortSignalKey);
   };
 
   activeQueries = new Map<
@@ -148,7 +149,6 @@ export class ViewHandler {
     }
   >();
   abortRequests = new Set<string>();
-  getDbHandlerWithAbort = getDbHandlerWithAbort.bind(this);
 
   _log = ({
     command,

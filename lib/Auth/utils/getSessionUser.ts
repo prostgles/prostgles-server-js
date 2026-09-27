@@ -1,16 +1,19 @@
-import { getKeys, pickKeys, type UserLike } from "prostgles-types";
+import { getKeys, pickKeys, type FieldFilter, type UserLike } from "prostgles-types";
 import { parseFieldFilter } from "../../DboBuilder/ViewHandler/parseFieldFilter";
-import type { AuthResultWithSID } from "../AuthTypes";
 
-export const getSessionUser = (clientInfo: AuthResultWithSID | undefined): UserLike | undefined => {
+export const getSessionUser = <U extends UserLike = UserLike>(
+  clientInfo: { user?: U } | undefined,
+  sessionFieldsFilter: undefined | FieldFilter<U>,
+): UserLike | undefined => {
   const user = clientInfo?.user;
   if (!user) return;
 
   const sessionFields = parseFieldFilter(
-    (clientInfo.sessionFields ?? []) as Parameters<typeof parseFieldFilter>[0],
+    //@ts-expect-error
+    sessionFieldsFilter ?? [],
     false,
     getKeys(user),
-  );
+  ) as string[];
 
   return {
     ...pickKeys(user, sessionFields),

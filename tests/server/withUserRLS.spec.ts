@@ -380,13 +380,14 @@ export const testWithUserRLS = async (
   await test(
     "onInsteadOfDelete receives the authenticated or anonymous request context",
     { timeout: 15_000 },
-    async () => {
+    async (t) => {
       const schemaName = `delete_context_${process.pid}_${Date.now()}`;
       const tableName = `${schemaName}.rec`;
       const schema = pgPromise.as.name(schemaName);
       const app = express();
       const http = createServer(app);
-      let instance: Pick<Awaited<ReturnType<typeof prostgles>>, "destroy"> | undefined;
+      let instance:
+        Pick<Awaited<ReturnType<typeof prostgles>>, "destroy" | "getClientDBHandlers"> | undefined;
       app.use(express.json());
 
       try {
@@ -413,6 +414,7 @@ export const testWithUserRLS = async (
             },
           },
           auth: {
+            sessionFields: "*",
             sidKeyName: "token",
             findUser: () => requestUser,
             getUser: (sid) =>
@@ -420,7 +422,6 @@ export const testWithUserRLS = async (
                 {
                   user: requestUser,
                   clientUser: { id: requestUser.id, type: requestUser.type },
-                  sessionFields: "*",
                 }
               : undefined,
           },
@@ -449,6 +450,20 @@ export const testWithUserRLS = async (
           { before: requestUser, after: requestUser },
         ]);
         assert.deepEqual(await deleteRequest("anonymous"), [{ before: {}, after: {} }]);
+        await t.test("server-user requests preserve tenant_id from sessionFields", async () => {
+          assert(instance);
+          // findUser returns the same user as getUser, whose sessionFields includes tenant_id.
+          const serverUser = await instance.getClientDBHandlers(
+            { userId: requestUser.id },
+            undefined,
+          );
+          const result = await serverUser.clientDb[tableName]!.delete!({ id: -1 });
+          assert.deepEqual(
+            result,
+            [{ before: requestUser, after: requestUser }],
+            "PostgreSQL hooks must receive tenant_id for both HTTP and server-user requests",
+          );
+        });
       } finally {
         await instance?.destroy();
         if (http.listening) {

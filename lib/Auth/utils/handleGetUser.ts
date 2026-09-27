@@ -4,6 +4,7 @@ import { getClientRequestIPsInfo, type AuthHandler } from "../AuthHandler";
 import type { AuthClientRequest, AuthResultOrError, AuthResultWithSID } from "../AuthTypes";
 import type { LoginResponseHandler } from "../endpoints/setLoginRequestHandler";
 import { throttledAuthCall } from "./throttledReject";
+import { getServerSideUserId } from "./serverSideRequest";
 
 export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
@@ -17,6 +18,18 @@ export async function handleGetUserThrottled(
   clientReq: AuthClientRequest,
 ): Promise<GetUserOrRedirected> {
   const config = this.config;
+  if (!clientReq.httpReq && !clientReq.socket) {
+    const userId = getServerSideUserId(this.prostgles, clientReq);
+    if (!userId) throw new Error("Invalid server-side user request");
+    if (!config?.findUser) throw new Error("auth.findUser is required for userId requests");
+    const user = await config.findUser({ id: userId }, this.dbHandles.dbo);
+    if (!user || user.id !== userId) throw new Error("User not found for userId request");
+    return {
+      sid: undefined,
+      user,
+      clientUser: { id: user.id, type: user.type },
+    } satisfies GetUserOrRedirected;
+  }
   if (!config) {
     return {
       sid: undefined,

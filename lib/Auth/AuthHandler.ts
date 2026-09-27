@@ -171,7 +171,7 @@ export class AuthHandler {
    * Based on sidKeyName from auth
    */
   getValidatedSid(maybeClientReq: AuthClientRequest | undefined): string | undefined {
-    if (!maybeClientReq) return undefined;
+    if (!maybeClientReq || (!maybeClientReq.socket && !maybeClientReq.httpReq)) return undefined;
     const { sidKeyName } = this;
     if (maybeClientReq.socket) {
       const { handshake } = maybeClientReq.socket;
