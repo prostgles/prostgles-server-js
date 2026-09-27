@@ -3,7 +3,18 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["node_modules", "dist", "debug", "examples", "**/*.d.ts", "tests", "docs"],
+    ignores: [
+      "**/node_modules",
+      "**/dist",
+      "**/debug",
+      "examples",
+      "**/*.d.ts",
+      "docs",
+      "tests/**/*.js",
+      "tests/DBGeneratedSchema.ts",
+      "tests/config_test",
+      "tests/server/DEMO_SERVER.ts",
+    ],
   },
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -56,6 +67,15 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  {
+    files: ["tests/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ["./tests/server/tsconfig.json", "./tests/client/tsconfig.json"],
+      },
     },
   },
 );

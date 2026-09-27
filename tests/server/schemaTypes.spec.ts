@@ -131,7 +131,7 @@ export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
   });
 
   await test("lookup types propagate through database references while preserving overrides", () => {
-    const tablesOrViews = db.uuid_text.dboBuilder.getSchema();
+    const tablesOrViews = db.uuid_text!.dboBuilder.getSchema();
     const lookupType = 'null | "a" | "b"';
     const cases = [
       ["TEXT REFERENCES lookup_col1", lookupType],
@@ -141,11 +141,11 @@ export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
       [{ references: { tableName: "lookup_col1" } }, lookupType],
       [{ enum: ["a"] }, 'null | "a"'],
       [{ jsonbSchema: { type: "boolean" } }, "boolean"],
-      [{ jsonbSchemaType: "boolean" }, "boolean"],
+      [{ jsonbSchemaType: { value: "boolean" } }, "{ value: boolean; };"],
     ] as const;
     for (const [colConf, expected] of cases) {
       const config: TableConfig = {
-        lookup_col1: testTableConfig.lookup_col1,
+        lookup_col1: testTableConfig.lookup_col1!,
         ...(colConf !== undefined && {
           uuid_text: { columns: { col3: colConf } },
         }),
@@ -155,7 +155,8 @@ export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
         schema
           .split("\n")
           .find((line) => line.trim().startsWith("col3?:"))
-          ?.trim(),
+          ?.trim()
+          .replace(/\s+/g, " "),
         `col3?: ${expected}`,
         JSON.stringify(colConf),
       );
@@ -167,7 +168,7 @@ export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
   });
 
   await test("lookup types follow FK chains by column and terminate cycles", async () => {
-    const { tablesOrViews } = await db.uuid_text.dboBuilder.getTsDefinitions({
+    const { tablesOrViews } = await db.uuid_text!.dboBuilder.getTsDefinitions({
       ddlWithRollback: `
         CREATE TABLE lookup_chain_bridge (
           lookup_key TEXT PRIMARY KEY REFERENCES lookup_col1,
@@ -195,7 +196,7 @@ export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
         );
       `,
     });
-    const config: TableConfig = { lookup_col1: testTableConfig.lookup_col1 };
+    const config: TableConfig = { lookup_col1: testTableConfig.lookup_col1! };
     const schema = getDBGeneratedSchema({ config, tablesOrViews });
     const lines = schema.split("\n").map((line) => line.trim());
     for (const definition of [

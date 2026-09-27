@@ -31,10 +31,7 @@ export const testWithUserRLS = async (
     isRemoteRequest: { clientInfo: undefined },
   };
   const readUser = `SELECT prostgles.user()::jsonb AS "user"`;
-  const assertUser = async (
-    tx: Pick<pgPromise.ITask<{}>, "one">,
-    user: object = requestUser,
-  ) => {
+  const assertUser = async (tx: Pick<pgPromise.ITask<{}>, "one">, user: object = requestUser) => {
     assert.deepEqual((await tx.one(readUser)).user, user);
   };
 
@@ -42,7 +39,7 @@ export const testWithUserRLS = async (
     const pgp = pgPromise();
     const pool = pgp({ ...db.$pool.options, password: db.$pool.options.password, max: 1 });
     try {
-      const { pid } = await pool.one("SELECT pg_backend_pid() AS pid");
+      const { pid } = await pool.one<{ pid: number }>("SELECT pg_backend_pid() AS pid");
       const assertReset = async () => {
         assert.deepEqual(await pool.one(`${readUser}, pg_backend_pid() AS pid`), {
           user: {},
@@ -102,7 +99,7 @@ export const testWithUserRLS = async (
     }
   });
 
-  const table = dbo.rec as unknown as TableHandler;
+  const table = dbo.rec!;
   await test("subscription and sync reads isolate users with a real RLS policy", async () => {
     const manager = await table.dboBuilder.getPubSubManager();
     const rollback = new Error("rollback RLS fixture");
@@ -123,20 +120,21 @@ export const testWithUserRLS = async (
           const params: LocalParams = {
             isRemoteRequest: {
               clientInfo: undefined,
-              user:
-                tenantId === undefined ? undefined : { ...requestUser, tenant_id: tenantId },
+              user: tenantId === undefined ? undefined : { ...requestUser, tenant_id: tenantId },
             },
             tx: { t: tx, dbTX: table.dboBuilder.dbo },
           };
-        const expected = tenantId === undefined ? [] : [{ id: tenantId }];
-        const table_rules = { select: { fields: "*", filterFields: "*", orderByFields: "*" } } as const;
-        const result = await manager.getSubData({
+          const expected = tenantId === undefined ? [] : [{ id: tenantId }];
+          const table_rules = {
+            select: { fields: "*", filterFields: "*", orderByFields: "*" },
+          } as const;
+          const result = await manager.getSubData({
             table_info: { name: "rec" },
             filter: {},
             selectParams: { select: ["id"] },
             onData: () => {},
-          localParams: params,
-          table_rules,
+            localParams: params,
+            table_rules,
           } as unknown as Subscription);
           assert.deepEqual(result, { data: expected });
           assert.deepEqual(
@@ -153,7 +151,7 @@ export const testWithUserRLS = async (
                 synced_field: "id",
                 batch_size: 10,
                 params: { select: ["id"] },
-              table_rules,
+                table_rules,
               },
             ),
             expected,
@@ -290,7 +288,7 @@ export const testWithUserRLS = async (
             },
           ],
         };
-        await rec.update(filter, { parent_id: rows[0].id }, { multi: false });
+        await rec.update(filter, { parent_id: rows[0]!.id }, { multi: false });
       }),
       (error: unknown) => JSON.stringify(error).includes("More than 1 row modified"),
     );
@@ -328,10 +326,7 @@ export const testWithUserRLS = async (
         CREATE POLICY hook_update ON rec FOR UPDATE TO ${role} USING (false);
         SET LOCAL ROLE ${role};
       `);
-        assert.deepEqual(
-          await rec.update(row, { parent_id: null }, { returning: "*" }),
-          [],
-        );
+        assert.deepEqual(await rec.update(row, { parent_id: null }, { returning: "*" }), []);
         assert.equal(calls, 1);
         throw abort;
       }),
@@ -391,11 +386,13 @@ export const testWithUserRLS = async (
       const schema = pgPromise.as.name(schemaName);
       const app = express();
       const http = createServer(app);
-      let instance: Awaited<ReturnType<typeof prostgles>> | undefined;
+      let instance: Pick<Awaited<ReturnType<typeof prostgles>>, "destroy"> | undefined;
       app.use(express.json());
 
       try {
-        await db.none(`CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.rec (id INTEGER PRIMARY KEY)`);
+        await db.none(
+          `CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.rec (id INTEGER PRIMARY KEY)`,
+        );
         http.listen(0, "127.0.0.1");
         await once(http, "listening");
         const address = http.address();
@@ -417,8 +414,8 @@ export const testWithUserRLS = async (
           },
           auth: {
             sidKeyName: "token",
-            findUser: async () => requestUser,
-            getUser: async (sid) =>
+            findUser: () => requestUser,
+            getUser: (sid) =>
               sid === "authenticated" ?
                 {
                   user: requestUser,

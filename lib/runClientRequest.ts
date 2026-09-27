@@ -9,6 +9,7 @@ import {
 import type { AuthClientRequest } from "./Auth/AuthTypes";
 import { getSessionUser } from "./Auth/utils/getSessionUser";
 import type { LocalParams } from "./DboBuilder/DboBuilder";
+import type { DbTxTableHandlers } from "./DboBuilder/DboBuilderTypes";
 import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
 import { canRunSQL } from "./DboBuilder/runSql/runSQL";
 import type { Prostgles } from "./Prostgles";
@@ -64,6 +65,7 @@ export const runClientRequest = async function (
   nonValidatedArgs: Args,
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
+  transactionHandlers?: DbTxTableHandlers,
 ) {
   this.checkNotDestroyed();
   /* Channel name will only include client-sent params so we ignore table_rules enforced params */
@@ -102,7 +104,9 @@ export const runClientRequest = async function (
     );
   }
 
-  const tableHandler = this.dboBuilder.dboMap.get(tableName);
+  const tableHandler = transactionHandlers ?
+    (Object.hasOwn(transactionHandlers, tableName) ? transactionHandlers[tableName] : undefined)
+  : this.dboBuilder.dboMap.get(tableName);
   if (!tableHandler) {
     throw `tableName ${tableName} is invalid or not allowed`;
   }

@@ -126,7 +126,7 @@ export async function testAudit(parentDb: DB) {
               },
             },
             onMount: async ({ dbo }) => {
-              await dbo.audit_test_source!.insert!({
+              await dbo.audit_test_source!.insert({
                 a: 100,
                 b: "mount",
                 value: "mounted",
@@ -168,7 +168,7 @@ export async function testAudit(parentDb: DB) {
         const sourceConfig = prgl.opts.tableConfig.audit_test_source as TableDefinition;
         for (const prefix of [AUDIT_TRIGGER_PREFIX, TABLE_CONFIG_TRIGGER_PREFIX]) {
           const name = prefix + "user_trigger";
-          sourceConfig.triggers![name] = sourceConfig.triggers!.audit_test_custom;
+          sourceConfig.triggers![name] = sourceConfig.triggers!.audit_test_custom!;
           assert.throws(() => prgl.mergedTableConfig, /prefix reserved for prostgles/);
           delete sourceConfig.triggers![name];
         }
@@ -179,16 +179,16 @@ export async function testAudit(parentDb: DB) {
         assert.throws(() => prgl.mergedTableConfig, /must exactly match/);
         prgl.opts.audit = originalAudit;
         assert.equal(prgl.resolvedAuditConfig?.tableName, audit.tableName);
-        assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_source, {
+        assert.deepEqual(prgl.resolvedAuditConfig.tables.audit_test_source, {
           idColumns: ["a", "b"],
           excludeColumns: ["secret"],
         });
-        assert.deepEqual(prgl.resolvedAuditConfig?.tables.audit_test_nopk, {
+        assert.deepEqual(prgl.resolvedAuditConfig.tables.audit_test_nopk, {
           idColumns: ["key"],
           excludeColumns: ["secret"],
         });
-        assert.equal(prgl.resolvedAuditConfig?.tables[audit.tableName], undefined);
-        assert(!("audit" in prgl.mergedTableConfig.tableConfig!.audit_test_source));
+        assert.equal(prgl.resolvedAuditConfig.tables[audit.tableName], undefined);
+        assert(!("audit" in prgl.mergedTableConfig.tableConfig!.audit_test_source!));
         const originalModifyClientSchema = prgl.opts.modifyClientSchema;
         let auditCallbacks = 0;
         prgl.opts.modifyClientSchema = (table, tableConfig, userData, resolvedAuditConfig) => {
@@ -200,7 +200,7 @@ export async function testAudit(parentDb: DB) {
         await source.getColumns!();
         assert.equal(auditCallbacks, 2);
         prgl.opts.modifyClientSchema = originalModifyClientSchema;
-        const mergedTriggers = prgl.mergedTableConfig.tableConfig!.audit_test_source.triggers!;
+        const mergedTriggers = prgl.mergedTableConfig.tableConfig!.audit_test_source!.triggers!;
         assert(mergedTriggers.audit_test_custom);
         assert(Object.keys(mergedTriggers).some((name) => name.startsWith(AUDIT_TRIGGER_PREFIX)));
 
@@ -235,7 +235,7 @@ export async function testAudit(parentDb: DB) {
         assert(!JSON.stringify(rows).includes("secret"));
         await assert.rejects(
           prgl.dboBuilder.getTX(async (tx) => {
-            await tx.audit_test_source!.insert!({ a: 5, b: "rollback" });
+            await tx.audit_test_source!.insert({ a: 5, b: "rollback" });
             throw new Error("rollback");
           }),
           /rollback/,
@@ -277,8 +277,8 @@ export async function testAudit(parentDb: DB) {
           `SELECT * FROM "audit_events" WHERE table_name = $1 ORDER BY id`,
           [maskedTable],
         );
-        assert.equal(storedMaskedHistory[0]?.new_row.secret, "mySecret");
-        assert.equal(storedMaskedHistory[1]?.old_row.secret, "mySecret");
+        assert.equal(storedMaskedHistory[0]?.new_row?.secret, "mySecret");
+        assert.equal(storedMaskedHistory[1]?.old_row?.secret, "mySecret");
         for (const sql of [
           `UPDATE "audit_events" SET table_name = 'tampered'`,
           `DELETE FROM "audit_events"`,
@@ -300,7 +300,7 @@ export async function testAudit(parentDb: DB) {
           resolvedPublishObject: { [auditName]: "*" },
         });
         assert(rules?.select);
-        assert(!rules?.insert && !rules?.update && !rules?.delete);
+        assert(!rules.insert && !rules.update && !rules.delete);
 
         const clientRequest = {
           httpReq: {
@@ -507,7 +507,7 @@ export async function testAudit(parentDb: DB) {
         const transaction = prgl.dboBuilder.getTX(async (tx) => {
           startedTx();
           await txRelease;
-          await tx.audit_test_source!.insert!({
+          await tx.audit_test_source!.insert({
             a: 6,
             b: "existing_transaction",
           });

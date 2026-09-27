@@ -18,6 +18,7 @@ if [ $# -eq 0 ]; then
 fi
 
 npm run build
+npm run lint --prefix ../..
 npm run test-server && \
 TEST_NAME="main"         npm run test-client && \
 TEST_NAME="useProstgles" npm run test-client && \

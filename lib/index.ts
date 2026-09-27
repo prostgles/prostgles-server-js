@@ -3,6 +3,7 @@ import type { SessionUser } from "./Auth/AuthTypes";
 import type { InitResult, OnReadyCallbackBasic } from "./initProstgles";
 import { Prostgles } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
+export { DB_GENERATED_NAMES } from "./DBSchemaBuilder/constants";
 
 function prostgles<
   S = void,
@@ -22,9 +23,8 @@ export const createProstgles = <
   SUser extends SessionUser = SessionUser,
   ClientSchema = S,
 >() => {
-  return <Context = undefined>(
-    params: ProstglesInitOptions<S, SUser, Context>,
-  ) => prostgles<S, SUser, Context, ClientSchema>(params);
+  return <Context = undefined>(params: ProstglesInitOptions<S, SUser, Context>) =>
+    prostgles<S, SUser, Context, ClientSchema>(params);
 };
 export * from "./PublishParser/defineServerFunction";
 export * from "./Auth/AuthTypes";

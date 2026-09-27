@@ -1,3 +1,4 @@
+import type { MaybePromise } from "prostgles-types";
 import type * as stream from "stream";
 
 export type LocalUploadedFileDetails = {
@@ -22,9 +23,9 @@ export type UploadFileOptions = {
   onProgress?: (bytesUploaded: number) => void;
 };
 export type StorageClientBase<T> = {
-  upload: (file: UploadFileOptions) => Promise<T>;
-  downloadAsStream: (name: string) => Promise<stream.Readable>;
-  delete: (fileName: string) => Promise<void>;
+  upload: (file: UploadFileOptions) => MaybePromise<T>;
+  downloadAsStream: (name: string) => MaybePromise<stream.Readable>;
+  delete: (fileName: string) => MaybePromise<void>;
 };
 export type LocalStorageClient = StorageClientBase<LocalUploadedFileDetails> & {
   type: "local";
@@ -32,6 +33,6 @@ export type LocalStorageClient = StorageClientBase<LocalUploadedFileDetails> & {
 };
 export type CloudStorageClient = StorageClientBase<CloudUploadedFileDetails> & {
   type: "cloud";
-  getSignedUrlForDownload: (fileName: string, expiresInSeconds: number) => Promise<string>;
+  getSignedUrlForDownload: (fileName: string, expiresInSeconds: number) => MaybePromise<string>;
 };
 export type StorageClient = LocalStorageClient | CloudStorageClient;

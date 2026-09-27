@@ -18,7 +18,6 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
     const config = files.dboBuilder.prostgles.opts.fileTable!;
     const storage = config.storageClient;
     assert.equal(storage.type, "local");
-    if (storage.type !== "local") throw new Error("Expected local test storage");
     const folder = storage.localFolderPath;
     const upload = storage.upload;
     const remove = storage.delete;
@@ -63,7 +62,7 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
       ...(originalHooks ?? []),
       {
         commands: { insert: 1, update: 1 },
-        validate: async ({ row }) => {
+        validate: ({ row }) => {
           if (row.original_name === "reject.txt") throw new Error("file hook rejected");
         },
       },
@@ -432,7 +431,7 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         const objects = new Map<string, Buffer>();
         const cloud: CloudStorageClient = {
           type: "cloud",
-          upload: async ({ file, fileName }) => {
+          upload: ({ file, fileName }) => {
             assert.ok(Buffer.isBuffer(file));
             objects.set(fileName, file);
             return {
@@ -442,11 +441,11 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
               contentLength: file.length,
             };
           },
-          delete: async (key) => {
+          delete: (key) => {
             objects.delete(key);
           },
-          downloadAsStream: async (key) => Readable.from([objects.get(key)!]),
-          getSignedUrlForDownload: async (key) => `https://storage.invalid/${key}`,
+          downloadAsStream: (key) => Readable.from([objects.get(key)!]),
+          getSignedUrlForDownload: (key) => `https://storage.invalid/${key}`,
         };
         config.storageClient = cloud;
         const app = express();

@@ -11,6 +11,7 @@ import type { SessionUser } from "../Auth/AuthTypes";
 import type { DBOFullyTyped, DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB } from "../initProstgles";
 import type { PublishParams } from "./publishTypesAndUtils";
+import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
 type FunctionContextBase<S, SUser extends SessionUser, Context> = Pick<
   PublishParams<S, SUser>,
@@ -30,6 +31,7 @@ export type RestrictedFunctionContext<
   Context = undefined,
 > = FunctionContextBase<S, SUser, Context> & {
   dbo: DBOFullyTypedClient<S>;
+  withClientDbTx: ClientHandlers<S>["withClientDbTx"];
 };
 
 export type UnrestrictedFunctionContext<
@@ -55,11 +57,7 @@ export type ServerFunctionDefinition = {
 };
 
 declare const serverFunctionContext: unique symbol;
-export type ServerFunctionContextMarker<
-  S,
-  SUser extends SessionUser,
-  Context = undefined,
-> = {
+export type ServerFunctionContextMarker<S, SUser extends SessionUser, Context = undefined> = {
   [serverFunctionContext]?: [S, SUser, [Context] extends [undefined] ? never : Context];
 };
 

@@ -1,8 +1,8 @@
-import { ProstglesInitOptions } from "prostgles-server/dist/ProstglesTypes";
-import { DBGeneratedSchema } from "../DBGeneratedSchema";
+import type { ProstglesInitOptions } from "prostgles-server/dist/ProstglesTypes";
+import type { DBGeneratedSchema } from "../DBGeneratedSchema";
 import type { PublishProfile } from "prostgles-server";
 
-import { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
+import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 export const testPublishTypes = () => {
   const profiles: PublishProfile<DBGeneratedSchema>[] = [
     {
@@ -108,7 +108,7 @@ export const testPublishTypes = () => {
         insert: {
           fields: "*",
           returningFields: { name: 1 },
-          validate: async ({ row }) => {
+          validate: ({ row }) => {
             if (row.name === "a") row.name = "b";
             return row;
           },

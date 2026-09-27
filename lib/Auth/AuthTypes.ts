@@ -21,6 +21,7 @@ import type {
   FullFilter,
   IdentityProvider,
   LocalLoginMode,
+  MaybePromise,
   UserLike,
 } from "prostgles-types";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
@@ -210,7 +211,7 @@ export type LoginWithOAuthConfig<S> = {
     req: ExpressReq;
     res: ExpressRes;
     clientInfo: LoginClientInfo;
-  }) => Promise<
+  }) => MaybePromise<
     AuthResponse.OAuthRegisterSuccess | AuthResponse.OAuthRegisterFailure | AuthResponse.AuthFailure
   >;
 
@@ -225,7 +226,7 @@ export type LoginWithOAuthConfig<S> = {
     req: ExpressReq;
     res: ExpressRes;
     clientInfo: LoginClientInfo;
-  }) => void | Promise<void>;
+  }) => void | MaybePromise<void>;
 };
 
 export type SessionUser<

@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { useAsyncEffectQueue } from "prostgles-client";
 import { renderReactHookManual } from "./renderReactHook";
 
-describe("React hooks", async (t) => {
+void describe("React hooks", async (t) => {
   await test("useAsyncEffectQueue executes the first and debounces the rest", async (t) => {
     const start = Date.now();
     const calls: (string | number)[] = [];
@@ -27,8 +27,8 @@ describe("React hooks", async (t) => {
       initialProps: getHookArgs(1),
       renderDuration: 10,
     });
-    setProps(getHookArgs(2));
-    setProps(getHookArgs(3));
+    void setProps(getHookArgs(2));
+    void setProps(getHookArgs(3));
     await tout(700);
     assert.deepStrictEqual(calls, [1, 11, 3]);
     unmount();
@@ -54,8 +54,8 @@ describe("React hooks", async (t) => {
       initialProps: getHookArgs(1),
       renderDuration: 10,
     });
-    setProps(getHookArgs(2));
-    setProps(getHookArgs(3));
+    void setProps(getHookArgs(2));
+    void setProps(getHookArgs(3));
     unmount();
     await tout(1500);
     assert.deepStrictEqual(calls, [1, 11]);

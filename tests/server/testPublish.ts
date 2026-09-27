@@ -1,8 +1,8 @@
-import { Publish, PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
-import { DBGeneratedSchema } from "../DBGeneratedSchema";
+import type { Publish, PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
+import type { DBGeneratedSchema } from "../DBGeneratedSchema";
 import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 
-export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => {
+export const testPublish: Publish<DBGeneratedSchema> = ({ user, sid }) => {
   if (sid === "noAuth") {
     return {
       planes: {
@@ -88,14 +88,14 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
 
     items4: {
       select:
-        user && user.type !== "public" ? "*" : (
-          {
+        user && user.type !== "public" ?
+          "*"
+        : {
             fields: { name: 0 },
             filterFields: "*",
             orderByFields: { added: 1 },
             forcedFilter: { name: "abc" },
-          }
-        ),
+          },
       insert: "*",
       update: "*",
       delete: "*",
@@ -121,7 +121,7 @@ export const testPublish: Publish<DBGeneratedSchema> = async ({ user, sid }) => 
       insert: {
         fields: { added: 0 },
         returningFields: { name: 1 },
-        validate: async ({ row }) => {
+        validate: ({ row }) => {
           if (row.name === "a") row.name = "b";
           row.added = new Date().toUTCString();
           return row;

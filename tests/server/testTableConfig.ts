@@ -14,6 +14,7 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
           };
 
           // @ts-expect-error Can be nested insert
+          // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
           data.parent_id! + 1;
 
           // @ts-expect-error Nested rows retain their column types.
@@ -27,7 +28,7 @@ export const testTableHooks: TableHooks<DBGeneratedSchema> = {
     afterEach: [
       {
         commands: { insert: 1, update: 1 },
-        validate: async ({ command, data, row }) => {
+        validate: ({ command, data, row }) => {
           row.id satisfies number;
           if (command === "insert") {
             const inputs: typeof data = [{}, { id: "1" }];

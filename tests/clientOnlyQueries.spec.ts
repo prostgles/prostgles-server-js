@@ -1,12 +1,13 @@
 import { strict as assert } from "assert";
 import { describe, test } from "node:test";
 import {
-  AnyObject,
-  DBSchemaTable,
-  SocketSQLStreamPacket,
+  type AnyObject,
+  type DBSchemaTable,
+  type SocketSQLStreamPacket,
   isDefined,
   omitKeys,
   type SQLHandler,
+  type TableHandler,
 } from "prostgles-types";
 import type { AuthHandler, ClientFunctionHandler, DBHandlerClient } from "./client";
 import type { GeneratedFunctionSchema } from "./DBGeneratedSchema";
@@ -23,24 +24,26 @@ export const clientOnlyQueries = async (
 ) => {
   await describe("Client only queries", async (t) => {
     await test("modifyClientSchema adds custom table and column metadata", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const planesTable = tableSchema.find((table) => table.name === "planes") as
         | (DBSchemaTable & {
             clientSchemaTest?: { sid?: string; tableIndex: number };
           })
         | undefined;
       assert.equal(planesTable?.clientSchemaTest?.sid, token);
-      assert.equal(typeof planesTable?.clientSchemaTest?.tableIndex, "number");
+      assert.equal(typeof planesTable.clientSchemaTest.tableIndex, "number");
 
-      const idColumn = planesTable?.columns.find((column) => column.name === "id") as
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const idColumn = planesTable.columns.find((column) => column.name === "id") as
         | (DBSchemaTable["columns"][number] & {
             clientSchemaTest?: { sid?: string; columnIndex: number };
           })
         | undefined;
       assert.equal(idColumn?.clientSchemaTest?.sid, token);
-      assert.equal(typeof idColumn?.clientSchemaTest?.columnIndex, "number");
+      assert.equal(typeof idColumn.clientSchemaTest.columnIndex, "number");
 
-      const info = (await db.planes.getInfo!()) as Awaited<
-        ReturnType<NonNullable<typeof db.planes.getInfo>>
+      const info = (await db.planes?.getInfo!()) as Awaited<
+        ReturnType<NonNullable<TableHandler["getInfo"]>>
       > & {
         clientSchemaTest: {
           sid?: string;
@@ -54,7 +57,7 @@ export const clientOnlyQueries = async (
       assert.equal("columns" in info, false);
 
       // A language forces a server request instead of returning cached schema columns.
-      const columns = (await db.planes.getColumns!("en")) as (DBSchemaTable["columns"][number] & {
+      const columns = (await db.planes?.getColumns!("en")) as (DBSchemaTable["columns"][number] & {
         clientSchemaTest: { sid?: string; passes: number };
       })[];
       assert.ok(columns.length);
@@ -79,13 +82,11 @@ export const clientOnlyQueries = async (
           {},
           { returnType: "stream" },
         );
-        const listener = async (packet: SocketSQLStreamPacket) => {
+        const listener = (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
           } else {
-            if (packet.rows) {
-              rows = [...rows, ...packet.rows];
-            }
+            rows = [...rows, ...packet.rows];
             if (packet.ended) {
               assert.equal(packet.ended, true);
               assert.equal(rows.length, expectedRowCount);
@@ -107,7 +108,7 @@ export const clientOnlyQueries = async (
           {},
           { returnType: "stream", persistStreamConnection: true, streamLimit },
         );
-        const listener = async (packet: SocketSQLStreamPacket) => {
+        const listener = (packet: SocketSQLStreamPacket) => {
           try {
             if (packet.type === "error") {
               reject(packet.error);
@@ -139,7 +140,7 @@ export const clientOnlyQueries = async (
         const query = "SELECT pg_backend_pid()";
         const res = await sql!(query, {}, { returnType: "stream", persistStreamConnection: true });
         const pids: number[] = [];
-        const listener = async (packet: SocketSQLStreamPacket) => {
+        const listener = (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
           } else {
@@ -173,7 +174,7 @@ export const clientOnlyQueries = async (
               { returnType: "rows" },
             );
             assert.equal(queryState.length, 1);
-            assert.equal(queryState[0].state, "idle");
+            assert.equal(queryState[0]!.state, "idle");
             assert.equal(packet.error.message, "canceling statement due to user request");
             resolve("ok");
           } else {
@@ -197,7 +198,7 @@ export const clientOnlyQueries = async (
           {},
           { returnType: "stream", streamLimit: 10 },
         );
-        const listener = async (packet: SocketSQLStreamPacket) => {
+        const listener = (packet: SocketSQLStreamPacket) => {
           if (packet.type === "error") {
             reject(packet.error);
           } else {
@@ -259,7 +260,7 @@ export const clientOnlyQueries = async (
               { returnType: "stream" },
             );
             let rows: any[] = [];
-            const listener = async (packet: SocketSQLStreamPacket) => {
+            const listener = (packet: SocketSQLStreamPacket) => {
               if (packet.type === "error") {
                 reject(packet.error);
               } else {
@@ -277,11 +278,11 @@ export const clientOnlyQueries = async (
     });
 
     await test("SQL Stream parallel execution + parameters", async () => {
-      await tryRunP("", async (resolve, reject) => {
+      await tryRunP("", (resolve, reject) => {
         const getExpected = (val: string) =>
           new Promise(async (resolve, reject) => {
             const res = await sql!("SELECT ${val} as val", { val }, { returnType: "stream" });
-            const listener = async (packet: SocketSQLStreamPacket) => {
+            const listener = (packet: SocketSQLStreamPacket) => {
               try {
                 assert.equal(packet.type, "data");
                 assert.equal(packet.ended, true);
@@ -411,7 +412,7 @@ export const clientOnlyQueries = async (
       });
       const dbTables = Object.entries(db)
         .map(([k, h]) => {
-          return !!(h.getColumns && h.getInfo) ? k : undefined;
+          return h.getColumns && h.getInfo ? k : undefined;
         })
         .filter(isDefined);
       const missingTbl = dbTables.find((t) => !tableSchema.some((st) => st.name === t));
@@ -448,9 +449,9 @@ export const clientOnlyQueries = async (
             const arrayMode = await sql("SELECT 1 as a, 2 as a", undefined, {
               returnType: "arrayMode",
             });
-            assert.equal(arrayMode.rows?.[0].join("."), "1.2", "sql statement arrayMode failed");
+            assert.equal(arrayMode.rows[0].join("."), "1.2", "sql statement arrayMode failed");
             assert.equal(
-              arrayMode.fields?.map((f) => f.name).join("."),
+              arrayMode.fields.map((f) => f.name).join("."),
               "a.a",
               "sql statement arrayMode failed",
             );
@@ -505,7 +506,7 @@ export const clientOnlyQueries = async (
                     `Notif value is not what we expect: ${JSON.stringify(notif)} is not ${JSON.stringify(expected)} (expected) `,
                   );
               });
-              sql("NOTIFY chnl , 'hello'; ");
+              void sql("NOTIFY chnl , 'hello'; ");
             } catch (e) {
               reject(e);
             }
@@ -526,7 +527,7 @@ export const clientOnlyQueries = async (
                     `Notice value is not what we expect: ${JSON.stringify(notice)} is not ${JSON.stringify(expected)} (expected) `,
                   );
               });
-              sql(`
+              void sql(`
             DO $$ 
             BEGIN
 
@@ -542,19 +543,19 @@ export const clientOnlyQueries = async (
           log("Started testRealtime");
           const start = Date.now();
 
-          await db.planes.delete!();
+          await db.planes!.delete!();
           await sql!("TRUNCATE planes RESTART IDENTITY CASCADE;", {});
-          let inserts = new Array(100).fill(null).map((d, i) => ({
+          const inserts = new Array(100).fill(null).map((d, i) => ({
             id: i,
             flight_number: `FN${i}`,
             x: Math.random(),
             y: i,
           }));
-          await db.planes.insert!(inserts);
+          await db.planes!.insert!(inserts);
 
           const CLOCK_DRIFT = 2000;
 
-          if ((await db.planes.count!()) !== 100) throw "Not 100 planes";
+          if ((await db.planes!.count!()) !== 100) throw "Not 100 planes";
 
           /**
            * Two listeners are added at the same time to dbo.planes (which has 100 records):
@@ -567,7 +568,7 @@ export const clientOnlyQueries = async (
            */
 
           /* After all sync records are updated to x10 here we'll update them to x20 */
-          const sP = await db.planes.subscribe!({ x: 10 }, {}, async (planes) => {
+          const sP = await db.planes!.subscribe!({ x: 10 }, {}, (planes) => {
             const p10 = planes.filter((p) => p.x == 10);
             log(
               Date.now() +
@@ -588,8 +589,8 @@ export const clientOnlyQueries = async (
                 const last_updated = Date.now();
                 if (dLastUpdated >= last_updated)
                   throw "dLastUpdated >= last_updated should not happen";
-                await db.planes.update!({}, { x: 20, last_updated });
-                log(Date.now() + ": sub: Updated to x20", await db.planes.count!({ x: 20 }));
+                await db.planes!.update!({}, { x: 20, last_updated });
+                log(Date.now() + ": sub: Updated to x20", await db.planes!.count!({ x: 20 }));
 
                 // db.planes.findOne({}, { select: { last_updated: "$max"}}).then(log)
               }, CLOCK_DRIFT);
@@ -597,7 +598,7 @@ export const clientOnlyQueries = async (
           });
 
           let updateCount = 0;
-          const sync = await db.planes.sync!({}, { handlesOnData: true }, (planes, deltas) => {
+          const sync = await db.planes!.sync!({}, { handlesOnData: true }, (planes, deltas) => {
             const x20 = planes.filter((p) => p.x == 20).length;
             const x10 = planes.filter((p) => p.x == 10);
             log(Date.now() + `: sync stats: x10 -> ${x10.length}  x20 -> ${x20}`);
@@ -609,7 +610,7 @@ export const clientOnlyQueries = async (
               if (+p.x < 10) {
                 updateCount++;
                 update = true;
-                p.$update!({ x: 10 });
+                void p.$update({ x: 10 });
                 log(Date.now() + `: sync: p.$update({ x: 10 }); (id: ${p.id})`);
               }
             });
@@ -631,14 +632,14 @@ export const clientOnlyQueries = async (
           const msLimit = 20000;
           setTimeout(async () => {
             const dbCounts = {
-              x10: await db.planes.count!({ x: 10 }),
-              x20: await db.planes.count!({ x: 20 }),
-              latest: await db.planes.findOne!({}, { orderBy: { last_updated: -1 } }),
+              x10: await db.planes!.count!({ x: 10 }),
+              x20: await db.planes!.count!({ x: 20 }),
+              latest: await db.planes!.findOne!({}, { orderBy: { last_updated: -1 } }),
             };
             const syncCounts = {
-              x10: sync?.getItems().filter((d) => d.x == 10).length,
-              x20: sync?.getItems().filter((d) => d.x == 20).length,
-              latest: sync?.getItems()?.sort((a, b) => +b.last_updated - +a.last_updated)[0],
+              x10: sync.getItems().filter((d) => d.x == 10).length,
+              x20: sync.getItems().filter((d) => d.x == 20).length,
+              latest: sync.getItems().sort((a, b) => +b.last_updated - +a.last_updated)[0],
             };
             const msg =
               "Replication test failed due to taking longer than " +
@@ -664,13 +665,13 @@ export const clientOnlyQueries = async (
     // Public data
     await test("Security rules example", { skip: isUser }, async () => {
       log("Checking public data");
-      const vQ = await db.items4.find!({}, { select: { added: 0 } });
+      const vQ = await db.items4!.find!({}, { select: { added: 0 } });
       assert.deepStrictEqual(vQ, [
         { id: 1, public: "public data" },
         { id: 2, public: "public data" },
       ]);
 
-      const aggregate = await db.items4.findOne!(
+      const aggregate = await db.items4!.findOne!(
         {},
         {
           select: {
@@ -684,13 +685,13 @@ export const clientOnlyQueries = async (
         values: ["public data", "public data"],
       });
 
-      const orderByError = await db.items4.findOne!(
+      const orderByError = await db.items4!.findOne!(
         {},
         { select: { values: { $array_agg: ["public"], $orderBy: { public: 1 } } } },
       ).catch((error) => error);
       assert.match(orderByError.message ?? String(orderByError), /invalid\/disallowed/i);
 
-      const cols = await db.insert_rules.getColumns!();
+      const cols = await db.insert_rules!.getColumns!();
       assert.equal(
         cols.filter(({ insert, update: u, select: s, delete: d }) => insert && !u && s && !d)
           .length,
@@ -699,34 +700,32 @@ export const clientOnlyQueries = async (
       );
 
       /* Validated insert */
-      const expectB = await db.insert_rules.insert!({ name: "a" }, { returning: "*" });
+      const expectB = await db.insert_rules!.insert!({ name: "a" }, { returning: "*" });
       assert.deepStrictEqual(expectB, { name: "b" }, "Validated insert failed");
 
       /* forced UUID insert */
-      const row: any = await db.uuid_text.insert!({}, { returning: "*" });
+      const row: any = await db.uuid_text!.insert!({}, { returning: "*" });
       assert.equal(row.id, "c81089e1-c4c1-45d7-a73d-e2d613cb7c3e");
 
       try {
-        await db.insert_rules.insert!({ name: "notfail" }, { returning: "*" });
-        await db.insert_rules.insert!({ name: "fail" }, { returning: "*" });
-        await db.insert_rules.insert!({ name: "fail-check" }, { returning: "*" });
+        await db.insert_rules!.insert!({ name: "notfail" }, { returning: "*" });
+        await db.insert_rules!.insert!({ name: "fail" }, { returning: "*" });
+        await db.insert_rules!.insert!({ name: "fail-check" }, { returning: "*" });
         throw "post insert checks should have failed";
       } catch (err) {}
-      assert.equal(0, +(await db.insert_rules.count!({ name: "fail" })), "postValidation failed");
+      assert.equal(0, +(await db.insert_rules!.count!({ name: "fail" })), "postValidation failed");
       assert.equal(
         0,
-        +(await db.insert_rules.count!({ name: "fail-check" })),
+        +(await db.insert_rules!.count!({ name: "fail-check" })),
         "checkFilter failed",
       );
       assert.equal(
         1,
-        +(await db.insert_rules.count!({ name: "notfail" })),
+        +(await db.insert_rules!.count!({ name: "notfail" })),
         "postValidation failed",
       );
 
-      const funcError = await serverFunctions
-        .myfunc?.(undefined as unknown as any)
-        .catch((err) => err);
+      const funcError = await serverFunctions.myfunc?.(undefined).catch((err) => err);
       assert.deepStrictEqual(funcError, {
         error: "input is of invalid type. Expecting { arg1: number }",
       });
@@ -753,7 +752,7 @@ export const clientOnlyQueries = async (
 
       const typedComplexFunc = await typedServerFunctions.myfuncWithComplexReturn({ arg1: 5 });
       if (Array.isArray(typedComplexFunc)) {
-        const item = typedComplexFunc[0];
+        const item = typedComplexFunc[0]!;
         // @ts-expect-error
         item satisfies string;
         item satisfies number;
@@ -803,42 +802,42 @@ export const clientOnlyQueries = async (
     await test("sync handlesOnData true -> false no data bug", { skip: isUser }, async () => {
       let sync1Planes: AnyObject[] = [];
       let sync2Planes: AnyObject[] = [];
-      const sync1 = await db.planes.sync!({}, { handlesOnData: true }, async (planes1, deltas) => {
+      const sync1 = await db.planes!.sync!({}, { handlesOnData: true }, (planes1, deltas) => {
         sync1Planes = planes1;
         log("sync handlesOnData true", planes1.length);
       });
       await tout(1000);
-      const sync2 = await db.planes.sync!({}, { handlesOnData: false }, (planes2, deltas) => {
+      const sync2 = await db.planes!.sync!({}, { handlesOnData: false }, (planes2, deltas) => {
         sync2Planes = planes2;
       });
       await tout(1000);
       if (sync1Planes.length !== sync2Planes.length || sync1Planes.length === 0) {
         throw `sync2Planes.length !== 100: ${sync1Planes.length} vs ${sync2Planes.length}`;
       }
-      await sync1.$unsync();
-      await sync2.$unsync();
+      sync1.$unsync();
+      sync2.$unsync();
     });
 
     // User data
     await test("Security rules example", { skip: !isUser }, async () => {
       log("Checking User data");
-      const vQ = await db.items4.find!();
+      const vQ = await db.items4?.find!();
       assert.deepStrictEqual(vQ, [
         { id: 1, public: "public data" },
         { id: 2, public: "public data" },
       ]);
 
-      await db.items4.find!({}, { select: { id: 1 }, orderBy: { added: 1 } });
+      await db.items4?.find!({}, { select: { id: 1 }, orderBy: { added: 1 } });
 
-      const dynamicCols = await db.uuid_text.getColumns!(undefined, {
+      const dynamicCols = await db.uuid_text!.getColumns!(undefined, {
         rule: "update",
         filter: {
           id: "c81089e1-c4c1-45d7-a73d-e2d613cb7c3e",
         },
       });
       assert.equal(dynamicCols.length, 1);
-      assert.equal(dynamicCols[0].name, "id");
-      const defaultCols = await db.uuid_text.getColumns!(undefined, {
+      assert.equal(dynamicCols[0]!.name, "id");
+      const defaultCols = await db.uuid_text!.getColumns!(undefined, {
         rule: "update",
         filter: {
           id: "not matching",
@@ -850,7 +849,7 @@ export const clientOnlyQueries = async (
 };
 
 const tout = (t = 3000) => {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
       resolve(true);
     }, t);

@@ -29,7 +29,7 @@ setGlobal("window", window);
 setGlobal("navigator", window.navigator);
 setGlobal("document", window.document);
 
-import React from "react";
+import React, { type Dispatch, type SetStateAction } from "react";
 import { createRoot } from "react-dom/client";
 
 type Hook = (...args: any[]) => any;
@@ -48,7 +48,7 @@ type RenderHookArgs = {
   lastRenderWait?: number;
 };
 
-let testedHook: Function;
+let testedHook: ((...args: any[]) => any) | null = null;
 const root = createRoot(window.document.getElementById("root"));
 const reactRender = ({
   hook,
@@ -58,7 +58,7 @@ const reactRender = ({
 }: Pick<Required<RenderHookArgs>, "hook" | "props" | "onResult"> & {
   onUnmount: () => void;
 }) => {
-  const BasicComponent = ({ props }) => {
+  const BasicComponent = ({ props }: { props: any[] }) => {
     const result = hook(...props);
     React.useEffect(() => {
       return onUnmount;
@@ -75,7 +75,7 @@ type RenderResult = {
 };
 
 const resetBasicComponent = () => {
-  const OtherBasicComponent = ({ props }) => {
+  const OtherBasicComponent = ({ props }: { props: any }) => {
     return React.createElement("div", null, `Goodbye`);
   };
   root.render(React.createElement(OtherBasicComponent, { props: {} }, null));
@@ -95,21 +95,21 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
   onEnd?: OnEnd<H>;
   onRender?: OnEnd<H>;
 }): Promise<{
-  setProps: (props: Parameters<H>, opts?: { waitFor?: number; onEnd?: OnEnd<H> }) => void;
+  setProps: (props: Parameters<H>, opts?: { waitFor?: number; onEnd?: OnEnd<H> }) => Promise<void>;
   getResults: () => ReturnType<H>[];
   unmount: () => void;
 }> => {
   const { hook, onUnmount, renderDuration = 250, onEnd, onRender } = rootArgs;
-  let lastRenderWaitTimeout: NodeJS.Timeout | null = null;
+  let lastRenderWaitTimeout: number | undefined | NodeJS.Timeout;
   let didResolve = false;
-  let setProps: (props: any[]) => void;
+  let setProps: Dispatch<SetStateAction<Parameters<H>>> | undefined;
   resetBasicComponent();
   return new Promise((resolve, reject) => {
-    const results = [];
-    const onCompRender = (result) => {
+    const results: ReturnType<H>[] = [];
+    const onCompRender = (result: ReturnType<H>) => {
       results.push(result);
       if (didResolve) return;
-      onRender?.(results);
+      void onRender?.(results);
       clearTimeout(lastRenderWaitTimeout);
       lastRenderWaitTimeout = setTimeout(async () => {
         if (!setProps) {
@@ -120,7 +120,7 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
         didResolve = true;
         return resolve({
           setProps: async (props, { waitFor = 250, onEnd } = {}) => {
-            setProps(props);
+            setProps!(props);
             await tout(waitFor);
             await onEnd?.(results);
           },
@@ -131,7 +131,7 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
         });
       }, renderDuration);
     };
-    const BasicComponent = ({ props: initialProps }) => {
+    const BasicComponent = ({ props: initialProps }: { props: Parameters<H> }) => {
       const [props, _setProps] = React.useState(initialProps);
       setProps = _setProps;
       const result = hook(...props);
@@ -161,11 +161,11 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
     resetBasicComponent();
   }
   testedHook = hook;
-  let lastRenderWaitTimeout: NodeJS.Timeout | null = null;
+  let lastRenderWaitTimeout: NodeJS.Timeout | number | undefined;
   return new Promise((resolve, reject) => {
     const results: any[] = [];
     let resolved = false;
-    const onRender = (result) => {
+    const onRender = (result: RenderResult) => {
       results.push(result);
       onResult?.(result);
       clearTimeout(lastRenderWaitTimeout);

@@ -2,13 +2,14 @@ import prostgles from "prostgles-client";
 import io from "socket.io-client";
 
 import type { DBHandlerClient, UseProstglesClientProps } from "prostgles-client";
-import { AuthHandler } from "prostgles-client/dist/getAuthHandler";
+import type { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 import type { ClientFunctionHandler } from "prostgles-client/dist/getMethods";
-import { DBSchemaTable, type SQLHandler } from "prostgles-types";
+import type { DBSchemaTable, SQLHandler } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
+//@ts-ignore
 import { isomorphicQueriesTyped } from "../isomorphicQueriesTyped.spec";
 import { clientHooks } from "./hooks.spec";
 import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
@@ -24,6 +25,9 @@ const log = (msgOrObj: any, extra?: any) => {
 log("Started client...");
 
 const { TEST_NAME } = process.env;
+if (!TEST_NAME) {
+  throw new Error("TEST_NAME environment variable is not set");
+}
 const url = "http://127.0.0.1:3001";
 const defaultPath = "/teztz/s";
 const pathWatchSchema = "/teztz/sWatchSchema";
@@ -51,12 +55,12 @@ type ClientTestSpecV2 = (args: {
   reconnectSocket: (reattachOnly?: boolean) => Promise<void>;
 }) => Promise<void>;
 
-let reconnectReadyResolve: () => void;
+let reconnectReadyResolve: undefined | (() => void);
 
 const tests: Record<string, ClientTestSpecV2> = {
   main: async ({ db, sql, methods, tableSchema, auth, reconnectSocket }) => {
-    await sql(`DROP TABLE IF EXISTS ${newly_created_table}`);
-    await isomorphicQueries(db, sql, log, TEST_NAME);
+    await sql!(`DROP TABLE IF EXISTS ${newly_created_table}`);
+    await isomorphicQueries(db as any, sql, log, TEST_NAME);
     await isomorphicQueriesTyped(
       //@ts-ignore
       db,
@@ -65,10 +69,10 @@ const tests: Record<string, ClientTestSpecV2> = {
     await clientHooks(db, reconnectSocket);
   },
   useProstgles: async ({ db, sql }) => {
-    await useProstglesTest(db, sql, getClientOptions);
+    await useProstglesTest(db, sql!, getClientOptions);
   },
   files: async ({ db, sql }) => {
-    await clientFileTests(db, sql);
+    await clientFileTests(db, sql!);
   },
   rest_api: async ({ db, tableSchema }) => {
     await clientRestApi(db, tableSchema, TEST_NAME);
@@ -92,7 +96,7 @@ const stopTest = (args?: { err: any }) => {
     socket.emit(
       "stop-test",
       !args ? undefined : { err: (err ?? "Unknown").toString(), error: err },
-      (cb) => {
+      () => {
         log("Stopping client...");
         if (err) console.trace(err);
       },
@@ -115,7 +119,7 @@ try {
   });
   socket.once("start-test", (data) => {
     //@ts-ignore
-    prostgles({
+    void prostgles({
       socket,
       onDisconnect: () => {
         log("Disconnected");
@@ -123,6 +127,7 @@ try {
       onReconnect: (socket) => {
         log("Reconnected");
       },
+      //@ts-ignore
       onReady: async ({ db, sql, methods, tableSchema, auth, isReconnect }) => {
         log(`TEST_NAME: ${TEST_NAME} Started`);
         if (reconnectReadyResolve) {
@@ -140,7 +145,7 @@ try {
             };
             //@ts-ignore
             window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
-              console.error("Error occured: " + errorMsg);
+              console.error("Error occurred: ", errorMsg);
               stopTest({ err: errorMsg });
               return false;
             };
@@ -175,6 +180,6 @@ try {
   });
 } catch (e) {
   console.trace(e);
-  stopTest(e);
+  stopTest(e ? { err: e } : undefined);
   throw e;
 }

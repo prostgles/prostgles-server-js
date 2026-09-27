@@ -12,10 +12,12 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^20.19.43",
-    "prostgles-client": "^4.0.407", 
+    "prostgles-client": "^4.0.407",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "jsdom": "^26.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

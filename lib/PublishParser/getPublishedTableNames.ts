@@ -2,12 +2,13 @@ import { isObject } from "prostgles-types";
 import type { PublishParser } from "./PublishParser";
 import { type PublishObject } from "./PublishParser";
 import { getFileVersionTableName, isFileVersionTable } from "../StorageClient/fileVersionUtils";
+import { TX_KEY } from "../DboBuilder/dboBuilderUtils";
 
 export const getPublishedTableNames = (
   publishParserInstance: PublishParser,
   publishObject: PublishObject,
 ) => {
-  const txKey = !publishParserInstance.prostgles.opts.transactions ? "" : "tx";
+  const txKey = !publishParserInstance.prostgles.opts.transactions ? "" : TX_KEY;
   if (txKey && txKey in publishObject) {
     throw new Error(
       `Transactions key ${JSON.stringify(txKey)} collides with a published table name`,

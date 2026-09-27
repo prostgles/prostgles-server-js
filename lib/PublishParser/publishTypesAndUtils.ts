@@ -127,7 +127,7 @@ export type AfterEachTsTrigger<R, DBX, Context = undefined, InputDataType = R> =
         localParams: undefined | LocalParams;
         context: Context;
       },
-  ) => Promise<void>;
+  ) => MaybePromise<void>;
 };
 
 export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {

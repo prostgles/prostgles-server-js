@@ -203,3 +203,5 @@ export const withUserRLS = (
   const queryId = crypto.randomUUID();
   return [QUERY_ID_PREFIX + queryId, firstQuery, query].filter(Boolean).join("\n");
 };
+
+export const TX_KEY = "tx" as const;

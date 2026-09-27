@@ -29,6 +29,7 @@ import {
   getCanExecute,
   getConstraints,
   getSerializedClientErrorFromPGError,
+  TX_KEY,
 } from "./dboBuilderUtils";
 import { prepareShortestJoinPaths } from "./joins/prepareShortestJoinPaths";
 import { cacheDBTypes, runSQL } from "./runSql/runSQL";
@@ -304,10 +305,14 @@ export class DboBuilder {
     });
 
     if (this.prostgles.opts.transactions) {
-      const txKey = "tx";
+      if (this.dboMap.has(TX_KEY)) {
+        throw new Error(
+          `Transaction key ${JSON.stringify(TX_KEY)} clashes with an existing table or view name`,
+        );
+      }
 
       //@ts-ignore
-      this.dbo[txKey] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
+      this.dbo[TX_KEY] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
         cb: TxCB<Promise<R>, TH>,
       ) => this.getTX(cb);
     }

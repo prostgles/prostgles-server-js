@@ -1,6 +1,6 @@
 import { strict as assert } from "assert";
 import type { DBHandlerClient, AuthHandler } from "./client";
-import { DBSchemaTable, omitKeys, type AnyObject } from "prostgles-types";
+import { type DBSchemaTable, omitKeys, type AnyObject } from "prostgles-types";
 import { describe, test } from "node:test";
 
 export const clientRestApi = async (
@@ -11,13 +11,13 @@ export const clientRestApi = async (
   const rest = async (
     { tableName, command, noAuth }: { tableName: string; command: string; noAuth?: boolean },
     ...params: any[]
-  ) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...(params ?? []));
+  ) => post({ path: `db/${tableName}/${command}`, noAuth, token }, ...params);
   const dbRest = (tableName: string, command: string, ...params: any[]) =>
-    rest({ tableName, command }, ...(params ?? []));
+    rest({ tableName, command }, ...params);
   const dbRestNoAuth = (tableName: string, command: string, ...params: any[]) =>
-    rest({ tableName, command, noAuth: true }, ...(params ?? []));
+    rest({ tableName, command, noAuth: true }, ...params);
   const sqlRest = (query: string, ...params: any[]) =>
-    post({ path: `db/sql`, token }, query, ...(params ?? []));
+    post({ path: `db/sql`, token }, query, ...params);
   const dbMethod = (methodName: string, input?: unknown) =>
     post({ path: `methods/${methodName}`, token, onlyFirstParam: true }, input);
 
@@ -25,8 +25,8 @@ export const clientRestApi = async (
     await test("Rest api test", async () => {
       const dataFilter = { id: 123123123, last_updated: Date.now() };
       const dataFilter1 = { id: 123123124, last_updated: Date.now() };
-      await db.planes.insert?.(dataFilter);
-      const item = await db.planes.findOne?.(dataFilter);
+      await db.planes?.insert?.(dataFilter);
+      const item = await db.planes?.findOne?.(dataFilter);
       const itemR = await dbRest("planes", "findOne", dataFilter);
       /** last_updated excluded from select.fields and select.filterFields */
       assert.deepStrictEqual(
@@ -45,7 +45,7 @@ export const clientRestApi = async (
 
       await dbRest("planes", "insert", dataFilter1);
       const filter = { "id.>=": dataFilter.id };
-      const count = await db.planes.count?.(filter);
+      const count = await db.planes?.count?.(filter);
       const restCount = await dbRest("planes", "count", filter);
       assert.equal(count, 2);
       assert.equal(restCount, 2);
@@ -53,16 +53,20 @@ export const clientRestApi = async (
       const sqlRes = await sqlRest("select 1 as a", {}, { returnType: "rows" });
       assert.deepStrictEqual(sqlRes, [{ a: 1 }]);
 
-      const restTableSchema = await post({ path: "schema", token });
-      assert.deepStrictEqual(tableSchema, restTableSchema.tableSchema);
-      const planesTable = restTableSchema.tableSchema.find((table) => table.name === "planes") as
+      const restTableSchema: typeof tableSchema = (await post({ path: "schema", token }))
+        .tableSchema;
+
+      assert.deepStrictEqual(tableSchema, restTableSchema);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const planesTable = restTableSchema.find((table) => table.name === "planes") as
         | (DBSchemaTable & {
             clientSchemaTest?: { sid?: string; tableIndex: number };
           })
         | undefined;
       assert.equal(planesTable?.clientSchemaTest?.sid, token);
 
-      const idColumn = planesTable?.columns.find((column) => column.name === "id") as
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const idColumn = planesTable.columns.find((column) => column.name === "id") as
         | (DBSchemaTable["columns"][number] & {
             clientSchemaTest?: { sid?: string; columnIndex: number };
           })
@@ -81,7 +85,7 @@ export const clientRestApi = async (
             const restCols = await dbRest(name, "getColumns", {});
             assert.deepStrictEqual(columns, cols);
             assert.deepStrictEqual(columns.map(withoutPassCount), restCols.map(withoutPassCount));
-            assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info));
+            assert.deepStrictEqual(withoutPassCount(otherInfo), withoutPassCount(info!));
             if (name === "planes") {
               assert.ok(restCols.length);
               for (const column of restCols) {
@@ -145,7 +149,7 @@ const post = async (
   });
 
   const body =
-    !params?.length ? undefined
+    !params.length ? undefined
     : onlyFirstParam ? JSON.stringify(params[0])
     : JSON.stringify(params);
   const res = await fetch(`http://127.0.0.1:3001/api/${path}`, {

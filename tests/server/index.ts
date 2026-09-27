@@ -24,10 +24,10 @@ http.listen(3001);
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
-import { DBGeneratedSchema } from "../DBGeneratedSchema";
+import { type DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
-import type { DBOFullyTyped } from "prostgles-server";
+import type { DBHandlerServer, DBOFullyTyped } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs: unknown[] = [];
@@ -88,11 +88,10 @@ function dd() {
   const dbo: DBOFullyTyped<{
     tbl: { is_view: true; columns: { col1: { type: number } } };
   }> = 1 as any;
-  if (!dbo) return;
-  dbo.tbl.find;
+  void dbo.tbl.find;
 }
 
-(async () => {
+void (async () => {
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
     await prostgles<DBGeneratedSchema>({
       dbConnection,
@@ -105,7 +104,7 @@ function dd() {
     });
   }
 
-  prostgles<DBGeneratedSchema>({
+  void prostgles<DBGeneratedSchema>({
     dbConnection,
     sqlFilePath: path.join(__dirname + "/../../init.sql"),
     io,
@@ -113,7 +112,7 @@ function dd() {
     tsGeneratedTypesFunctionsPath: path.join(__dirname + "/../../index.ts"),
     transactions: true,
     schemaFilter: { public: 1, prostgles_test: 1 },
-    onLog: async (ev) => {
+    onLog: (ev) => {
       logs.push(ev);
       logs = logs.slice(-10);
       if (ev.type === "sync" && ev.command === "replicationError") {
@@ -159,7 +158,7 @@ function dd() {
       if (isClientTest) {
         log("Client connected -> console does not work. use log function. socket.id:", socket.id);
         socket.emit("start-test", { server_id: Math.random() });
-        socket.on("log", async (data, cb) => {
+        socket.on("log", (data, cb) => {
           console.log("Client log ", data);
           if (typeof data === "string" && data.includes("show-logs")) {
             log(data);
@@ -168,7 +167,7 @@ function dd() {
         socket.on("reattach-syncs", () => {
           socket.emit(CHANNELS.SCHEMA, socket.prostgles!.values().next().value);
         });
-        socket.on("stop-test", async (err, cb) => {
+        socket.on("stop-test", (err, cb) => {
           cb();
           console.log("Client test " + (!err ? "successful" : "failed"));
           stopTest(err);
@@ -183,13 +182,13 @@ function dd() {
     },
     auth: {
       sidKeyName: "token",
-      getUser: async (sid) => {
+      getUser: (sid) => {
         if (!sid) return;
         const s = sessions.find((s) => s.id === sid);
         if (!s) {
           return;
         }
-        const user = users.find((u) => s && s.user_id === u.id);
+        const user = users.find((u) => s.user_id === u.id);
         if (!user) {
           return;
         }
@@ -204,16 +203,16 @@ function dd() {
           },
         };
       },
-      findUser: async (userFilter, dbo) => dbo.users.findOne(userFilter) as any,
+      findUser: (userFilter, dbo) => dbo.users.findOne(userFilter) as any,
       cacheSession: {
-        getSession: async (sid) => {
+        getSession: (sid) => {
           const s = sessions.find((s) => s.id === sid);
           return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
         },
       },
       loginSignupConfig: {
         app,
-        login: async (loginData) => {
+        login: (loginData) => {
           if (loginData.type !== "username") throw "Only username login is supported";
           const { username, password } = loginData;
           const u = users.find((u) => u.username === username && u.password === password);
@@ -241,7 +240,7 @@ function dd() {
               clientSecret: "GITHUB",
             },
           },
-          onProviderLoginStart: async () => ({ success: true }),
+          onProviderLoginStart: () => ({ success: true }),
           onProviderLoginFail: console.error,
         },
       },
@@ -271,7 +270,7 @@ function dd() {
           }),
           myfuncWithBadReturn: defineFunction({
             input: { arg1: { type: "number" } },
-            run: async () => "222",
+            run: () => "222",
           }),
           myfuncWithComplexReturn: defineFunction({
             input: { arg1: { type: "number" } },
@@ -319,7 +318,7 @@ function dd() {
       },
     },
     publish: testPublish,
-    publishRawSQL: async (params) => {
+    publishRawSQL: (params) => {
       return true; // Boolean(user && user.type === "admin")
     },
     modifyClientSchema: (table, tableConfig, userData) => {
@@ -420,9 +419,9 @@ function dd() {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
-          await serverOnlyQueries(dbo as any, db, withUserRLS);
+          await serverOnlyQueries(dbo as unknown as DBHandlerServer, db, withUserRLS);
           log("Server-only query tests successful");
-          await isomorphicQueries(dbo as any, sql, log);
+          await isomorphicQueries(dbo, sql, log);
           log("Server isomorphic tests successful");
 
           stopTest();

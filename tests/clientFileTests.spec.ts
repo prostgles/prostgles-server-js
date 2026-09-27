@@ -1,14 +1,14 @@
 import { strict as assert } from "assert";
 import fs from "fs";
 import { describe, test } from "node:test";
-import type { DBHandlerClient } from "./client";
 import type { AnyObject, SQLHandler } from "prostgles-types";
+import type { DBHandlerClient } from "./client";
 
 export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
   await describe("clientFileTests", async () => {
     const fileFolder = `${__dirname}/../../server/dist/server/media/`;
-    const getFiles = () => sql?.("SELECT id, original_name FROM files", {}, { returnType: "rows" });
-    await sql?.(
+    const getFiles = () => sql("SELECT id, original_name FROM files", {}, { returnType: "rows" });
+    await sql(
       `
       ALTER TABLE users_public_info 
       DROP CONSTRAINT "users_public_info_avatar_fkey";
@@ -28,7 +28,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
      * and show only show files that are referenced by users_public_info
      */
     await test("Files table is present", async () => {
-      const files = await db.files.find!();
+      const files = await db.files!.find!();
       assert.deepStrictEqual(files, []);
     });
 
@@ -38,33 +38,33 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
     };
     let insertedFile: AnyObject;
     await test("Insert file from nested insert", async () => {
-      const nestedInsert = await db.users_public_info.insert!(
+      const nestedInsert = await db.users_public_info!.insert!(
         { name: "somename.txt", avatar: file },
         { returning: "*" },
       );
-      const files = await db.files.find!();
+      const files = await db.files!.find!();
       assert.equal(files.length, 1);
-      assert.equal(files[0].id, nestedInsert.avatar.id);
-      assert.equal(files[0].original_name, file.original_name);
-      const initialFileStr = fs.readFileSync(fileFolder + files[0].storage_key).toString("utf8");
+      assert.equal(files[0]!.id, nestedInsert.avatar.id);
+      assert.equal(files[0]!.original_name, file.original_name);
+      const initialFileStr = fs.readFileSync(fileFolder + files[0]!.storage_key).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
-      insertedFile = files[0];
-      const versions = await db.files_versions.find!({
+      insertedFile = files[0]!;
+      const versions = await db.files_versions!.find!({
         file_id: insertedFile.id,
       });
       assert.equal(versions.length, 1);
-      assert.equal(versions[0].version, 1);
-      assert.deepEqual(versions[0].metadata, {
+      assert.equal(versions[0]!.version, 1);
+      assert.deepEqual(versions[0]!.metadata, {
         description: "Updated by afterEach hook",
       });
-      assert.equal(db.files_versions.insert, undefined);
-      assert.equal(db.files_versions.update, undefined);
-      assert.equal(db.files_versions.delete, undefined);
+      assert.equal(db.files_versions!.insert, undefined);
+      assert.equal(db.files_versions!.update, undefined);
+      assert.equal(db.files_versions!.delete, undefined);
     });
 
     await test("Cannot Insert file directly", async () => {
       try {
-        await db.files.insert!(file, { returning: "*" });
+        await db.files!.insert!(file, { returning: "*" });
         throw "Should not be able to insert files directly";
       } catch (err: any) {
         assert.equal(err.message.startsWith("Direct inserts not allowed"), true);
@@ -77,9 +77,9 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         insertedFile.id,
       ]);
       try {
-        assert.ok(!(await db.files.findOne!({ id: insertedFile.id })));
-        assert.deepEqual(await db.files_versions.find!({ file_id: insertedFile.id }), []);
-        const rows = await db.files.update!(
+        assert.ok(!(await db.files!.findOne!({ id: insertedFile.id })));
+        assert.deepEqual(await db.files_versions!.find!({ file_id: insertedFile.id }), []);
+        const rows = await db.files!.update!(
           { id: insertedFile.id },
           {
             data: Buffer.from("unauthorized replacement"),
@@ -89,7 +89,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         );
         assert.deepEqual(rows, []);
         assert.deepEqual(
-          await db.users_public_info.update!(
+          await db.users_public_info!.update!(
             { avatar: insertedFile.id },
             { avatar: file },
             { returning: "*" },
@@ -111,7 +111,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
     await test("Duplicate file IDs and failed validation preserve the original object", async () => {
       const before = fs.readdirSync(fileFolder).sort();
       await assert.rejects(() =>
-        db.users_public_info.insert!({
+        db.users_public_info!.insert!({
           name: "duplicate",
           avatar: {
             ...file,
@@ -121,7 +121,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         }),
       );
       await assert.rejects(() =>
-        db.files.update!(
+        db.files!.update!(
           { id: insertedFile.id },
           { data: Buffer.from("invalid"), original_name: "missing-extension" },
         ),
@@ -138,8 +138,8 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         data: Buffer.from("# Replacement markdown", "utf-8"),
         original_name: "replacement.md",
       };
-      await db.files.update!({ id: insertedFile.id }, newData);
-      const newFiles = await db.files.find!();
+      await db.files!.update!({ id: insertedFile.id }, newData);
+      const newFiles = await db.files!.find!();
       assert.equal(newFiles.length, 1);
       const [newFile] = newFiles;
       assert.equal(newFile?.original_name, newData.original_name);
@@ -155,7 +155,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       );
       assert.notEqual(newFile.storage_key, insertedFile.storage_key);
       assert.equal(fs.existsSync(fileFolder + insertedFile.storage_key), true);
-      const versions = await db.files_versions.find!(
+      const versions = await db.files_versions!.find!(
         { file_id: insertedFile.id },
         { orderBy: "version" },
       );
@@ -167,13 +167,13 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
         versions.map(({ metadata }) => metadata),
         Array(2).fill({ description: "Updated by afterEach hook" }),
       );
-      const previousFile = await fetch(`http://localhost:3001${versions[0].url}`, {
+      const previousFile = await fetch(`http://localhost:3001${versions[0]!.url}`, {
         headers: {
           Authorization: `Bearer ${Buffer.from("files").toString("base64")}`,
         },
       });
       assert.equal(await previousFile.text(), file.data.toString());
-      const disallowedPreviousFile = await fetch(`http://localhost:3001${versions[0].url}`, {
+      const disallowedPreviousFile = await fetch(`http://localhost:3001${versions[0]!.url}`, {
         headers: {
           Authorization: `Bearer ${Buffer.from("files_versions_denied").toString("base64")}`,
         },
@@ -182,36 +182,36 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
     });
 
     await test("Can insert allowed files through a nested update", async () => {
-      await db.files.delete!();
-      const user = await db.users_public_info.findOne!();
+      await db.files!.delete!();
+      const user = await db.users_public_info!.findOne!();
       const newData = {
         data: Buffer.from("nestedupdate", "utf-8"),
         original_name: "nestedupdate.txt",
       };
-      const d = await db.users_public_info.update!(
+      const d = await db.users_public_info!.update!(
         { id: user?.id },
         { avatar: newData },
         { returning: "*" },
       );
       const avatarRow = d?.at(0)?.avatar;
-      const avatarFile = await db.files.findOne?.({ id: avatarRow.id });
+      const avatarFile = await db.files!.findOne?.({ id: avatarRow.id });
       const initialFileStr = fs.readFileSync(fileFolder + avatarFile?.storage_key).toString("utf8");
       assert.equal(newData.data.toString(), initialFileStr);
     });
 
     await test("Can delete only allowed files directly", async () => {
-      const users = await db.users_public_info.find!();
+      const users = await db.users_public_info!.find!();
       for (const user of users) {
-        await db.files.delete!({ id: user.avatar.id });
-        await db.users_public_info.delete!({ id: user.id });
+        await db.files!.delete!({ id: user.avatar.id });
+        await db.users_public_info!.delete!({ id: user.id });
       }
 
-      await db.users_public_info.delete!();
-      const files = await db.files.find!();
+      await db.users_public_info!.delete!();
+      const files = await db.files!.find!();
       assert.deepStrictEqual(files, []);
-      assert.deepStrictEqual(await db.files_versions.find!(), []);
+      assert.deepStrictEqual(await db.files_versions!.find!(), []);
       const latestFiles = await getFiles();
-      assert.equal(initialFiles?.length, latestFiles?.length);
+      assert.equal(initialFiles.length, latestFiles.length);
     });
   });
 };

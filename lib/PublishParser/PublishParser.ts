@@ -129,10 +129,11 @@ export class PublishParser {
               };
               return unrestrictedCtx;
             }
-            const { clientDb } = await publishParams.getClientDBHandlers(undefined);
+            const { clientDb, withClientDbTx } = await publishParams.getClientDBHandlers(undefined);
             const { clientInfo, clientReq, tables } = publishParams;
             const restrictedCtx: RestrictedFunctionContext<void, SessionUser, unknown> = {
               dbo: clientDb,
+              withClientDbTx,
               user,
               clientInfo,
               clientReq,

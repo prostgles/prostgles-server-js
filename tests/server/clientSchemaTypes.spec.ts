@@ -1,34 +1,45 @@
-import { DB_GENERATED_NAMES } from "prostgles-server/dist/DBSchemaBuilder/constants";
+import express from "express";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import prostgles, {
-  type DBHandlerServer,
+  DB_GENERATED_NAMES,
+  defineFunction,
   getLocalStorageClient,
   type ProstglesInitOptions,
   type PublishContextValue,
 } from "prostgles-server";
-import type { DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import { CHANNELS, type ClientSchema } from "prostgles-types";
+import type { DB } from "prostgles-server/dist/Prostgles";
+import { CHANNELS, type AnyObject, type ClientSchema } from "prostgles-types";
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
 import ts from "typescript";
-import express from "express";
 
 export const testClientSchemaTypes = async (db: DB) => {
   await test(
     "client publish profiles compile at startup and follow user types",
     { timeout: 30000 },
-    async () => {
+    async (t) => {
       const http = createServer();
       const io = new Server(http);
       const sockets: Socket[] = [];
-      let instance: Awaited<ReturnType<typeof prostgles>> | undefined;
+      let instance:
+        | Pick<
+            Awaited<ReturnType<typeof prostgles>>,
+            | "update"
+            | "db"
+            | "destroy"
+            | "getTSSchema"
+            | "reWriteDBSchema"
+            | "options"
+            | "getClientDBHandlers"
+          >
+        | undefined;
       const suffix = randomUUID().slice(0, 8);
       const schemaName = `client_schema_types_${suffix}`;
       const tableName = "correspondence";
@@ -61,6 +72,7 @@ export const testClientSchemaTypes = async (db: DB) => {
             options: `-c search_path=${schemaName}`,
           } as unknown as ProstglesInitOptions["dbConnection"],
           tsGeneratedTypesDir: generatedTypesDir,
+          transactions: true,
           schemaFilter: { [schemaName]: 1 },
           tableConfig: {
             [tableName]: {
@@ -77,14 +89,41 @@ export const testClientSchemaTypes = async (db: DB) => {
           io,
           auth: {
             sidKeyName: "token",
-            getUser: async (sid) => {
+            getUser: (sid) => {
               if (!sid) return undefined;
               return {
                 user: { id: `user-${sid}`, type: sid },
                 clientUser: { id: sid, type: sid },
               };
             },
-            findUser: async () => undefined,
+            findUser: (filter) =>
+              (
+                "$and" in filter &&
+                filter.$and?.every((condition: AnyObject) => condition.id === "user-guest")
+              ) ?
+                { id: "user-guest", type: "guest" }
+              : undefined,
+          },
+          functions: {
+            guest: {
+              userFilter: { id: "user-guest" },
+              functions: {
+                transactionTest: defineFunction({
+                  input: { fail: "boolean" },
+                  run: ({ fail }, { withClientDbTx }) =>
+                    withClientDbTx(async (tx) => {
+                      const row = await tx[tableName]!.insert!(
+                        { body: fail ? "function-rollback" : "function-commit" },
+                        { returning: "*" },
+                      );
+                      if (fail) {
+                        await tx[tableName]!.update!({ id: row.id }, { internal: "forbidden" });
+                      }
+                      return row;
+                    }),
+                }),
+              },
+            },
           },
           publish: [
             {
@@ -101,14 +140,21 @@ export const testClientSchemaTypes = async (db: DB) => {
                   },
                   update: {
                     fields: ["body", "note", "created_by", "synced"],
+                    disableMethods: { updateBatch: 1 },
+                    postValidate: ({ row }) => {
+                      if (row.body === "denied-by-post-validate") {
+                        throw new Error("Update rejected by postValidate");
+                      }
+                    },
                     forcedData: {
-                      created_by: userIdContextValue as unknown as string,
+                      created_by: userIdContextValue,
                     },
                   },
                   insert: {
                     fields: { internal: 0 },
+                    checkFilter: { body: { $ne: "denied-by-check-filter" } },
                     forcedData: {
-                      created_by: userIdContextValue as unknown as string,
+                      created_by: userIdContextValue,
                     },
                   },
                 },
@@ -133,10 +179,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         const { tsSchema } = await instance.getTSSchema();
         assert.doesNotMatch(tsSchema, /\bimport(?:\s|\()/);
         assert.equal(
-          readFileSync(
-            path.join(generatedTypesDir, `${DB_GENERATED_NAMES.SCHEMA}.ts`),
-            "utf8",
-          ),
+          readFileSync(path.join(generatedTypesDir, `${DB_GENERATED_NAMES.SCHEMA}.ts`), "utf8"),
           tsSchema,
         );
         await instance.reWriteDBSchema();
@@ -176,6 +219,23 @@ export const testClientSchemaTypes = async (db: DB) => {
           const restrictedRow = await restricted.dbo["${tableName}"].insert({ body: "hello" }, { returning: "*" });
           restrictedRow.created_by satisfies string;
           await handlers.clientDb["${tableName}"].update({}, { body: "changed" });
+          const transactionResult = await handlers.withClientDbTx(async (tx) => {
+            const row = await tx["${tableName}"].insert({ body: "transaction" }, { returning: "*" });
+            row.created_by satisfies string;
+            // @ts-expect-error transactions preserve profile field restrictions
+            await tx["${tableName}"].update({}, { internal: "private" });
+            // @ts-expect-error transactions do not expose unpublished tables
+            await tx["${privateTableName}"].find();
+            // @ts-expect-error transactions do not expose raw SQL
+            tx.sql("SELECT 1");
+            // @ts-expect-error transactions do not expose nested transactions
+            tx.tx(() => {});
+            return row.id;
+          });
+          transactionResult satisfies number;
+          restricted.withClientDbTx satisfies typeof handlers.withClientDbTx;
+          // @ts-expect-error callbacks do not receive the unrestricted SQL transaction
+          handlers.withClientDbTx((tx, rawTx) => rawTx.any("SELECT 1"));
           // @ts-expect-error getClientHandlers preserves profile field restrictions
           await handlers.clientDb["${tableName}"].update({}, { internal: "private" });
           // @ts-expect-error restricted functions respect forced insert fields
@@ -272,7 +332,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           ["member", "MemberDBSchema"],
           ["unknown", "UnknownDBSchema"],
           ["", "AnonymousDBSchema"],
-        ]) {
+        ] as const) {
           const socket = createClient(`http://127.0.0.1:${address.port}`, {
             transports: ["websocket"],
             reconnection: false,
@@ -295,7 +355,29 @@ export const testClientSchemaTypes = async (db: DB) => {
         const serverSocket = io.sockets.sockets.get(sockets[0]!.id!);
         assert(serverSocket);
         const handlers = await instance.getClientDBHandlers({ socket: serverSocket }, undefined);
-        const inserted = await (handlers.clientDb as DBHandlerServer)[tableName]!.insert!(
+        assert.equal(privateTableName in handlers.clientDb, false);
+        assert.equal("delete" in handlers.clientDb[tableName]!, false);
+        assert.equal(typeof handlers.clientDb[tableName]!.upsert, "function");
+        assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
+        assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
+        const viewerSocket = io.sockets.sockets.get(sockets[2]!.id!);
+        assert(viewerSocket);
+        const viewerHandlers = await instance.getClientDBHandlers(
+          { socket: viewerSocket },
+          undefined,
+        );
+        assert.deepEqual(Object.keys(viewerHandlers.clientDb).sort(), [tableName]);
+        assert.deepEqual(Object.keys(viewerHandlers.clientDb[tableName]!).sort(), [
+          "count",
+          "find",
+          "findOne",
+          "getColumns",
+          "getInfo",
+          "size",
+          "subscribe",
+          "subscribeOne",
+        ]);
+        const inserted = await handlers.clientDb[tableName]!.insert!(
           { body: "hello" },
           { returning: "*" },
         );
@@ -306,22 +388,132 @@ export const testClientSchemaTypes = async (db: DB) => {
           { body: "updated" },
           { returning: "*" },
         );
-        assert.equal(updated![0].body, "updated");
-        assert.equal(updated![0].created_by, "user-guest");
+        assert.equal(updated![0]!.body, "updated");
+        assert.equal(updated![0]!.created_by, "user-guest");
         assert.equal(
-          (
-            await (handlers.clientDb as DBHandlerServer)[tableName]!.findOne!({
-              id: inserted.id,
-            })
-          ).created_by,
+          (await handlers.clientDb[tableName]!.findOne!({
+            id: inserted.id,
+          }))!.created_by,
           "user-guest",
         );
         await assert.rejects(
-          (handlers.clientDb as DBHandlerServer)[tableName]!.update!(
-            { id: inserted.id },
-            { internal: "forbidden" },
-          ),
+          handlers.clientDb[tableName]!.update!({ id: inserted.id }, { internal: "forbidden" }),
         );
+        const transactionRow = await handlers.withClientDbTx(async (...args) => {
+          assert.equal(args.length, 1);
+          const [tx] = args;
+          assert.equal("sql" in tx, false);
+          const row = await tx[tableName]!.insert!(
+            { body: "transaction", created_by: "other" },
+            { returning: "*" },
+          );
+          assert.equal(row.created_by, "user-guest");
+          assert.equal(await tx[tableName]!.count!({ id: row.id }), 1);
+          assert.equal(await handlers.clientDb[tableName]!.count!({ id: row.id }), 0);
+          await tx[tableName]!.update!({ id: row.id }, { body: "committed" });
+          return tx[tableName]!.findOne!({ id: row.id });
+        });
+        assert.equal(transactionRow!.body, "committed");
+        assert.equal(await handlers.clientDb[tableName]!.count!({ id: transactionRow!.id }), 1);
+        await instance.db[tableName]!.insert!({ body: "hidden", created_by: "other" });
+        await handlers.withClientDbTx(async (tx) => {
+          assert.equal(await tx[tableName]!.count!({ body: "hidden" }), 0);
+          assert.equal(privateTableName in tx, false);
+          assert.equal("delete" in tx[tableName]!, false);
+          assert.equal("db" in tx[tableName]!, false);
+          assert.equal("tx" in tx[tableName]!, false);
+        });
+        await t.test("caught subscription errors still roll back client transactions", async () => {
+          const row = { body: "before-subscription-failure" };
+          const error = { message: /subscribe/ };
+          await assert.rejects(
+            handlers.withClientDbTx(async (tx) => {
+              await tx[tableName]!.insert!(row);
+              await assert.rejects(tx[tableName]!.subscribe!({}, {}, undefined as any), error);
+            }),
+            error,
+          );
+          assert.equal(await handlers.clientDb[tableName]!.count!(row), 0);
+        });
+        for (const failure of ["throw", "permission", "database"] as const) {
+          const body = `rollback-${failure}`;
+          await assert.rejects(
+            handlers.withClientDbTx(async (tx) => {
+              await tx[tableName]!.insert!({ body });
+              if (failure === "permission") {
+                await tx[tableName]!.update!({}, { internal: "forbidden" });
+              } else if (failure === "database") {
+                await tx[tableName]!.insert!({ id: transactionRow!.id, body });
+              } else {
+                throw new Error("rollback");
+              }
+            }),
+          );
+          assert.equal(await handlers.clientDb[tableName]!.count!({ body }), 0);
+        }
+        await t.test("caught checkFilter errors still roll back client transactions", async () => {
+          const row = { body: "denied-by-check-filter" };
+          const error = { message: /failed the check condition/ };
+          await assert.rejects(handlers.clientDb[tableName]!.insert!(row), error);
+          assert.equal(await handlers.clientDb[tableName]!.count!(row), 0);
+
+          await assert.rejects(
+            handlers.withClientDbTx(async (tx) => {
+              await tx[tableName]!.insert!({ body: "before-check-filter-failure" });
+              await assert.rejects(tx[tableName]!.insert!(row), error);
+              await assert.rejects(tx[tableName]!.update!({}, { internal: "forbidden" }));
+            }),
+            error,
+          );
+          assert.equal(await handlers.clientDb[tableName]!.count!(row), 0);
+          assert.equal(
+            await handlers.clientDb[tableName]!.count!({ body: "before-check-filter-failure" }),
+            0,
+          );
+        });
+        await t.test("caught postValidate errors still roll back client transactions", async () => {
+          const error = { message: "Update rejected by postValidate" };
+          await assert.rejects(
+            handlers.withClientDbTx(async (tx) => {
+              await assert.rejects(
+                tx[tableName]!.update!(
+                  { id: transactionRow!.id },
+                  { body: "denied-by-post-validate" },
+                ),
+                error,
+              );
+            }),
+            error,
+          );
+          const row = await handlers.clientDb[tableName]!.findOne!({ id: transactionRow!.id });
+          assert.equal(row!.body, "committed");
+        });
+        const scopedHandlers = await instance.getClientDBHandlers(
+          { socket: serverSocket },
+          { tables: { [tableName]: { select: { forcedFilter: { body: "committed" } } } } },
+        );
+        assert.deepEqual(Object.keys(scopedHandlers.clientDb).sort(), [tableName]);
+        assert.equal("insert" in scopedHandlers.clientDb[tableName]!, false);
+        assert.equal("update" in scopedHandlers.clientDb[tableName]!, false);
+        assert.equal("upsert" in scopedHandlers.clientDb[tableName]!, false);
+        await scopedHandlers.withClientDbTx(async (tx) => {
+          assert.equal(await tx[tableName]!.count!(), 1);
+          assert.deepEqual(Object.keys(tx).sort(), Object.keys(scopedHandlers.clientDb).sort());
+          assert.deepEqual(
+            Object.keys(tx[tableName]!),
+            Object.keys(scopedHandlers.clientDb[tableName]!),
+          );
+        });
+        const functionRow = await handlers.clientMethods.transactionTest!.run({ fail: false });
+        const committedRow = await handlers.clientDb[tableName]!.findOne!({
+          body: "function-commit",
+        });
+        assert.equal(committedRow!.created_by, "user-guest");
+        assert.deepEqual(functionRow, committedRow);
+        await assert.rejects(
+          () => handlers.clientMethods.transactionTest!.run({ fail: true }) as any,
+        );
+        assert.equal(await handlers.clientDb[tableName]!.count!({ body: "function-rollback" }), 0);
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
         await instance.update({ publish: originalPublish });
@@ -372,10 +564,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert(updatedSchema.includes("export type Publish1Schema"));
         assert(!updatedSchema.includes("GuestDBSchema"));
         assert.equal(
-          readFileSync(
-            path.join(generatedTypesDir, `${DB_GENERATED_NAMES.SCHEMA}.ts`),
-            "utf8",
-          ),
+          readFileSync(path.join(generatedTypesDir, `${DB_GENERATED_NAMES.SCHEMA}.ts`), "utf8"),
           updatedSchema,
         );
         await instance.update({ publish: originalPublish });
@@ -401,6 +590,7 @@ const checkTypes = (schema: string, checks: string) => {
     moduleResolution: ts.ModuleResolutionKind.Node10,
   };
   const host = ts.createCompilerHost(options);
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const getSourceFile = host.getSourceFile;
   host.getSourceFile = (name, languageVersion, onError, shouldCreateNewSourceFile) =>
     name === filename ?

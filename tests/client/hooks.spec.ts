@@ -14,61 +14,65 @@ export const clientHooks = async (
   await describe("React hooks", async (t) => {
     const defaultFilter = { name: "abc" };
     await Promise.all(
-      ["useFind", "useSubscribe", "useFindOne", "useSubscribeOne"].map(async (hookName) => {
-        await test(hookName, async (t) => {
-          const expectsOne = hookName.includes("One");
-          const options = {
-            select: { added: "$Mon" },
-            limit: expectsOne ? undefined : 1,
-          };
-          const expectedData = expectsOne ? { added: "Dec" } : [{ added: "Dec" }];
-          const { rerender, results } = await renderReactHook({
-            hook: db.items4[hookName]!,
-            props: [{ name: "abc" }, options],
-            expectedRerenders: 2,
-          });
+      (["useFind", "useSubscribe", "useFindOne", "useSubscribeOne"] as const).map(
+        async (hookName) => {
+          await test(hookName, async (t) => {
+            const expectsOne = hookName.includes("One");
+            const options = {
+              select: { added: "$Mon" },
+              limit: expectsOne ? undefined : 1,
+            };
+            const expectedData = expectsOne ? { added: "Dec" } : [{ added: "Dec" }];
+            const { rerender, results } = await renderReactHook({
+              hook: db.items4![hookName]!,
+              props: [{ name: "abc" }, options],
+              expectedRerenders: 2,
+            });
 
-          assert.deepStrictEqual(results, [
-            resultLoading,
-            { data: expectedData, isLoading: false, error: undefined },
-          ]);
+            assert.deepStrictEqual(results, [
+              resultLoading,
+              { data: expectedData, isLoading: false, error: undefined },
+            ]);
 
-          const { results: errorResults } = await rerender({
-            props: [{ named: "error" }, options],
-            expectedRerenders: 2,
-          });
+            const { results: errorResults } = await rerender({
+              props: [{ named: "error" }, options],
+              expectedRerenders: 2,
+            });
 
-          assert.deepStrictEqual(errorResults, [
-            resultLoading,
-            {
-              data: undefined,
-              isLoading: false,
-              error: {
-                message:
-                  'items4.named is invalid/disallowed for filtering. Allowed columns: added, "id", "public", "name"',
+            assert.deepStrictEqual(errorResults, [
+              resultLoading,
+              {
+                data: undefined,
+                isLoading: false,
+                error: {
+                  message:
+                    'items4.named is invalid/disallowed for filtering. Allowed columns: added, "id", "public", "name"',
+                },
               },
-            },
-          ]);
-        });
-      })
+            ]);
+          });
+        },
+      ),
     );
 
     await Promise.all(
-      [
-        {
-          hookName: "useCount",
-          result1: { data: 2, error: undefined, isLoading: false },
-          result2: { data: 0, error: undefined, isLoading: false },
-        },
-        {
-          hookName: "useSize",
-          result1: { data: "93", error: undefined, isLoading: false },
-          result2: { data: "0", error: undefined, isLoading: false },
-        },
-      ].map(async ({ hookName, result1, result2 }) => {
+      (
+        [
+          {
+            hookName: "useCount",
+            result1: { data: 2, error: undefined, isLoading: false },
+            result2: { data: 0, error: undefined, isLoading: false },
+          },
+          {
+            hookName: "useSize",
+            result1: { data: "93", error: undefined, isLoading: false },
+            result2: { data: "0", error: undefined, isLoading: false },
+          },
+        ] as const
+      ).map(async ({ hookName, result1, result2 }) => {
         await test(hookName, async (t) => {
           const { results, rerender } = await renderReactHook({
-            hook: db.items4[hookName]!,
+            hook: db.items4![hookName]!,
             props: [defaultFilter],
             expectedRerenders: 2,
           });
@@ -85,12 +89,12 @@ export const clientHooks = async (
           // New results
           assert.deepStrictEqual(noResults, [resultLoading, result2]);
         });
-      })
+      }),
     );
 
     await test("useCount planes", async (t) => {
       const { results } = await renderReactHook({
-        hook: db.planes.useCount!,
+        hook: db.planes!.useCount!,
         props: [{}],
         expectedRerenders: 2,
       });
@@ -130,7 +134,7 @@ export const clientHooks = async (
 
       const props = [{ id: 0 }, { handlesOnData: true }]; // , select: { id: 1, x: 1 }
       const { results, rerender } = await renderReactHook({
-        hook: db.planes.useSync!,
+        hook: db.planes!.useSync!,
         props,
         expectedRerenders: 3,
       });
@@ -153,7 +157,7 @@ export const clientHooks = async (
       assert.deepStrictEqual(pickKeys(lastDataItem, Object.keys(plane0)), plane0);
 
       // Update item
-      await db.planes.update!({ id: 0 }, { x: 230 });
+      await db.planes!.update!({ id: 0 }, { x: 230 });
       const { results: deletedResults } = await rerender({
         props,
         expectedRerenders: 3,
@@ -165,7 +169,7 @@ export const clientHooks = async (
           undefined, // TODO - should be defined and 20
           20,
           230,
-        ]
+        ],
       );
 
       // // Rerender with different filter
@@ -189,19 +193,16 @@ export const clientHooks = async (
     });
 
     await test("useSync updates invalidate useMemo without mutating old data", async () => {
-      await db.planes.update!({ id: 0 }, { x: 20 });
+      await db.planes!.update!({ id: 0 }, { x: 20 });
 
       let memoRun = 0;
       const useSyncWithMemo = () => {
-        const result = db.planes.useSync!<
-          { id: number; x: number },
-          { handlesOnData: true }
-        >({ id: 0 }, { handlesOnData: true });
-        const { data } = result;
-        const memoized = React.useMemo(
-          () => ({ run: ++memoRun, x: data?.[0]?.x }),
-          [data],
+        const result = db.planes!.useSync!<{ id: number; x: number }, { handlesOnData: true }>(
+          { id: 0 },
+          { handlesOnData: true },
         );
+        const { data } = result;
+        const memoized = React.useMemo(() => ({ run: ++memoRun, x: data?.[0]?.x }), [data]);
         return { ...result, data, memoized };
       };
 
@@ -218,62 +219,56 @@ export const clientHooks = async (
         const initialMemoRun = initialResult.memoized.run;
         assert.equal(initialResult.memoized.x, 20);
 
-        await db.planes.update!({ id: 0 }, { x: 231 });
+        await db.planes!.update!({ id: 0 }, { x: 231 });
         await waitFor(() => getLatest().data?.[0]?.x === 231);
 
         const serverUpdateResult = getLatest();
         assert.equal(serverUpdateResult.memoized.x, 231);
         assert.ok(serverUpdateResult.memoized.run > initialMemoRun);
         assert.notStrictEqual(serverUpdateResult.data, initialResult.data);
-        assert.notStrictEqual(
-          serverUpdateResult.data[0],
-          initialResult.data[0],
-        );
-        assert.equal(initialResult.data[0].x, 20);
+        assert.notStrictEqual(serverUpdateResult.data![0], initialResult.data![0]);
+        assert.equal(initialResult.data![0]!.x, 20);
 
         const serverUpdateMemoRun = serverUpdateResult.memoized.run;
-        await serverUpdateResult.data[0].$update({ x: 232 });
+        await serverUpdateResult.data![0]!.$update({ x: 232 });
         await waitFor(() => getLatest().data?.[0]?.x === 232);
 
         const handleUpdateResult = getLatest();
         assert.equal(handleUpdateResult.memoized.x, 232);
         assert.ok(handleUpdateResult.memoized.run > serverUpdateMemoRun);
         assert.notStrictEqual(handleUpdateResult.data, serverUpdateResult.data);
-        assert.notStrictEqual(
-          handleUpdateResult.data[0],
-          serverUpdateResult.data[0],
-        );
-        assert.equal(serverUpdateResult.data[0].x, 231);
+        assert.notStrictEqual(handleUpdateResult.data![0], serverUpdateResult.data![0]);
+        assert.equal(serverUpdateResult.data![0]!.x, 231);
       } finally {
         rendered.unmount();
       }
     });
 
     await test("concurrent useSync hooks with matching options all update", async () => {
-      await db.planes.update!({ id: 0 }, { x: 30 });
+      await db.planes!.update!({ id: 0 }, { x: 30 });
 
       const filter = { id: 0 };
       const syncOptions = { handlesOnData: true } as const;
       const memoRuns = [0, 0, 0];
       const usePlaneSync = () =>
-        db.planes.useSync!<
-          { id: number; x: number },
-          { handlesOnData: true }
-        >(filter, syncOptions);
+        db.planes!.useSync!<{ id: number; x: number }, { handlesOnData: true }>(
+          filter,
+          syncOptions,
+        );
       const useConcurrentSyncs = () => {
         const syncs = [usePlaneSync(), usePlaneSync(), usePlaneSync()];
         const memoized = [
           React.useMemo(
-            () => ({ run: ++memoRuns[0], x: syncs[0].data?.[0]?.x }),
-            [syncs[0].data],
+            () => ({ run: ++memoRuns[0]!, x: syncs[0]!.data?.[0]?.x }),
+            [syncs[0]!.data],
           ),
           React.useMemo(
-            () => ({ run: ++memoRuns[1], x: syncs[1].data?.[0]?.x }),
-            [syncs[1].data],
+            () => ({ run: ++memoRuns[1]!, x: syncs[1]!.data?.[0]?.x }),
+            [syncs[1]!.data],
           ),
           React.useMemo(
-            () => ({ run: ++memoRuns[2], x: syncs[2].data?.[0]?.x }),
-            [syncs[2].data],
+            () => ({ run: ++memoRuns[2]!, x: syncs[2]!.data?.[0]?.x }),
+            [syncs[2]!.data],
           ),
         ];
         return { syncs, memoized };
@@ -293,27 +288,27 @@ export const clientHooks = async (
         const initialResult = getLatest();
         const initialMemoRuns = initialResult.memoized.map(({ run }) => run);
 
-        await db.planes.update!({ id: 0 }, { x: 31 });
+        await db.planes!.update!({ id: 0 }, { x: 31 });
         await waitFor(() => allSyncsHaveX(31));
 
         const serverUpdateResult = getLatest();
         serverUpdateResult.syncs.forEach((sync, index) => {
-          assert.equal(serverUpdateResult.memoized[index].x, 31);
-          assert.ok(serverUpdateResult.memoized[index].run > initialMemoRuns[index]);
-          assert.notStrictEqual(sync.data, initialResult.syncs[index].data);
-          assert.equal(initialResult.syncs[index].data![0].x, 30);
+          assert.equal(serverUpdateResult.memoized[index]!.x, 31);
+          assert.ok(serverUpdateResult.memoized[index]!.run > initialMemoRuns[index]!);
+          assert.notStrictEqual(sync.data, initialResult.syncs[index]!.data);
+          assert.equal(initialResult.syncs[index]!.data![0]!.x, 30);
         });
 
         const serverUpdateMemoRuns = serverUpdateResult.memoized.map(({ run }) => run);
-        await serverUpdateResult.syncs[0].data![0].$update({ x: 32 });
+        await serverUpdateResult.syncs[0]!.data![0]!.$update({ x: 32 });
         await waitFor(() => allSyncsHaveX(32));
 
         const handleUpdateResult = getLatest();
         handleUpdateResult.syncs.forEach((sync, index) => {
-          assert.equal(handleUpdateResult.memoized[index].x, 32);
-          assert.ok(handleUpdateResult.memoized[index].run > serverUpdateMemoRuns[index]);
-          assert.notStrictEqual(sync.data, serverUpdateResult.syncs[index].data);
-          assert.equal(serverUpdateResult.syncs[index].data![0].x, 31);
+          assert.equal(handleUpdateResult.memoized[index]!.x, 32);
+          assert.ok(handleUpdateResult.memoized[index]!.run > serverUpdateMemoRuns[index]!);
+          assert.notStrictEqual(sync.data, serverUpdateResult.syncs[index]!.data);
+          assert.equal(serverUpdateResult.syncs[index]!.data![0]!.x, 31);
         });
       } finally {
         rendered.unmount();
@@ -325,16 +320,16 @@ export const clientHooks = async (
       const filter = { y };
       const options = { handlesOnData: false } as const;
       const usePlane = () =>
-        db.planes.useSync!<
-          { id: number; x: number; y: number },
-          { handlesOnData: false }
-        >(filter, options);
+        db.planes!.useSync!<{ id: number; x: number; y: number }, { handlesOnData: false }>(
+          filter,
+          options,
+        );
       const usePlanes = () => [usePlane(), usePlane()];
 
-      await db.planes.delete!(filter);
+      await db.planes!.delete!(filter);
       // Exceed the default 50-row snapshot and give the cursor distinct timestamps.
       const start = Date.now() - 1000;
-      await db.planes.insert!(
+      await db.planes!.insert!(
         Array.from({ length: 101 }, (_, index) => ({
           id: 999_000 + index,
           x: 1 + index,
@@ -353,17 +348,15 @@ export const clientHooks = async (
           rendered
             .getResults()
             .at(-1)
-            ?.every(({ data }) =>
-              data?.length === count && data.some((plane) => plane.x === x),
-            );
+            ?.every(({ data }) => data?.length === count && data.some((plane) => plane.x === x));
         await waitFor(() => Boolean(allSyncsHaveX(101, 101)));
 
         await reconnectSocket(true);
-        await db.planes.insert!({ id: 999_999, x: 102, y });
+        await db.planes!.insert!({ id: 999_999, x: 102, y });
         await waitFor(() => Boolean(allSyncsHaveX(102, 102)));
 
         await reconnectSocket();
-        await db.planes.insert!({ id: 1_000_000, x: 103, y });
+        await db.planes!.insert!({ id: 1_000_000, x: 103, y });
         await waitFor(() => Boolean(allSyncsHaveX(103, 103)));
       } catch (error) {
         reconnectTestError = error;

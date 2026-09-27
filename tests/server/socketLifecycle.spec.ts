@@ -33,13 +33,18 @@ export const testSocketLifecycle = async (db: DB) => {
             await beforeGetUser?.();
             return { user, clientUser: user };
           },
-          findUser: async () => user,
+          findUser: () => user,
         },
         onReady: () => {},
         publishRawSQL: () => true,
         restApi: { expressApp: app, path: "/lifecycle" },
       };
-      let instance: Awaited<ReturnType<typeof prostgles>> | undefined;
+
+      const getInstance = () => {
+        return prostgles({ ...options, functions: getFunctions(0) });
+      };
+
+      let instance: Awaited<ReturnType<typeof getInstance>> | undefined;
       try {
         await db.none("DROP SCHEMA IF EXISTS socket_lifecycle_test CASCADE");
         await db.none("CREATE SCHEMA socket_lifecycle_test");
@@ -48,7 +53,7 @@ export const testSocketLifecycle = async (db: DB) => {
         const address = http.address();
         assert(address && typeof address === "object");
         const url = `http://127.0.0.1:${address.port}`;
-        instance = await prostgles({ ...options, functions: getFunctions(0) });
+        instance = await getInstance();
         for (let cycle = 0; cycle < 2; cycle++) {
           const client = connect(url);
           clients.push(client.socket);
@@ -76,7 +81,7 @@ export const testSocketLifecycle = async (db: DB) => {
             };
           });
           const inFlight = assert.rejects(
-            async () => oldHandlers.clientMethods.version.run(),
+            async () => await oldHandlers.clientMethods.version!.run(),
             /instance is destroyed/,
           );
           await authPaused;
@@ -89,7 +94,7 @@ export const testSocketLifecycle = async (db: DB) => {
           assert(http.listening);
           assert.equal((await callHttpMethod(url)).status, 404);
           await assert.rejects(
-            async () => oldHandlers.clientMethods.version.run(),
+            async () => await oldHandlers.clientMethods.version!.run(),
             /instance is destroyed/,
           );
           await assert.rejects(() => oldHandlers.clientSql("SELECT 1"), /instance is destroyed/);
@@ -153,6 +158,7 @@ const getFunctions = (version: number): ProstglesInitOptions["functions"] => ({
 
 const callMethod = (socket: Socket, name: string) =>
   new Promise<unknown>((resolve, reject) => {
+    //@ts-ignore
     socket.timeout(2000).emit(CHANNELS.METHOD, { name }, (timeoutError, error, result) => {
       if (timeoutError || error) reject(timeoutError || error);
       else resolve(result);

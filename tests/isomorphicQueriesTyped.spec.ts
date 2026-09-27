@@ -1,5 +1,5 @@
 import test, { describe } from "node:test";
-import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
+import { type DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
@@ -8,7 +8,8 @@ export const isomorphicQueriesTyped = async (
 ) => {
   await describe("isomorphic typed queries", async () => {
     await test("isLookupTable DB Types from colConf", async () => {
-      const row = await db.uuid_text.findOne?.({});
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const row = await db.uuid_text.findOne?.();
       if (row) {
         const { col1, col2 } = row;
         //@ts-expect-error
@@ -26,7 +27,8 @@ export const isomorphicQueriesTyped = async (
     });
 
     await test("isLookupTable DB Types from reference column actual definition", async () => {
-      const row = await db.uuid_text.findOne?.({});
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const row = await db.uuid_text.findOne?.();
       if (row) {
         const { col3 } = row;
         //@ts-expect-error
@@ -44,7 +46,8 @@ export const isomorphicQueriesTyped = async (
     });
 
     await test("isLookupTable pkey column itself is typed", async () => {
-      const row = await db.lookup_col1?.findOne?.({});
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const row = await db.lookup_col1?.findOne?.();
       if (row) {
         const { id } = row;
         //@ts-expect-error

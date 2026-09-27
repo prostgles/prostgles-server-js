@@ -7,23 +7,21 @@ import {
 } from "node:test";
 import {
   ABORTABLE_METHODS,
-  SubscriptionHandler,
-  getSerialisableError,
+  type SubscriptionHandler,
   innerJoin,
   leftJoin,
   pickKeys,
   type AnyObject,
   type CaseSelect,
-  type DBHandler,
   type SQLHandler,
 } from "prostgles-types";
-import { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
+import { type DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
-import type { DBHandlerServer } from "../dist";
 
 export const isomorphicQueries = async (
-  db: DBOFullyTyped | DBHandlerClient,
+  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
+  // db: DBOFullyTyped | DBHandlerClient,
   sql: SQLHandler | undefined,
   log: (msg: string, extra?: any) => void,
   token?: string,
@@ -63,37 +61,38 @@ export const isomorphicQueries = async (
   const isServer = !!(db.items as any).dboBuilder;
   await describe("Isomorphic queries", async () => {
     await test("Deleting stale data", async () => {
-      const itemsCount = await db.items.count?.();
+      const itemsCount = await db.items.count();
       if (itemsCount) {
         log("DELETING items");
 
         /* Access controlled */
-        await db.items4.delete!({});
+        await db.items4.delete({});
 
-        await db.items4_pub.delete!({});
-        await db.items3.delete!({});
-        await db.items2.delete!({});
-        await db.items.delete!({});
+        await db.items4_pub.delete({});
+        await db.items3.delete({});
+        await db.items2.delete({});
+        await db.items.delete({});
       }
       await sql!(`TRUNCATE items RESTART IDENTITY CASCADE;`);
       await sql!(`TRUNCATE users_public_info RESTART IDENTITY CASCADE;`);
     });
 
     await test("Error structure malformed array literal", async () => {
-      const errFind = await db.items.find?.({ h: "a" }).catch((err) => err);
-      const errCount = await db.items.count?.({ h: "a" }).catch((err) => err);
-      const errSize = await db.items.size?.({ h: "a" }).catch((err) => err);
-      const errFindOne = await db.items.findOne?.({ h: "a" }).catch((err) => err);
-      const errDelete = await db.items.delete?.({ h: "a" }).catch((err) => err);
-      const errUpdate = await db.items.update?.({}, { h: "a" }).catch((err) => err);
-      const errUpdateBatch = await db.items.updateBatch?.([[{}, { h: "a" }]]).catch((err) => err);
-      const errUpsert = await db.items.upsert?.({}, { h: "a" }).catch((err) => err);
-      const errInsert = await db.items.insert?.({ h: "a" }).catch((err) => err);
+      const invalidFilter = { h: "a" } as Record<string, any>;
+      const errFind = await db.items.find(invalidFilter).catch((err) => err);
+      const errCount = await db.items.count(invalidFilter).catch((err) => err);
+      const errSize = await db.items.size(invalidFilter).catch((err) => err);
+      const errFindOne = await db.items.findOne(invalidFilter).catch((err) => err);
+      const errDelete = await db.items.delete(invalidFilter).catch((err) => err);
+      const errUpdate = await db.items.update({}, invalidFilter).catch((err) => err);
+      const errUpdateBatch = await db.items.updateBatch([[{}, invalidFilter]]).catch((err) => err);
+      const errUpsert = await db.items.upsert({}, invalidFilter).catch((err) => err);
+      const errInsert = await db.items.insert(invalidFilter).catch((err) => err);
       const errSubscribe = await db.items
-        .subscribe?.({ h: "a" }, {}, console.warn)
+        .subscribe(invalidFilter, {}, console.warn)
         .catch((err) => err);
       const errSubscribeOne = await db.items
-        .subscribeOne?.({ h: "a" }, {}, console.warn)
+        .subscribeOne(invalidFilter, {}, console.warn)
         .catch((err) => err);
 
       for (const [index, err] of [
@@ -156,7 +155,7 @@ export const isomorphicQueries = async (
         isFileTable,
         publishInfo,
         ...tableInfo
-      } = (await db.items.getInfo?.()) ?? {};
+      } = await db.items.getInfo();
       assert.deepStrictEqual(tableInfo, {
         clientSchemaTest: {
           sid: token,
@@ -181,10 +180,10 @@ export const isomorphicQueries = async (
     await test("Prepare data", async () => {
       if (!sql) throw "sql missing";
 
-      await db.items.delete!();
-      await db.items2.delete!();
+      await db.items.delete();
+      await db.items2.delete();
 
-      const res = await db.items.insert!([{ name: "a" }, { name: "a" }, { name: "b" }], {
+      const res = await db.items.insertMany([{ name: "a" }, { name: "a" }, { name: "b" }], {
         returning: "*",
       });
       assert.equal(res.length, 3);
@@ -192,28 +191,30 @@ export const isomorphicQueries = async (
       const added2 = "04 Dec 1996 00:12:00";
       const added3 = "04 Dec 1997 00:12:00";
 
-      await db.items2.insert!([{ name: "a", items_id: res[0]!.id }]);
-      await db.items3.insert!([{ name: "a" }, { name: "za123" }]);
-      await db.items4.insert!([
+      await db.items2.insertMany([{ name: "a", items_id: res[0]!.id }]);
+      await db.items3.insertMany([{ name: "a" }, { name: "za123" }]);
+      await db.items4.insertMany([
         { name: "abc1", public: "public data", added: added1 },
         { name: "abc2", public: "public data", added: added1 },
         { name: "abcd", public: "public data d", added: added2 },
       ]);
-      await db[`prostgles_test.basic1`].insert!({
+      await db[`prostgles_test.basic1`].insert({
         id_basic: { txt: "basic" },
         txt: "basic1",
       });
       await sql(`REFRESH MATERIALIZED VIEW  prostgles_test.mv_basic1;`);
       assert.deepStrictEqual(
-        await db["prostgles_test.mv_basic1"].find!(),
-        await db["prostgles_test.basic1"].find!(),
+        await db["prostgles_test.mv_basic1"].find(),
+        await db["prostgles_test.basic1"].find(),
       );
 
       /* Ensure */
-      await db[`"*"`].insert!([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
-      await db[`"""*"""`].insert!([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
+      await db[`"*"`].insertMany([{ "*": "a" }, { "*": "a" }, { "*": "b" }]);
 
-      await db.various.insert!([
+      //@ts-expect-error
+      await db[`"""*"""`].insertMany([{ [`"*"`]: "a" }, { [`"*"`]: "a" }, { [`"*"`]: "b" }]);
+
+      await db.various.insertMany([
         { name: "abc9", added: added1, jsn: { a: { b: 2 } } },
         { name: "abc1", added: added2, jsn: { a: { b: 3 } } },
         { name: "abc81 here", added: added3, jsn: { a: { b: 2 } } },
@@ -223,27 +224,27 @@ export const isomorphicQueries = async (
     });
 
     await test("Test bytea", async () => {
-      await db.bytea_test.delete!();
+      await db.bytea_test.delete();
 
-      const value = new Uint8Array([0, 1, 127, 255]).buffer;
-      const inserted = await db.bytea_test.insert!({ value }, { returning: "*" });
-      const newRow = await db.bytea_test.findOne!();
+      const value = new Uint8Array([0, 1, 127, 255]).buffer as any;
+      const inserted = await db.bytea_test.insert({ value }, { returning: "*" });
+      const newRow = await db.bytea_test.findOne();
 
       // TODO: do not use cte and json in runInsertUpdateQuery.ts because it will convert the buffer to string
-      assert.deepStrictEqual(new Uint8Array(inserted!.value), new Uint8Array(value));
-      assert.deepStrictEqual(new Uint8Array(newRow!.value), new Uint8Array(value));
+      assert.deepStrictEqual(new Uint8Array(inserted.value!), new Uint8Array(value));
+      assert.deepStrictEqual(new Uint8Array(newRow!.value!), new Uint8Array(value));
     });
 
     await test("abortSignal terminates a running query", async () => {
       const tableHandler = db.slow_items;
       const firstStart = Date.now();
-      await tableHandler.find?.();
+      await tableHandler.find();
       assert(Date.now() - firstStart > 4_000, "slow_items.find should take more than 4 second");
 
       for (const method of ABORTABLE_METHODS) {
         const start = Date.now();
 
-        await assert.rejects(tableHandler[method]!({}, { abortSignal: AbortSignal.timeout(100) }));
+        await assert.rejects(tableHandler[method]({}, { abortSignal: AbortSignal.timeout(100) }));
 
         assert(
           Date.now() - start < 2_000,
@@ -252,7 +253,7 @@ export const isomorphicQueries = async (
       }
 
       const abortError = await tableHandler
-        .find?.({}, { abortSignal: AbortSignal.timeout(100) })
+        .find({}, { abortSignal: AbortSignal.timeout(100) })
         .catch((err) => err);
       assert.deepStrictEqual(
         { message: abortError.message },
@@ -269,14 +270,14 @@ export const isomorphicQueries = async (
       }
       const tableHandler = db.very_slow_items;
       const start1 = Date.now();
-      await assert.rejects(tableHandler.find!({}, { abortSignal: AbortSignal.timeout(12_000) }));
+      await assert.rejects(tableHandler.find({}, { abortSignal: AbortSignal.timeout(12_000) }));
       assert(
         Date.now() - start1 < 9_000,
         "very_slow_items.find should abort before the slow query completed",
       );
 
       const start2 = Date.now();
-      await assert.rejects(tableHandler.find!());
+      await assert.rejects(tableHandler.find());
       assert(
         Date.now() - start2 < 9_000,
         "very_slow_items.find should abort before the slow query completed",
@@ -288,28 +289,28 @@ export const isomorphicQueries = async (
         // Client forbids name select
         return;
       }
-      const sub1 = await db.items4.subscribe!({}, { select: { name: 1 } }, () => {});
+      const sub1 = await db.items4.subscribe({}, { select: { name: 1 } }, () => {});
       const triggers1 = (await getTriggers()).filter((t) => t.table_name === "items4");
       assert.equal(triggers1.length, 1);
-      assert.deepStrictEqual(triggers1[0].columns_info?.tracked_columns, { name: 1 });
-      const sub2 = await db.items4.subscribe!({}, { select: { public: 1 } }, () => {});
+      assert.deepStrictEqual(triggers1[0]!.columns_info?.tracked_columns, { name: 1 });
+      const sub2 = await db.items4.subscribe({}, { select: { public: 1 } }, () => {});
       const triggers2 = (await getTriggers()).filter((t) => t.table_name === "items4");
       assert.equal(triggers2.length, 1);
-      assert.deepStrictEqual(triggers2[0].columns_info?.tracked_columns, { name: 1, public: 1 });
+      assert.deepStrictEqual(triggers2[0]!.columns_info?.tracked_columns, { name: 1, public: 1 });
       await sub1.unsubscribe();
       await sub2.unsubscribe();
     });
 
     await test("Aggregate subscription tracks FILTER and ORDER BY dependencies", async () => {
       const ids = [501, 502];
-      await db.various.delete!({ id: { $in: ids } });
-      await db.various.insert!([
+      await db.various.delete({ id: { $in: ids } });
+      await db.various.insertMany([
         { id: ids[0], name: "included", added: "2020-01-01" },
         { id: ids[1], name: "excluded", added: "2021-01-01" },
       ]);
 
       const results: AnyObject[] = [];
-      const sub = await db.various.subscribe!(
+      const sub = await db.various.subscribe(
         { id: { $in: ids } },
         {
           select: {
@@ -334,11 +335,11 @@ export const isomorphicQueries = async (
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { ids: [ids[0]], count: "1" });
 
-      await db.various.update!({ id: ids[1] }, { name: "included" });
+      await db.various.update({ id: ids[1] }, { name: "included" });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { ids, count: "2" });
 
-      await db.various.update!({ id: ids[0] }, { added: "2022-01-01" });
+      await db.various.update({ id: ids[0] }, { added: "2022-01-01" });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), {
         ids: ids.slice().reverse(),
@@ -346,13 +347,13 @@ export const isomorphicQueries = async (
       });
 
       await sub.unsubscribe();
-      await db.various.delete!({ id: { $in: ids } });
+      await db.various.delete({ id: { $in: ids } });
     });
 
     await test("CASE select and subscription dependencies", async () => {
       const ids = [503, 504];
-      await db.various.delete!({ id: { $in: ids } });
-      await db.various.insert!([
+      await db.various.delete({ id: { $in: ids } });
+      await db.various.insertMany([
         { id: ids[0], name: "first" },
         { id: ids[1], name: "second" },
       ]);
@@ -369,7 +370,7 @@ export const isomorphicQueries = async (
           $case: [[{ name: "missing" }, "found"]],
         },
       } satisfies Record<string, CaseSelect>;
-      const rows = await db.various.find!(
+      const rows = await db.various.find(
         { id: { $in: ids } },
         { select: caseSelect, orderBy: { id: 1 } },
       );
@@ -379,20 +380,16 @@ export const isomorphicQueries = async (
       ]);
 
       const results: AnyObject[] = [];
-      const sub = await db.various.subscribe!(
-        { id: ids[0] },
-        { select: caseSelect },
-        ([result]) => {
-          if (result) results.push(result);
-        },
-      );
+      const sub = await db.various.subscribe({ id: ids[0] }, { select: caseSelect }, ([result]) => {
+        if (result) results.push(result);
+      });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), {
         label: "it's first",
         nullable: null,
       });
 
-      await db.various.update!({ id: ids[0] }, { name: "changed" });
+      await db.various.update({ id: ids[0] }, { name: "changed" });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), {
         label: "other",
@@ -400,19 +397,19 @@ export const isomorphicQueries = async (
       });
 
       await sub.unsubscribe();
-      await db.various.delete!({ id: { $in: ids } });
+      await db.various.delete({ id: { $in: ids } });
     });
 
     await test("Subscription tracks non-selected ORDER BY columns", async () => {
       const ids = [511, 512];
-      await db.various.delete!({ id: { $in: ids } });
-      await db.various.insert!([
+      await db.various.delete({ id: { $in: ids } });
+      await db.various.insertMany([
         { id: ids[0], name: "first", added: "2020-01-01" },
         { id: ids[1], name: "second", added: "2021-01-01" },
       ]);
 
       const results: AnyObject[] = [];
-      const sub = await db.various.subscribe!(
+      const sub = await db.various.subscribe(
         { id: { $in: ids } },
         { select: { name: 1 }, orderBy: { added: 1 }, limit: 1 },
         ([result]) => {
@@ -423,12 +420,12 @@ export const isomorphicQueries = async (
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { name: "first" });
 
-      await db.various.update!({ id: ids[1] }, { added: "2019-01-01" });
+      await db.various.update({ id: ids[1] }, { added: "2019-01-01" });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { name: "second" });
 
       await sub.unsubscribe();
-      await db.various.delete!({ id: { $in: ids } });
+      await db.various.delete({ id: { $in: ids } });
     });
 
     const json = {
@@ -439,26 +436,28 @@ export const isomorphicQueries = async (
       arrStr: ["1123.string"],
     };
     await test("merge json", async () => {
-      const inserted = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*" });
-      const res = await db.tjson.update!(
+      //@ts-expect-error
+      const inserted = await db.tjson.insert({ colOneOf: "a", json }, { returning: "*" });
+      const res = await db.tjson.update(
         { colOneOf: "a" },
         { json: { $merge: [{ a: false }] } },
         { returning: "*" },
       );
-      assert.deepStrictEqual(res?.[0].json, { ...json, a: false });
+      assert.deepStrictEqual(res?.[0]!.json, { ...json, a: false });
     });
 
     await test("json array converted to pg array filter bug", async () => {
-      const result = await db.tjson.find!({ json: [2] });
+      //@ts-expect-error
+      const result = await db.tjson.find({ json: [2] });
       assert.deepStrictEqual(result, []);
     });
 
     await test("onConflict do update", async () => {
-      const initial = await db.items4.insert!(
+      const initial = await db.items4.insert(
         { id: -99, name: "onConflict", public: "onConflict" },
         { returning: "*" },
       );
-      const updated = await db.items4.insert!(
+      const updated = await db.items4.insert(
         { id: -99, name: "onConflict", public: "onConflict2" },
         { onConflict: "DoUpdate", returning: "*" },
       );
@@ -466,32 +465,32 @@ export const isomorphicQueries = async (
       assert.equal(initial.public, "onConflict");
       assert.equal(updated.id, -99);
       assert.equal(updated.public, "onConflict2");
-      await db.items4.delete!({ id: -99 });
+      await db.items4.delete({ id: -99 });
     });
 
     const fileFolder = `${__dirname}/../../server/dist/server/media/`;
     const fileName = "sample_file.txt";
     await test("Local file upload", async () => {
-      let str = "This is a string",
+      const str = "This is a string",
         data = Buffer.from(str, "utf-8"),
         mediaFile = { data, original_name: fileName };
 
       /** Ensure the types are ok */
-      const file = await (
-        db as DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>
-      ).files.insert!(mediaFile, { returning: "*" });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const file = await db.files.insert!(mediaFile, { returning: "*" });
       const _data = fs.readFileSync(fileFolder + file.storage_key);
       assert.equal(str, _data.toString("utf8"));
-      assert.deepStrictEqual((await db.files.findOne!())!.metadata, {
+      assert.deepStrictEqual((await db.files.findOne())!.metadata, {
         description: "Updated by afterEach hook",
       });
       await tryRun("Nested insert", async () => {
-        const nestedInsert = await db.users_public_info.insert!(
+        const nestedInsert = await db.users_public_info.insert(
           { name: "some_user", avatar: mediaFile },
           { returning: "*" },
         );
         const { name, avatar } = nestedInsert;
-        const { extension, content_type, original_name } = avatar;
+        //TODO: Fix typing for nested insert
+        const { extension, content_type, original_name } = avatar as any;
         assert.deepStrictEqual(
           { extension, content_type, original_name },
           {
@@ -510,14 +509,14 @@ export const isomorphicQueries = async (
         data: Buffer.from("str", "utf-8"),
         original_name: "will delete.txt",
       };
-      await db.files.insert!(file);
+      await db.files.insert(file);
 
-      const files = await db.files.find!({ original_name: file.original_name });
+      const files = await db.files.find({ original_name: file.original_name });
       assert.equal(files.length, 1);
-      const exists0 = fs.existsSync(fileFolder + files[0].storage_key);
+      const exists0 = fs.existsSync(fileFolder + files[0]!.storage_key);
       assert.equal(exists0, true);
-      await db.files.delete!({ original_name: file.original_name }, { returning: "*" });
-      const exists = fs.existsSync(fileFolder + files[0].storage_key);
+      await db.files.delete({ original_name: file.original_name }, { returning: "*" });
+      const exists = fs.existsSync(fileFolder + files[0]!.storage_key);
       assert.equal(exists, false);
     });
 
@@ -533,10 +532,10 @@ export const isomorphicQueries = async (
         original_name: "will update new.txt",
         original_last_modified: new Date().toISOString(),
       };
-      await db.files.insert!(file);
-      const originals = await db.files.find!({ original_name: file.original_name });
+      await db.files.insert(file);
+      const originals = await db.files.find({ original_name: file.original_name });
       assert.equal(originals.length, 1);
-      const [original] = originals;
+      const original = originals[0]!;
       const initialFileStr = fs.readFileSync(fileFolder + original.storage_key).toString("utf8");
       assert.equal(initialStr, initialFileStr);
       assert.equal(original.url, ["/files", original.id].join("/"));
@@ -551,9 +550,9 @@ export const isomorphicQueries = async (
         assert.equal(initialStr, fileText);
       }
 
-      await db.files.update!({ id: original.id }, newFile);
+      await db.files.update({ id: original.id }, newFile);
 
-      const newF = await db.files.findOne!({ id: original.id });
+      const newF = await db.files.findOne({ id: original.id });
       const newFileStr = fs.readFileSync(fileFolder + newF?.storage_key).toString("utf8");
       assert.equal(newStr, newFileStr);
 
@@ -561,7 +560,7 @@ export const isomorphicQueries = async (
     });
 
     await test("getColumns definition", async () => {
-      const res = await db.tr2.getColumns!("fr");
+      const res = await db.tr2.getColumns("fr");
       const expected = [
         {
           label: "Id",
@@ -675,7 +674,7 @@ export const isomorphicQueries = async (
       ];
 
       assert.deepStrictEqual(res, expected);
-      const resDynamic = await db.tr2.getColumns!("fr", {
+      const resDynamic = await db.tr2.getColumns("fr", {
         rule: "update",
         filter: {},
       });
@@ -683,22 +682,22 @@ export const isomorphicQueries = async (
     });
 
     await test("returnType", async () => {
-      const whereStatement = await db.tr1.find!({ t1: "a" }, { returnType: "statement-where" });
+      const whereStatement = await db.tr1.find({ t1: "a" }, { returnType: "statement-where" });
 
       assert.equal(whereStatement, `"t1" = 'a'`);
     });
 
     await test("Table config triggers", async () => {
-      const tr1 = await db.tr1.insert!({});
-      const tr2 = await db.tr2.insert!({
+      const tr1 = await db.tr1.insert({});
+      const tr2 = await db.tr2.insert({
         tr1_id: 1,
         t1: "a",
         t2: "b",
       });
       try {
-        await db.tr2.delete!();
+        await db.tr2.delete();
       } catch (e) {}
-      const one = await db.tr2.findOne!({
+      const one = await db.tr2.findOne({
         t1: "a",
         t2: "b",
       });
@@ -708,7 +707,7 @@ export const isomorphicQueries = async (
     });
 
     await test("$unnest_words", async () => {
-      const res = await db.various.find!(
+      const res = await db.various.find(
         {},
         { returnType: "values", select: { name: "$unnest_words" } },
       );
@@ -720,8 +719,8 @@ export const isomorphicQueries = async (
      * Group by/Distinct
      */
     await test("Group by/Distinct", async () => {
-      const res = await db.items.find!({}, { select: { name: 1 }, groupBy: true });
-      const resV = await db.items.find!(
+      const res = await db.items.find({}, { select: { name: 1 }, groupBy: true });
+      const resV = await db.items.find(
         {},
         { select: { name: 1 }, groupBy: true, returnType: "values" },
       );
@@ -738,7 +737,7 @@ export const isomorphicQueries = async (
         { returnType: "default-with-rollback" },
       );
       assert.deepEqual(res.rows, [item]);
-      const count = await db.items2.count!();
+      const count = await db.items2.count();
       assert.equal(count, 1);
 
       const testCreateTable = async (
@@ -795,7 +794,7 @@ export const isomorphicQueries = async (
      * returnType "value"
      */
     await test("returnType: value", async () => {
-      const resVl = await db.items.find!(
+      const resVl = await db.items.find(
         {},
         { select: { name: { $array_agg: ["name"] } }, returnType: "value" },
       );
@@ -805,15 +804,15 @@ export const isomorphicQueries = async (
 
     await test("PostgreSQL array element", async () => {
       const id = -100;
-      await db.items.insert!({ id, name: "array element", h: ["a1", "a2"] });
+      await db.items.insert({ id, name: "array element", h: ["a1", "a2"] });
       const result = await (async () => {
         try {
-          return await db.items.findOne!(
+          return await db.items.findOne(
             { id },
             { select: { second: { $array_element: ["h", 2] } } },
           );
         } finally {
-          await db.items.delete!({ id });
+          await db.items.delete({ id });
         }
       })();
 
@@ -824,10 +823,12 @@ export const isomorphicQueries = async (
      * TODO -> ADD ALL FILTER TYPES
      */
     await test("FTS filtering", async () => {
-      const res = await db.various.count!({ "tsv.@@.to_tsquery": ["a"] });
+      //@ts-expect-error
+      const res = await db.various.count({ "tsv.@@.to_tsquery": ["a"] });
       assert.equal(res, 0);
 
-      const d = await db.various.findOne!(
+      const d = await db.various.findOne(
+        //@ts-expect-error
         { "name.@@.to_tsquery": ["abc81"] },
         {
           select: {
@@ -839,9 +840,10 @@ export const isomorphicQueries = async (
         },
       );
       // console.log(d);
-      await db.various.findOne!(
+      await db.various.findOne(
         {},
         {
+          //@ts-expect-error
           select: {
             h: { $ts_headline_simple: ["name", { plainto_tsquery: "abc81" }] },
             hh: { $ts_headline: ["name", "abc81"] },
@@ -865,7 +867,8 @@ export const isomorphicQueries = async (
 
     await test("$term_highlight", async () => {
       const term = "abc81";
-      const res = await db.various.find!(
+      const res = await db.various.find(
+        //@ts-ignore short-hand notation
         { "hIdx.>": -2 },
         {
           select: {
@@ -912,7 +915,8 @@ export const isomorphicQueries = async (
 
     await test("funcFilters: $term_highlight", async () => {
       const term = "abc81";
-      const res = await db.various.count!({
+      const res = await db.various.count({
+        //@ts-expect-error
         $term_highlight: [["*"], term, { returnType: "boolean" }],
       });
       assert.equal(+res, 1);
@@ -958,42 +962,42 @@ export const isomorphicQueries = async (
 
     const variousId99 = { id: 99 };
     await test("subscribe skipChangedColumnsCheck false by default = sub should not fire if selected data did not change", async () => {
-      await db.various.delete!(variousId99);
-      await db.various.insert!(variousId99);
+      await db.various.delete(variousId99);
+      await db.various.insert(variousId99);
       let runs = 0;
-      const sub = await db.various.subscribe!(variousId99, { select: { name: 1 } }, async (d) => {
+      const sub = await db.various.subscribe(variousId99, { select: { name: 1 } }, (d) => {
         log(JSON.stringify(d));
         runs++;
       });
-      await db.various.update!(variousId99, { name: "zz3zz1" });
+      await db.various.update(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2, "First update!");
-      await db.various.update!(variousId99, { name: "zz3zz1" });
+      await db.various.update(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 2, "Updating to same value"); // No change
-      await db.various.update!(variousId99, { tsv: "hehe" });
+      await db.various.update(variousId99, { tsv: "hehe" });
       await tout(200);
       assert.equal(runs, 2, "Updating other col"); // Still no change to the selected data
-      await db.various.delete!(variousId99);
+      await db.various.delete(variousId99);
       await tout(200);
       assert.equal(runs, 3, "Delete should trigger");
       await sub.unsubscribe();
     });
 
     await test("subscribe skipChangedColumnsCheck true", async () => {
-      await db.various.delete!(variousId99);
-      await db.various.insert!(variousId99);
+      await db.various.delete(variousId99);
+      await db.various.insert(variousId99);
       await expectNoTriggers();
       let runs = 0;
-      const sub = await db.various.subscribe!(
+      const sub = await db.various.subscribe(
         variousId99,
         { select: { name: 1 }, skipChangedColumnsCheck: true },
-        async (d) => {
+        (d) => {
           log(JSON.stringify(d));
           runs++;
         },
       );
-      await db.various.update!(variousId99, { name: "zz3zz1" });
+      await db.various.update(variousId99, { name: "zz3zz1" });
       // const trgs = await sql!(
       //   `SELECT * FROM prostgles.v_triggers WHERE table_name = 'various'`,
       //   {},
@@ -1002,13 +1006,13 @@ export const isomorphicQueries = async (
       // assert.deepStrictEqual(trgs, {}, "There should be no triggers before starting the test");
       await tout(200);
       assert.equal(runs, 2);
-      await db.various.update!(variousId99, { name: "zz3zz1" });
+      await db.various.update(variousId99, { name: "zz3zz1" });
       await tout(200);
       assert.equal(runs, 3);
-      await db.various.update!(variousId99, { tsv: "hehe" });
+      await db.various.update(variousId99, { tsv: "hehe" });
       await tout(200);
       assert.equal(runs, 4);
-      await db.various.delete!(variousId99);
+      await db.various.delete(variousId99);
       await tout(200);
       assert.equal(runs, 5);
       await sub.unsubscribe();
@@ -1018,17 +1022,17 @@ export const isomorphicQueries = async (
       await tryRunP(
         "subscribe",
         async (resolve, reject) => {
-          await db.various.insert!(variousId99);
-          const sub = await db.various.subscribe!(variousId99, {}, async ([item]) => {
+          await db.various.insert(variousId99);
+          const sub = await db.various.subscribe(variousId99, {}, async ([item]) => {
             if (item?.name === "zz3zz3") {
-              await db.various.delete!({ name: "zz3zz3" });
+              await db.various.delete({ name: "zz3zz3" });
               await testToEnsureTriggersAreDisabled(sub, "various");
               resolve(true);
             }
           });
-          await db.various.update!(variousId99, { name: "zz3zz1" });
-          await db.various.update!(variousId99, { name: "zz3zz2" });
-          await db.various.update!(variousId99, { name: "zz3zz3" });
+          await db.various.update(variousId99, { name: "zz3zz1" });
+          await db.various.update(variousId99, { name: "zz3zz2" });
+          await db.various.update(variousId99, { name: "zz3zz3" });
         },
         { timeout: 4000 },
       );
@@ -1037,13 +1041,13 @@ export const isomorphicQueries = async (
     await test("subscribe to schema.table", async () => {
       await tryRunP("subscribe to schema.table", async (resolve, reject) => {
         let runs = 0;
-        const sub = await db[`prostgles_test.basic1`].subscribe!({}, {}, async (items) => {
+        const sub = await db[`prostgles_test.basic1`].subscribe({}, {}, async (items) => {
           runs++;
           if (runs === 1) {
             if (items.length !== 1) {
               reject("Should have 1 item");
             } else {
-              await db[`prostgles_test.basic1`].insert!({
+              await db[`prostgles_test.basic1`].insert({
                 txt: "basic12",
               });
             }
@@ -1063,10 +1067,10 @@ export const isomorphicQueries = async (
 
     await test("parallel subscriptions", async () => {
       await tryRunP("parallel subscriptions", async (resolve, reject) => {
-        let callbacksFired: Record<string, true> = {};
+        const callbacksFired: Record<string, true> = {};
         const subscriptions = await Promise.all(
           [1, 2, 3, 4, 5].map(async (subId) => {
-            const handler = await db.various.subscribe!(variousId99, {}, async (items) => {
+            const handler = await db.various.subscribe(variousId99, {}, (items) => {
               callbacksFired[subId] = true;
             });
 
@@ -1074,7 +1078,7 @@ export const isomorphicQueries = async (
               handler,
             };
           }),
-        ).catch(reject);
+        );
 
         await tout(2000);
         await Promise.all(
@@ -1131,8 +1135,8 @@ export const isomorphicQueries = async (
         return locks;
       };
       const updateInTx = async (id: number) => {
-        await db.various.insert!({ id, name: `slowtx${id}` }, { returning: "*" });
-        checkLocks();
+        await db.various.insert({ id, name: `slowtx${id}` }, { returning: "*" });
+        await checkLocks();
         await sql!(
           `
           BEGIN;
@@ -1153,7 +1157,7 @@ export const isomorphicQueries = async (
         await Promise.all(Array.from({ length: UPDATE_COUNT }, (_, i) => i + 1000).map(updateInTx));
         const duration = Date.now() - start;
         log("updateAll done in " + duration);
-        await db.various.delete!({ id: { ">": 100 } });
+        await db.various.delete({ id: { ">": 100 } });
         return duration;
       };
       const duration1 = await updateAll();
@@ -1165,7 +1169,7 @@ export const isomorphicQueries = async (
       );
       const callOffsets: number[] = [];
       const start = Date.now();
-      const sub = await db.various.subscribe!({ id: { ">": -1 } }, {}, async (_items) => {
+      const sub = await db.various.subscribe({ id: { ">": -1 } }, {}, (_items) => {
         callOffsets.push(Date.now() - start);
       });
       const duration2 = await updateAll();
@@ -1207,28 +1211,28 @@ export const isomorphicQueries = async (
       await tryRunP(
         "subscribeOne with throttle",
         async (resolve, reject) => {
-          await db.various.insert!(variousId99);
+          await db.various.insert(variousId99);
           const start = Date.now();
           const pushed: number[] = [];
-          const sub = await db.various.subscribeOne!(
+          const sub = await db.various.subscribeOne(
             variousId99,
             { throttle: 1700 },
             async (item) => {
               const now = Date.now();
               pushed.push(now - start);
-              if (pushed.length && pushed[0] > 400) {
+              if (pushed.length && pushed[0]! > 400) {
                 reject("First item run should not be throttled", pushed);
                 return;
               }
               if (item && item.name === "zz3zz2" && now - start > 1600 && now - start < 1800) {
-                await db.various.delete!({ name: "zz3zz2" });
-                sub.unsubscribe();
+                await db.various.delete({ name: "zz3zz2" });
+                void sub.unsubscribe();
                 resolve(true);
               }
             },
           );
-          await db.various.update!(variousId99, { name: "zz3zz1" });
-          await db.various.update!(variousId99, { name: "zz3zz2" });
+          await db.various.update(variousId99, { name: "zz3zz1" });
+          await db.various.update(variousId99, { name: "zz3zz2" });
         },
         { timeout: 4000 },
       );
@@ -1240,14 +1244,14 @@ export const isomorphicQueries = async (
         async (resolve, reject) => {
           const start = Date.now();
           const pushed: number[] = [];
-          const sub = await db.various.subscribeOne!(
+          const sub = await db.various.subscribeOne(
             variousId99,
             { throttle: 1700, throttleOpts: { skipFirst: true } },
-            async (item) => {
+            async (_item) => {
               const now = Date.now();
               pushed.push(now - start);
               if (pushed.length) {
-                if (pushed[0] < 1700) {
+                if (pushed[0]! < 1700) {
                   reject("First item run should be throttled" + pushed[0], pushed);
                 } else {
                   await sub.unsubscribe();
@@ -1256,7 +1260,7 @@ export const isomorphicQueries = async (
               }
             },
           );
-          await db.various.insert!(variousId99);
+          await db.various.insert(variousId99);
         },
         { timeout: 4000 },
       );
@@ -1265,13 +1269,13 @@ export const isomorphicQueries = async (
     await test("subscribeOne without skipFirst", async () => {
       let runs = 0;
       const filter = { id: 199 };
-      const sub = await db.various.subscribeOne!(filter, { skipFirst: true }, async () => {
+      const sub = await db.various.subscribeOne(filter, { skipFirst: true }, () => {
         runs++;
       });
-      await db.various.insert!(filter);
+      await db.various.insert(filter);
       await tout(500);
       assert.equal(runs, 1);
-      await db.various.delete!(filter);
+      await db.various.delete(filter);
       await tout(500);
       assert.equal(runs, 2);
       await sub.unsubscribe();
@@ -1280,15 +1284,15 @@ export const isomorphicQueries = async (
     await test("subscribeOne with skipFirst: true", async () => {
       let runs = 0;
       const filter = { id: 199 };
-      const sub = await db.various.subscribeOne!(filter, { skipFirst: true }, async () => {
+      const sub = await db.various.subscribeOne(filter, { skipFirst: true }, () => {
         runs++;
       });
       await tout(500);
       assert.equal(runs, 0);
-      await db.various.insert!(filter);
+      await db.various.insert(filter);
       await tout(500);
       assert.equal(runs, 1);
-      await db.various.delete!(filter);
+      await db.various.delete(filter);
       await tout(500);
       assert.equal(runs, 2);
       await sub.unsubscribe();
@@ -1297,19 +1301,15 @@ export const isomorphicQueries = async (
     await test("subscribeOne actions: { insert: true }", async () => {
       let runs = 0;
       const filter = { id: 199 };
-      const sub = await db.various.subscribeOne!(
-        filter,
-        { actions: { insert: true } },
-        async () => {
-          runs++;
-        },
-      );
+      const sub = await db.various.subscribeOne(filter, { actions: { insert: true } }, () => {
+        runs++;
+      });
       await tout(500);
       assert.deepStrictEqual(runs, 1);
-      await db.various.insert!(filter);
+      await db.various.insert(filter);
       await tout(500);
       assert.equal(runs, 2);
-      await db.various.delete!(filter);
+      await db.various.delete(filter);
       await tout(500);
       assert.equal(runs, 2);
       await sub.unsubscribe();
@@ -1317,32 +1317,29 @@ export const isomorphicQueries = async (
     await test("subscribeOne actions: { insert: false }", async () => {
       let runs = 0;
       const filter = { id: 199 };
-      const sub = await db.various.subscribeOne!(
-        filter,
-        { actions: { insert: false } },
-        async () => {
-          runs++;
-        },
-      );
+      const sub = await db.various.subscribeOne(filter, { actions: { insert: false } }, () => {
+        runs++;
+      });
       await tout(500);
       assert.deepStrictEqual(runs, 1);
-      await db.various.insert!(filter);
+      await db.various.insert(filter);
       await tout(500);
       assert.equal(runs, 1);
-      await db.various.delete!(filter);
-      assert.equal(await db.various.count!(filter), 0);
+      await db.various.delete(filter);
+      assert.equal(await db.various.count(filter), 0);
       await tout(500);
       assert.equal(runs, 2);
       await sub.unsubscribe();
     });
 
     await test("JSON filtering", async () => {
-      const res = await db.various.count!({ "jsn->a->>b": "3" });
+      //@ts-expect-error
+      const res = await db.various.count({ "jsn->a->>b": "3" });
       assert.equal(res, 1);
     });
 
     await test("Complex filtering", async () => {
-      const res = await db.various.count!({
+      const res = await db.various.count({
         $and: [
           {
             $filter: [{ $year: ["added"] }, "=", "1996"],
@@ -1356,11 +1353,11 @@ export const isomorphicQueries = async (
     });
 
     await test("template_string function", async () => {
-      const res = await db.various.findOne!(
+      const res = await db.various.findOne(
         { name: "abc9" },
         { select: { tstr: { $template_string: ["{name} is hehe"] } } },
       );
-      const res2 = await db.various.findOne!(
+      const res2 = await db.various.findOne(
         { name: "abc9" },
         { select: { tstr: { $template_string: ["is hehe"] } } },
       );
@@ -1369,20 +1366,20 @@ export const isomorphicQueries = async (
     });
 
     await test("Between filtering", async () => {
-      const res = await db.various.count!({
+      const res = await db.various.count({
         added: { $between: ["06 Dec 1995 00:12:00", "03 Dec 1997 00:12:00"] },
       });
       assert.equal(res, 1);
     });
     await test("In filtering", async () => {
-      const res = await db.various.count!({
+      const res = await db.various.count({
         added: { $in: ["04 Dec 1996 00:12:00"] },
       });
       assert.equal(res, 1);
     });
 
     await test("Order by", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
         {},
         {
           select: { name: 1 },
@@ -1392,10 +1389,12 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(res, [{ name: "b" }, { name: "a" }, { name: "a" }]);
     });
     await test("Order by aliased func", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
         {},
         {
           select: { uname: { $upper: ["name"] }, count: { $countAll: [] } },
+          /** TODO: Fix typing for filter when using aliased functions */
+          //@ts-expect-error
           orderBy: { uname: -1 },
         },
       );
@@ -1405,37 +1404,42 @@ export const isomorphicQueries = async (
       ]);
     });
     await test("Filter by aliased func", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
+        /** TODO: Fix typing for filter when using aliased functions */
+        //@ts-expect-error
         { uname: "B" },
         { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } },
       );
       assert.deepStrictEqual(res, [{ uname: "B", count: "1" }]);
     });
     await test("Count with Filter by aliased func ", async () => {
-      const res = await db.items.count!(
-        { uname: "A" },
-        { select: { uname: { $upper: ["name"] } } },
-      );
+      /** TODO: Fix typing for filter when using aliased functions */
+      //@ts-expect-error
+      const res = await db.items.count({ uname: "A" }, { select: { uname: { $upper: ["name"] } } });
       assert.deepStrictEqual(res, 2);
     });
     await test("Count with Aggregate and Filter by aliased func ", async () => {
-      const res = await db.items.count!(
+      const res = await db.items.count(
+        /** TODO: Fix typing for filter when using aliased functions */
+        //@ts-expect-error
         { uname: "A" },
         { select: { uname: { $upper: ["name"] }, count: { $countAll: [] } } },
       );
       assert.deepStrictEqual(res, 1);
     });
     await test("Count with complex filter ", async () => {
-      const res = await db.items.count!({
+      const res = await db.items.count({
         $filter: [{ $upper: ["name"] }, "$in", ["A"]],
       });
       assert.deepStrictEqual(res, 2);
     });
     await test("Order by aggregation", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
         {},
         {
           select: { name: 1, count: { $countAll: [] } },
+          /** TODO: Fix typing for orderBy when using aliased functions */
+          //@ts-expect-error
           orderBy: { count: -1 },
         },
       );
@@ -1445,7 +1449,7 @@ export const isomorphicQueries = async (
       ]);
     });
     await test("Aggregate FILTER and ORDER BY", async () => {
-      const res = await db.items.findOne!(
+      const res = await db.items.findOne(
         {},
         {
           select: {
@@ -1464,10 +1468,12 @@ export const isomorphicQueries = async (
       });
     });
     await test("Column alias func", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
         {},
         {
           select: { label: { $column: ["name"] }, count: { $countAll: [] } },
+          /** TODO: Fix typing for orderBy when using aliased functions */
+          //@ts-expect-error
           orderBy: { count: -1 },
         },
       );
@@ -1477,7 +1483,7 @@ export const isomorphicQueries = async (
       ]);
     });
     await test("Order by colliding alias name", async () => {
-      const res = await db.items.find!(
+      const res = await db.items.find(
         {},
         {
           select: { name: { $countAll: [] }, n: { $left: ["name", 1] } },
@@ -1491,37 +1497,34 @@ export const isomorphicQueries = async (
     });
 
     await test("Update batch example", async () => {
-      await db.items4.updateBatch!([
+      await db.items4.updateBatch([
         [{ name: "abc1" }, { name: "abc" }],
         [{ name: "abc2" }, { name: "abc" }],
       ]);
-      assert.equal(await db.items4.count!({ name: "abc" }), 2);
+      assert.equal(await db.items4.count({ name: "abc" }), 2);
     });
 
     await test("Function example", async () => {
-      const f = await db.items4.findOne!(
+      const f = await db.items4.findOne(
         {},
         { select: { public: 1, p_5: { $left: ["public", 3] } } },
       );
       assert.equal(f?.p_5?.length, 3);
-      assert.equal(f?.p_5, f.public.substr(0, 3));
+      assert.equal(f.p_5, f.public!.substr(0, 3));
 
       // Nested function
-      const fg = await db.items2.findOne!(
+      const fg = await db.items2.findOne(
         {},
         { select: { id: 1, name: 1, items3: { name: "$upper" } } },
       ); // { $upper: ["public"] } } });
       assert.deepStrictEqual(fg, { id: 1, name: "a", items3: [{ name: "A" }] });
 
       // Date utils
-      const Mon = await db.items4.findOne!(
-        { name: "abc" },
-        { select: { added: "$Mon" as "$max" } },
-      );
+      const Mon = await db.items4.findOne({ name: "abc" }, { select: { added: "$Mon" as "$max" } });
       assert.deepStrictEqual(Mon, { added: "Dec" });
 
       // Date + agg
-      const MonAgg = await db.items4.find!(
+      const MonAgg = await db.items4.find(
         { name: "abc" },
         { select: { added: "$Mon" as "$max", public: "$count" } },
       );
@@ -1537,7 +1540,7 @@ export const isomorphicQueries = async (
           added_day: { $day: ["added"] },
         },
       } as const; //   ctid: 1,
-      let i = await db.items4_pub.insert!(
+      const i = await db.items4_pub.insert(
         {
           name: "abc123",
           public: "public data",
@@ -1553,7 +1556,7 @@ export const isomorphicQueries = async (
         added_day: "monday",
       }); //  , ctid: '(0,1)'
 
-      let u = await db.items4_pub.update!(
+      const u = await db.items4_pub.update(
         { name: "abc123" },
         { public: "public data2" },
         returningParam,
@@ -1568,7 +1571,7 @@ export const isomorphicQueries = async (
         },
       ]);
 
-      let d = await db.items4_pub.delete!({ name: "abc123" }, returningParam);
+      const d = await db.items4_pub.delete({ name: "abc123" }, returningParam);
       assert.deepStrictEqual(d, [
         {
           id: 1,
@@ -1584,11 +1587,13 @@ export const isomorphicQueries = async (
 
     await test("JSONB filtering", async () => {
       const obj = { propName: 3232 };
-      const row = await db.obj_table.insert!({ obj }, { returning: "*" });
-      const sameRow = await db.obj_table.findOne!({ obj });
-      const sameRow1 = await db.obj_table.findOne!({ obj: { "=": obj } });
-      const sameRow2 = await db.obj_table.findOne!({ "obj.=": obj });
-      const count = await db.obj_table.count!({ obj });
+      const row = await db.obj_table.insert({ obj }, { returning: "*" });
+      const sameRow = await db.obj_table.findOne({ obj });
+      const sameRow1 = await db.obj_table.findOne({ obj: { "=": obj } });
+
+      //@ts-expect-error
+      const sameRow2 = await db.obj_table.findOne({ "obj.=": obj });
+      const count = await db.obj_table.count({ obj });
       assert.deepStrictEqual(row, sameRow);
       assert.deepStrictEqual(row, sameRow1);
       assert.deepStrictEqual(row, sameRow2);
@@ -1596,21 +1601,22 @@ export const isomorphicQueries = async (
     });
 
     await test("Postgis examples", async () => {
-      await db.shapes.delete!();
-      const p1 = { $ST_GeomFromText: ["POINT(-1 1)", 4326] },
-        p2 = { $ST_GeomFromText: ["POINT(-2 2)", 4326] };
-      await db.shapes.insert!([
+      await db.shapes.delete();
+      /** TODO: Fix typings */
+      const p1 = { $ST_GeomFromText: ["POINT(-1 1)", 4326] } as any,
+        p2 = { $ST_GeomFromText: ["POINT(-2 2)", 4326] } as any;
+      await db.shapes.insertMany([
         { geom: p1, geog: p1 },
         { geom: p2, geog: p2 },
       ]);
 
       /** Basic functions and extent filters */
-      const f = await db.shapes.findOne!(
+      const f = await db.shapes.findOne(
         {
           $and: [
             { "geom.&&.st_makeenvelope": [-3, 2, -2, 2] },
             { "geog.&&.st_makeenvelope": [-3, 2, -2, 2] },
-          ],
+          ] as any,
         },
         {
           select: {
@@ -1629,7 +1635,7 @@ export const isomorphicQueries = async (
       });
 
       /**Aggregate functions */
-      const aggs = await db.shapes.findOne!(
+      const aggs = await db.shapes.findOne(
         {},
         {
           select: {
@@ -1671,14 +1677,16 @@ export const isomorphicQueries = async (
     },
       */
 
-      const fo = await db.tjson.insert!({ colOneOf: "a", json }, { returning: "*" });
+      //@ts-expect-error
+      const fo = await db.tjson.insert({ colOneOf: "a", json }, { returning: "*" });
       // assert.deepStrictEqual(fo.json, json);
-      await db.tjson.insert!({
+      await db.tjson.insert({
         colOneOf: "a",
-        json: { ...json, o: { o1: 2 } },
+        json: { ...json, o: { o1: 2 } } as any,
       });
       try {
-        await db.tjson.insert!({ colOneOf: "a", json: { a: true, arr: "22" } });
+        //@ts-expect-error
+        await db.tjson.insert({ colOneOf: "a", json: { a: true, arr: "22" } });
         throw "Should have failed";
       } catch (e) {
         // Expected
@@ -1686,28 +1694,30 @@ export const isomorphicQueries = async (
     });
 
     await test("find and findOne", async () => {
-      const fo = await db.items.findOne!();
-      const f = await db.items.find!();
+      const fo = await db.items.findOne();
+      const f = await db.items.find();
       assert.deepStrictEqual(fo, { h: null, id: 1, name: "a" });
       assert.deepStrictEqual(f[0], { h: null, id: 1, name: "a" });
     });
 
     await test("Result size", async () => {
-      const is75bits = await db.items.size!({}, { select: { name: 1 } });
+      const is75bits = await db.items.size({}, { select: { name: 1 } });
       assert.equal(is75bits, "75", "Result size query failed");
     });
 
     await test("Basic exists", async () => {
-      const expect0 = await db.items.count!({
+      const expect0 = await db.items.count({
         $and: [{ $exists: { items2: { name: "a" } } }, { $exists: { items3: { name: "b" } } }],
       });
       assert.equal(expect0, 0, "$exists query failed");
     });
 
     await test("Basic fts with shorthand notation", async () => {
-      const res = await db.items.count!({
+      const res = await db.items.count({
         $and: [
+          //@ts-expect-error
           { $exists: { items2: { "name.@@.to_tsquery": ["a"] } } },
+          //@ts-expect-error
           { $exists: { items3: { "name.@@.to_tsquery": ["b"] } } },
         ],
       });
@@ -1716,15 +1726,17 @@ export const isomorphicQueries = async (
     });
 
     await test("Exists with shortest path wildcard filter example", async () => {
-      const expect2 = await db.items.find!({
+      const expect2 = await db.items.find({
         $and: [
+          //@ts-expect-error
           { $existsJoined: { "**.items3": { name: "a" } } },
           { $existsJoined: { items2: { name: "a" } } },
         ],
       });
       assert.equal(expect2.length, 2, "$existsJoined query failed");
-      const expectNothing = await db.items.find!({
+      const expectNothing = await db.items.find({
         $and: [
+          //@ts-expect-error
           { $existsJoined: { "**.items3": { name: "nothing" } } },
           { $existsJoined: { items2: { name: "a" } } },
         ],
@@ -1733,7 +1745,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Exists with exact path filter example", async () => {
-      const _expect2 = await db.items.find!({
+      const _expect2 = await db.items.find({
         $and: [
           // { "items2": { name: "a" } },
           // { "items2.items3": { name: "a" } },
@@ -1744,7 +1756,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Not Exists with exact path filter example", async () => {
-      const _expect1 = await db.items.find!({
+      const _expect1 = await db.items.find({
         $and: [{ $notExistsJoined: { items2: { name: "a" } } }],
       });
       assert.equal(_expect1.length, 1, "$notExistsJoined query failed");
@@ -1752,14 +1764,14 @@ export const isomorphicQueries = async (
 
     /* Upsert */
     await test("Upsert example", async () => {
-      await db.items.upsert!({ name: "tx" }, { name: "tx" });
-      await db.items.upsert!({ name: "tx" }, { name: "tx" });
-      assert.equal(await db.items.count!({ name: "tx" }), 1, "upsert command failed");
+      await db.items.upsert({ name: "tx" }, { name: "tx" });
+      await db.items.upsert({ name: "tx" }, { name: "tx" });
+      assert.equal(await db.items.count({ name: "tx" }), 1, "upsert command failed");
     });
 
     /* Joins example */
     await test("Joins example", async () => {
-      const items = await db.items.find!(
+      const items = await db.items.find(
         {},
         {
           select: {
@@ -1774,14 +1786,14 @@ export const isomorphicQueries = async (
         !items.length ||
         !items.every((it) => Array.isArray(it.items3) && Array.isArray(it.items22))
       ) {
-        console.log(items[0].items3);
+        console.log(items[0]?.items3);
         throw "Joined select query failed";
       }
     });
 
     /* Joins duplicate table example */
     await test("Joins repeating table example", async () => {
-      const items2 = await db.items.find!(
+      const items2 = await db.items.find(
         {},
         {
           select: {
@@ -1790,7 +1802,7 @@ export const isomorphicQueries = async (
           },
         },
       );
-      const items2j = await db.items.find!(
+      const items2j = await db.items.find(
         {},
         {
           select: {
@@ -1804,30 +1816,30 @@ export const isomorphicQueries = async (
       items2.forEach((d, i) => {
         assert.deepStrictEqual(
           d.items2,
-          items2j[i].items2,
+          items2j[i]?.items2,
           "Joins duplicate aliased table query failed",
         );
         assert.deepStrictEqual(
           d.items2,
-          items2j[i].items2j,
+          items2j[i]?.items2j,
           "Joins duplicate aliased table query failed",
         );
       });
     });
 
     await test("Join aggregate functions example", async () => {
-      const singleShortHandAgg = await db.items.findOne!({}, { select: { id: "$max" } });
-      const singleAgg = await db.items.findOne!({}, { select: { id: { $max: ["id"] } } });
+      const singleShortHandAgg = await db.items.findOne({}, { select: { id: "$max" } });
+      const singleAgg = await db.items.findOne({}, { select: { id: { $max: ["id"] } } });
       assert.deepStrictEqual(singleShortHandAgg, { id: 4 });
       assert.deepStrictEqual(singleAgg, { id: 4 });
 
-      const shortHandAggJoined = await db.items.findOne!(
+      const shortHandAggJoined = await db.items.findOne(
         { id: 4 },
         { select: { id: 1, items2: { name: "$max" } } },
       );
       assert.deepStrictEqual(shortHandAggJoined, { id: 4, items2: [] });
 
-      const nestedAggregateRows = await db.items2.insertMany!(
+      const nestedAggregateRows = await db.items2.insertMany(
         [
           { items_id: 1, name: "a" },
           { items_id: 1, name: "a" },
@@ -1836,7 +1848,7 @@ export const isomorphicQueries = async (
         { returning: "*" },
       );
       const includedIds = nestedAggregateRows.slice(0, 2).map(({ id }) => id);
-      const aggOptionsJoined = await db.items.findOne!(
+      const aggOptionsJoined = await db.items.findOne(
         { id: 1 },
         {
           select: {
@@ -1859,25 +1871,28 @@ export const isomorphicQueries = async (
         id: 1,
         items2Agg: [{ ids: includedIds.slice().reverse() }],
       });
-      await db.items2.delete!({ id: { $in: nestedAggregateRows.map(({ id }) => id) } });
+      await db.items2.delete({ id: { $in: nestedAggregateRows.map(({ id }) => id) } });
     });
 
     /* $rowhash -> Custom column that returns md5(ctid + allowed select columns). Used in joins & CRUD to bypass PKey details */
     await test("$rowhash example", async () => {
-      const rowhash = await db.items.findOne!({}, { select: { $rowhash: 1, "*": 1 } });
+      const rowhash = await db.items.findOne({}, { select: { $rowhash: 1, "*": 1 } });
       const f = { $rowhash: rowhash?.$rowhash };
-      const rowhashView = await db.v_items.findOne!({}, { select: { $rowhash: 1 } });
-      const rh1 = await db.items.findOne!(
+      const rowhashView = await db.v_items.findOne({}, { select: { $rowhash: 1 } });
+      const rh1 = await db.items.findOne(
+        //@ts-expect-error
         { $rowhash: rowhash?.$rowhash },
         { select: { $rowhash: 1 } },
       );
-      const rhView = await db.v_items.findOne!(
+      const rhView = await db.v_items.findOne(
+        //@ts-expect-error
         { $rowhash: rowhashView?.$rowhash },
         { select: { $rowhash: 1 } },
       );
       // console.log({ rowhash, f });
 
-      await db.items.update!(f, { name: "a" });
+      //@ts-expect-error
+      await db.items.update(f, { name: "a" });
 
       // console.log(rowhash, rh1)
       // console.log(rowhashView, rhView)
@@ -1894,20 +1909,20 @@ export const isomorphicQueries = async (
     await test("Reference column nested insert", async () => {
       const nestedRow = { name: "nested_insert" };
       const parentRow = { name: "parent insert" };
-      const pr = await db.items2.insert!({ items_id: nestedRow, ...parentRow }, { returning: "*" });
+      const pr = await db.items2.insert({ items_id: nestedRow, ...parentRow }, { returning: "*" });
 
-      const childRows = await db.items.find!(nestedRow);
+      const childRows = await db.items.find(nestedRow);
       assert.equal(childRows.length, 1);
-      assert.deepStrictEqual(await db.items2.findOne!(parentRow), {
+      assert.deepStrictEqual(await db.items2.findOne(parentRow), {
         hh: null,
         id: pr.id,
         ...parentRow,
-        items_id: childRows[0].id,
+        items_id: childRows[0]?.id,
       });
     });
 
     await test("Join escaped table names with quotes", async () => {
-      await db[`"""quoted0"""`].insert!({
+      await db[`"""quoted0"""`].insert({
         [`"text_col0"`]: "0",
         [`"quoted1_id"`]: {
           [`"text_col1"`]: "1",
@@ -1917,7 +1932,7 @@ export const isomorphicQueries = async (
         },
       });
 
-      const res = await db[`"""quoted0"""`].find!(
+      const res = await db[`"""quoted0"""`].find(
         {
           [`"text_col0"`]: "0",
         },
@@ -1946,7 +1961,7 @@ export const isomorphicQueries = async (
         '"text_col0"': "0",
       });
 
-      const aliasedQuotedJoin = await db[`"""quoted0"""`].find!(
+      const aliasedQuotedJoin = await db[`"""quoted0"""`].find(
         {
           [`"text_col0"`]: "0",
         },
@@ -1980,9 +1995,10 @@ export const isomorphicQueries = async (
         },
       ]);
 
-      const exists1 = await db[`"""quoted0"""`].find!(
+      const exists1 = await db[`"""quoted0"""`].find(
         {
           $existsJoined: {
+            //@ts-expect-error
             path: ['"""quoted1"""', '"""quoted2"""'],
             filter: {
               '"id2"': 1,
@@ -1992,9 +2008,10 @@ export const isomorphicQueries = async (
         { select: "*" },
       );
       /** Duplicated tables */
-      const exists2 = await db[`"""quoted0"""`].find!(
+      const exists2 = await db[`"""quoted0"""`].find(
         {
           $existsJoined: {
+            //@ts-expect-error
             path: ['"""quoted1"""', '"""quoted2"""', '"""quoted1"""', '"""quoted2"""'],
             filter: {
               '"id2"': 1,
@@ -2032,7 +2049,7 @@ export const isomorphicQueries = async (
             log(JSON.stringify({ appName, apps, app_triggers }, null, 2));
           }
         }, 2000);
-        const sub = await db[`"""quoted0"""`].subscribe!(filter, {}, async (items) => {
+        const sub = await db[`"""quoted0"""`].subscribe(filter, {}, async (items) => {
           const item = items[0];
           log(
             JSON.stringify(
@@ -2044,10 +2061,10 @@ export const isomorphicQueries = async (
               2,
             ),
           );
-          if (item && ["0", "1"].includes(item[`"text_col0"`])) {
+          if (item && ["0", "1"].includes(item[`"text_col0"`]!)) {
             runs++;
             if (runs === 1) {
-              await db[`"""quoted0"""`].update!(filter, { [`"text_col0"`]: "1" });
+              await db[`"""quoted0"""`].update(filter, { [`"text_col0"`]: "1" });
             }
             if (runs < 2) {
               return;
@@ -2059,18 +2076,17 @@ export const isomorphicQueries = async (
               reject(e);
             }
           }
-        }).catch(reject);
+        });
       });
     });
     const testName = "subscribe using a filter bigger than block_size";
     await test(testName, async () => {
-      await tryRunP(testName, async (resolve, reject) => {
-        const sub = await db[`"""quoted0"""`].subscribe!(
+      await tryRunP(testName, async (resolve) => {
+        const sub = await db[`"""quoted0"""`].subscribe(
           { [`"text_col0"`]: "0".repeat(2e3) },
           {},
-          async (items) => {
+          (items) => {
             setTimeout(async () => {
-              if (!sub) return;
               await sub.unsubscribe();
               resolve(true);
             }, 10);
@@ -2080,14 +2096,14 @@ export const isomorphicQueries = async (
     });
 
     await test("Reverse join with agg", async () => {
-      const inserted = await db.tr1.insert!({ tr2: { t1: "a", t2: "b" } }, { returning: "*" });
+      const inserted = await db.tr1.insert({ tr2: [{ t1: "a", t2: "b" }] }, { returning: "*" });
 
       const idAggSelect = {
         ids: {
           $array_agg: ["id"],
         },
       };
-      const normalJoin = await db.tr1.find!(
+      const normalJoin = await db.tr1.find(
         {},
         {
           orderBy: { id: true },
@@ -2101,7 +2117,7 @@ export const isomorphicQueries = async (
           },
         },
       );
-      const reverseJoin = await db.tr2.find!(
+      const reverseJoin = await db.tr2.find(
         { t1: "a" },
         {
           orderBy: { id: true },
@@ -2136,9 +2152,9 @@ export const isomorphicQueries = async (
 
     await test("Related table subscribe", async () => {
       await expectNoTriggers();
-      await tryRunP("Related table subscribe", async (resolve, reject) => {
+      await tryRunP("Related table subscribe", async (resolve) => {
         let runs = 0;
-        const sub = await db.tr1.subscribe!(
+        const sub = await db.tr1.subscribe(
           {},
           {
             select: {
@@ -2151,7 +2167,7 @@ export const isomorphicQueries = async (
             runs++;
             console.log({ _rows, runs });
             if (runs === 1) {
-              await db.tr2.insert!({ tr1_id: _rows[0]!.id, t1: "a", t2: "b" });
+              await db.tr2.insert({ tr1_id: _rows[0]!.id, t1: "a", t2: "b" });
             } else if (runs === 2) {
               await sub.unsubscribe();
               await tout(4000);
@@ -2165,12 +2181,12 @@ export const isomorphicQueries = async (
 
     await test("Aggregate FILTER registers joined dependency triggers", async () => {
       const tr1Id = 701;
-      await db.tr2.delete!({ tr1_id: tr1Id });
-      await db.tr1.delete!({ id: tr1Id });
-      await db.tr1.insert!({ id: tr1Id, t1: "aggregate-filter-root" });
+      await db.tr2.delete({ tr1_id: tr1Id });
+      await db.tr1.delete({ id: tr1Id });
+      await db.tr1.insert({ id: tr1Id, t1: "aggregate-filter-root" });
 
       const results: AnyObject[] = [];
-      const sub = await db.tr1.subscribe!(
+      const sub = await db.tr1.subscribe(
         { id: tr1Id },
         {
           select: {
@@ -2192,18 +2208,18 @@ export const isomorphicQueries = async (
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { count: "0" });
 
-      await db.tr2.insert!({ tr1_id: tr1Id, t1: "aggregate-filter-related" });
+      await db.tr2.insert({ tr1_id: tr1Id, t1: "aggregate-filter-related" });
       await tout(300);
       assert.deepStrictEqual(results.at(-1), { count: "1" });
 
       await sub.unsubscribe();
-      await db.tr2.delete!({ tr1_id: tr1Id });
-      await db.tr1.delete!({ id: tr1Id });
+      await db.tr2.delete({ tr1_id: tr1Id });
+      await db.tr1.delete({ id: tr1Id });
     });
 
     await test("Nested sort by computed col", async () => {
       const getSorted = (asc = false, badKey = false, limited = false) =>
-        db.tr1.find!(
+        db.tr1.find(
           {},
           {
             select: {
@@ -2223,10 +2239,10 @@ export const isomorphicQueries = async (
       const sortedDesc = await getSorted(false);
       assert.deepStrictEqual(
         sortedAsc
-          .map((d) => d.tr2[0].maxId)
+          .map((d) => d.tr2[0]!.maxId)
           .slice(0)
           .reverse(),
-        sortedDesc.map((d) => d.tr2[0].maxId),
+        sortedDesc.map((d) => d.tr2[0]!.maxId),
       );
       assert.deepStrictEqual(await getSorted(true, false, true), sortedAsc);
       assert.deepStrictEqual(await getSorted(false, false, true), sortedDesc);
@@ -2239,7 +2255,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Nested function on different than source column getNewQuery name bug fix", async () => {
-      const res = await db.tr1.find!(
+      const res = await db.tr1.find(
         {},
         {
           select: {
@@ -2263,7 +2279,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Reference column deep nested insert", async () => {
-      const pr = await db.items4a.insert!(
+      const pr = await db.items4a.insert(
         {
           items_id: { name: "it" },
           items2_id: { name: "it2", items_id: { name: "it" } },
@@ -2271,9 +2287,9 @@ export const isomorphicQueries = async (
         },
         { returning: "*" },
       );
-      const itemsCount = await db.items.count!({ name: "it" });
-      const items2Count = await db.items2.count!({ name: "it2" });
-      const items4aCount = await db.items4a.count!({ name: "it4a" });
+      const itemsCount = await db.items.count({ name: "it" });
+      const items2Count = await db.items2.count({ name: "it2" });
+      const items4aCount = await db.items4a.count({ name: "it4a" });
 
       assert.equal(+itemsCount, 2);
       assert.equal(+items2Count, 1);
@@ -2281,7 +2297,7 @@ export const isomorphicQueries = async (
     });
 
     await test("Multi reference column nested insert", async () => {
-      await db.items_multi.insert!(
+      await db.items_multi.insert(
         {
           items0_id: { name: "multi" },
           items1_id: { name: "multi" },
@@ -2291,20 +2307,20 @@ export const isomorphicQueries = async (
         },
         { returning: "*" },
       );
-      const itemsCount = await db.items.count!({ name: "multi" });
+      const itemsCount = await db.items.count({ name: "multi" });
       assert.equal(+itemsCount, 4);
 
-      const multiItem = await db.items_multi.findOne!(
+      const multiItem = await db.items_multi.findOne(
         { name: "root_multi" },
         { select: { "*": 1, items: "*" } },
       );
       assert.equal(multiItem?.name, "root_multi");
       //@ts-ignore
-      assert.equal(multiItem?.items.filter((d) => d.name === "multi").length, 4);
+      assert.equal(multiItem.items.filter((d) => d.name === "multi").length, 4);
     });
 
     await test("Join path with order by nested", async () => {
-      await db.items_multi.insert!(
+      await db.items_multi.insert(
         {
           items0_id: { name: "multi0" },
           items1_id: { name: "multi1" },
@@ -2313,7 +2329,7 @@ export const isomorphicQueries = async (
         { returning: "*" },
       );
 
-      const res = await db.items_multi.find!(
+      const res = await db.items_multi.find(
         {},
         {
           select: {
@@ -2329,31 +2345,37 @@ export const isomorphicQueries = async (
             }),
           },
           orderBy: {
+            //@ts-expect-error
             "i0.name": -1,
           },
         },
       );
       assert.equal(res.length, 1);
-      assert.equal(res[0].i0[0].name, "multi0");
-      assert.equal(res[0].items2_id, null);
-      assert.equal(res[0].items2_id, null);
-      assert.deepStrictEqual(res[0].i0, res[0].i1);
-      assert.deepStrictEqual(res[0].i1, res[0].i2);
+      //@ts-expect-error
+      assert.equal(res[0]!.i0[0].name, "multi0");
+      assert.equal(res[0]!.items2_id, null);
+      assert.equal(res[0]!.items2_id, null);
+
+      //@ts-expect-error
+      assert.deepStrictEqual(res[0]?.i0, res[0]?.i1);
+
+      //@ts-expect-error
+      assert.deepStrictEqual(res[0]?.i1, res[0]?.i2);
     });
 
     await test("Self join", async () => {
-      await db.self_join.delete!();
-      const a = await db.self_join.insert!({ name: "a" });
-      const a1 = await db.self_join.insert!({
+      await db.self_join.delete();
+      const a = await db.self_join.insert({ name: "a" });
+      const a1 = await db.self_join.insert({
         name: "a",
         my_id: { name: "b" },
       });
-      const a2 = await db.self_join.insert!({
+      const a2 = await db.self_join.insert({
         name: "a",
         my_id1: { name: "b1" },
       });
 
-      const one = await db.self_join.find!(
+      const one = await db.self_join.find(
         {},
         {
           select: {
@@ -2368,12 +2390,12 @@ export const isomorphicQueries = async (
         },
       );
       assert.equal(one.length, 1);
-      assert.equal(one[0].my.length, 1);
-      assert.equal(one[0].my[0].name, "b");
+      assert.equal(one[0]!.my.length, 1);
+      assert.equal(one[0]!.my[0]!.name, "b");
     });
 
     await test("One to many multi join duplicate row bug fix", async () => {
-      await db.symbols.insert!([
+      await db.symbols.insertMany([
         {
           id: "btc",
           trades: [{ price: 1 }, { price: 3 }, { price: 2 }],
@@ -2387,7 +2409,7 @@ export const isomorphicQueries = async (
         },
       ]);
 
-      const res = await db.symbols.find!(
+      const res = await db.symbols.find(
         {},
         {
           select: {
@@ -2411,7 +2433,7 @@ export const isomorphicQueries = async (
         }
       });
 
-      const resSortedInnerJoin = await db.symbols.find!(
+      const resSortedInnerJoin = await db.symbols.find(
         {},
         {
           select: {
@@ -2437,19 +2459,17 @@ export const isomorphicQueries = async (
     });
 
     await test("subscribe triggers with stale schema should fail gracefully and never block other queries", async () => {
-      const sub = await db.various.subscribe!(
-        variousId99,
-        { select: { name: 1 } },
-        async (d, err) => {
+      const sub = await db.various
+        .subscribe(variousId99, { select: { name: 1 } }, (d, err) => {
           log("various id=99 count", d.length);
           if (err) {
             log("Error in subscription callback: " + JSON.stringify(err));
           }
-        },
-      ).catch((e) => {
-        log("subscribe failed with error: " + JSON.stringify(e));
-        return Promise.reject(e);
-      });
+        })
+        .catch((e) => {
+          log("subscribe failed with error: " + JSON.stringify(e));
+          return Promise.reject(e);
+        });
 
       const deleteItems = () => sql!(`DELETE FROM various WHERE id = \${id}`, variousId99);
       await deleteItems();
@@ -2473,17 +2493,18 @@ export const isomorphicQueries = async (
       const newVariousId99Count = await getVariousCount();
       assert.equal(variousId99Count + 1, newVariousId99Count);
       await deleteItems();
-      await sub.unsubscribe?.();
+      await sub.unsubscribe();
       await expectNoTriggers();
     });
   });
 
   await test("Having clause", async () => {
-    const res = await db.items.find!(
+    const res = await db.items.find(
       {},
       {
         select: { name: 1, c: { $countAll: [] } },
         having: {
+          //@ts-expect-error
           c: 4,
         },
       },
@@ -2497,7 +2518,7 @@ export const isomorphicQueries = async (
   });
 
   await test("Having clause with complex filter", async () => {
-    const res = await db.items.find!(
+    const res = await db.items.find(
       {},
       {
         select: { name: 1, c: { $countAll: [] } },
@@ -2514,7 +2535,7 @@ export const isomorphicQueries = async (
     ]);
   });
   await test("Nested join having clause", async () => {
-    const res = await db.items.find!(
+    const res = await db.items.find(
       {},
       {
         select: {
@@ -2543,7 +2564,7 @@ export const isomorphicQueries = async (
   });
 };
 
-export async function tryRun(desc: string, func: () => any, log?: Function) {
+export async function tryRun(desc: string, func: () => any, log?: (...values: unknown[]) => void) {
   try {
     await func();
   } catch (err) {
@@ -2556,15 +2577,18 @@ export async function tryRun(desc: string, func: () => any, log?: Function) {
 }
 export function tryRunP(
   desc: string,
-  func: (resolve: any, reject: any) => any,
-  opts?: { log?: Function; timeout?: number },
+  func: (
+    resolve: (...values: unknown[]) => void,
+    reject: (reason?: unknown, ...values: unknown[]) => void,
+  ) => any,
+  opts?: { log?: (value?: unknown) => void; timeout?: number },
 ) {
   const timeoutMs = opts?.timeout || 7000;
   return new Promise(async (rv, rj) => {
     const testTimeout =
       Number.isFinite(timeoutMs) ?
         setTimeout(() => {
-          const errMsg = `${desc} failed. Reason: Timout reached: ${timeoutMs}ms`;
+          const errMsg = `${desc} failed. Reason: Timeout reached: ${timeoutMs}ms`;
           opts?.log?.(errMsg);
           rj(errMsg);
         }, timeoutMs)
@@ -2581,7 +2605,7 @@ export function tryRunP(
   });
 }
 const tout = (t = 3000) => {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       resolve(true);
     }, t);
