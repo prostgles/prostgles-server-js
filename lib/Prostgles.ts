@@ -6,6 +6,10 @@ import type { ContextCleanup, OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
+import {
+  getClientDBHandlers,
+  type GetClientDBHandlers,
+} from "./WebsocketAPI/getClientHandlers";
 import { onSocketConnected } from "./WebsocketAPI/onSocketConnected";
 import pg = require("pg-promise/typescript/pg-subset");
 
@@ -106,6 +110,9 @@ export class Prostgles {
     this._dboBuilder = d;
   }
   publishParser?: PublishParser;
+
+  getClientDBHandlers: GetClientDBHandlers = (clientReq, scope) =>
+    getClientDBHandlers(this, clientReq, scope);
 
   authHandler = new AuthHandler(this);
 

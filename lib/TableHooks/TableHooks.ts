@@ -9,6 +9,7 @@ import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type {
   AfterAllTsTrigger,
+  AfterCommitTsTrigger,
   AfterEachTsTrigger,
   BeforeEachTsTrigger,
   TransactionCallbacks,
@@ -20,7 +21,8 @@ export type TableHooks<S = void, Context = undefined> = S extends DBSchema
         Required<S[tableName]["columns"]>,
         DBOFullyTyped<S>,
         Context,
-        InsertDataWithNested<S[tableName]["columns"], S, tableName>
+        InsertDataWithNested<S[tableName]["columns"], S, tableName>,
+        S
       >;
     }>
   : Record<string, TableHooksDefinition<AnyObject, DbTxTableHandlers, Context>>;
@@ -30,6 +32,7 @@ export type TableHooksDefinition<
   DBX = DbTxTableHandlers,
   Context = undefined,
   InputDataType = RowDataType,
+  ClientSchema = void,
 > = {
   /**
    * Runs sequentially before data validation and mutation SQL for each insert row,
@@ -64,8 +67,17 @@ export type TableHooksDefinition<
   afterAll?: AfterAllTsTrigger<RowDataType, DBX, Context>[];
 
   /**
+   * Runs once after the outer transaction commits successfully with at least one affected row.
+   * Receives committed rows and non-transactional handlers; it cannot roll back the mutation.
+   * It is awaited before the mutation promise resolves. Errors are logged and do not change the
+   * mutation result.
+   */
+  afterCommit?: AfterCommitTsTrigger<RowDataType, DBX, Context, ClientSchema>[];
+
+  /**
    * Replaces the generated DELETE. Must perform the mutation and shape its return value using
-   * the prepared filter and returning arguments. Delete `afterEach`/`afterAll` hooks do not run.
+   * the prepared filter and returning arguments. Delete `afterEach`/`afterAll`/`afterCommit`
+   * hooks do not run.
    * Use `onCommit`/`onRollback` for external side effects after the outer transaction finishes.
    */
   onInsteadOfDelete?: (

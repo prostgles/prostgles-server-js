@@ -8,7 +8,7 @@ import {
   withUserRLS,
 } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
-import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
+import { getReturnTypeQuery, isReturningQuery } from "../ViewHandler/getReturnTypeQuery";
 
 export async function updateBatch(
   this: TableHandler,
@@ -23,6 +23,33 @@ export async function updateBatch(
     const { checkFilter, postValidate } = tableRules?.update ?? {};
     if (checkFilter || postValidate) {
       throw `updateBatch not allowed for tables with checkFilter or postValidate rules`;
+    }
+    const hasHooks =
+      this.getAfterHooksAndChecks({ name: "update", rule: tableRules?.update }, localParams).length ||
+      this.hooks?.beforeEach?.some(({ commands }) => commands.update);
+    if (hasHooks && !isReturningQuery(params?.returnType, localParams)) {
+      if (!this.getTransaction(localParams)) {
+        return this.dboBuilder.getTX((dbx) =>
+          dbx[this.name]!.updateBatch(updates, params, undefined, tableRules, localParams),
+        );
+      }
+      // Run the full update pipeline so hooks share the batch transaction.
+      for (const [filter, data] of updates) {
+        await this.update(
+          filter,
+          data,
+          { ...(params ?? {}), returning: undefined },
+          tableRules,
+          localParams,
+        );
+      }
+      await this._log({
+        command: "updateBatch",
+        localParams,
+        data: { data: updates, params },
+        duration: Date.now() - start,
+      });
+      return null;
     }
     const updateQueries: string[] = await Promise.all(
       updates.map(async ([filter, data]) => {

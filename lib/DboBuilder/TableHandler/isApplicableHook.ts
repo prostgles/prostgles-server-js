@@ -12,7 +12,7 @@ export const isApplicableHook = (
   const getChangedFieldsSet = () => {
     changedFieldsSet ??= new Set(
       tableHandler.column_names.filter((col) =>
-        rows.some((row) => row[col] !== undefined && row[col] !== null),
+        rows.some((row) => row[col] !== undefined),
       ),
     );
     return changedFieldsSet;

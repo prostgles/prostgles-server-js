@@ -8,6 +8,7 @@ import {
   type TableHandler,
 } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
+import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
 import type { DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { Prostgles } from "../Prostgles";
@@ -27,6 +28,42 @@ export type ClientHandlers<S = void> = {
   clientMethods: Record<string, ServerFunctionDefinition>;
   clientSchema: ClientSchema;
 };
+
+export type ClientDBHandlerRequest =
+  | AuthClientRequest
+  | {
+      /** Trusted server-only identity, resolved through auth.findUser on every operation. */
+      userId: string;
+      socket?: never;
+      httpReq?: never;
+      res?: never;
+    };
+
+export type GetClientDBHandlers<ClientSchema = void> = <
+  NarrowedClientSchema = ClientSchema,
+>(
+  clientReq: ClientDBHandlerRequest,
+  scope: PermissionScope | undefined,
+) => Promise<ClientHandlers<NarrowedClientSchema>>;
+
+export const getClientDBHandlers = async <ClientSchema = void>(
+  prostgles: Prostgles,
+  clientReq: ClientDBHandlerRequest,
+  scope: PermissionScope | undefined,
+) => {
+  if ("userId" in clientReq) {
+    if ("socket" in clientReq || "httpReq" in clientReq || "res" in clientReq) {
+      throw new Error("userId cannot be combined with a client request");
+    }
+    return getClientHandlers<ClientSchema>(
+      prostgles,
+      createServerSideRequest(prostgles, clientReq.userId),
+      scope,
+    );
+  }
+  return getClientHandlers<ClientSchema>(prostgles, clientReq, scope);
+};
+
 export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest,

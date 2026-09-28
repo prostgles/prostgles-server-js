@@ -125,6 +125,19 @@ export const executeAfterHooksCheckAndPostValidation = async ({
           localParams,
           context: tableHandler.dboBuilder.prostgles.context,
         });
+      } else if (hook.type === "afterCommit" && applicableRows.length) {
+        const context = tableHandler.dboBuilder.prostgles.context;
+        txParams.onCommit(({ db, dbo }) =>
+          hook.run({
+            rows: applicableRows,
+            command,
+            context,
+            db,
+            dbo,
+            getClientDBHandlers: tableHandler.dboBuilder.prostgles.getClientDBHandlers,
+            localParams,
+          }),
+        );
       }
     }
   } finally {

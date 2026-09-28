@@ -65,6 +65,7 @@ export const useProstglesTest = async (
         },
       });
       await setProps([clientOptions], {
+        waitFor: process.env.CI ? 300 : 250,
         onEnd: async (results) => {
           assert.equal(results.length, 3);
           const [res1, res2, res3] = results;
@@ -87,6 +88,7 @@ export const useProstglesTest = async (
       });
 
       await setProps([getSocketOptions(true)], {
+        waitFor: process.env.CI ? 300 : 250,
         onEnd: async (results) => {
           assert.equal(results.length, 5);
           const [res1, res2, res3, res4, res5] = results;

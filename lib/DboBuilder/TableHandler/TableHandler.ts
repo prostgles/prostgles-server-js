@@ -176,6 +176,18 @@ export class TableHandler extends ViewHandler {
         } as const;
       })
       .filter(isDefined);
+    const afterCommitHooks = this.hooks?.afterCommit
+      ?.map((hook) => {
+        const { commands } = hook;
+        if (!commands[command.name]) {
+          return;
+        }
+        return {
+          type: "afterCommit",
+          ...hook,
+        } as const;
+      })
+      .filter(isDefined);
     return [
       ...(afterEachHooks ?? []),
       ...(postValidate ?
@@ -185,6 +197,7 @@ export class TableHandler extends ViewHandler {
         [{ type: "checkFilter", checkFilter, changedFields: undefined } as const]
       : []),
       ...(afterAllHooks ?? []),
+      ...(afterCommitHooks ?? []),
     ];
   };
   shouldWrapInTx = (

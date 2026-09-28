@@ -26,6 +26,9 @@ export const getReturnTypeQuery = async ({
   if (localParams?.returnNewQuery) {
     return newQuery;
   }
+  if (!isReturningQuery(returnType, localParams)) {
+    return;
+  }
 
   if (returnType === "statement-where" || localParams?.returnQuery === "where-condition") {
     if (!newQuery) {
@@ -37,9 +40,6 @@ export const getReturnTypeQuery = async ({
     return localParams.returnQuery === "noRLS" ? queryWithoutRLS : queryWithRLS;
   }
 
-  if (!sqlTypes.some((v) => v === returnType)) {
-    return;
-  }
   if (!(await canRunSQL(handler.dboBuilder.prostgles, localParams?.clientReq))) {
     throw `Not allowed:  { returnType: ${JSON.stringify(returnType)} } requires execute sql privileges `;
   }
@@ -48,3 +48,8 @@ export const getReturnTypeQuery = async ({
   }
   return queryWithRLS as unknown as unknown[];
 };
+
+export const isReturningQuery = (
+  returnType: SelectParams["returnType"],
+  localParams: LocalParams | undefined,
+) => Boolean(localParams?.returnQuery || sqlTypes.some((type) => type === returnType));

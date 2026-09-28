@@ -3,7 +3,7 @@ import { deferDbQueries } from "./deferDbQueries";
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
 import type { MaybePromise, SQLHandler, TableSchema } from "prostgles-types";
-import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
+import type { SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
 import type { DboBuilder } from "./DboBuilder/DboBuilder";
@@ -17,19 +17,11 @@ import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { runSQLFile } from "./TableConfig/runSQLFile";
 import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
 import { sleep } from "./utils/utils";
-import { getClientHandlers } from "./WebsocketAPI/getClientHandlers";
 import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
-import { createServerSideRequest } from "./Auth/utils/serverSideRequest";
-
-type ClientDBHandlerRequest =
-  | AuthClientRequest
-  | {
-      /** Trusted server-only identity, resolved through auth.findUser on every operation. */
-      userId: string;
-      socket?: never;
-      httpReq?: never;
-      res?: never;
-    };
+import type {
+  ClientDBHandlerRequest,
+  GetClientDBHandlers,
+} from "./WebsocketAPI/getClientHandlers";
 
 /**
  * Database connection details
@@ -140,10 +132,7 @@ export type InitResult<
    * Uses the configured client schema by default and accepts a publish-profile schema override.
    * Only pass userId from trusted server code; never forward client-supplied input here.
    */
-  getClientDBHandlers: <NarrowedClientSchema = ClientSchema>(
-    clientReq: ClientDBHandlerRequest,
-    scope: PermissionScope | undefined,
-  ) => ReturnType<typeof getClientHandlers<NarrowedClientSchema>>;
+  getClientDBHandlers: GetClientDBHandlers<ClientSchema>;
 
   getFieldsWithTypes: typeof DboBuilder.prototype.getDetailedFieldInfo;
 };
@@ -350,19 +339,7 @@ export const initProstgles = async function (
       getClientDBHandlers: async <ClientSchema = void>(
         clientReq: ClientDBHandlerRequest,
         scope: PermissionScope | undefined,
-      ) => {
-        if ("userId" in clientReq) {
-          if ("socket" in clientReq || "httpReq" in clientReq || "res" in clientReq) {
-            throw new Error("userId cannot be combined with a client request");
-          }
-          return getClientHandlers<ClientSchema>(
-            this,
-            createServerSideRequest(this, clientReq.userId),
-            scope,
-          );
-        }
-        return getClientHandlers<ClientSchema>(this, clientReq, scope);
-      },
+      ) => this.getClientDBHandlers<ClientSchema>(clientReq, scope),
     };
 
     return initResult;

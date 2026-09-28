@@ -26,7 +26,7 @@ import type {
 } from "prostgles-types";
 import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/AuthTypes";
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
-import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
+import type { ClientHandlers, GetClientDBHandlers } from "../WebsocketAPI/getClientHandlers";
 import { isArray } from "../utils/utils";
 
 export type InsertRequestData = {
@@ -171,6 +171,21 @@ export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
         context: Context;
       },
   ) => Promise<void>;
+};
+
+export type AfterCommitTsTrigger<R, DBO, Context = undefined, ClientSchema = void> = {
+  commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  changedFields?: (keyof R)[];
+  run: (params: {
+    /** Committed rows, or the deleted rows' pre-delete state. */
+    rows: R[];
+    command: "insert" | "update" | "delete";
+    context: Context;
+    db: DB;
+    dbo: DBO;
+    getClientDBHandlers: GetClientDBHandlers<ClientSchema>;
+    localParams: undefined | LocalParams;
+  }) => MaybePromise<unknown>;
 };
 
 export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = ValidateRowArgsCommon<
