@@ -5,6 +5,7 @@ import prostgles, { defineFunction, getLocalStorageClient } from "prostgles-serv
 import { withUserRLS } from "prostgles-server/dist/DboBuilder/DboBuilder";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
+import { delaySyncTriggerRegistration } from "../syncTriggerCleanup.spec";
 import { testTableConfig, testTableHooks } from "./testTableConfig";
 import { VALIDATE_SCHEMA_FUNCTION_SQL_TEST } from "./VALIDATE_SCHEMA_FUNCTION_SQL_TEST";
 
@@ -52,6 +53,7 @@ const stopTest = (err?: unknown) => {
 
 const sessions: { id: string; user_id: string }[] = [
   { id: "main", user_id: "1" },
+  { id: "syncTriggerCleanup", user_id: "1" },
   { id: "rest_api", user_id: "1" },
 ];
 type USER = {
@@ -84,13 +86,6 @@ const dbConnection = {
   password: process.env.POSTGRES_PASSWORD || "api",
 };
 
-function dd() {
-  const dbo: DBOFullyTyped<{
-    tbl: { is_view: true; columns: { col1: { type: number } } };
-  }> = 1 as any;
-  void dbo.tbl.find;
-}
-
 void (async () => {
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
     await prostgles<DBGeneratedSchema>({
@@ -120,6 +115,9 @@ void (async () => {
       }
       if (ev.type === "debug" || ev.type === "connect" || ev.type === "disconnect") {
         // log("onLog", ev);
+      }
+      if (isClientTest && process.env.TEST_NAME === "syncTriggerCleanup") {
+        return delaySyncTriggerRegistration(ev);
       }
     },
     tableConfig: testTableConfig,

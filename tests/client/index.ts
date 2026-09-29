@@ -8,6 +8,7 @@ import type { DBSchemaTable, SQLHandler } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
 import { clientOnlyQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
+import { testSyncTriggerCleanup } from "../syncTriggerCleanup.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 //@ts-ignore
 import { isomorphicQueriesTyped } from "../isomorphicQueriesTyped.spec";
@@ -58,6 +59,9 @@ type ClientTestSpecV2 = (args: {
 let reconnectReadyResolve: undefined | (() => void);
 
 const tests: Record<string, ClientTestSpecV2> = {
+  syncTriggerCleanup: async ({ db, sql }) => {
+    await testSyncTriggerCleanup(db, sql!);
+  },
   main: async ({ db, sql, methods, tableSchema, auth, reconnectSocket }) => {
     await sql!(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db as any, sql, log, TEST_NAME);

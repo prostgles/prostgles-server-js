@@ -2,10 +2,12 @@ import type { PubSubManager } from "./PubSubManager";
 import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
 export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {
+  const activeListeners = this.getActiveListeners();
   const conditions = tableNames.map((tableName) => {
-    const activeTriggers = this.getActiveTriggers(tableName);
-    const activeConditionHashes = activeTriggers.map((c) => c.hash);
-    return `(at.table_name = ${asValue(tableName)} ${activeConditionHashes.length ? `AND at.condition_hash NOT IN (${asValue(activeConditionHashes, ":csv")})` : ""})`;
+    const activeConditions = activeListeners
+      .filter((listener) => listener.table_name === tableName)
+      .map((listener) => listener.condition);
+    return `(at.table_name = ${asValue(tableName)} ${activeConditions.length ? `AND at.condition NOT IN (${asValue(activeConditions, ":csv")})` : ""})`;
   });
 
   // log("deleteOrphanedTriggers", { appId: this.appId, conditions });

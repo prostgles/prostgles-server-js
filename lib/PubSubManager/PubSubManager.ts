@@ -278,16 +278,11 @@ export class PubSubManager {
     );
     const matchingSub = this.subs[matchingSubIdx];
     if (matchingSub) {
-      /** Ensure we check and refresh related table/view triggers as well */
-      const oldActiveTriggers = this.getAllActiveTriggers();
       this.subs.splice(matchingSubIdx, 1);
-      const newActiveTriggers = this.getAllActiveTriggers();
-      const tableNames = new Set(
-        [...oldActiveTriggers, ...newActiveTriggers].map((t) => t.tableName),
+      // These are tables to recheck, not a snapshot of which triggers can be deleted.
+      this.deleteOrphanedTriggers(
+        new Set(matchingSub.triggers.map((trigger) => trigger.table_name)),
       );
-      if (newActiveTriggers.length < oldActiveTriggers.length) {
-        this.deleteOrphanedTriggers(tableNames);
-      }
     } else {
       console.error("Could not unsubscribe. Subscription might not have initialised yet", {
         channelName,
@@ -314,22 +309,6 @@ export class PubSubManager {
     }));
     return tableTriggerConditions;
   };
-  getActiveTriggers = (tableName: string) => {
-    const activeTriggers = (this.getTriggerInfo(tableName) ?? []).filter(
-      (c) => c.subs.length || c.syncs.length,
-    );
-    return activeTriggers;
-  };
-
-  getAllActiveTriggers = () => {
-    return Array.from(this._triggers.keys()).flatMap((tableName) => {
-      return this.getActiveTriggers(tableName).map((triggerInfo) => ({
-        ...triggerInfo,
-        tableName,
-      }));
-    });
-  };
-
   getSubData = async (sub: Subscription) => {
     const {
       table_info,
@@ -418,9 +397,11 @@ export class PubSubManager {
   syncTimeout?: ReturnType<typeof setTimeout>;
   syncData = syncData.bind(this);
 
-  addSync = addSync.bind(this);
+  addSync = (...args: Parameters<typeof addSync>) =>
+    this.registerTriggers(() => addSync.apply(this, args));
 
-  addSub = addSub.bind(this);
+  addSub = (...args: Parameters<typeof addSub>) =>
+    this.registerTriggers(() => addSub.apply(this, args));
 
   getActiveListeners = (): { table_name: string; condition: string }[] => {
     const activeListeners: { table_name: string; condition: string }[] = [];
@@ -445,9 +426,17 @@ export class PubSubManager {
   /**
    * Sync triggers with database
    *  */
-  refreshTriggers = refreshTriggers.bind(this);
+  private triggerRefresh: Promise<void> = Promise.resolve();
+  refreshTriggers = () => {
+    // Apply database snapshots in order, including after a previous refresh failed.
+    const refresh = () => refreshTriggers.call(this);
+    this.triggerRefresh = this.triggerRefresh.then(refresh, refresh);
+    return this.triggerRefresh;
+  };
 
   /** Throttle trigger deletes */
+  private triggerCleanup: Promise<void> = Promise.resolve();
+  private pendingTriggerRegistrations = new Set<Promise<unknown>>();
   deletingOrphanedTriggers:
     | {
         tableNames: Set<string>;
@@ -460,13 +449,27 @@ export class PubSubManager {
       timeout: setTimeout(() => {
         const tableNames = this.deletingOrphanedTriggers!.tableNames;
         this.deletingOrphanedTriggers = undefined;
-        void deleteOrphanedTriggers.bind(this)(Array.from(tableNames));
+        // Finish existing registrations before cleanup; new ones wait for this cleanup.
+        this.triggerCleanup = Promise.allSettled([
+          this.triggerCleanup,
+          ...this.pendingTriggerRegistrations,
+        ]).then(() => deleteOrphanedTriggers.call(this, Array.from(tableNames)));
       }, 1000),
     };
 
     latestTableNames.forEach((latestTableName) => {
       this.deletingOrphanedTriggers?.tableNames.add(latestTableName);
     });
+  };
+
+  private registerTriggers = <T>(register: () => Promise<T>): Promise<T> => {
+    const result = this.triggerCleanup.then(register);
+    this.pendingTriggerRegistrations.add(result);
+    const settled = () => {
+      this.pendingTriggerRegistrations.delete(result);
+    };
+    void result.then(settled, settled);
+    return result;
   };
 
   addingTrigger: any;

@@ -20,6 +20,7 @@ fi
 npm run build
 npm run lint --prefix ../..
 npm run test-server && \
+TEST_NAME="syncTriggerCleanup" npm run test-client && \
 TEST_NAME="main"         npm run test-client && \
 TEST_NAME="useProstgles" npm run test-client && \
 TEST_NAME="files"        npm run test-client && \

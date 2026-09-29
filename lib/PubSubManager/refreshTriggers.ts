@@ -1,4 +1,4 @@
-import type { PubSubManager, TableTriggerInfo } from "./PubSubManager";
+import type { PubSubManager, PubSubManagerTriggers, TableTriggerInfo } from "./PubSubManager";
 
 export async function refreshTriggers(this: PubSubManager) {
   const start = Date.now();
@@ -18,14 +18,15 @@ export async function refreshTriggers(this: PubSubManager) {
     [this.dboBuilder.prostgles.appId],
   );
 
-  const oldTriggers = new Map(this._triggers);
+  const oldTriggers = this._triggers;
+  const newTriggers: PubSubManagerTriggers = new Map();
 
   triggers.forEach((t) => {
-    this._triggers.set(
+    newTriggers.set(
       t.table_name,
-      this._triggers.get(t.table_name) ?? new Map<number, TableTriggerInfo>(),
+      newTriggers.get(t.table_name) ?? new Map<number, TableTriggerInfo>(),
     );
-    const tableTriggers = this._triggers.get(t.table_name)!;
+    const tableTriggers = newTriggers.get(t.table_name)!;
     const table_condition_id = Number(t.table_condition_id);
     tableTriggers.set(table_condition_id, {
       condition: t.condition,
@@ -34,6 +35,7 @@ export async function refreshTriggers(this: PubSubManager) {
       table_condition_id,
     });
   });
+  this._triggers = newTriggers;
 
   await this._log({
     type: "syncOrSub",

@@ -417,15 +417,17 @@ export const isomorphicQueries = async (
         },
       );
 
-      await tout(300);
-      assert.deepStrictEqual(results.at(-1), { name: "first" });
+      try {
+        await tout(300);
+        assert.deepStrictEqual(results.at(-1), { name: "first" });
 
-      await db.various.update({ id: ids[1] }, { added: "2019-01-01" });
-      await tout(300);
-      assert.deepStrictEqual(results.at(-1), { name: "second" });
-
-      await sub.unsubscribe();
-      await db.various.delete({ id: { $in: ids } });
+        await db.various.update({ id: ids[1] }, { added: "2019-01-01" });
+        await tout(300);
+        assert.deepStrictEqual(results.at(-1), { name: "second" });
+      } finally {
+        await sub.unsubscribe();
+        await db.various.delete({ id: { $in: ids } });
+      }
     });
 
     const json = {

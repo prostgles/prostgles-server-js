@@ -13,8 +13,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
         CREATE OR REPLACE FUNCTION ${DB_OBJ_NAMES.data_watch_func}() RETURNS TRIGGER 
         AS $$
  
-            DECLARE c_ids INTEGER[];  
-            DECLARE err_c_ids INTEGER[]; 
+            DECLARE c_ids BIGINT[];
             DECLARE condition_checks_union_query TEXT := '';          
             DECLARE query TEXT := '';            
             DECLARE v_trigger RECORD;

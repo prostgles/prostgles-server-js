@@ -102,11 +102,11 @@ export async function notifListener(this: PubSubManager, data: { payload: string
       conditionIds.includes(table_condition_id),
     );
     const orphanedTableConditions = conditionIds.filter((condId) => {
-      const tc = tableTriggerConditions.at(condId);
+      const tc = tableTriggerConditions.find((trigger) => trigger.table_condition_id === condId);
       return !tc || (tc.subs.length === 0 && tc.syncs.length === 0);
     });
     if (orphanedTableConditions.length) {
-      void this.deleteOrphanedTriggers(new Set(table_name));
+      void this.deleteOrphanedTriggers(new Set([table_name]));
     }
 
     const triggeredSubs = new Set<Subscription>();
