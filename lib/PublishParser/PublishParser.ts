@@ -36,6 +36,9 @@ import {
   type PublishObject,
 } from "./publishTypesAndUtils";
 import { validatePublishProfiles } from "./validatePublishProfiles";
+import { randomUUID } from "node:crypto";
+import { createExecutionContext } from "../ExecutionContext";
+import { getFunctionRelatedRecords } from "./getFunctionRelatedRecords";
 
 export class PublishParser {
   parsedPublish: ReturnType<typeof getParsedPublish>;
@@ -144,7 +147,20 @@ export class PublishParser {
           })();
 
           this.prostgles.checkNotDestroyed();
-          return method.run(args, ctx);
+          const parent = createExecutionContext(this.prostgles.getExecution());
+          const relatedRecords = getFunctionRelatedRecords(method.input, args);
+          return this.prostgles.runWithExecution(
+            {
+              ...parent,
+              user,
+              clientReq,
+              invocations: [
+                ...parent.invocations,
+                { type: "function", id: randomUUID(), functionName: name, relatedRecords },
+              ],
+            },
+            () => method.run(args, ctx),
+          );
         };
         allowedFunctionsMap.set(name, { ...method, run: runWithContext });
       }

@@ -1,4 +1,5 @@
 import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
+import type { ExecutionContext } from "./ExecutionContext";
 import { deferDbQueries } from "./deferDbQueries";
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
@@ -18,10 +19,7 @@ import { runSQLFile } from "./TableConfig/runSQLFile";
 import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
 import { sleep } from "./utils/utils";
 import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
-import type {
-  ClientDBHandlerRequest,
-  GetClientDBHandlers,
-} from "./WebsocketAPI/getClientHandlers";
+import type { ClientDBHandlerRequest, GetClientDBHandlers } from "./WebsocketAPI/getClientHandlers";
 
 /**
  * Database connection details
@@ -93,6 +91,8 @@ export type OnReadyParams<S, Context = undefined> = OnReadyParamsCommon & {
 export type ContextCleanup = () => MaybePromise<void>;
 export type CreateContextParams<S> = OnReadyParamsCommon & {
   dbo: DBOFullyTyped<S>;
+  /** Read at call time; undefined outside a function, client operation, or table hook. */
+  getExecution: () => ExecutionContext | undefined;
   onCleanup: (cleanup: ContextCleanup) => void;
 };
 export type CreateContext<S, Context> = (params: CreateContextParams<S>) => MaybePromise<Context>;
@@ -324,6 +324,7 @@ export const initProstgles = async function (
         }
         this.restApi?.destroy();
         await this.cleanupContext();
+        this.executionStorage.disable();
         await this.dboBuilder.destroy();
         this.authHandler.destroy();
         await this.tableConfigurator?.destroy();

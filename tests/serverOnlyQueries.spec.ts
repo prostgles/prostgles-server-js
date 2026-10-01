@@ -10,6 +10,7 @@ import { testFileStorage } from "./server/fileStorage.spec";
 import type { withUserRLS as WithUserRLS } from "../dist/DboBuilder/dboBuilderUtils";
 import { testSchemaTypes } from "./server/schemaTypes.spec";
 import { testClientSchemaTypes } from "./server/clientSchemaTypes.spec";
+import { testExecutionContext } from "./server/executionContext.spec";
 
 export const serverOnlyQueries = async (
   db: DBHandlerServer,
@@ -17,6 +18,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
+    await testExecutionContext(pgDb);
     await testSchemaTypes(db, pgDb);
     await testClientSchemaTypes(pgDb);
     await testFileStorage(db, pgDb);

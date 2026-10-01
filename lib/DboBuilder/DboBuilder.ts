@@ -147,7 +147,8 @@ export class DboBuilder {
   registerOnRollbackCallback = (transaction: object, callback: OnCommitCallback) => {
     const callbacks = this.onRollbackCallbacksByTransaction.get(transaction);
     if (!callbacks) throw new Error("Transaction is not active");
-    callbacks.push(callback);
+    const execution = this.prostgles.getExecution();
+    callbacks.push((args) => this.prostgles.runWithExecution(execution, () => callback(args)));
   };
 
   registerOnCommitCallback = (transaction: object, callback: OnCommitCallback) => {
@@ -155,7 +156,8 @@ export class DboBuilder {
     if (!callbacks) {
       throw new Error("onCommit can only be called while its transaction is active");
     }
-    callbacks.push(callback);
+    const execution = this.prostgles.getExecution();
+    callbacks.push((args) => this.prostgles.runWithExecution(execution, () => callback(args)));
   };
 
   private runOnCommitCallbacks = async (

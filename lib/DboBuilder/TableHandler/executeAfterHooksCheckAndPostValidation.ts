@@ -4,6 +4,7 @@ import { isArray } from "../../utils/utils";
 import type { LocalParams } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { isApplicableHook } from "./isApplicableHook";
+import { runTableHook } from "../../ExecutionContext";
 
 /**
  * Prevent same-table same-command after-hook re-entry within the same tx.
@@ -82,10 +83,12 @@ export const executeAfterHooksCheckAndPostValidation = async ({
         );
         if (!isApplicable) continue;
         if (hook.type === "afterEach") {
-          await hook.validate({
-            ...commonParams,
-            localParams,
-          });
+          await runTableHook(tableHandler, [row], () =>
+            hook.validate({
+              ...commonParams,
+              localParams,
+            }),
+          );
         } else if (hook.type === "postValidate") {
           if (!localParams) throw new Error("Unexpected: no localParams for postValidate");
           await hook.validate({
@@ -117,26 +120,30 @@ export const executeAfterHooksCheckAndPostValidation = async ({
       });
       if (!applicableRows.length && !applicableData.length) continue;
       if (hook.type === "afterAll") {
-        await hook.validate({
-          ...txParams,
-          command,
-          data: applicableData,
-          rows: applicableRows,
-          localParams,
-          context: tableHandler.dboBuilder.prostgles.context,
-        });
+        await runTableHook(tableHandler, applicableRows, () =>
+          hook.validate({
+            ...txParams,
+            command,
+            data: applicableData,
+            rows: applicableRows,
+            localParams,
+            context: tableHandler.dboBuilder.prostgles.context,
+          }),
+        );
       } else if (hook.type === "afterCommit" && applicableRows.length) {
         const context = tableHandler.dboBuilder.prostgles.context;
-        txParams.onCommit(({ db, dbo }) =>
-          hook.run({
-            rows: applicableRows,
-            command,
-            context,
-            db,
-            dbo,
-            getClientDBHandlers: tableHandler.dboBuilder.prostgles.getClientDBHandlers,
-            localParams,
-          }),
+        runTableHook(tableHandler, applicableRows, () =>
+          txParams.onCommit(({ db, dbo }) =>
+            hook.run({
+              rows: applicableRows,
+              command,
+              context,
+              db,
+              dbo,
+              getClientDBHandlers: tableHandler.dboBuilder.prostgles.getClientDBHandlers,
+              localParams,
+            }),
+          ),
         );
       }
     }

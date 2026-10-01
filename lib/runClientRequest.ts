@@ -12,10 +12,10 @@ import type { LocalParams } from "./DboBuilder/DboBuilder";
 import type { DbTxTableHandlers } from "./DboBuilder/DboBuilderTypes";
 import type { TableHandler as TableHandlerServer } from "./DboBuilder/TableHandler/TableHandler";
 import { canRunSQL } from "./DboBuilder/runSql/runSQL";
+import { createExecutionContext } from "./ExecutionContext";
 import type { Prostgles } from "./Prostgles";
 import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
-import { getAbortSignalKeys } from "./DboBuilder/ViewHandler/getDbHandlerWithAbort";
 
 const TABLE_METHODS = {
   find: 1,
@@ -184,13 +184,21 @@ export const runClientRequest = async function (
     undefined | TableMethodFunctionWithRulesAndLocalParams;
 
   this.checkNotDestroyed();
-  return (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
-    param1,
-    param2,
-    param3,
-    parsedTableRule,
-    localParams,
-  ) as AnyObject | undefined;
+  return this.runWithExecution(
+    {
+      ...createExecutionContext(this.getExecution()),
+      user: clientInfo.user,
+      clientReq,
+    },
+    () =>
+      (tableHandler[command] as TableMethodFunctionWithRulesAndLocalParams)(
+        param1,
+        param2,
+        param3,
+        parsedTableRule,
+        localParams,
+      ) as AnyObject | undefined,
+  );
 };
 
 export const clientCanRunSqlRequest = async function (

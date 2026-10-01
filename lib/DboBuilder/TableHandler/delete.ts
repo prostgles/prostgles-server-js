@@ -12,6 +12,7 @@ import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
+import { runTableHook } from "../../ExecutionContext";
 
 export async function _delete(
   this: TableHandler,
@@ -100,7 +101,7 @@ export async function _delete(
 
     const FULL_ROW_KEY = "_prostgles_full_row" as const;
     const fullRowReturning =
-      hasAfterChecks ? `to_jsonb(${this.escapedName}) as ${FULL_ROW_KEY}` : undefined;
+      hasAfterChecks ? `to_jsonb(${this.escapedName}.*) as ${FULL_ROW_KEY}` : undefined;
     let returningQuery = "";
     if (returning !== undefined) {
       queryType = "any";
@@ -163,16 +164,18 @@ export async function _delete(
       if (localParams?.isRemoteRequest) {
         await transaction.t.none(withUserRLS(localParams, ""));
       }
-      const result = await onInsteadOfDelete({
-        ...this.getTransactionCallbacks(localParams),
-        context: this.dboBuilder.prostgles.context,
-        queryType,
-        isOneOrNone,
-        dbx: transaction.dbTX,
-        tx: transaction.t,
-        returningQuery,
-        filterOpts,
-      });
+      const result = await runTableHook(this, [filterOpts.filter], () =>
+        onInsteadOfDelete({
+          ...this.getTransactionCallbacks(localParams),
+          context: this.dboBuilder.prostgles.context,
+          queryType,
+          isOneOrNone,
+          dbx: transaction.dbTX,
+          tx: transaction.t,
+          returningQuery,
+          filterOpts,
+        }),
+      );
 
       await this._log({
         command: "delete",

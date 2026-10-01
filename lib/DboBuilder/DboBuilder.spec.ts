@@ -4,15 +4,11 @@ import type { EventInfo } from "../Logging";
 import type { Prostgles } from "../Prostgles";
 import { DboBuilder } from "./DboBuilder";
 
-const createDboBuilder = ({
-  events,
-  logs,
-}: {
-  events: string[];
-  logs: EventInfo[];
-}) => {
+const createDboBuilder = ({ events, logs }: { events: string[]; logs: EventInfo[] }) => {
   const transaction = {};
   const prostgles = {
+    getExecution: () => undefined,
+    runWithExecution: <T>(_execution: unknown, callback: () => T) => callback(),
     db: {
       tx: async (callback: (tx: object) => unknown) => {
         const result = await callback(transaction);

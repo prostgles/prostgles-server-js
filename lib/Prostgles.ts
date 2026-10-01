@@ -1,4 +1,6 @@
 import { DB_GENERATED_NAMES } from "./DBSchemaBuilder/constants";
+import { AsyncLocalStorage } from "node:async_hooks";
+import type { ExecutionContext } from "./ExecutionContext";
 import type pgPromise from "pg-promise";
 import { AuthHandler } from "./Auth/AuthHandler";
 import type { SessionUser } from "./Auth/AuthTypes";
@@ -6,10 +8,7 @@ import type { ContextCleanup, OnInitReason } from "./initProstgles";
 import { initProstgles } from "./initProstgles";
 import type { SchemaWatch } from "./SchemaWatch/SchemaWatch";
 import { getClientSchema } from "./WebsocketAPI/getClientSchema";
-import {
-  getClientDBHandlers,
-  type GetClientDBHandlers,
-} from "./WebsocketAPI/getClientHandlers";
+import { getClientDBHandlers, type GetClientDBHandlers } from "./WebsocketAPI/getClientHandlers";
 import { onSocketConnected } from "./WebsocketAPI/onSocketConnected";
 import pg = require("pg-promise/typescript/pg-subset");
 
@@ -266,6 +265,10 @@ export class Prostgles {
   }
 
   context: unknown;
+  readonly executionStorage = new AsyncLocalStorage<ExecutionContext | undefined>();
+  getExecution = () => this.executionStorage.getStore();
+  runWithExecution = <T>(execution: ExecutionContext | undefined, callback: () => T): T =>
+    this.executionStorage.run(execution, callback);
   private contextCleanups: ContextCleanup[] = [];
 
   cleanupContext = async () => {
@@ -296,6 +299,7 @@ export class Prostgles {
         sql: this.dboBuilder.sql,
         tables: this.dboBuilder.tables,
         reason,
+        getExecution: this.getExecution,
         onCleanup: (cleanup) => cleanups.push(cleanup),
       });
       this.context = context;

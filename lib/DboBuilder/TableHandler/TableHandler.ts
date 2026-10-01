@@ -38,6 +38,7 @@ import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
 import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 import type { TransactionCallbacks } from "../../PublishParser/publishTypesAndUtils";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
+import { runTableHook } from "../../ExecutionContext";
 
 export type ValidatedParams = {
   row: AnyObject;
@@ -101,17 +102,19 @@ export class TableHandler extends ViewHandler {
     for (const hook of hooks) {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
-      const hookResult = await hook.validate({
-        ...this.getTransactionCallbacks(localParams),
-        command,
-        context: this.dboBuilder.prostgles.context,
-        data: newRow,
-        dbx: this.getFinalDbo(localParams),
-        localParams,
-        tx: transaction?.t || this.db,
-        filter,
-        hookContext: newHookContext,
-      });
+      const hookResult = await runTableHook(this, [newRow], () =>
+        hook.validate({
+          ...this.getTransactionCallbacks(localParams),
+          command,
+          context: this.dboBuilder.prostgles.context,
+          data: newRow,
+          dbx: this.getFinalDbo(localParams),
+          localParams,
+          tx: transaction?.t || this.db,
+          filter,
+          hookContext: newHookContext,
+        }),
+      );
       if (hookResult) {
         newRow = hookResult.row;
         newHookContext = hookResult.hookContext;
