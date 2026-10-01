@@ -1686,13 +1686,10 @@ export const isomorphicQueries = async (
         colOneOf: "a",
         json: { ...json, o: { o1: 2 } } as any,
       });
-      try {
+      await assert.rejects(async () => {
         //@ts-expect-error
         await db.tjson.insert({ colOneOf: "a", json: { a: true, arr: "22" } });
-        throw "Should have failed";
-      } catch (e) {
-        // Expected
-      }
+      });
     });
 
     await test("find and findOne", async () => {

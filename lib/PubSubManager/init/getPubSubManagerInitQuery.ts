@@ -57,6 +57,8 @@ BEGIN; -- TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
 DO
 $do$
+DECLARE
+    reset_pubsub BOOLEAN := false;
 BEGIN
 
     /* Drop older version.  */
@@ -69,21 +71,21 @@ BEGIN
           ${PROSTGLES_SCHEMA_EXISTS_QUERY}
         )
       THEN
-        DROP SCHEMA IF EXISTS prostgles CASCADE;
+        reset_pubsub := true;
       ELSIF
         /* There is no newer version or same same version but different schema */
         NOT EXISTS (
           ${PROSTGLES_SCHEMA_VERSION_OK_QUERY}
         )
       THEN
-        DROP SCHEMA IF EXISTS prostgles CASCADE;
+        reset_pubsub := true;
 
       END IF;
 
     END IF;
 
 
-    IF NOT EXISTS (
+    IF reset_pubsub OR NOT EXISTS (
         SELECT 1 
         FROM information_schema.schemata 
         WHERE schema_name = 'prostgles'
@@ -92,6 +94,12 @@ BEGIN
 
         CREATE SCHEMA IF NOT EXISTS prostgles;
         COMMENT ON SCHEMA prostgles IS 'Used by prostgles-server to enable data/schema change tracking through subscribe/sync/watchSchema';
+
+        -- Keep application dependencies on the validator and helper functions intact.
+        DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.schema_watch_func}() CASCADE;
+        DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.data_watch_func}() CASCADE;
+        DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.trigger_add_remove_func}() CASCADE;
+        DROP TABLE IF EXISTS prostgles.app_triggers, prostgles.apps, prostgles.versions CASCADE;
 
         ${CREATE_VALIDATE_SCHEMA_FUNCTION_SQL}
 

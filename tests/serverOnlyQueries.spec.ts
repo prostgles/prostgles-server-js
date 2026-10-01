@@ -11,6 +11,7 @@ import type { withUserRLS as WithUserRLS } from "../dist/DboBuilder/dboBuilderUt
 import { testSchemaTypes } from "./server/schemaTypes.spec";
 import { testClientSchemaTypes } from "./server/clientSchemaTypes.spec";
 import { testExecutionContext } from "./server/executionContext.spec";
+import { testTableConfigValidation } from "./server/tableConfig.spec";
 
 export const serverOnlyQueries = async (
   db: DBHandlerServer,
@@ -18,6 +19,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
+    await testTableConfigValidation(pgDb);
     await testExecutionContext(pgDb);
     await testSchemaTypes(db, pgDb);
     await testClientSchemaTypes(pgDb);
