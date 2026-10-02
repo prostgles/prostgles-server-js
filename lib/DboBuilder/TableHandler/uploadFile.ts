@@ -5,6 +5,7 @@ import type { FileTableRow } from "../../StorageClient/getFileTableConfig";
 import { getValidatedFileType } from "../../StorageClient/getValidatedFileType";
 import { getFileServeRoute } from "../../StorageClient/setupFileServeHandler";
 import { deleteUnreferencedFile } from "../../StorageClient/deleteUnreferencedFile";
+import { FILE_DATA_SCHEMA } from "./getFileBuffer";
 import type { LocalParams } from "../DboBuilder";
 import type {
   OnCommitCallback,
@@ -15,7 +16,7 @@ const FILE_SCHEMA = {
   id: { type: "string", optional: true },
   original_name: "string",
   original_last_modified: { type: "string", optional: true },
-  data: "Blob",
+  data: FILE_DATA_SCHEMA,
 } as const;
 
 export const FILE_SCHEMA_KEYS = getKeys(FILE_SCHEMA);
@@ -26,7 +27,7 @@ export const assertFileObjectValid: AssertFileObjectValid = (row) => {
   const validation = getJSONBObjectSchemaValidationError(
     FILE_SCHEMA,
     row,
-    "file insert",
+    "file upload",
     undefined,
     {
       allowExtraProperties: false,

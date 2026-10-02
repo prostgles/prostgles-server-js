@@ -3,6 +3,7 @@ import { md5 } from "prostgles-types/dist/md5";
 import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
 import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/uploadFile";
+import { getFileBuffer } from "../DboBuilder/TableHandler/getFileBuffer";
 import type { Prostgles } from "../Prostgles";
 import type {
   AfterEachTsTrigger,
@@ -169,7 +170,7 @@ export const getFileTableConfig = (
             assertFileObjectValid(fileData);
 
             const { data: dataBlob, original_name, id, original_last_modified = null } = fileData;
-            const data = dataBlob as unknown as Buffer;
+            const data = await getFileBuffer(dataBlob);
             if (command === "update") {
               const { newData } = await updateFile(tableHandler, fileTable, {
                 onCommit,

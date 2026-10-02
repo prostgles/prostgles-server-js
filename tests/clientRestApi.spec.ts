@@ -103,6 +103,100 @@ export const clientRestApi = async (
       assert.equal(two22, 222);
     });
 
+    await test("REST file inserts and updates preserve decoded bytes", async () => {
+      const fileRest = (tableName: string, command: string, ...params: any[]) =>
+        post({ path: `db/${tableName}/${command}`, token: "main" }, ...params);
+      const bytes = Buffer.from([0, 1, 127, 128, 254, 255, 10]);
+      const replacement = Buffer.from("Updated through REST ✓");
+      const formats = [
+        (value: Buffer) => Array.from(value),
+        (value: Buffer) => value, // JSON.stringify invokes Buffer.toJSON().
+        (value: Buffer) => ({ encoding: "base64", data: value.toString("base64") }),
+        (value: Buffer) => ({ encoding: "base64", data: value.toString("base64").replace(/=+$/, "") }),
+      ];
+      const readFile = async (url: string) => {
+        const response = await fetch(`http://127.0.0.1:3001${url}`, {
+          headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
+        });
+        assert.equal(response.status, 200);
+        return Buffer.from(await response.arrayBuffer());
+      };
+      for (const format of formats) {
+        for (const nested of [false, true]) {
+          const payload = { original_name: "rest.txt", data: format(bytes) };
+          const row = await fileRest(
+            nested ? "users_public_info" : "files",
+            "insert",
+            nested ? { name: "REST upload", avatar: payload } : payload,
+            { returning: "*" },
+          );
+          const file = nested ? row.avatar : row;
+          try {
+            assert.deepEqual(await readFile(file.url), bytes);
+            assert.equal(Number(file.content_length), bytes.length);
+            const [updated] = await fileRest(
+              "files",
+              "update",
+              { id: file.id },
+              { original_name: "rest-updated.txt", data: format(replacement) },
+              { returning: "*" },
+            );
+            assert.deepEqual(await readFile(updated.url), replacement);
+            assert.equal(Number(updated.content_length), replacement.length);
+            assert.equal(updated.version, 2);
+          } finally {
+            if (nested) await fileRest("users_public_info", "delete", { id: row.id });
+            await fileRest("files", "delete", { id: file.id });
+          }
+        }
+      }
+      const count = await fileRest("files", "count", {});
+      const invalidData = [
+        [-1], [256], [1.5], ["1"],
+        { type: "Buffer", data: [256] },
+        { type: "Buffer", data: "invalid" },
+        { encoding: "base64", data: "%%%" },
+        { encoding: "base64", data: "YQ=" },
+        { encoding: "base64", data: "YQ==junk" },
+        { encoding: "base64", data: "YQ==\n" },
+        { encoding: "base64", data: "-_8=" },
+        { encoding: "base64", data: "YR==" },
+        { encoding: "base64", data: "data:text/plain;base64,YQ==" },
+        { encoding: "hex", data: "ff" },
+        "unencoded string",
+        null,
+        undefined,
+      ];
+      for (const payload of [
+        ...invalidData.map((data) => ({ original_name: "invalid.txt", data })),
+        { data: [] },
+        { original_name: 123, data: [] },
+      ]) {
+        await assert.rejects(
+          () => fileRest("files", "insert", payload),
+          (error: any) => {
+            const message = error.error?.message;
+            assert.match(message, /data|original_name/);
+            if (
+              payload.data && typeof payload.data === "object" &&
+              "encoding" in payload.data && payload.data.encoding === "base64"
+            ) {
+              assert.ok(message.includes(
+                'canonical standard base64, with correct "=" padding or no padding',
+              ));
+              assert.ok(message.includes('"YQ==" or "YQ"'));
+            }
+            if (payload.data === "unencoded string") {
+              assert.ok(message.includes('Blob | integer[] | { type: "Buffer"; data: integer[] }'));
+              assert.ok(message.includes('{ encoding: "base64"; data: string }'));
+            }
+            return true;
+          },
+        );
+      }
+      assert.equal(await fileRest("files", "count", {}), count);
+    });
+
     await test("Rest api security", async () => {
       const sensitiveKeys = ["constructor", "__proto__", "prototype"];
       for (const key of sensitiveKeys) {
