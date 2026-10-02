@@ -30,30 +30,31 @@ export const useProstglesTest = async (
     });
 
     await test("useProstglesClient with schema reload", async (t) => {
-      await sql(`select pg_sleep(1)`);
-      await renderReactHookManual({
+      let renderCount = 0;
+      const { results } = await renderReactHook({
         hook: useProstglesClient,
-        initialProps: [getSocketOptions(true)],
-        renderDuration: 1000,
-        onRender: (results) => {
-          if (results.length !== 1) return;
-          void sql(`CREATE TABLE ${newly_created_table}(id integer);`);
-        },
-        onEnd: async (results) => {
-          const [res1, res2, res3] = results;
-          assert.deepStrictEqual(res1, { isLoading: true, hasError: false });
-          assert.equal(res2!.isLoading, false);
-          assert.equal(res2!.hasError, false);
-          assert.equal(res3!.isLoading, false);
-          assert.equal(typeof res2?.db[newly_created_table]?.useFind, "undefined");
-          assert.equal(res3!.hasError, false);
-          assert.equal(typeof res3?.db[newly_created_table]?.useFind, "function");
-          assert.equal(results.length, 3);
-
-          const count = await res3?.db[newly_created_table]?.count?.();
-          assert.equal(count, 0);
+        props: [getSocketOptions(true)],
+        expectedRerenders: 3,
+        onResult: async (result) => {
+          if (++renderCount !== 2) return;
+          assert.equal(result.isLoading, false);
+          assert.equal(result.hasError, false);
+          assert.equal(typeof result.db[newly_created_table], "undefined");
+          await sql(`CREATE TABLE ${newly_created_table}(id integer);`);
         },
       });
+      const [res1, res2, res3] = results;
+      assert.deepStrictEqual(res1, { isLoading: true, hasError: false });
+      assert.equal(res2!.isLoading, false);
+      assert.equal(res2!.hasError, false);
+      assert.equal(res3!.isLoading, false);
+      assert.equal(typeof res2?.db[newly_created_table]?.useFind, "undefined");
+      assert.equal(res3!.hasError, false);
+      assert.equal(typeof res3?.db[newly_created_table]?.useFind, "function");
+      assert.equal(results.length, 3);
+
+      const count = await res3?.db[newly_created_table]?.count?.();
+      assert.equal(count, 0);
     });
 
     await test("useProstglesClient with initial skip", async (t) => {

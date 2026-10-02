@@ -38,7 +38,7 @@ type Hook = (...args: any[]) => any;
 type RenderHookArgs = {
   hook: Hook;
   props: any[];
-  onResult?: (result: any) => void;
+  onResult?: (result: any) => void | Promise<void>;
   expectedRerenders: number;
   timeout?: number;
   /**
@@ -63,7 +63,7 @@ const reactRender = ({
     React.useEffect(() => {
       return onUnmount;
     }, []);
-    onResult(result);
+    void onResult(result);
     return React.createElement("h1", null, `Hello`);
   };
   root.render(React.createElement(BasicComponent, { props }, null));
@@ -109,14 +109,19 @@ export const renderReactHookManual = async <H extends Hook>(rootArgs: {
     const onCompRender = (result: ReturnType<H>) => {
       results.push(result);
       if (didResolve) return;
-      void onRender?.(results);
+      void Promise.resolve().then(() => onRender?.(results)).catch(reject);
       clearTimeout(lastRenderWaitTimeout);
       lastRenderWaitTimeout = setTimeout(async () => {
         if (!setProps) {
           reject("setProps not set");
           return;
         }
-        await onEnd?.(results);
+        try {
+          await onEnd?.(results);
+        } catch (error) {
+          reject(error);
+          return;
+        }
         didResolve = true;
         return resolve({
           setProps: async (props, { waitFor = 250, onEnd } = {}) => {
@@ -167,7 +172,7 @@ export const renderReactHook = (rootArgs: RenderHookArgs): Promise<RenderResult>
     let resolved = false;
     const onRender = (result: RenderResult) => {
       results.push(result);
-      onResult?.(result);
+      void Promise.resolve().then(() => onResult?.(result)).catch(reject);
       clearTimeout(lastRenderWaitTimeout);
       resolved = expectedRerenders === results.length;
       if (resolved) {
