@@ -8,6 +8,30 @@ import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableC
 import { testTableConfig } from "./testTableConfig";
 
 export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
+  await test("server function return types preserve generated schema references", async () => {
+    const { tsSchema } = await db.items!.dboBuilder.getTsDefinitions();
+    const arrayReference = 'NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]';
+    const elementReference = `NonNullable<${arrayReference}>[number]`;
+    const expectedTypes = {
+      myfunc: "number",
+      myfuncWithBadReturn: "string",
+      scalarResult: "number",
+      recursiveResult: "{ value: string; next?: unknown }",
+      unrelatedSchema: "{ other: string }",
+      schemaResult:
+        '(undefined | { rows: Array<DBSchema["users"]>; inserts: Array<DBSchemaForInsert["users"]>; selection: Pick<DBSchema["users"], ("id" | "preferences")>; preferences: DBSchema["users"]["preferences"]; optional: Partial<DBSchema["users"]>; unrelated: { nested: { enabled: boolean } }; tags: Array<string>; created: Date })',
+      schemaArray: arrayReference,
+      schemaArrayElement: elementReference,
+      schemaNestedField: `{ a: { b: { c: { d: { e: { f: { g: { h: { i: { j: { k: ${elementReference} } } } } } } } } } } }`,
+      sampleSchemas:
+        'Array<(({ name: string; path: string } & { type: "sql"; file: string }) | ({ name: string; path: string } & { type: "dir"; workspaceConfig?: (undefined | { workspaces: Array<{ options?: (undefined | { hideCounts?: (undefined | false | true); tableListEndInfo?: (undefined | "count" | "size" | "none") }) }> }) }))>',
+    };
+    for (const [name, returnType] of Object.entries(expectedTypes)) {
+      const definition = tsSchema.split("\n").find((line) => line.includes(`"${name}":`));
+      assert.ok(definition?.endsWith(`=> Promise<${returnType}>;`), definition ?? name);
+    }
+  });
+
   await test("column definition row types support SQL aliases, arrays and generated columns", async () => {
     const columns = {
       int: "INT NOT NULL",

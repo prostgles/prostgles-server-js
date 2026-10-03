@@ -2,17 +2,21 @@ import * as ts from "typescript";
 
 /**
  * Recursively resolve a type to its structural representation
- * using only built-in/primitive types
+ * using built-in types and references to the generated schema
  */
 export const resolveTypeToStructure = (
   globalBuiltIns: Set<string>,
   functionName: string,
   checker: ts.TypeChecker,
   type: ts.Type,
+  schemaTypeReferences: ReadonlyMap<ts.Type, string> = new Map(),
   parentTypes: ts.Type[] = [],
   maxDepth = 10,
   depth = 0,
 ): string => {
+  const schemaReference = schemaTypeReferences.get(type);
+  if (schemaReference) return schemaReference;
+
   const getParentNames = () => parentTypes.map((t) => checker.typeToString(t));
   if (depth > maxDepth) {
     console.warn(
@@ -30,6 +34,7 @@ export const resolveTypeToStructure = (
       functionName,
       checker,
       childType,
+      schemaTypeReferences,
       nextParentTypes,
       maxDepth,
       depth + (isNestedStructure ? 1 : 0),
@@ -56,6 +61,18 @@ export const resolveTypeToStructure = (
 
   /** Recursive output types cannot be represented in the generated inline schema. */
   if (parentTypes.includes(type)) return "unknown";
+
+  /** Preserve standard utility types when their arguments reference the generated schema. */
+  if (
+    type.aliasTypeArguments?.length &&
+    type.aliasTypeArguments.some((argument) => schemaTypeReferences.has(argument)) &&
+    type.aliasSymbol?.declarations?.every(
+      (declaration) => declaration.getSourceFile().hasNoDefaultLib,
+    )
+  ) {
+    const args = type.aliasTypeArguments.map((argument) => resolveChild(argument));
+    return `${type.aliasSymbol.getName()}<${args.join(", ")}>`;
+  }
 
   // Handle union types
   if (type.isUnion()) {
@@ -165,14 +182,10 @@ export const resolveTypeToStructure = (
     const numberIndexType = type.getNumberIndexType();
 
     if (stringIndexType) {
-      members.push(
-        `[key: string]: ${resolveChild(stringIndexType, true)}`,
-      );
+      members.push(`[key: string]: ${resolveChild(stringIndexType, true)}`);
     }
     if (numberIndexType) {
-      members.push(
-        `[key: number]: ${resolveChild(numberIndexType, true)}`,
-      );
+      members.push(`[key: number]: ${resolveChild(numberIndexType, true)}`);
     }
 
     if (members.length === 0) {

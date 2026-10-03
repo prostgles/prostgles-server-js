@@ -1,9 +1,14 @@
 import * as ts from "typescript";
-import { dirname } from "path";
+import { dirname, resolve } from "path";
 import { resolveTypeToStructure } from "./resolveTypeToStructure";
 import { getGlobalBuiltinTypes } from "./getGlobalBuiltinTypes";
+import { getSchemaTypeReferences } from "./getSchemaTypeReferences";
+import { DB_GENERATED_NAMES } from "./constants";
 
-export const getServerFunctionReturnTypes = (instancePath: string): Map<string, string> => {
+export const getServerFunctionReturnTypes = (
+  instancePath: string,
+  tsGeneratedTypesDir: string | undefined,
+): Map<string, string> => {
   const configPath = ts.findConfigFile(dirname(instancePath), (f) => ts.sys.fileExists(f));
   if (!configPath) throw new Error("tsconfig.json not found");
 
@@ -20,6 +25,11 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
   }
 
   const globalBuiltins = getGlobalBuiltinTypes(instancePath, checker, program);
+  const schemaFile =
+    tsGeneratedTypesDir === undefined ? undefined : (
+      program.getSourceFile(resolve(tsGeneratedTypesDir, `${DB_GENERATED_NAMES.SCHEMA}.ts`))
+    );
+  const schemaTypeReferences = getSchemaTypeReferences(checker, schemaFile);
 
   if (sourceFile.isDeclarationFile) {
     throw new Error(`Source file is a declaration file: ${instancePath}`);
@@ -73,6 +83,7 @@ export const getServerFunctionReturnTypes = (instancePath: string): Map<string, 
               prop.getName(),
               checker,
               finalRunReturnType,
+              schemaTypeReferences,
             );
             result.set(prop.getName(), resolvedReturnType);
           }

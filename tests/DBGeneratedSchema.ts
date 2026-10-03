@@ -479,6 +479,14 @@ export type DBSchemaForInsert = {
 
 
 export type GeneratedFunctionSchema = { 
+  "schemaResult": () => Promise<(undefined | { rows: Array<DBSchema["users"]>; inserts: Array<DBSchemaForInsert["users"]>; selection: Pick<DBSchema["users"], ("id" | "preferences")>; preferences: DBSchema["users"]["preferences"]; optional: Partial<DBSchema["users"]>; unrelated: { nested: { enabled: boolean } }; tags: Array<string>; created: Date })>;
+  "schemaArray": () => Promise<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>;
+  "schemaArrayElement": () => Promise<NonNullable<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>[number]>;
+  "schemaNestedField": () => Promise<{ a: { b: { c: { d: { e: { f: { g: { h: { i: { j: { k: NonNullable<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>[number] } } } } } } } } } } }>;
+  "unrelatedSchema": () => Promise<{ other: string }>;
+  "recursiveResult": () => Promise<{ value: string; next?: unknown }>;
+  "sampleSchemas": () => Promise<Array<(({ name: string; path: string } & { type: "sql"; file: string }) | ({ name: string; path: string } & { type: "dir"; workspaceConfig?: (undefined | { workspaces: Array<{ options?: (undefined | { hideCounts?: (undefined | false | true); tableListEndInfo?: (undefined | "count" | "size" | "none") }) }> }) }))>>;
+  "scalarResult": (args: {    value: number;  }) => Promise<number>;
   "myfunc": (args: {    arg1: number;  }) => Promise<number>;
   "myfuncVoid": () => Promise<void>;
   "myfuncWithBadReturn": (args: {    arg1: number;  }) => Promise<string>;

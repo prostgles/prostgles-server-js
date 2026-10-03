@@ -4,7 +4,10 @@ import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getServerFunctionReturnTypes } from "./getServerFunctionReturnTypes";
 
 export const getFunctionsTypescriptSchema = (
-  { tsGeneratedTypesFunctionsPath }: Pick<ProstglesInitOptions, "tsGeneratedTypesFunctionsPath">,
+  {
+    tsGeneratedTypesFunctionsPath,
+    tsGeneratedTypesDir,
+  }: Pick<ProstglesInitOptions, "tsGeneratedTypesFunctionsPath" | "tsGeneratedTypesDir">,
   tablesOrViews: TableSchema[],
   resolvedFunctions: Map<
     string,
@@ -16,7 +19,7 @@ export const getFunctionsTypescriptSchema = (
 ) => {
   const functionReturnTypes =
     !tsGeneratedTypesFunctionsPath ? undefined : (
-      getServerFunctionReturnTypes(tsGeneratedTypesFunctionsPath)
+      getServerFunctionReturnTypes(tsGeneratedTypesFunctionsPath, tsGeneratedTypesDir)
     );
   const methodDefinitions = Array.from(resolvedFunctions.entries()).map(
     ([name, functionDefinition]) => {

@@ -1,11 +1,11 @@
 import express from "express";
 import path from "path";
-import { CHANNELS } from "prostgles-types";
 import prostgles, { defineFunction, getLocalStorageClient } from "prostgles-server";
 import { withUserRLS } from "prostgles-server/dist/DboBuilder/DboBuilder";
+import { CHANNELS } from "prostgles-types";
+import { delaySyncTriggerRegistration } from "../syncTriggerCleanup.spec";
 import { testPublishTypes } from "./publishTypeCheck";
 import { testPublish } from "./testPublish";
-import { delaySyncTriggerRegistration } from "../syncTriggerCleanup.spec";
 import { testTableConfig, testTableHooks } from "./testTableConfig";
 import { VALIDATE_SCHEMA_FUNCTION_SQL_TEST } from "./VALIDATE_SCHEMA_FUNCTION_SQL_TEST";
 
@@ -25,10 +25,10 @@ http.listen(3001);
 import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
-import { type DBGeneratedSchema } from "../DBGeneratedSchema";
+import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
-import type { DBHandlerServer, DBOFullyTyped } from "prostgles-server";
+import type { DBHandlerServer } from "prostgles-server";
 export type { DBHandlerServer } from "prostgles-server";
 
 let logs: unknown[] = [];
@@ -244,6 +244,44 @@ void (async () => {
       },
     },
     functions: {
+      schemaTests: {
+        userFilter: { type: "schema-tests" },
+        functions: {
+          schemaResult: defineFunction({ run: (): SchemaResult | undefined => undefined }),
+          schemaArray: defineFunction({ run: (): ReferencedTables => [] }),
+          schemaArrayElement: defineFunction({
+            run: (): NonNullable<ReferencedTables>[number] => ({ name: "users", minFiles: 1 }),
+          }),
+          schemaNestedField: defineFunction({
+            run: (): DeepValue<NonNullable<ReferencedTables>[number]> => ({
+              a: {
+                b: {
+                  c: {
+                    d: {
+                      e: { f: { g: { h: { i: { j: { k: { name: "users", minFiles: 1 } } } } } } },
+                    },
+                  },
+                },
+              },
+            }),
+          }),
+          unrelatedSchema: defineFunction({
+            run: (): DBSchema["users"] => ({ other: "ok" }),
+          }),
+          recursiveResult: defineFunction({ run: (): RecursiveResult => ({ value: "ok" }) }),
+          sampleSchemas: defineFunction({ run: (): SampleSchema[] => [] }),
+          scalarResult: defineFunction({
+            input: { value: "number" },
+            run: ({ value }, { dbo }) => {
+              value satisfies number;
+              void dbo.users.find();
+              // @ts-expect-error Function contexts must preserve the database schema.
+              void dbo.missingTable;
+              return value;
+            },
+          }),
+        },
+      },
       allUsers: {
         userFilter: {},
         functions: {
@@ -433,3 +471,37 @@ void (async () => {
     },
   });
 })();
+
+type DBSchema = { users: { other: string } };
+type ReferencedTables = NonNullable<AliasedSchema["tjson"]["table_config"]>["referencedTables"];
+type SchemaForInsert = {
+  [K in keyof DBGeneratedSchema]: DBGeneratedSchema[K]["columns"];
+};
+type SchemaResult = {
+  rows: AliasedSchema["users"][];
+  inserts: SchemaForInsert["users"][];
+  selection: Pick<AliasedSchema["users"], "id" | "preferences">;
+  preferences: AliasedSchema["users"]["preferences"];
+  optional: Partial<AliasedSchema["users"]>;
+  unrelated: { nested: { enabled: boolean } };
+  tags: string[];
+  created: Date;
+};
+type DeepValue<T> = {
+  a: { b: { c: { d: { e: { f: { g: { h: { i: { j: { k: T } } } } } } } } } };
+};
+type RecursiveResult = { value: string; next?: RecursiveResult };
+type SampleSchema = { name: string; path: string } & (
+  | { type: "sql"; file: string }
+  | {
+      type: "dir";
+      workspaceConfig?: {
+        workspaces: {
+          options?: {
+            hideCounts?: boolean;
+            tableListEndInfo?: "count" | "size" | "none";
+          };
+        }[];
+      };
+    }
+);
