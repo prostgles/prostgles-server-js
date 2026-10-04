@@ -12,6 +12,7 @@ import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
 import { runMigrations } from "./runMigrations";
 import type { TableConfigurator } from "./TableConfigurator";
+import { getTableCheckBranches, getTableCheckConstraint } from "./getTableCheck";
 
 export const initTableConfig = async function (this: TableConfigurator) {
   this.initialising = true;
@@ -161,6 +162,11 @@ export const initTableConfig = async function (this: TableConfigurator) {
     const tableHandler = this.dbo[tableName];
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
+    if ("check" in tableConf && tableConf.check !== undefined) {
+      // Checked table introspection may reference tables queued earlier in this config.
+      await runQueries();
+    }
+
     /* isLookupTable table has already been created */
     const tableColumnDefinition =
       "isLookupTable" in tableConf ? undefined : (
@@ -177,12 +183,37 @@ export const initTableConfig = async function (this: TableConfigurator) {
     }
 
     /** CONSTRAINTS */
-    const constraintDefs = getConstraintDefinitionQueries({
-      tableName,
-      tableConf,
-    });
+    const constraintDefs =
+      getConstraintDefinitionQueries({
+        tableName,
+        tableConf,
+      }) ?? [];
+    if ("check" in tableConf && tableConf.check !== undefined) {
+      if (!tableColumnDefinition)
+        throw new Error(`tableConfig.check requires columns for ${tableName}`);
+      // Let PostgreSQL determine types and nullability from the SQL column definitions.
+      const { cols } = await getFutureTableSchema({
+        db: this.db,
+        tableName,
+        columnDefs: tableColumnDefinition.columnDefs,
+        constraintDefs,
+      });
+      const branches = getTableCheckBranches(
+        tableConf.check,
+        cols.map((c) => ({
+          name: c.column_name,
+          nullable: c.nullable,
+          udt_name: c.udt_name,
+        })),
+      );
+      const constraint = getTableCheckConstraint(tableName, branches);
+      if (constraintDefs.some((c) => c.name === constraint.name)) {
+        throw new Error(`Constraint ${constraint.name} is reserved for tableConfig.check`);
+      }
+      constraintDefs.push(constraint);
+    }
     if (tableColumnDefinition?.isCreate) {
-      queries.push(...(constraintDefs?.map((c) => c.alterQuery) ?? []));
+      queries.push(...constraintDefs.map((c) => c.alterQuery));
     } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
         db: this.db,
@@ -192,7 +223,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       });
       const futureCons = fullSchema.constraints.map((nc) => ({
         ...nc,
-        isNamed: constraintDefs?.some((c) => c.name === nc.name),
+        isNamed: constraintDefs.some((c) => c.name === nc.name),
       }));
 
       /** Run this first to ensure any dropped cols drop their constraints as well */
@@ -214,7 +245,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       });
 
       /** Add missing named constraints */
-      constraintDefs?.forEach((c) => {
+      constraintDefs.forEach((c) => {
         if (!c.name) return;
         const fc = futureCons.find((nc) => nc.name === c.name);
         if (fc && !currCons.some((cc) => cc.name === c.name && cc.definition === fc.definition)) {

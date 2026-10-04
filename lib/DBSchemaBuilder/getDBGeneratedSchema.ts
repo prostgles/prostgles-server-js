@@ -7,15 +7,19 @@ import {
   type ClientSchemaProfiles,
 } from "./getClientDBGeneratedSchemas";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
+import { getCheckedTableColumns } from "./getCheckedTableColumns";
 
 export const getDBGeneratedSchema = ({
   config,
   tablesOrViews,
   clientSchemas,
+  skipChecks = false,
 }: {
   config: TableConfig | undefined;
   tablesOrViews: TableSchema[];
   clientSchemas?: ClientSchemaProfiles;
+  /** The initial DBO build precedes tableConfig migrations. */
+  skipChecks?: boolean;
 }): string => {
   const tables: string[] = [];
 
@@ -55,13 +59,18 @@ export const getDBGeneratedSchema = ({
       );
       const referencedByStr =
         isEmpty(referencedBy) ? "" : `referencedBy: ${JSON.stringify(referencedBy)};`;
+      const checkedColumns =
+        skipChecks ? undefined : getCheckedTableColumns(config, tableOrView, tablesOrViews);
       tables.push(`${escapeTSNames(tableOrView.name)}: {
-    columns: {${cols
-      .map(
-        (column) => `
+    columns: ${
+      checkedColumns ??
+      `{${cols
+        .map(
+          (column) => `
       ${getColumnTypescriptDefinition({ tablesOrViews, config, tableOrView, column })}`,
-      )
-      .join("")}
+        )
+        .join("")}
+    }`
     };
     ${referencedByStr}
   };\n  `);

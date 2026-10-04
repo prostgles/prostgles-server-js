@@ -283,19 +283,19 @@ export const runClientMethod = async function (
     throw "Function " + JSON.stringify(name) + " does not accept any arguments";
   }
 
-  const expectedArgsError =
-    !inputSchema ? undefined : (
-      await getJSONBSchemaValidationErrorAsync(
-        { type: inputSchema },
-        input,
-        this.dboBuilder.dboMap as Map<string, TableHandler>,
-      )
+  if (inputSchema) {
+    const { clientDb } = await this.getClientDBHandlers(clientReq, undefined);
+    const expectedArgsError = await getJSONBSchemaValidationErrorAsync(
+      { type: inputSchema },
+      input,
+      new Map(Object.entries(clientDb)),
     );
 
-  if (expectedArgsError?.error !== undefined) {
-    const { error } = expectedArgsError;
-    const message = error.startsWith(" ") ? "input" + error : error;
-    throw message;
+    if (expectedArgsError.error !== undefined) {
+      const { error } = expectedArgsError;
+      const message = error.startsWith(" ") ? "input" + error : error;
+      throw message;
+    }
   }
 
   /** Allowed functions are wrapped with their request context by PublishParser. */

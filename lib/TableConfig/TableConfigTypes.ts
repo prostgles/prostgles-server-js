@@ -178,6 +178,13 @@ export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
 
 type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
 
+export type TableCheckValue = string | number | boolean | null;
+export type TableCheckBranch = Record<
+  string,
+  TableCheckValue | { enum: readonly TableCheckValue[] } | { $ne: null }
+>;
+export type TableCheck = { $or: readonly TableCheckBranch[] };
+
 /**
  * Each column definition cannot reference to tables that appear later in the table definition.
  * These references should be specified in constraints property
@@ -190,6 +197,13 @@ export type TableDefinition<LANG_IDS = { en: 1 }> = BaseTableDefinition & {
   columns?: {
     [column_name: string]: ColumnConfig<LANG_IDS>;
   };
+  /**
+   * Allowed row variants, enforced by a CHECK constraint and emitted as a generated union.
+   * Nullable configured columns omitted from a variant must be NULL; other columns are unchanged.
+   * Supports literals, { enum: [...] }, and { $ne: null }; nested filters are not supported.
+   * Non-null literals support text/varchar, boolean, and PostgreSQL types read as numbers.
+   */
+  check?: TableCheck;
   constraints?:
     | string[]
     | {

@@ -98,8 +98,21 @@ export const getClientDBGeneratedSchemas = (
               "Record<string, never>"))
           );
         const optionalTable = published.every(Boolean) ? "" : " optional: true;";
+        const tableConfig = config?.[table.name];
+        const preserveVariants = (input: string) => {
+          if (
+            !tableConfig ||
+            !("check" in tableConfig) ||
+            !tableConfig.check ||
+            input === "never"
+          ) {
+            return input;
+          }
+          const columns = `${tableType}["columns"]`;
+          return `(${columns} extends infer Row extends ${columns} ? Row extends unknown ? ${input.replaceAll(columns, "Row")} : never : never)`;
+        };
         return [
-          `  ${JSON.stringify(table.name)}: ${tableType} & { insertColumns: ${input}; updateColumns: ${updateInput};${optionalTable} };`,
+          `  ${JSON.stringify(table.name)}: ${tableType} & { insertColumns: ${preserveVariants(input)}; updateColumns: ${preserveVariants(updateInput)};${optionalTable} };`,
         ];
       });
     if (!definitions.length) {

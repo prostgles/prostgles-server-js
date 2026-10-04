@@ -6,6 +6,7 @@ npm run build
 
 cd client
 npm run build
+node ../checkProstglesTypes.js
 npm run testBasicHooks
 
 

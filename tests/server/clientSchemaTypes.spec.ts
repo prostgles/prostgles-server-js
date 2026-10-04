@@ -80,6 +80,7 @@ export const testClientSchemaTypes = async (db: DB) => {
           ["user-admin", { id: "user-admin", type: "admin" }],
         ]);
         let networkAuthCalls = 0;
+        let lookupCalls = 0;
         instance = await prostgles({
           dbConnection: {
             ...getConnectionDetails(db),
@@ -131,6 +132,41 @@ export const testClientSchemaTypes = async (db: DB) => {
             guest: {
               userFilter: { id: "user-guest" },
               functions: {
+                lookupTest: defineFunction({
+                  input: {
+                    row: {
+                      type: "RowLookup",
+                      table: tableName,
+                      optional: true,
+                      filter: { body: { $ne: "lookup-filtered" } },
+                    },
+                    value: {
+                      type: "ValueLookup",
+                      table: tableName,
+                      column: "id",
+                      optional: true,
+                      filter: { body: { $ne: "lookup-filtered" } },
+                    },
+                    rows: { type: "RowLookup[]", table: tableName, optional: true },
+                    values: {
+                      type: "ValueLookup[]",
+                      table: tableName,
+                      column: "id",
+                      optional: true,
+                    },
+                    table: { type: "TableLookup", optional: true },
+                    column: { type: "ColumnLookup", optional: true },
+                    privateRow: { type: "RowLookup", table: privateTableName, optional: true },
+                    privateValue: {
+                      type: "ValueLookup",
+                      table: privateTableName,
+                      column: "id",
+                      optional: true,
+                    },
+                  },
+                  unrestrictedDbAccess: true,
+                  run: () => ++lookupCalls,
+                }),
                 transactionTest: defineFunction({
                   input: { fail: "boolean" },
                   run: ({ fail }, { withClientDbTx }) =>
@@ -385,6 +421,64 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(typeof handlers.clientDb[tableName]!.upsert, "function");
         assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
+        await t.test(
+          "function lookups enforce caller permissions before unrestricted execution",
+          async () => {
+            assert(instance);
+            const rows = await instance.db[tableName]!.insertMany!(
+              [
+                { body: "lookup-visible", created_by: "user-guest" },
+                { body: "lookup-hidden", created_by: "other" },
+                { body: "lookup-filtered", created_by: "user-guest" },
+              ],
+              { returning: "*" },
+            );
+            const [visible, hidden, filtered] = rows;
+            assert(visible && hidden && filtered);
+            const privateRow = await instance.db[privateTableName]!.insert!({}, { returning: "*" });
+            try {
+              const guest = await instance.getClientDBHandlers({ userId: "user-guest" }, undefined);
+              for (const client of [handlers, guest]) {
+                const run = async (input: AnyObject) =>
+                  await client.clientMethods.lookupTest!.run(input);
+                const before = lookupCalls;
+                assert.equal(
+                  await run({
+                    row: { id: visible.id },
+                    value: visible.id,
+                    rows: [{ id: visible.id }],
+                    values: [visible.id],
+                    table: tableName,
+                    column: { table: tableName, column: "id" },
+                  }),
+                  before + 1,
+                );
+                for (const input of [
+                  { row: { id: hidden.id } },
+                  { value: hidden.id },
+                  { rows: [{ id: visible.id }, { id: hidden.id }] },
+                  { values: [visible.id, hidden.id] },
+                  { row: { id: filtered.id } },
+                  { value: filtered.id },
+                  { table: privateTableName },
+                  { column: { table: privateTableName, column: "id" } },
+                  { privateRow: { id: privateRow.id } },
+                  { privateValue: privateRow.id },
+                ]) {
+                  await assert.rejects(() => run(input));
+                  assert.equal(
+                    lookupCalls,
+                    before + 1,
+                    "Rejected lookups must not execute the function",
+                  );
+                }
+              }
+            } finally {
+              await instance.db[tableName]!.delete!({ id: { $in: rows.map(({ id }) => id) } });
+              await instance.db[privateTableName]!.delete!({ id: privateRow.id });
+            }
+          },
+        );
         await t.test("server user handlers enforce permissions and reject client impersonation", async () => {
           assert(instance);
           assert(networkAuthCalls > 0);
@@ -724,7 +818,7 @@ export const testClientSchemaTypes = async (db: DB) => {
   );
 };
 
-const checkTypes = (schema: string, checks: string) => {
+export const checkTypes = (schema: string, checks: string) => {
   const filename = path.resolve(__dirname, "../../../client/client-schema-typecheck.ts");
   const options: ts.CompilerOptions = {
     strict: true,

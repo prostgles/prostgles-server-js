@@ -340,6 +340,7 @@ export class DboBuilder {
     this.tableTsDefinitions = getDBGeneratedSchema({
       config: this.prostgles.mergedTableConfig.tableConfig,
       tablesOrViews,
+      skipChecks: this.prostgles.preparingTableConfig,
     });
     this.functionTsDefinitions = getFunctionsTypescriptSchema(
       this.prostgles.opts,
