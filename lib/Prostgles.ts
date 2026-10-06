@@ -66,6 +66,7 @@ import * as fs from "fs";
 import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
+import { getJobTableConfig } from "./Jobs/getJobTableConfig";
 import { dirname } from "path";
 import { getAuditTableConfig } from "./Audit/getAuditTableConfig";
 import { parseAuditConfig } from "./Audit/parseAuditConfig";
@@ -73,8 +74,10 @@ import { getAuditTriggerConfig } from "./Audit/getAuditTriggerConfig";
 import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
 import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
 import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+import { JobManager } from "./Jobs/JobManager";
 
 export class Prostgles {
+  readonly jobs = new JobManager(this);
   /**
    * Used to manage concurrent prostgles connections to the same database
    */
@@ -151,7 +154,7 @@ export class Prostgles {
       }
     }
     const config = getFileTableConfig(this);
-    const tableConfig = getAuditTableConfig(this, config.tableConfig);
+    const tableConfig = getJobTableConfig(this, getAuditTableConfig(this, config.tableConfig));
     const audit = this.resolvedAuditConfig;
     if (tableConfig && audit) {
       for (const [name, auditConfig] of Object.entries(getAuditTriggerConfig(audit))) {
@@ -178,6 +181,7 @@ export class Prostgles {
       onReady: 1,
       dbConnection: 1,
       functions: 1,
+      jobs: 1,
       io: 1,
       publish: 1,
       schemaFilter: 1,
@@ -272,6 +276,7 @@ export class Prostgles {
   private contextCleanups: ContextCleanup[] = [];
 
   cleanupContext = async () => {
+    await this.jobs.stop();
     const cleanups = this.contextCleanups.splice(0).reverse();
     this.context = undefined;
     for (const cleanup of cleanups) {
@@ -351,8 +356,10 @@ export class Prostgles {
         await this.rebuildDBO();
       }
     });
+    await this.jobs.validate();
     await this.createContext({ type: "dbo.refresh" });
     this.loaded = true;
+    this.jobs.start();
     return this.dbo!;
   };
 

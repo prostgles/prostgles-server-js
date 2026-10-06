@@ -53,6 +53,7 @@ export type ValidatedParams = {
 
 export class TableHandler extends ViewHandler {
   dataValidator: DataValidator;
+  readonly allowColumnFunctions: boolean;
   constructor({
     db,
     config,
@@ -76,6 +77,9 @@ export class TableHandler extends ViewHandler {
     this.remove = this.delete;
 
     this.dataValidator = new DataValidator(this);
+    // Queue payloads are literal JSON, even when shaped like a column function.
+    this.allowColumnFunctions =
+      !dboBuilder.prostgles.opts.jobs || this.name !== dboBuilder.prostgles.jobs.tableName;
     this.is_media = dboBuilder.prostgles.isMedia(this.name);
   }
 
@@ -155,7 +159,7 @@ export class TableHandler extends ViewHandler {
       throw new Error("Unexpected: no localParams for postValidate");
     }
     const afterEachHooks = this.hooks?.afterEach
-      ?.map((hook) => {
+      ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
           return;
@@ -163,12 +167,13 @@ export class TableHandler extends ViewHandler {
         return {
           type: "afterEach",
           ...hook,
+          hookKey: `afterEach:${index}`,
         } as const;
       })
       .filter(isDefined);
 
     const afterAllHooks = this.hooks?.afterAll
-      ?.map((hook) => {
+      ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
           return;
@@ -176,11 +181,12 @@ export class TableHandler extends ViewHandler {
         return {
           type: "afterAll",
           ...hook,
+          hookKey: `afterAll:${index}`,
         } as const;
       })
       .filter(isDefined);
     const afterCommitHooks = this.hooks?.afterCommit
-      ?.map((hook) => {
+      ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
           return;
@@ -188,6 +194,7 @@ export class TableHandler extends ViewHandler {
         return {
           type: "afterCommit",
           ...hook,
+          hookKey: `afterCommit:${index}`,
         } as const;
       })
       .filter(isDefined);
@@ -212,7 +219,9 @@ export class TableHandler extends ViewHandler {
     newRows: AnyObject[],
   ) => {
     const transaction = this.getTransaction(localParams);
-    const hasAfterChecks = this.getAfterHooksAndChecks(command, localParams).length > 0;
+    const hasAfterChecks =
+      this.getAfterHooksAndChecks(command, localParams).length > 0 ||
+      this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, command.name);
     const hasBeforeHooks =
       command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
     return {
@@ -246,7 +255,7 @@ export class TableHandler extends ViewHandler {
     param3_unused?: undefined,
     tableRules?: ParsedTableRule,
     _localParams?: LocalParams,
-  ): Promise<any> {
+  ): Promise<AnyObject[]> {
     return insert.bind(this)(rows, param2, param3_unused, tableRules, _localParams);
   }
 

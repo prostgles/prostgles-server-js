@@ -10,6 +10,7 @@ import type {
 import type { SessionUser } from "../Auth/AuthTypes";
 import type { DBOFullyTyped, DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB } from "../initProstgles";
+import type { Jobs } from "../Jobs/JobTypes";
 import type { PublishParams } from "./publishTypesAndUtils";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
@@ -18,6 +19,7 @@ type FunctionContextBase<S, SUser extends SessionUser, Context> = Pick<
   "tables" | "clientReq" | "clientInfo"
 > & {
   context: Context;
+  jobs: Jobs;
   user: S extends DBSchema ?
     S["users"]["columns"] extends AnyObject ?
       Required<S["users"]["columns"]>

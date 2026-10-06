@@ -143,6 +143,11 @@ export class DboBuilder {
 
   private readonly onCommitCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
   private readonly onRollbackCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
+  private readonly transactionFailures = new WeakMap<object, { error: unknown }>();
+
+  failTransaction = (transaction: object, error: unknown) => {
+    this.transactionFailures.set(transaction, { error });
+  };
 
   registerOnRollbackCallback = (transaction: object, callback: OnCommitCallback) => {
     const callbacks = this.onRollbackCallbacksByTransaction.get(transaction);
@@ -423,7 +428,7 @@ export class DboBuilder {
     let transaction: object | undefined;
     let result: R;
     try {
-      result = await this.db.tx((t) => {
+      result = await this.db.tx(async (t) => {
         transaction = t;
         this.onCommitCallbacksByTransaction.set(transaction, onCommitCallbacks);
         this.onRollbackCallbacksByTransaction.set(transaction, onRollbackCallbacks);
@@ -441,7 +446,10 @@ export class DboBuilder {
           });
         });
 
-        return cb(dbTX as TH, t);
+        const value = await cb(dbTX as TH, t);
+        const failure = this.transactionFailures.get(t);
+        if (failure) throw failure.error;
+        return value;
       });
     } catch (error) {
       if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);

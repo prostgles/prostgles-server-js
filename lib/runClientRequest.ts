@@ -16,6 +16,7 @@ import { createExecutionContext } from "./ExecutionContext";
 import type { Prostgles } from "./Prostgles";
 import type { ParsedTableRule } from "./PublishParser/publishTypesAndUtils";
 import { type PermissionScope } from "./PublishParser/publishTypesAndUtils";
+import { replaceContextPlaceholders } from "./PublishParser/getPublishedObjectFromResult";
 
 const TABLE_METHODS = {
   find: 1,
@@ -284,9 +285,10 @@ export const runClientMethod = async function (
   }
 
   if (inputSchema) {
+    const publishParams = await this.publishParser!.getPublishParams(clientReq, undefined);
     const { clientDb } = await this.getClientDBHandlers(clientReq, undefined);
     const expectedArgsError = await getJSONBSchemaValidationErrorAsync(
-      { type: inputSchema },
+      { type: replaceContextPlaceholders(inputSchema, publishParams, "runtime") },
       input,
       new Map(Object.entries(clientDb)),
     );

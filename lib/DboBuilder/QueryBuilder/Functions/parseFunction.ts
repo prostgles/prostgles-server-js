@@ -1,17 +1,17 @@
-import { COMPUTED_FIELDS } from "./COMPUTED_FIELDS";
-import type { FunctionSpec } from "./Functions";
+import type { FieldSpec, FunctionSpec } from "./Functions";
 
 export const parseFunction = (funcData: {
   func: string | FunctionSpec;
   args: any[];
   functions: FunctionSpec[];
+  computedFields: Pick<FieldSpec, "name">[];
   allowedFields: string[];
 }): FunctionSpec => {
   const { func, args, functions, allowedFields } = funcData;
 
   /* Function is computed column. No checks needed */
   if (typeof func !== "string") {
-    const computedCol = COMPUTED_FIELDS.find((c) => c.name === func.name);
+    const computedCol = funcData.computedFields.find((c) => c.name === func.name);
     if (!computedCol)
       throw `Unexpected function: computed column spec not found for ${JSON.stringify(func.name)}`;
     return func;

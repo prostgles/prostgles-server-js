@@ -21,6 +21,7 @@ export const getTableCheckBranches = (
       const column = columns.find((c) => c.name === name);
       if (!column) throw new Error(`Unknown tableConfig.check column: ${name}`);
       if (isObject(condition)) {
+        if (!Object.keys(condition).length) continue;
         if (Object.keys(condition).length !== 1) {
           throw new Error(`Invalid tableConfig.check condition for ${name}`);
         }
@@ -38,6 +39,10 @@ export const getTableCheckBranches = (
     return Object.fromEntries(
       columns
         .filter((column) => Object.hasOwn(branch, column.name) || column.nullable)
+        .filter((column) => {
+          const condition = branch[column.name];
+          return !isObject(condition) || Object.keys(condition).length > 0;
+        })
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((column) => [
           column.name,
@@ -50,12 +55,13 @@ export const getTableCheckBranches = (
 export const getTableCheckConstraint = (
   tableName: string,
   branches: readonly TableCheckBranch[],
-): ConstraintDef => {
+): ConstraintDef & { name: string } => {
   const name = "prostgles_row_check";
   const expression = branches
     .map((branch) => {
       const conditions = Object.entries(branch).map(([column, condition]) => {
         const columnSQL = asName(column);
+        if (isObject(condition) && !Object.keys(condition).length) return "TRUE";
         if (isObject(condition) && "$ne" in condition) return `${columnSQL} IS NOT NULL`;
         const values = isObject(condition) ? condition.enum : [condition];
         // JSON equality avoids casts or collations admitting values outside the inferred literals.

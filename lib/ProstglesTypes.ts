@@ -13,6 +13,7 @@ import type { OnSchemaChangeCallback } from "./SchemaWatch/SchemaWatch";
 import type { StorageClient } from "./StorageClient/StorageClientTypes";
 import type { PGConstraint } from "./TableConfig/fetchTableConstraints";
 import type { TableConfig } from "./TableConfig/TableConfigTypes";
+import type { JobsOptions } from "./Jobs/JobTypes";
 import type { TableHooks } from "./TableHooks/TableHooks";
 import type { ResolvedAuditConfig, SchemaConfigAudit } from "./Audit/AuditTypes";
 
@@ -208,6 +209,9 @@ export type ProstglesInitOptions<
    * Server-side functions that can be invoked by the client
    */
   functions?: ServerFunctionDefinitions<S, SUser, Context>;
+
+  /** Durable jobs triggered by row changes or schedules. */
+  jobs?: JobsOptions<S, Context>;
 
   /**
    * If true then will test all table methods on each socket connect.

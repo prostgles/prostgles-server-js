@@ -90,7 +90,7 @@ export async function insertRowWithNestedRecords(
     });
   }
 
-  const fullRootResult = (await tableHandler.insert(
+  const fullRootResult = await tableHandler.insert(
     rootData,
     { returning: "*", onConflict: insertParams?.onConflict },
     undefined,
@@ -107,7 +107,7 @@ export async function insertRowWithNestedRecords(
       }
     : tableRules,
     localParams,
-  )) as AnyObject;
+  );
   let returnData: AnyObject | undefined;
   const returning = insertParams?.returning;
   if (returning) {
@@ -297,7 +297,7 @@ const referencedInsert = async (
 
   const results: AnyObject[] = [];
   for (const dataItem of (Array.isArray(targetData) ? targetData : [targetData]) as AnyObject[]) {
-    const result: AnyObject = await dbTX[targetTable]
+    const result = await dbTX[targetTable]
       .insert(dataItem, { returning: "*", onConflict }, undefined, childRules, localParams)
       .catch((e) => {
         return Promise.reject(e);

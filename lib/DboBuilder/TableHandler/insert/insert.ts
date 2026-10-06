@@ -10,6 +10,7 @@ import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 import { getInsertQuery } from "./getInsertQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
+import { insertOnConflictUpdate } from "./insertOnConflictUpdate";
 
 export type InsertedRowWithInfo = { row: AnyObject; columnsAddedFromBeforeHooks: string[] };
 
@@ -28,6 +29,20 @@ export async function insert(
 
     const rule = tableRules?.[ACTION];
     const { allowedNestedInserts, requiredNestedInserts, validate } = rule ?? {};
+    const conflict = insertParams?.onConflict;
+    const isConflictUpdate =
+      (typeof conflict === "string" ? conflict : conflict?.action) === "DoUpdate";
+    const { jobs } = this.dboBuilder.prostgles;
+    const useConflictFallback =
+      isConflictUpdate &&
+      Boolean(
+        tableRules ||
+        (["insert", "update"] as const).some(
+          (name) =>
+            this.getAfterHooksAndChecks({ name, rule: undefined }, localParams).length ||
+            jobs.hasRowTrigger(this.name, name),
+        ),
+      );
 
     /** Post validate and checkFilter require a transaction dbo handler because they need the action result */
     if (
@@ -35,7 +50,8 @@ export async function insert(
         { name: ACTION, rule },
         localParams,
         isArray(rowOrRows) ? rowOrRows : [rowOrRows],
-      ).shouldWrap
+      ).shouldWrap ||
+      (useConflictFallback && !this.getTransaction(localParams))
     ) {
       return this.dboBuilder.getTX((t) =>
         t[this.name]?.[ACTION](rowOrRows, insertParams, param3_unused, tableRules, localParams),
@@ -65,8 +81,9 @@ export async function insert(
     const rows = isMultiInsert ? rowOrRows : [rowOrRows];
 
     requiredNestedInserts?.forEach(({ ftable, maxRows, minRows }) => {
-      if (this.column_names.includes(ftable))
+      if (this.column_names.includes(ftable)) {
         throw `requiredNestedInserts.ftable is clashing with existing column: ${ftable}`;
+      }
       rows.forEach((row, rowId) => {
         const nestedInsert = row[ftable] as unknown;
         const nestedInsertRows =
@@ -86,16 +103,32 @@ export async function insert(
     });
 
     validateInsertParams(insertParams);
+    let conflictReturningFields: string[] | undefined;
+    if (useConflictFallback) {
+      if (tableRules && !tableRules.update) {
+        throw new Error(`update rules missing for ${this.name} needed for onConflict "DoUpdate"`);
+      }
+      if (insertParams?.returnType?.startsWith("statement") || localParams?.returnQuery) {
+        throw new Error(
+          "onConflict DoUpdate with publish rules, after hooks or row jobs cannot return SQL statements",
+        );
+      }
+      const insertReturningFields = this.parseFieldFilter(returningFields);
+      const updateReturningFields = this.parseFieldFilter(tableRules?.update?.returningFields);
+      conflictReturningFields = insertReturningFields.filter((field) =>
+        updateReturningFields.includes(field),
+      );
+      /** Ensure the conflict returning fields are allowed */
+      await this.prepareReturning(insertParams?.returning, conflictReturningFields);
+    }
     if (this.is_media) {
       if (insertParams?.returnType === "statement" || localParams?.returnQuery) {
         throw new Error("File inserts cannot return SQL statements");
       }
-      const conflict = insertParams?.onConflict;
-      if ((typeof conflict === "string" ? conflict : conflict?.action) === "DoUpdate") {
+      if (isConflictUpdate) {
         throw new Error("Use update to replace an existing file");
       }
     }
-
     const transaction = this.getTransaction(localParams);
     const tx = transaction?.t || this.db;
 
@@ -158,20 +191,35 @@ export async function insert(
       tableRules,
       validate,
     };
+    if (useConflictFallback) {
+      const result = await insertOnConflictUpdate({
+        ...commonArgs,
+        rows: isArray(data) ? data : [data],
+        returningFields: conflictReturningFields,
+        isMultiInsert,
+      });
+      await this._log({
+        command: "insert",
+        localParams,
+        data: { rowOrRows, param2: insertParams },
+        duration: Date.now() - start,
+      });
+      return result;
+    }
     if (isArray(data)) {
       if (!data.length) {
         throw "Empty insert. Provide data";
       }
 
-      query = await getInsertQuery({
+      ({ query } = await getInsertQuery({
         ...commonArgs,
         rows: data,
-      });
+      }));
     } else {
-      query = await getInsertQuery({
+      ({ query } = await getInsertQuery({
         ...commonArgs,
         rows: [data],
-      });
+      }));
     }
 
     const queryWithoutUserRLS = query;

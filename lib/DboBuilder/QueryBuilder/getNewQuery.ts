@@ -1,9 +1,8 @@
 import type { AnyObject, SelectParams } from "prostgles-types";
-import { asName, isEmpty, isObject, omitKeys } from "prostgles-types";
+import { asName, isEmpty, isObject, omitKeys, ROW_ACTIONS_COLUMN } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import {
   prepareOrderByQuery,
-  pgp,
   type Filter,
   type LocalParams,
   type PGIdentifier,
@@ -17,7 +16,9 @@ import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
 import { FUNCTIONS } from "./Functions/Functions";
 import type { NewQuery, NewQueryJoin } from "./QueryBuilder";
 import { SelectItemBuilder } from "./QueryBuilder";
+import { parseCaseExpression } from "./parseCaseExpression";
 import { ROOT_TABLE_ALIAS } from "./getSelectQuery";
+import { getRowActionsField } from "./getRowActionsField";
 
 export const getNewQuery = async (
   viewHandler: ViewHandler,
@@ -72,7 +73,21 @@ export const getNewQuery = async (
   const selectItemBuilder = new SelectItemBuilder({
     allowedFields: allowedSelectFields,
     allowedOrderByFields,
-    computedFields: COMPUTED_FIELDS,
+    computedFields: [
+      ...COMPUTED_FIELDS,
+      {
+        name: ROW_ACTIONS_COLUMN,
+        type: "computed",
+        resolve: () =>
+          getRowActionsField(
+            viewHandler,
+            tableRules,
+            localParams,
+            selectExpressionAlias,
+            allowedSelectFields,
+          ),
+      },
+    ],
     isView: viewHandler.isView,
     functions: FUNCTIONS,
     allFields: viewHandler.column_names.slice(0),
@@ -99,29 +114,8 @@ export const getNewQuery = async (
         dependencyExists: filterInfo?.exists ?? [],
       };
     },
-    parseCaseExpression: async (caseExpression) => {
-      const parsedBranches = await Promise.all(
-        caseExpression.$case.map(async ([condition, result]) => {
-          const filterInfo = await parseExpressionFilter(condition, "CASE condition");
-          if (!filterInfo.condition) {
-            throw "CASE conditions cannot be empty";
-          }
-          return {
-            query: `WHEN ${filterInfo.condition} THEN ${pgp.as.format("$1", [result])}`,
-            filterInfo,
-          };
-        }),
-      );
-      return {
-        query: `CASE ${parsedBranches.map(({ query }) => query).join(" ")}${
-          Object.hasOwn(caseExpression, "$else") ?
-            ` ELSE ${pgp.as.format("$1", [caseExpression.$else])}`
-          : ""
-        } END`,
-        dependencyFields: parsedBranches.flatMap(({ filterInfo }) => filterInfo.columnsUsed),
-        dependencyExists: parsedBranches.flatMap(({ filterInfo }) => filterInfo.exists),
-      };
-    },
+    parseCaseExpression: (expression) =>
+      parseCaseExpression(expression, (filter) => parseExpressionFilter(filter, "CASE condition")),
   });
 
   await selectItemBuilder.parseUserSelectWithJoins(

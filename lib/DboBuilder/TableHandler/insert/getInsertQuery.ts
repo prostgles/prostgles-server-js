@@ -20,6 +20,7 @@ export const getInsertQuery = async ({
   localParams,
   insertParams,
   validate,
+  conflictUpdateAsDoNothing = false,
 }: {
   tableHandler: TableHandler;
   rows: (InsertedRowWithInfo | undefined)[];
@@ -29,10 +30,11 @@ export const getInsertQuery = async ({
   localParams: LocalParams | undefined;
   insertParams: InsertParams | undefined;
   validate: ValidateRowBasic | undefined;
+  conflictUpdateAsDoNothing?: boolean;
 }) => {
   const transaction = tableHandler.getTransaction(localParams);
   const { removeDisallowedFields = false } = insertParams ?? {};
-  const validatedData = rows.map((rowWithInfo) => {
+  const preparedData = rows.map((rowWithInfo) => {
     const { row: _row, columnsAddedFromBeforeHooks = [] } = rowWithInfo ?? {};
     const row = { ..._row };
 
@@ -42,7 +44,7 @@ export const getInsertQuery = async ({
       );
     }
 
-    const { data: validatedRow, allowedCols } = prepareNewData({
+    return prepareNewData({
       row,
       forcedData,
       allowedFields: fields,
@@ -52,30 +54,23 @@ export const getInsertQuery = async ({
       tableHandler,
       columnsAddedFromBeforeHooks,
     });
-    return { validatedRow, allowedCols };
   });
 
-  const validatedRows = validatedData.map((d) => d.validatedRow);
-  const allowedCols = Array.from(new Set(validatedData.flatMap((d) => d.allowedCols)));
+  const allowedCols = Array.from(new Set(preparedData.flatMap((d) => d.allowedCols)));
   const dbTx = transaction?.dbTX || tableHandler.dboBuilder.dbo;
   const tx = transaction?.t || tableHandler.db;
-  const validationOptions = {
-    validate: validate as ValidateRowBasic,
-    localParams,
-  };
-
-  const query = (
-    await tableHandler.dataValidator.parse({
-      command: "insert",
-      rows: validatedRows,
-      allowedCols,
-      dbTx,
-      validationOptions,
-      tx,
-    })
-  ).getQuery();
+  const { getQuery, validatedRows } = await tableHandler.dataValidator.parse({
+    command: "insert",
+    rows: preparedData.map((d) => d.data),
+    allowedCols,
+    dbTx,
+    validationOptions: { validate, localParams },
+    tx,
+  });
+  const query = getQuery();
   const { onConflict } = insertParams ?? {};
   let conflict_query = "";
+  let conflictColumns: string[] | undefined;
   if (onConflict) {
     const onConflictAction = typeof onConflict === "string" ? onConflict : onConflict.action;
     const onConflictColumns =
@@ -83,13 +78,14 @@ export const getInsertQuery = async ({
     if (onConflictAction === "DoNothing") {
       conflict_query = " ON CONFLICT DO NOTHING ";
     } else {
-      const firstRowKeys = Object.keys(validatedData[0]?.validatedRow ?? {});
+      const firstRowKeys = Object.keys(validatedRows[0] ?? {});
       const pkeyNames = tableHandler.columns.filter((c) => c.is_pkey).map((c) => c.name);
-      const conflictColumns =
+      conflictColumns =
         onConflictColumns ??
         tableHandler.tableOrViewInfo.uniqueColumnGroups?.find((colGroup) => {
-          if (!firstRowKeys.length)
+          if (!firstRowKeys.length) {
             throw "Cannot determine conflict columns for onConflict DoUpdate";
+          }
           return colGroup.some((col) => {
             return firstRowKeys.includes(col);
           });
@@ -104,14 +100,18 @@ export const getInsertQuery = async ({
       }
 
       const nonConflictColumns = allowedCols
-        .filter((c) => !conflictColumns.includes(c))
+        .filter((c) => !conflictColumns!.includes(c))
         .map((v) => asName(v));
 
       if (nonConflictColumns.length === 0) {
         throw "No non conflict columns to update for onConflict=DoUpdate";
       }
-      conflict_query = ` ON CONFLICT (${conflictColumns.join(", ")}) DO UPDATE SET ${nonConflictColumns.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`;
+      conflict_query =
+        ` ON CONFLICT (${conflictColumns.map(asName).join(", ")}) ` +
+        (conflictUpdateAsDoNothing ? "DO NOTHING" : (
+          `DO UPDATE SET ${nonConflictColumns.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`
+        ));
     }
   }
-  return query + conflict_query;
+  return { query: query + conflict_query, conflictColumns, validatedRows };
 };

@@ -129,6 +129,7 @@ export class PublishParser {
                 ...publishParams,
                 user,
                 context: this.prostgles.context,
+                jobs: this.prostgles.jobs.api,
               };
               return unrestrictedCtx;
             }
@@ -142,6 +143,7 @@ export class PublishParser {
               clientReq,
               tables,
               context: this.prostgles.context,
+              jobs: this.prostgles.jobs.api,
             };
             return restrictedCtx;
           })();

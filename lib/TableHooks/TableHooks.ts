@@ -62,7 +62,7 @@ export type TableHooksDefinition<
    * Receives all affected `rows`; throwing rolls back the operation.
    * Use `onCommit` for side effects that must only run after the transaction commits.
    * Its callback receives the non-transactional `db` and `dbo` objects.
-   * Same-table, same-command writes from after-hooks do not retrigger after-hooks.
+   * Nested writes retrigger hooks unless the individual hook sets `preventRecursion: true`.
    */
   afterAll?: AfterAllTsTrigger<RowDataType, DBX, Context>[];
 

@@ -117,6 +117,8 @@ export type TransactionCallbacks<DBO = DBHandlerServer> = {
 
 export type AfterEachTsTrigger<R, DBX, Context = undefined, InputDataType = R> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
+  preventRecursion?: boolean;
   /**
    * Will only run this trigger if the insert/update provides non null values for these fields.
    */
@@ -163,6 +165,8 @@ export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
 
 export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
+  preventRecursion?: boolean;
   changedFields?: string[];
   validate: (
     params: ValidateRowsArgsCommon<R, DBX> &
@@ -175,6 +179,8 @@ export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
 
 export type AfterCommitTsTrigger<R, DBO, Context = undefined, ClientSchema = void> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
+  /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
+  preventRecursion?: boolean;
   changedFields?: (keyof R)[];
   run: (params: {
     /** Committed rows, or the deleted rows' pre-delete state. */

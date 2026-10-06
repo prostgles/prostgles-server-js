@@ -36,20 +36,34 @@ export const runTableHook = <T>(
   table: ViewHandler,
   rows: Record<string, unknown>[],
   callback: () => T,
-): T => {
+  hook?: { hookKey: string; preventRecursion?: boolean },
+): T | undefined => {
   const prostgles = table.dboBuilder.prostgles;
   const parent = createExecutionContext(prostgles.getExecution());
+  if (
+    hook?.preventRecursion &&
+    parent.invocations.some(
+      (invocation) =>
+        invocation.type === "trigger" &&
+        invocation.tableName === table.name &&
+        hookKeys.get(invocation) === hook.hookKey,
+    )
+  )
+    return;
   const invocation: TriggerInvocation = {
     type: "trigger",
     id: randomUUID(),
     tableName: table.name,
     rowParts: rows,
   };
+  if (hook) hookKeys.set(invocation, hook.hookKey);
   return prostgles.runWithExecution(
     { ...parent, invocations: [...parent.invocations, invocation] },
     callback,
   );
 };
+
+const hookKeys = new WeakMap<TriggerInvocation, string>();
 
 export const createExecutionContext = (parent: ExecutionContext | undefined): ExecutionContext =>
   parent ?? {

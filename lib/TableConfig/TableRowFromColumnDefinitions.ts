@@ -1,4 +1,5 @@
 import type { JSONB } from "prostgles-types";
+import type { TableCheck, TableCheckBranch } from "./TableConfigTypes";
 
 type ColumnDefinition =
   | string
@@ -9,6 +10,61 @@ type ColumnDefinition =
 export type TableRowFromColumnDefinitions<T extends Record<string, ColumnDefinition>> = InsertRow<{
   [K in keyof T]: T[K] extends string ? NormalizeSQL<Uppercase<T[K]>> : T[K];
 }>;
+
+/** Selected managed rows, narrowed by the same CHECK branches as the generated schema. */
+export type TableRowFromTableConfig<
+  T extends { columns: Record<string, ColumnDefinition>; check?: TableCheck },
+  ValueTypes extends Partial<Record<keyof T["columns"], unknown>> = {},
+> = CheckedRow<
+  {
+    [K in keyof T["columns"]]: K extends keyof ValueTypes ? ValueTypes[K]
+    : TableRowFromColumnDefinitions<T["columns"]> extends infer Row ?
+      K extends keyof Row ?
+        Required<Row>[K]
+      : never
+    : never;
+  },
+  T extends { check: { $or: readonly (infer Branch extends TableCheckBranch)[] } } ? Branch
+  : undefined
+>;
+
+/** Insert rows may omit nullable columns and columns supplied by database defaults. */
+export type TableInsertRowFromTableConfig<
+  T extends { columns: Record<string, ColumnDefinition>; check?: TableCheck },
+  ValueTypes extends Partial<Record<keyof T["columns"], unknown>> = {},
+> = CheckedInsertRow<
+  TableRowFromTableConfig<T, ValueTypes>,
+  GeneratedColumnNames<{
+    [K in keyof T["columns"]]: T["columns"][K] extends string ?
+      NormalizeSQL<Uppercase<T["columns"][K]>>
+    : T["columns"][K];
+  }>
+>;
+
+type CheckedInsertRow<Row, Defaults> =
+  Row extends unknown ?
+    Omit<Row, OptionalInsertKeys<Row, Defaults>> &
+      Partial<Pick<Row, OptionalInsertKeys<Row, Defaults>>>
+  : never;
+
+type OptionalInsertKeys<Row, Defaults> = {
+  [K in keyof Row]: K extends Defaults ? K
+  : null extends Row[K] ? K
+  : never;
+}[keyof Row];
+
+type CheckedRow<Row, Branch> =
+  Branch extends TableCheckBranch ?
+    {
+      [K in keyof Row]: K extends keyof Branch ?
+        Branch[K] extends { $ne: null } ? NonNullable<Row[K]>
+        : Branch[K] extends { enum: readonly (infer V)[] } ? V
+        : Branch[K] extends Record<string, never> ? Row[K]
+        : Branch[K]
+      : null extends Row[K] ? null
+      : Row[K];
+    }
+  : Row;
 
 type InsertRow<T extends Record<string, ColumnDefinition>> = Omit<
   TableRow<T>,

@@ -20,6 +20,7 @@ import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfigur
 import { sleep } from "./utils/utils";
 import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { ClientDBHandlerRequest, GetClientDBHandlers } from "./WebsocketAPI/getClientHandlers";
+import type { Jobs } from "./Jobs/JobTypes";
 
 /**
  * Database connection details
@@ -50,6 +51,7 @@ export type UpdatableOptions<
   | "auth"
   | "publish"
   | "functions"
+  | "jobs"
   | "publishRawSQL"
   | "tsGeneratedTypesDir"
   | "tsGeneratedTypesFunctionsPath"
@@ -112,6 +114,8 @@ export type InitResult<
   Context = undefined,
   ClientSchema = S,
 > = {
+  /** Inspect, cancel or rerun jobs. Pass userId to enforce client job access. */
+  jobs: Jobs;
   db: DBOFullyTyped<S>;
   context: Context;
   sql: SQLHandler;
@@ -245,6 +249,7 @@ export const initProstgles = async function (
       await this.rebuildDBO();
       await syncTableTriggers(this);
     });
+    await this.jobs.validate();
     await this.createContext(reason);
     this.initRestApi();
 
@@ -292,8 +297,10 @@ export const initProstgles = async function (
     }
 
     this.loaded = true;
+    this.jobs.start();
     const getContext = () => this.context;
     const initResult: InitResult<void, SessionUser, any> = {
+      jobs: this.jobs.api,
       db: this.dbo as DBOFullyTyped,
       get context() {
         return getContext();

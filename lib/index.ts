@@ -27,6 +27,8 @@ export const createProstgles = <
     prostgles<S, SUser, Context, ClientSchema>(params);
 };
 export * from "./PublishParser/defineServerFunction";
+export { createJobDefiner } from "./Jobs/JobTypes";
+export type { JobsConfig, JobsOptions, JobDefinition, JobContext, RowTrigger, ScheduleTrigger, ParamsSchema, ParamsOutput, Jobs, JobRecord, JobStatus } from "./Jobs/JobTypes";
 export * from "./Auth/AuthTypes";
 export type { ExecutionContext, FunctionInvocation, TriggerInvocation } from "./ExecutionContext";
 

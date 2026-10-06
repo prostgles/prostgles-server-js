@@ -9,6 +9,9 @@ export const updateConfiguration = async (
   force?: true,
 ) => {
   prgl.checkNotDestroyed();
+  if ("jobs" in newOpts && (force || !isEqual(prgl.opts.jobs, newOpts.jobs))) {
+    await prgl.jobs.stop();
+  }
   const optionsThatChanged = getKeys(newOpts)
     .map((k) => {
       // eslint-disable-next-line @typescript-eslint/unbound-method

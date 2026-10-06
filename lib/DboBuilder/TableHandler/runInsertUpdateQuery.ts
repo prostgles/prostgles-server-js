@@ -1,3 +1,5 @@
+import { enqueueRowJobs } from "../../Jobs/enqueueRowJobs";
+import { JOB_PREVIOUS_ROW } from "../../Jobs/getJobUpdateQuery";
 import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { asName, isDefined } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
@@ -8,8 +10,14 @@ import { getSelectItemQuery } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
 
+export type RunAfterHooks = (
+  args: Parameters<typeof executeAfterHooksCheckAndPostValidation>[0],
+) => void | Promise<void>;
+
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
+  runAfterHooks?: RunAfterHooks;
+  includePreviousRowForJob?: boolean;
   queryWithoutUserRLS: string;
   localParams: LocalParams | undefined;
   fields: FieldFilter | undefined;
@@ -22,6 +30,7 @@ type RunInsertUpdateQueryArgs = {
       data: AnyObject | AnyObject[];
       isMultiInsert: boolean;
       nestedInsertsResultsObj?: undefined;
+      conflictResult?: { skipped: boolean };
     }
   | {
       command: "update";
@@ -52,9 +61,10 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     tableHandler.parseFieldFilter(returningFields),
   );
   const { checkFilter } = rule ?? {};
-  // let checkCondition = "WHERE FALSE";
-  let checkCondition = "FALSE";
-  if (checkFilter) {
+  const checkCondition = await (async () => {
+    if (!checkFilter) {
+      return "FALSE";
+    }
     const checkCond = await prepareWhere(tableHandler, {
       select: undefined,
       localParams: undefined,
@@ -62,9 +72,8 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       filter: checkFilter,
       addWhere: false,
     });
-    // checkCondition = `WHERE NOT (${checkCond.where})`;
-    checkCondition = `NOT (${checkCond.where})`;
-  }
+    return `NOT (${checkCond.where})`;
+  })();
   const hasReturning = !!returningSelectItems.length;
   const userRLS = withUserRLS(localParams, "", !!tableHandler.getTransaction(localParams));
   const CHECK_CONDITION_ALIAS = "prostgles_check_condition";
@@ -74,7 +83,13 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     ${userRLS} 
     ${queryWithoutUserRLS}
     RETURNING ${[
-      "*",
+      `${tableHandler.escapedName}.*`,
+      ...(args.includePreviousRowForJob ?
+        [
+          `jsonb_build_object('old', ${asName(JOB_PREVIOUS_ROW)},
+        'new', to_jsonb(${asName(tableHandler.tableOrViewInfo.qualifiedNameParts.name)})) AS ${asName(JOB_PREVIOUS_ROW)}`,
+        ]
+      : []),
       getSelectItemQuery(
         returningSelectItems
           .map((item, index) => {
@@ -127,6 +142,11 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     }),
   );
 
+  if (!result.length && args.command === "insert" && args.conflictResult) {
+    args.conflictResult.skipped = true;
+    return;
+  }
+
   if (checkFilter && result.some((row) => row[CHECK_CONDITION_ALIAS])) {
     throw new Error(
       `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
@@ -152,7 +172,13 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     return tableRowWithReturning;
   });
 
-  await executeAfterHooksCheckAndPostValidation({
+  await enqueueRowJobs(tableHandler, command, tableRows, localParams);
+  if (args.includePreviousRowForJob)
+    tableRows.forEach((row) => {
+      delete row[JOB_PREVIOUS_ROW];
+    });
+
+  await (args.runAfterHooks ?? executeAfterHooksCheckAndPostValidation)({
     tableHandler,
     operation: command === "insert" ? { name: "insert", rule } : { name: "update", rule },
     localParams,

@@ -56,9 +56,9 @@ export const getPublishedObjectFromResult = (
   return replaceContextPlaceholders(publish, publishParams, contextReplacementMode);
 };
 
-const replaceContextPlaceholders = <T>(
+export const replaceContextPlaceholders = <T>(
   publish: T,
-  publishParams: PublishParams | undefined,
+  publishParams: Pick<PublishParams, "user"> | undefined,
   mode: "runtime" | "schemaGeneration",
 ): T => {
   const context = { user: publishParams?.user };

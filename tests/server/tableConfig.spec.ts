@@ -6,7 +6,10 @@ import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ProstglesInitOptions, TableCheck, TableConfig } from "prostgles-server";
 import { checkTypes } from "./clientSchemaTypes.spec";
-import { getTableCheckBranches, getTableCheckConstraint } from "prostgles-server/dist/TableConfig/getTableCheck";
+import {
+  getTableCheckBranches,
+  getTableCheckConstraint,
+} from "prostgles-server/dist/TableConfig/getTableCheck";
 
 export const testTableConfigValidation = async (parentDb: DB) => {
   await test("tableConfig checks enforce and infer row variants", async () => {
@@ -16,18 +19,34 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     const dbConnection = { ...getConnectionDetails(parentDb), database };
     const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
     const columns = {
-      id: "BIGSERIAL PRIMARY KEY", state: "TEXT", size: "INT4", error: "TEXT", finished_at: "TIMESTAMPTZ",
+      id: "BIGSERIAL PRIMARY KEY",
+      state: "TEXT",
+      size: "INT4",
+      error: "TEXT",
+      finished_at: "TIMESTAMPTZ",
       group_id: "INT REFERENCES backup_groups(id)",
+      metadata: "TEXT",
     };
-    const check: TableCheck = { $or: [
-      { state: "loading" },
-      { state: "finished", size: { $ne: null }, error: { enum: [null] }, finished_at: { $ne: null } },
-      { state: "error", error: { $ne: null }, finished_at: { $ne: null } },
-    ] };
+    const check: TableCheck = {
+      $or: [
+        { state: "loading", metadata: {} },
+        {
+          state: "finished",
+          size: { $ne: null },
+          error: { enum: [null] },
+          finished_at: { $ne: null },
+        },
+        { state: "error", error: { $ne: null }, finished_at: { $ne: null } },
+      ],
+    };
     const tableConfig: TableConfig = {
       backup_groups: { columns: { id: "INT PRIMARY KEY" } },
       backup_jobs: {
-        columns: { id: "INT PRIMARY KEY", group_id: "INT REFERENCES backup_groups(id)", state: "TEXT" },
+        columns: {
+          id: "INT PRIMARY KEY",
+          group_id: "INT REFERENCES backup_groups(id)",
+          state: "TEXT",
+        },
         check: { $or: [{ state: "queued", group_id: { $ne: null } }] },
       },
       backups: { columns, check },
@@ -35,7 +54,8 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     let instance: Awaited<ReturnType<Prostgles["init"]>> | undefined;
     const start = async () => {
       const prgl = new Prostgles({
-        dbConnection: dbConnection as ProstglesInitOptions["dbConnection"], tableConfig,
+        dbConnection: dbConnection as ProstglesInitOptions["dbConnection"],
+        tableConfig,
         publish: [{ name: "BackupClientSchema", userTypes: ["user"], publish: "*" }],
         onReady: () => {},
       });
@@ -53,39 +73,71 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       const prgl = await start();
       await db.none("INSERT INTO backup_groups VALUES (1)");
       await db.none("INSERT INTO backup_jobs VALUES (1, 1, 'queued')");
-      await assert.rejects(db.none("INSERT INTO backup_jobs VALUES (2, 2, 'queued')"), { code: "23503" });
-      await assert.rejects(db.none("INSERT INTO backup_jobs VALUES (2, 1, 'invalid')"), { code: "23514" });
+      await assert.rejects(db.none("INSERT INTO backup_jobs VALUES (2, 2, 'queued')"), {
+        code: "23503",
+      });
+      await assert.rejects(db.none("INSERT INTO backup_jobs VALUES (2, 1, 'invalid')"), {
+        code: "23514",
+      });
       const backups = prgl.dbo!.backups!;
-      const checkColumns = backups.columns.map((c) => ({ name: c.name, nullable: c.is_nullable, udt_name: c.udt_name }));
+      const checkColumns = backups.columns.map((c) => ({
+        name: c.name,
+        nullable: c.is_nullable,
+        udt_name: c.udt_name,
+      }));
       assert.deepEqual(
         getTableCheckConstraint("backups", getTableCheckBranches(check, checkColumns)),
-        getTableCheckConstraint("backups", getTableCheckBranches(check, checkColumns.slice().reverse())),
+        getTableCheckConstraint(
+          "backups",
+          getTableCheckBranches(check, checkColumns.slice().reverse()),
+        ),
       );
       for (const invalid of [
-        { $or: [] }, { $or: [{ missing: "value" }] }, { $or: [{ state: { enum: [] } }] },
-        { $or: [{ state: { $ne: "loading" } }] }, { $or: [{ $or: [{ state: "loading" }] }] },
-        { $or: [{ state: { enum: ["loading"], $ne: null } }] }, { $or: [{ state: 42 }] },
+        { $or: [] },
+        { $or: [{ missing: "value" }] },
+        { $or: [{ state: { enum: [] } }] },
+        { $or: [{ state: { $ne: "loading" } }] },
+        { $or: [{ $or: [{ state: "loading" }] }] },
+        { $or: [{ state: { enum: ["loading"], $ne: null } }] },
+        { $or: [{ state: 42 }] },
       ]) {
         assert.throws(() => getTableCheckBranches(invalid as unknown as TableCheck, checkColumns));
       }
-      const loading = await backups.insert({ state: "loading", unmanaged: "kept" }, { returning: "*" });
+      const loading = await backups.insert(
+        { state: "loading", unmanaged: "kept", metadata: "upload" },
+        { returning: "*" },
+      );
       assert.equal(loading.size, null);
       assert.equal(loading.unmanaged, "kept");
+      assert.equal(loading.metadata, "upload");
+      await backups.insert({ state: "loading", metadata: null });
       assert.equal(typeof loading.id, "string");
       await backups.insert({ state: "finished", size: 42, finished_at: "2026-01-01" });
       await backups.insert({ state: "error", error: "failed", finished_at: "2026-01-01" });
       for (const row of [
-        { state: null }, { state: "unknown" }, { state: "loading", size: 1 },
-        { state: "loading", error: "failed" }, { state: "loading", finished_at: "2026-01-01" },
-        { state: "finished", finished_at: "2026-01-01" }, { state: "finished", size: 1 },
+        { state: null },
+        { state: "unknown" },
+        { state: "loading", size: 1 },
+        { state: "loading", error: "failed" },
+        { state: "loading", finished_at: "2026-01-01" },
+        { state: "finished", finished_at: "2026-01-01" },
+        { state: "finished", size: 1 },
         { state: "finished", size: 1, finished_at: "2026-01-01", error: "failed" },
         { state: "error", finished_at: "2026-01-01" },
+        { state: "finished", size: 1, finished_at: "2026-01-01", metadata: "upload" },
       ]) {
-        await assert.rejects(db.none(pgp.helpers.insert(row, undefined, "backups")), { code: "23514" });
+        await assert.rejects(db.none(pgp.helpers.insert(row, undefined, "backups")), {
+          code: "23514",
+        });
       }
-      await assert.rejects(db.none("UPDATE backups SET state = 'finished' WHERE state = 'loading'"), { code: "23514" });
+      await assert.rejects(
+        db.none("UPDATE backups SET state = 'finished' WHERE state = 'loading'"),
+        { code: "23514" },
+      );
       const { tsSchema } = await backups.dboBuilder.getTsDefinitions();
-      checkTypes(tsSchema, `
+      checkTypes(
+        tsSchema,
+        `
         import type { TableHandler } from "prostgles-types";
         declare const db: TableHandler<DBGeneratedSchema, "backups">;
         declare const client: TableHandler<BackupClientSchema, "backups">;
@@ -96,6 +148,9 @@ export const testTableConfigValidation = async (parentDb: DB) => {
           row.finished_at satisfies null;
           row.id satisfies string;
           row.unmanaged satisfies string | null;
+          row.metadata satisfies string | null;
+          // @ts-expect-error explicitly unconstrained metadata is not forced to null
+          row.metadata satisfies null;
           // @ts-expect-error unmanaged nullable columns are not forced to null
           row.unmanaged satisfies null;
         }
@@ -132,8 +187,14 @@ export const testTableConfigValidation = async (parentDb: DB) => {
           // @ts-expect-error loading rows cannot have a size
           await client.insert({ state: "loading", size: 1 });
         };
-      `);
-      const getCheck = () => db.one("SELECT oid FROM pg_constraint WHERE conrelid = 'backups'::regclass AND conname = 'prostgles_row_check'");
+        declare const finished: Extract<DBSchema["backups"], { state: "finished" }>;
+        finished.metadata satisfies null;
+      `,
+      );
+      const getCheck = () =>
+        db.one(
+          "SELECT oid FROM pg_constraint WHERE conrelid = 'backups'::regclass AND conname = 'prostgles_row_check'",
+        );
       const originalCheck = await getCheck();
       await instance!.destroy();
       instance = undefined;
@@ -144,20 +205,34 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       assert.deepEqual(await getCheck(), originalCheck);
       await instance!.destroy();
       instance = undefined;
-      tableConfig.backups = { columns, check: { $or: [
-        ...check.$or, { state: { enum: ["queued", "err'or"] } }, { state: "number", size: { enum: [0, 1] } },
-      ] } };
+      tableConfig.backups = {
+        columns,
+        check: {
+          $or: [
+            ...check.$or,
+            { state: { enum: ["queued", "err'or"] } },
+            { state: "number", size: { enum: [0, 1] } },
+          ],
+        },
+      };
       await start();
       await db.none("INSERT INTO backups(state) VALUES ('queued'), ($1)", ["err'or"]);
       await db.none("INSERT INTO backups(state, size) VALUES ('number', 0), ('number', 1)");
-      await assert.rejects(db.none("INSERT INTO backups(state, size) VALUES ('number', 2)"), { code: "23514" });
+      await assert.rejects(db.none("INSERT INTO backups(state, size) VALUES ('number', 2)"), {
+        code: "23514",
+      });
       await assert.rejects(db.none("INSERT INTO backups(state) VALUES (NULL)"), { code: "23514" });
       await instance!.destroy();
       instance = undefined;
       tableConfig.backups = { columns };
       await start();
       await db.none("INSERT INTO backups(state, size) VALUES ('anything', 1)");
-      assert.equal(await db.oneOrNone("SELECT 1 FROM pg_constraint WHERE conrelid = 'backups'::regclass AND conname = 'prostgles_row_check'"), null);
+      assert.equal(
+        await db.oneOrNone(
+          "SELECT 1 FROM pg_constraint WHERE conrelid = 'backups'::regclass AND conname = 'prostgles_row_check'",
+        ),
+        null,
+      );
     } finally {
       await instance?.destroy();
       await db.$pool.end();
@@ -192,14 +267,14 @@ export const testTableConfigValidation = async (parentDb: DB) => {
           onReady: () => {},
         });
         instance = await prgl.init(() => {}, { type: "init" });
-        const getChecks = () => db.any(
-          "SELECT oid, conname FROM pg_constraint WHERE conrelid = 'validated'::regclass AND contype = 'c'",
-        );
+        const getChecks = () =>
+          db.any(
+            "SELECT oid, conname FROM pg_constraint WHERE conrelid = 'validated'::regclass AND contype = 'c'",
+          );
         const checks = await getChecks();
         assert.equal(checks.length, 1, scenario);
-        const invalidInsert = () => db.none(
-          `INSERT INTO validated VALUES (2, '{"enabled":"invalid"}')`,
-        );
+        const invalidInsert = () =>
+          db.none(`INSERT INTO validated VALUES (2, '{"enabled":"invalid"}')`);
         await assert.rejects(invalidInsert, { code: "P0001" });
 
         // A first subscription initializes PubSub after tableConfig has installed its CHECK.

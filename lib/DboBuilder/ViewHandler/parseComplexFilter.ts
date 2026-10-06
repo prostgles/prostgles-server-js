@@ -54,6 +54,7 @@ export const parseComplexFilter = ({
     }
     const { funcName, args } = parseFunctionObject(funcData);
     const funcDef = parseFunction({
+      computedFields: [],
       func: funcName,
       args,
       functions: FUNCTIONS,

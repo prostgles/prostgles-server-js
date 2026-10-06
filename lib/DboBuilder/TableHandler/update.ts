@@ -1,3 +1,4 @@
+import { getJobUpdateQuery } from "../../Jobs/getJobUpdateQuery";
 import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
@@ -6,7 +7,7 @@ import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules } from "./insert/getInsertTableRules";
 import { getReferenceColumnInserts } from "./insert/getReferenceColumnInserts";
-import { runInsertUpdateQuery } from "./runInsertUpdateQuery";
+import { runInsertUpdateQuery, type RunAfterHooks } from "./runInsertUpdateQuery";
 import { lockFileForUpdate } from "./updateFile";
 import type { TableHandler } from "./TableHandler";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
@@ -18,6 +19,7 @@ export async function update(
   params?: UpdateParams,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
+  runAfterHooks?: RunAfterHooks,
 ): Promise<AnyObject | void> {
   const ACTION = "update";
   const start = Date.now();
@@ -31,6 +33,7 @@ export async function update(
           params,
           tableRules,
           localParams,
+          runAfterHooks,
         ),
       );
     const rule = tableRules?.[ACTION];
@@ -144,13 +147,13 @@ export async function update(
               referencingColumn: nestedInsert.insertedFieldName,
             },
           };
-          const nestedInsertResult = (await nestedTableHandler.insert(
+          const nestedInsertResult = await nestedTableHandler.insert(
             nestedInsert.data,
             { returning: "*" },
             undefined,
             refTableRules,
             nestedLocalParams,
-          )) as AnyObject;
+          );
           nestedInsertsResultsObj[nestedInsert.insertedFieldName] = nestedInsertResult;
 
           nestedInsert.insertedFieldRef.fcols.forEach((fcol, idx) => {
@@ -180,7 +183,11 @@ export async function update(
         validationOptions: { validate: validateRow, localParams },
       })
     ).getQuery();
-    query += "\n" + updateFilter.where;
+    const hasRowJobs = this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, "update");
+    query =
+      hasRowJobs ?
+        getJobUpdateQuery(this, query, updateFilter.where)
+      : query + "\n" + updateFilter.where;
     const queryWithoutUserRLS = query;
     query = withUserRLS(localParams, query, !!this.getTransaction(localParams));
 
@@ -206,7 +213,9 @@ export async function update(
       returningFields,
       rule,
       command: "update",
+      includePreviousRowForJob: hasRowJobs,
       nestedInsertsResultsObj,
+      runAfterHooks,
     });
     await this._log({
       command: "update",

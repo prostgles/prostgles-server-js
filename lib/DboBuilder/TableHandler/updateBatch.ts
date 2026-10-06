@@ -25,6 +25,7 @@ export async function updateBatch(
       throw `updateBatch not allowed for tables with checkFilter or postValidate rules`;
     }
     const hasHooks =
+      this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, "update") ||
       this.getAfterHooksAndChecks({ name: "update", rule: tableRules?.update }, localParams).length ||
       this.hooks?.beforeEach?.some(({ commands }) => commands.update);
     if (hasHooks && !isReturningQuery(params?.returnType, localParams)) {

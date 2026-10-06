@@ -22,6 +22,17 @@ export async function getParsedPublishTable(
   if (!rawTableRule || (isObject(rawTableRule) && Object.values(rawTableRule).every((v) => !v))) {
     return undefined;
   }
+  const readOnlyTableType =
+    isAuditTable(this.prostgles, tableName) ? "Audit"
+    : this.prostgles.opts.jobs && tableName === this.prostgles.jobs.tableName ? "Jobs"
+    : undefined;
+  if (
+    readOnlyTableType &&
+    isObject(rawTableRule) &&
+    Object.entries(rawTableRule).some(([command, rule]) => command !== "select" && rule)
+  ) {
+    throw new Error(`${readOnlyTableType} table ${tableName} only supports select publish rules`);
+  }
 
   /* Get view or table specific rules */
   const tableHandler = this.dbo[tableName] as TableHandler | ViewHandler | undefined;
@@ -52,7 +63,7 @@ export async function getParsedPublishTable(
     : rawTableRule;
 
   const tableRulesObject =
-    isAuditTable(this.prostgles, tableName) ?
+    readOnlyTableType ?
       {
         select: rawTableRulesObject.select,
         insert: undefined,

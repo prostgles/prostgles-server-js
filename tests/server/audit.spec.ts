@@ -11,6 +11,7 @@ import {
   AUDIT_TABLE_COLUMN_NAMES,
   getLocalStorageClient,
   type AuditTableRow,
+  type PublishObject,
 } from "prostgles-server";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
@@ -293,14 +294,24 @@ export async function testAudit(parentDb: DB) {
         const auditName = prgl.dboBuilder.tables.find(
           (t) => t.qualifiedNameParts.name === audit.tableName,
         )!.name;
-        const rules = await parser.getParsedPublishTable({
-          tableName: auditName,
-          clientReq: undefined,
-          clientInfo: undefined,
-          resolvedPublishObject: { [auditName]: "*" },
-        });
-        assert(rules?.select);
-        assert(!rules.insert && !rules.update && !rules.delete);
+        const parseAuditRule = (rule: PublishObject[string]) =>
+          parser.getParsedPublishTable({
+            tableName: auditName,
+            clientReq: undefined,
+            clientInfo: undefined,
+            resolvedPublishObject: { [auditName]: rule },
+          });
+        for (const rule of ["*", true, { select: "*", insert: false, update: false, delete: false }] as const) {
+          const rules = await parseAuditRule(rule);
+          assert(rules?.select);
+          assert(!rules.insert && !rules.update && !rules.delete);
+        }
+        for (const command of ["insert", "update", "delete"]) {
+          await assert.rejects(
+            parseAuditRule({ select: "*", [command]: "*" }),
+            /Audit table .* only supports select publish rules/,
+          );
+        }
 
         const clientRequest = {
           httpReq: {

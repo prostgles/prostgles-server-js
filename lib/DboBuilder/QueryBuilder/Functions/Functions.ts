@@ -5,6 +5,7 @@ import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
 import { asFunction, getAggregateQuery } from "./utils";
+import type { ExistsFilterConfig } from "../../DboBuilderTypes";
 const pgp = pgPromise();
 
 type GetQueryArgs = {
@@ -20,6 +21,8 @@ type GetQueryArgs = {
 export type FieldSpec = {
   name: string;
   type: "column" | "computed";
+  dependencyFields?: string[];
+  dependencyExists?: ExistsFilterConfig[];
   /**
    * allowedFields passed for multicolumn functions (e.g.: $rowhash)
    */
@@ -28,6 +31,8 @@ export type FieldSpec = {
 
 export type FunctionSpec = {
   name: string;
+  dependencyFields?: string[];
+  dependencyExists?: ExistsFilterConfig[];
 
   description?: string;
 

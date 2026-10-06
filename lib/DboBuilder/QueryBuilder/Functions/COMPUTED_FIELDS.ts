@@ -9,7 +9,7 @@ export const COMPUTED_FIELDS: FieldSpec[] = [
     name: "$rowhash",
     type: "computed",
     // description: ` order hash of row content  `,
-    getQuery: ({ allowedFields, tableAliasRaw: tableAlias, ctidField }) => {
+    getQuery: ({ allowedFields, tableAliasRaw: tableAlias }) => {
       return (
         "md5(" +
         allowedFields

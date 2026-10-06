@@ -23,6 +23,9 @@ const ioWatchSchema =
 http.listen(3001);
 
 import { isomorphicQueries } from "../isomorphicQueries.spec";
+import { testBackgroundJobs } from "./backgroundJobs.spec";
+import { testFileJobs } from "./fileJobs.spec";
+import { testConflictUpdates } from "./conflictUpdates.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
@@ -455,6 +458,17 @@ void (async () => {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
+          if (process.env.TEST_NAME === "conflictUpdates") {
+            await testConflictUpdates(db);
+            stopTest();
+            return;
+          }
+          if (process.env.TEST_NAME === "jobs") {
+            await testBackgroundJobs(db);
+            await testFileJobs(db);
+            stopTest();
+            return;
+          }
           await serverOnlyQueries(dbo as unknown as DBHandlerServer, db, withUserRLS);
           log("Server-only query tests successful");
           await isomorphicQueries(dbo, sql, log);

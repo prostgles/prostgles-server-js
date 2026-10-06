@@ -50,7 +50,7 @@ export class DataValidator {
 
   parse = async (args: ParseDataArgs) => {
     const { command } = args;
-    const rowFieldData = await getValidatedRowFieldData(args, this.tableHandler);
+    const { rowFieldData, validatedRows } = await getValidatedRowFieldData(args, this.tableHandler);
     const parsedRowFieldData = getParsedRowFieldData(rowFieldData, args);
     if (command === "update") {
       if (rowFieldData.some((rowParts) => rowParts.length === 0)) {
@@ -59,6 +59,7 @@ export class DataValidator {
     }
 
     return {
+      validatedRows,
       parsedRowFieldData,
       getQuery: () => getQuery(command, parsedRowFieldData, this.tableHandler.escapedName),
     };
@@ -216,7 +217,7 @@ const getValidatedRowFieldData = async (
   if (!allowedCols.length && command === "update") {
     throw "allowedColumns cannot be empty";
   }
-  const rowFieldData = await Promise.all(
+  const validatedData = await Promise.all(
     rows.map(async (nonValidatedRow) => {
       let row = pickKeys(nonValidatedRow, allowedCols);
       const initialRowKeys = Object.keys(row);
@@ -250,16 +251,7 @@ const getValidatedRowFieldData = async (
 
       const rowPartValues = Object.entries(row).map(([fieldName, fieldValue]) => {
         const column = getColumn(fieldName);
-        if (isObject(fieldValue)) {
-          // const textPatch = getTextPatch(column, fieldValue);
-          // if(textPatch){
-          //   return {
-          //     type: "plain",
-          //     column,
-          //     fieldValue: textPatch,
-          //   } satisfies RowFieldData;
-          // }
-
+        if (tableHandler.allowColumnFunctions && isObject(fieldValue)) {
           const [firstKey, ...remainingKeys] = Object.keys(fieldValue);
           const func =
             firstKey && !remainingKeys.length ?
@@ -282,50 +274,15 @@ const getValidatedRowFieldData = async (
         } satisfies RowFieldData;
       });
 
-      return rowPartValues;
+      return { row, rowFieldData: rowPartValues };
     }),
   );
 
-  return rowFieldData;
+  return {
+    validatedRows: validatedData.map((data) => data.row),
+    rowFieldData: validatedData.map((data) => data.rowFieldData),
+  };
 };
-
-// const getTextPatch = (c: TableSchemaColumn, fieldValue: any) => {
-//   if (
-//     c.data_type === "text" &&
-//     fieldValue &&
-//     isObject(fieldValue) &&
-//     !["from", "to"].find((key) => typeof fieldValue[key] !== "number")
-//   ) {
-//     const unrecProps = Object.keys(fieldValue).filter(
-//       (k) => !["from", "to", "text", "md5"].includes(k)
-//     );
-//     if (unrecProps.length) {
-//       throw "Unrecognised params in textPatch field: " + unrecProps.join(", ");
-//     }
-//     const patchedTextData: {
-//       fieldName: string;
-//       from: number;
-//       to: number;
-//       text: string;
-//       md5: string;
-//     } = {
-//       ...fieldValue,
-//       fieldName: c.name,
-//     } as any;
-
-//     // if (tableRules && !tableRules.select) throw "Select needs to be permitted to patch data";
-//     // const rows = await this.find(filter, { select: patchedTextData.reduce((a, v) => ({ ...a, [v.fieldName]: 1 }), {}) }, undefined, tableRules);
-
-//     // if (rows.length !== 1) {
-//     //   throw "Cannot patch data within a filter that affects more/less than 1 row";
-//     // }
-//     // return unpatchText(rows[0][p.fieldName], patchedTextData);
-//     const rawValue = `OVERLAY(${asName(c.name)} PLACING ${asValue(patchedTextData.text)} FROM ${asValue(patchedTextData.from)} FOR ${asValue(patchedTextData.to - patchedTextData.from + 1)})`;
-//     return rawValue;
-//   }
-
-//   return undefined;
-// };
 
 const getParsedRowFieldDataFunction = (rowPart: RowFieldDataFunction, args: ParseDataArgs) => {
   const func = conversionFunctions.find((f) => `$${f.name}` === rowPart.funcName);

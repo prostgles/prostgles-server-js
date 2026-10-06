@@ -19,7 +19,6 @@ import type { Awaitable } from "../../PublishParser/publishTypesAndUtils";
 import { asNameAlias } from "../../utils/asNameAlias";
 import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
 import type { WhereOptions } from "../ViewHandler/prepareWhere";
-import { COMPUTED_FIELDS } from "./Functions/COMPUTED_FIELDS";
 import type { FieldSpec, FunctionSpec } from "./Functions/Functions";
 import { parseFunction } from "./Functions/parseFunction";
 import { parseJoinSelect, type ParsedJoin } from "./parseJoinSelect";
@@ -131,13 +130,21 @@ const parseSelectFunctionObject = (funcData: Record<string, unknown>) => {
   };
 };
 
+type ComputedField =
+  | FieldSpec
+  | {
+      name: string;
+      type: "computed";
+      resolve: () => Promise<FieldSpec>;
+    };
+
 export class SelectItemBuilder {
   select: SelectItemValidated[] = [];
   private allFields: string[];
 
   private allowedFields: string[];
   private allowedOrderByFields: string[];
-  private computedFields: FieldSpec[];
+  private computedFields: ComputedField[];
   private functions: FunctionSpec[];
   private allowedFieldsIncludingComputed: string[];
   private columns: ColumnInfo[];
@@ -147,7 +154,7 @@ export class SelectItemBuilder {
   constructor(params: {
     allowedFields: string[];
     allowedOrderByFields: string[];
-    computedFields: FieldSpec[];
+    computedFields: ComputedField[];
     functions: FunctionSpec[];
     allFields: string[];
     isView: boolean;
@@ -224,6 +231,7 @@ export class SelectItemBuilder {
       func,
       args,
       functions: this.functions,
+      computedFields: this.computedFields,
       allowedFields: this.allowedFieldsIncludingComputed,
     });
 
@@ -267,24 +275,24 @@ export class SelectItemBuilder {
           // ctidField: this.isView? undefined : "ctid"
         }),
       selected: true,
-      dependencyFields: aggregateOptions?.dependencyFields,
-      dependencyExists: aggregateOptions?.dependencyExists,
+      dependencyFields: aggregateOptions?.dependencyFields ?? funcDef.dependencyFields,
+      dependencyExists: aggregateOptions?.dependencyExists ?? funcDef.dependencyExists,
     });
   };
 
-  private addColumn = (fieldName: string, selected: boolean) => {
+  private addColumn = async (fieldName: string, selected: boolean) => {
     /* Check if computed col */
     if (selected) {
-      const compCol = COMPUTED_FIELDS.find((cf) => cf.name === fieldName);
+      const compCol = this.computedFields.find((cf) => cf.name === fieldName);
       if (compCol && !this.select.find((s) => s.alias === fieldName)) {
         const cf: FunctionSpec = {
-          ...compCol,
+          ...("resolve" in compCol ? await compCol.resolve() : compCol),
           type: "computed",
           numArgs: 0,
           singleColArg: false,
           getFields: (_args: any[]) => [],
         };
-        void this.addFunction(cf, [], compCol.name);
+        await this.addFunction(cf, [], compCol.name);
         return;
       }
     }
@@ -350,7 +358,9 @@ export class SelectItemBuilder {
     }
 
     if (userSelect === "*") {
-      this.allowedFields.map((key) => this.addColumn(key, true));
+      for (const key of this.allowedFields) {
+        await this.addColumn(key, true);
+      }
       return;
     }
 
@@ -360,7 +370,9 @@ export class SelectItemBuilder {
         throw "Invalid array select. Expecting an array of strings";
       }
 
-      userSelect.map((key) => this.addColumn(key, true));
+      for (const key of userSelect) {
+        await this.addColumn(key, true);
+      }
       return;
     }
 
@@ -382,9 +394,9 @@ export class SelectItemBuilder {
       }
 
       /* Exclude only */
-      this.allowedFields
-        .filter((f) => !selectKeys.includes(f))
-        .map((key) => this.addColumn(key, true));
+      for (const key of this.allowedFields.filter((f) => !selectKeys.includes(f))) {
+        await this.addColumn(key, true);
+      }
     } else {
       await Promise.all(
         selectKeys.map(async (key) => {
@@ -399,9 +411,11 @@ export class SelectItemBuilder {
           /* Included fields */
           if (userSelectValue === 1 || userSelectValue === true) {
             if (key === "*") {
-              this.allowedFields.map((key) => this.addColumn(key, true));
+              for (const key of this.allowedFields) {
+                await this.addColumn(key, true);
+              }
             } else {
-              this.addColumn(key, true);
+              await this.addColumn(key, true);
             }
 
             /* Aggregations and functions */
@@ -473,11 +487,11 @@ export class SelectItemBuilder {
      * Add non selected columns
      * This ensures all fields are available for orderBy in case of nested select
      * */
-    Array.from(new Set([...this.allowedFields, ...this.allowedOrderByFields])).map((columnName) => {
+    for (const columnName of new Set([...this.allowedFields, ...this.allowedOrderByFields])) {
       if (!this.select.find((s) => s.alias === columnName && s.type === "column")) {
-        this.addColumn(columnName, false);
+        await this.addColumn(columnName, false);
       }
-    });
+    }
   };
 
   parseUserSelect = (userSelect: Select) => this.parse(userSelect);
