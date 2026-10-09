@@ -4,6 +4,7 @@ import { getTableTriggerQueries } from "./getTableTriggerQueries";
 import type { TableConfigurator } from "./TableConfigurator";
 import { getAuditTriggerConfig } from "../Audit/getAuditTriggerConfig";
 import { getMutationTriggerConfig } from "../TableHooks/getMutationTriggerConfig";
+import { isPublishProfiles, type Publish } from "../PublishParser/publishTypesAndUtils";
 
 /** Reconcile application and generated triggers through one setup path. */
 export const syncTableTriggers = async (configurator: TableConfigurator) => {
@@ -19,13 +20,21 @@ export const syncTableTriggers = async (configurator: TableConfigurator) => {
   const audit = prostgles.resolvedAuditConfig;
   const auditTriggers = audit && getAuditTriggerConfig(audit);
   const tableTriggers = tables.map((table) => {
-    // Publish rules are resolved per request, so upsert checks need capture ready in advance.
+    const hooks = tableHooks?.[table.name];
+    const hasAfterHooks = [
+      ...(hooks?.afterEach ?? []),
+      ...(hooks?.afterAll ?? []),
+      ...(hooks?.afterCommit ?? []),
+    ].some(
+      ({ commands }) =>
+        commands.insert || commands.update || (commands.delete && !hooks?.onInsteadOfDelete),
+    );
     const needsCapture =
       !table.is_view &&
-      (tableHooks?.[table.name] ||
-        prostgles.opts.publish ||
-        prostgles.jobs.hasRowTrigger(table.name, "insert") ||
-        prostgles.jobs.hasRowTrigger(table.name, "update"));
+      (hasAfterHooks ||
+        (table.privileges.insert &&
+          table.privileges.update &&
+          publishNeedsCapture(prostgles.opts.publish, table.name)));
     return {
       tableIdent: table.escaped_identifier,
       triggers: {
@@ -54,4 +63,19 @@ export const syncTableTriggers = async (configurator: TableConfigurator) => {
       await transaction.none(`/* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */\n${queries.join("\n")}`);
     }
   });
+};
+
+const publishNeedsCapture = (publish: Publish | undefined, tableName: string): boolean => {
+  // Request-dependent rules can introduce upsert checks after setup has finished.
+  if (typeof publish === "function") return true;
+  if (isPublishProfiles(publish)) {
+    return publish.some((profile) => publishNeedsCapture(profile.publish, tableName));
+  }
+  // Unrestricted rules and the all-tables tuple cannot contain validation callbacks or filters.
+  if (!publish || publish === "*" || Array.isArray(publish)) return false;
+  const rules = publish[tableName];
+  if (!rules || typeof rules !== "object" || !rules.insert || !rules.update) return false;
+  return [rules.insert, rules.update].some(
+    (rule) => typeof rule === "object" && (rule.checkFilter || rule.postValidate),
+  );
 };

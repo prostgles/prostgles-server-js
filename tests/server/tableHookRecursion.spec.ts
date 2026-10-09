@@ -20,7 +20,7 @@ export const testTableHookRecursion = async (db: DB) => {
       const table = `${schema}.records`;
       const otherTable = `${schema}.other_records`;
       const tableHooks: TableHooks = { [table]: {}, [otherTable]: {} };
-      const setHooks = (hooks: TableHooks) => {
+      const setHooks = async (hooks: TableHooks) => {
         for (const name of [table, otherTable]) {
           Object.assign(
             tableHooks[name]!,
@@ -32,6 +32,7 @@ export const testTableHookRecursion = async (db: DB) => {
             hooks[name],
           );
         }
+        await instance!.update({ tableHooks }, true);
       };
       let instance: InitResult | undefined;
       try {
@@ -115,7 +116,7 @@ export const testTableHookRecursion = async (db: DB) => {
                       ],
                     },
               };
-              setHooks(hooks);
+              await setHooks(hooks);
               await dbo[table]!.update({ id: 1 }, { value: 0 });
               assert.deepEqual(calls, preventRecursion ? [0] : [0, 1, 2]);
               assert.deepEqual(siblings, preventRecursion ? [1, 0] : [2, 1, 0]);
@@ -166,7 +167,7 @@ export const testTableHookRecursion = async (db: DB) => {
                 }
               },
             };
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [
                   hook,
@@ -205,7 +206,7 @@ export const testTableHookRecursion = async (db: DB) => {
             const proceed = new Promise<void>((resolve) => {
               release = resolve;
             });
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [
                   {
@@ -243,7 +244,7 @@ export const testTableHookRecursion = async (db: DB) => {
             const each: AnyObject[] = [];
             const all: AnyObject[][] = [];
             const committed: AnyObject[][] = [];
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [
                   {
@@ -304,7 +305,7 @@ export const testTableHookRecursion = async (db: DB) => {
         await t.test("database BEFORE triggers contribute actual changed fields", async () => {
           const changed: string[] = [];
           const jsonChanges: number[] = [];
-          setHooks({
+          await setHooks({
             [table]: {
               afterEach: [
                 {
@@ -341,7 +342,7 @@ export const testTableHookRecursion = async (db: DB) => {
           async () => {
             const rows: AnyObject[] = [];
             const batches: number[] = [];
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [
                   {
@@ -395,7 +396,7 @@ export const testTableHookRecursion = async (db: DB) => {
           "delete row/value return types reject multiple rows and roll back",
           async () => {
             const captured: number[] = [];
-            setHooks({
+            await setHooks({
               [otherTable]: {
                 afterEach: [
                   {
@@ -431,7 +432,7 @@ export const testTableHookRecursion = async (db: DB) => {
 
         await t.test("table config repairs disabled and modified capture triggers", async () => {
           const captured: number[] = [];
-          setHooks({
+          await setHooks({
             [otherTable]: {
               afterEach: [
                 {
@@ -460,8 +461,262 @@ export const testTableHookRecursion = async (db: DB) => {
           assert.deepEqual(captured, [903, 904]);
         });
 
+        await t.test(
+          "fresh tables install capture only for after hooks or upsert checks",
+          async () => {
+            const checkedRules = {
+              insert: { fields: "*", checkFilter: { value: { $gt: 0 } } },
+              update: { fields: "*", filterFields: "*", checkFilter: { value: { $gt: 0 } } },
+            } as const;
+            const cases: {
+              name: string;
+              hooks: TableHooks[string] | undefined;
+              publish: (tableName: string) => ProstglesInitOptions["publish"];
+              expectedCapture: boolean;
+            }[] = [
+              { name: "empty hooks", hooks: {}, publish: () => undefined, expectedCapture: false },
+              {
+                name: "before hooks",
+                expectedCapture: false,
+                publish: () => undefined,
+                hooks: { beforeEach: [{ commands: { insert: 1, update: 1 }, validate: () => {} }] },
+              },
+              {
+                name: "instead of delete suppresses delete after hooks",
+                expectedCapture: false,
+                publish: () => undefined,
+                hooks: {
+                  onInsteadOfDelete: () => Promise.resolve(undefined),
+                  afterEach: [
+                    {
+                      commands: { delete: 1 },
+                      validate: () => {
+                        throw new Error("Unexpected delete hook");
+                      },
+                    },
+                  ],
+                },
+              },
+              {
+                name: "empty and inactive after hooks",
+                expectedCapture: false,
+                publish: () => undefined,
+                hooks: {
+                  afterEach: [],
+                  afterAll: [{ commands: {}, validate: () => Promise.resolve() }],
+                  afterCommit: [],
+                },
+              },
+              {
+                name: "afterEach",
+                expectedCapture: true,
+                publish: () => undefined,
+                hooks: { afterEach: [{ commands: { insert: 1 }, validate: () => {} }] },
+              },
+              {
+                name: "afterAll",
+                expectedCapture: true,
+                publish: () => undefined,
+                hooks: {
+                  afterAll: [{ commands: { delete: 1 }, validate: () => Promise.resolve() }],
+                },
+              },
+              {
+                name: "afterCommit",
+                expectedCapture: true,
+                publish: () => undefined,
+                hooks: { afterCommit: [{ commands: { update: 1 }, run: () => {} }] },
+              },
+              {
+                name: "unrestricted publish",
+                hooks: undefined,
+                publish: () => "*",
+                expectedCapture: false,
+              },
+              {
+                name: "all-tables publish tuple",
+                hooks: undefined,
+                expectedCapture: false,
+                publish: () => ["*", { select: true, insert: true, update: true }],
+              },
+              {
+                name: "read-only and unpublished tables",
+                hooks: undefined,
+                expectedCapture: false,
+                publish: (tableName) => ({
+                  [tableName]: { select: { fields: "*" } },
+                  [table]: checkedRules,
+                }),
+              },
+              {
+                name: "insert-only checks",
+                hooks: undefined,
+                expectedCapture: false,
+                publish: (tableName) => ({ [tableName]: { insert: checkedRules.insert } }),
+              },
+              {
+                name: "update-only validation",
+                hooks: undefined,
+                expectedCapture: false,
+                publish: (tableName) => ({
+                  [tableName]: {
+                    update: {
+                      ...checkedRules.update,
+                      postValidate: ({ row }) => {
+                        assert(row.value > 0);
+                      },
+                    },
+                  },
+                }),
+              },
+              {
+                name: "upsert checkFilter",
+                hooks: undefined,
+                expectedCapture: true,
+                publish: (tableName) => ({ [tableName]: checkedRules }),
+              },
+              {
+                name: "upsert postValidate",
+                hooks: undefined,
+                expectedCapture: true,
+                publish: (tableName) => ({
+                  [tableName]: {
+                    insert: {
+                      fields: "*",
+                      postValidate: ({ row }) => {
+                        assert(row.value > 0);
+                      },
+                    },
+                    update: { fields: "*", filterFields: "*" },
+                  },
+                }),
+              },
+              {
+                name: "read-only publish profiles",
+                hooks: undefined,
+                expectedCapture: false,
+                publish: (tableName) => [
+                  { userTypes: ["writer"], publish: { [tableName]: { select: "*" } } },
+                ],
+              },
+              {
+                name: "checked publish profiles",
+                hooks: undefined,
+                expectedCapture: true,
+                publish: (tableName) => [
+                  { userTypes: ["reader"], publish: "*" },
+                  { userTypes: ["writer"], publish: { [tableName]: checkedRules } },
+                ],
+              },
+              {
+                name: "request-dependent publish",
+                hooks: undefined,
+                expectedCapture: true,
+                publish: () => () => "*",
+              },
+            ];
+            for (const [index, { name, hooks, publish, expectedCapture }] of cases.entries()) {
+              const tableName = `${schema}.capture_requirements_${index}`;
+              await db.none(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, value INTEGER)`);
+              const configuredPublish = publish(tableName);
+              const configured = await prostgles({
+                dbConnection: getConnectionDetails(
+                  db,
+                ) as unknown as ProstglesInitOptions["dbConnection"],
+                schemaFilter: { [schema]: 1 },
+                tableHooks: hooks && { [tableName]: hooks },
+                publish: configuredPublish,
+                auth:
+                  configuredPublish ?
+                    { getUser: () => undefined, findUser: () => ({ id: "writer", type: "writer" }) }
+                  : undefined,
+                onReady: () => {},
+              });
+              try {
+                const { count } = await db.one<{ count: number }>(
+                  `SELECT count(*)::int FROM pg_trigger
+                  WHERE tgrelid = $1::regclass AND tgname LIKE 'prostgles_capture_%'`,
+                  [tableName],
+                );
+                assert.equal(count, expectedCapture ? 4 : 0, name);
+                await configured.db[tableName]!.insert!({ id: 0, value: 1 });
+                await configured.db[tableName]!.update!({ id: 0 }, { value: 1 });
+                const clientTable =
+                  configuredPublish ?
+                    (await configured.getClientDBHandlers({ userId: "writer" }, undefined))
+                      .clientDb[tableName]
+                  : undefined;
+                if (clientTable?.insert && clientTable.update) {
+                  await Promise.all(
+                    [1, 2].map(async (id) => {
+                      const params = {
+                        onConflict: { action: "DoUpdate" as const, conflictColumns: ["id"] },
+                      };
+                      await clientTable.insert!({ id, value: 1 }, params);
+                      await clientTable.insert!({ id, value: 2 }, params);
+                    }),
+                  );
+                } else if (clientTable?.insert) {
+                  await clientTable.insert({ id: 1, value: 1 });
+                } else if (clientTable?.update) {
+                  await clientTable.update({ id: 0 }, { value: 1 });
+                }
+                await configured.db[tableName]!.delete!({ id: 0 });
+              } finally {
+                await configured.destroy();
+              }
+            }
+          },
+        );
+
+        await t.test(
+          "read-only publishing does not require capture trigger privileges",
+          async () => {
+            const readOnlyTable = `${schema}.read_only_records`;
+            const readerRole = `hook_reader_${randomUUID().replaceAll("-", "")}`;
+            let reader: InitResult | undefined;
+            try {
+              await db.none(`CREATE TABLE ${readOnlyTable} (id INTEGER PRIMARY KEY);
+              INSERT INTO ${readOnlyTable} VALUES (1);
+              CREATE ROLE ${readerRole} LOGIN PASSWORD 'read_only';
+              GRANT USAGE ON SCHEMA ${schema} TO ${readerRole};
+              GRANT SELECT ON ${readOnlyTable} TO ${readerRole};`);
+              reader = await prostgles({
+                dbConnection: {
+                  ...getConnectionDetails(db),
+                  user: readerRole,
+                  password: "read_only",
+                } as unknown as ProstglesInitOptions["dbConnection"],
+                schemaFilter: { [schema]: 1 },
+                auth: {
+                  getUser: () => undefined,
+                  findUser: () => ({ id: "reader", type: "user" }),
+                },
+                publish: { [readOnlyTable]: { select: { fields: "*" } } },
+                onReady: () => {},
+              });
+              const { clientDb } = await reader.getClientDBHandlers(
+                { userId: "reader" },
+                undefined,
+              );
+              assert.deepEqual(await clientDb[readOnlyTable]!.find!({}), [{ id: 1 }]);
+              await reader.update({ publish: () => ({ [readOnlyTable]: "*" }) });
+              const { count } = await db.one<{ count: number }>(
+                `SELECT count(*)::int FROM pg_trigger
+                WHERE tgrelid = $1::regclass AND tgname LIKE 'prostgles_capture_%'`,
+                [readOnlyTable],
+              );
+              assert.equal(count, 0);
+            } finally {
+              await reader?.destroy();
+              await db.none(`DROP TABLE IF EXISTS ${readOnlyTable};
+              DROP OWNED BY ${readerRole}; DROP ROLE ${readerRole};`);
+            }
+          },
+        );
+
         await t.test("publish capture is configured before concurrent upserts", async () => {
-          setHooks({});
+          await setHooks({});
           await instance!.update({ tableHooks: undefined }, true);
           const validated: number[] = [];
           await (dbo[otherTable] as TableHandler).update(
@@ -493,7 +748,14 @@ export const testTableHookRecursion = async (db: DB) => {
             4,
           );
           await db.none(`ALTER TABLE ${otherTable} ADD PRIMARY KEY (id)`);
-          await instance!.update({ publish: "*" });
+          await instance!.update({
+            publish: {
+              [otherTable]: {
+                insert: { fields: "*", checkFilter: { value: 1 } },
+                update: { fields: "*", filterFields: "*", checkFilter: { value: 1 } },
+              },
+            },
+          });
           assert.equal(
             (
               await db.one<{ count: number }>(
@@ -587,7 +849,7 @@ export const testTableHookRecursion = async (db: DB) => {
         await t.test(
           "capture triggers share table config setup and survive hook removal",
           async () => {
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [
                   { commands: { update: 1 }, changedFields: ["amount"], validate: () => {} },
@@ -627,7 +889,7 @@ export const testTableHookRecursion = async (db: DB) => {
             assert.deepEqual(await getTriggers(), before);
             await instance.db[table]!.update!({ id: 2 }, { amount: "9007199254741999" });
             // Changing the requested fields does not replace triggers or lose application triggers.
-            setHooks({
+            await setHooks({
               [table]: {
                 afterEach: [{ commands: { update: 1 }, validate: () => {} }],
               },

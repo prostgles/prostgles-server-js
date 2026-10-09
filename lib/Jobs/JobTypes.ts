@@ -30,7 +30,7 @@ export type RowTrigger<S, T extends JobTableName<S>> = {
   on: ("insert" | "update")[];
   /** On updates, at least one of these columns must actually change. */
   columns?: (keyof JobRow<S, T> & string)[];
-  /** Existing column receiving the job ID atomically, including reruns, without invoking row hooks. */
+  /** Existing column receiving the job ID atomically, including reruns, through normal table hooks. */
   jobIdColumn?: keyof JobRow<S, T> & string;
   when?: FullFilter<JobRow<S, T>, S extends DBSchema ? S : void>;
 };

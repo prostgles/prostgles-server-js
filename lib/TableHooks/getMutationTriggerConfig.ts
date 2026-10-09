@@ -69,11 +69,4 @@ export const needsChangedFields = (table: TableHandler) =>
     ...(table.hooks?.afterEach ?? []),
     ...(table.hooks?.afterAll ?? []),
     ...(table.hooks?.afterCommit ?? []),
-  ].some((hook) => hook.commands.update && hook.changedFields !== undefined) ||
-  Object.values(table.dboBuilder.prostgles.opts.jobs?.definitions ?? {}).some(
-    ({ trigger }) =>
-      trigger.type === "row" &&
-      trigger.table === table.name &&
-      trigger.on.includes("update") &&
-      trigger.columns !== undefined,
-  );
+  ].some((hook) => hook.commands.update && hook.changedFields !== undefined);

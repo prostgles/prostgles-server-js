@@ -1,4 +1,3 @@
-import { enqueueRowJobs } from "../../Jobs/enqueueRowJobs";
 import {
   captureMutation,
   getMutationRowKeyQuery,
@@ -180,7 +179,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       [MUTATION_METADATA.updateCheckCondition]: updateCheckFailed,
       [MUTATION_METADATA.rowKey]: rowKey,
       ...tableRowWithReturning
-    } = row;
+    } = row as AnyObject;
     const mutation = needsCapture ? mutationsByRow.get(rowKey)?.shift() : undefined;
     if (needsCapture && !mutation) throw new Error(`Missing captured mutation for ${name}`);
     const actualCommand = mutation?.command ?? command;
@@ -214,37 +213,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   if (!batches.size && !isUpsert) {
     batches.set(command, { rows: [], changedFields: [] });
   }
-  const linkedRows = new Map<AnyObject, Record<string, any>>();
-  for (const [actualCommand, { rows, changedFields }] of batches) {
-    const linked = await enqueueRowJobs(
-      tableHandler,
-      actualCommand,
-      rows,
-      localParams,
-      changedFields,
-    );
-    linked?.forEach((owner, row) => linkedRows.set(row, owner));
-  }
-  if (returningRows && linkedRows.size) {
-    const returningExpressions = returningSelectItems.filter((item) => item.type !== "column");
-    for (const [index, row] of tableRows.entries()) {
-      const owner = linkedRows.get(row);
-      if (!owner) continue;
-      const returningRow = returningRows[index]!;
-      for (const item of returningSelectItems) {
-        if (item.type === "column") returningRow[item.alias] = row[item.columnName!];
-      }
-      if (!returningExpressions.length) continue;
-      const where = Object.keys(owner)
-        .map((key, i) => `${asName(key)} = $${i + 1}`)
-        .join(" AND ");
-      const expressionValues = await tx!.one<AnyObject>(
-        `SELECT ${getSelectItemQuery(returningExpressions)} FROM ${tableHandler.escapedName} WHERE ${where}`,
-        Object.values(owner),
-      );
-      Object.assign(returningRow, expressionValues);
-    }
-  }
+  const rowsBeforeHooks = returningRows ? tableRows.map((row) => ({ ...row })) : undefined;
   for (const [actualCommand, { rows, changedFields }] of batches) {
     await executeAfterHooksCheckAndPostValidation({
       tableHandler,
@@ -258,7 +227,28 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       changedFields,
     });
   }
-
+  if (returningRows && rowsBeforeHooks) {
+    const returningExpressions = returningSelectItems.filter((item) => item.type !== "column");
+    const primaryKeyNames = tableHandler.columns
+      .filter((column) => column.is_pkey)
+      .map((column) => column.name);
+    for (const [index, row] of tableRows.entries()) {
+      const previousRow = rowsBeforeHooks[index]!;
+      if (!Object.keys(previousRow).some((column) => row[column] !== previousRow[column])) continue;
+      const returningRow = returningRows[index]!;
+      for (const item of returningSelectItems) {
+        if (item.type === "column") returningRow[item.alias] = row[item.columnName!];
+      }
+      if (!returningExpressions.length || !primaryKeyNames.length) continue;
+      const where = primaryKeyNames.map((key, i) => `${asName(key)} = $${i + 1}`).join(" AND ");
+      const expressionValues = await tx!.one<AnyObject>(
+        `SELECT ${getSelectItemQuery(returningExpressions)} 
+        FROM ${tableHandler.escapedName} WHERE ${where}`,
+        primaryKeyNames.map((column) => row[column]),
+      );
+      Object.assign(returningRow, expressionValues);
+    }
+  }
   let returnMany = false;
   if (args.command === "update") {
     const { multi = true } = args.params || {};

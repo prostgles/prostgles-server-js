@@ -1,6 +1,7 @@
 import type { Prostgles } from "../Prostgles";
 import { getFileTableConfig } from "../StorageClient/getFileTableConfig";
 import { getJobTableConfig } from "../Jobs/getJobTableConfig";
+import { getJobTableHooks } from "../Jobs/getJobTableHooks";
 import { getAuditTableConfig } from "../Audit/getAuditTableConfig";
 import { isManagedTriggerName } from "./managedTriggerNames";
 
@@ -17,5 +18,5 @@ export const getMergedTableConfig = (prostgles: Prostgles) => {
     prostgles,
     getAuditTableConfig(prostgles, config.tableConfig),
   );
-  return { ...config, tableConfig };
+  return { tableConfig, tableHooks: getJobTableHooks(prostgles, config.tableHooks) };
 };

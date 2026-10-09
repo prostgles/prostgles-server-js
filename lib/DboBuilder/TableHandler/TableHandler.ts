@@ -99,7 +99,7 @@ export class TableHandler extends ViewHandler {
     filter: AnyObject | undefined,
   ) => {
     const transaction = this.getTransaction(localParams);
-    const hooks = localParams?.bypassHooks ? [] : this.getBeforeHooks(command, [row]);
+    const hooks = this.getBeforeHooks(command, [row]);
     if (hooks.length && transaction && localParams?.isRemoteRequest) {
       await transaction.t.none(withUserRLS(localParams, ""));
     }
@@ -168,7 +168,7 @@ export class TableHandler extends ViewHandler {
     if (postValidate && !localParams) {
       throw new Error("Unexpected: no localParams for postValidate");
     }
-    const hooks = localParams?.bypassHooks ? undefined : this.hooks;
+    const hooks = this.hooks;
     const afterEachHooks = hooks?.afterEach
       ?.map((hook, index) => {
         const { commands } = hook;
@@ -177,8 +177,9 @@ export class TableHandler extends ViewHandler {
         }
         return {
           type: "afterEach",
-          ...hook,
+          // Generated hooks provide a stable key shared with explicit reruns.
           hookKey: `afterEach:${index}`,
+          ...hook,
         } as const;
       })
       .filter(isDefined);
@@ -230,14 +231,9 @@ export class TableHandler extends ViewHandler {
     newRows: AnyObject[],
   ) => {
     const transaction = this.getTransaction(localParams);
-    const hasAfterChecks =
-      this.getAfterHooksAndChecks(command, localParams).length > 0 ||
-      (!localParams?.bypassHooks &&
-        this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, command.name));
+    const hasAfterChecks = this.getAfterHooksAndChecks(command, localParams).length > 0;
     const hasBeforeHooks =
-      !localParams?.bypassHooks &&
-      command.name !== "delete" &&
-      this.getBeforeHooks(command.name, newRows).length > 0;
+      command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
     return {
       shouldWrap:
         !transaction && (hasAfterChecks || hasBeforeHooks || this.hooks?.onInsteadOfDelete),

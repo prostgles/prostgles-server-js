@@ -232,7 +232,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           audit: { tableName: "job_validation_audit", tables: { job_validation_setup: 1 } },
           tableConfig: {
             job_validation_setup: {
-              columns: { id: "serial PRIMARY KEY" },
+              columns: { id: "serial PRIMARY KEY", job_id: "UUID" },
+              constraints: {
+                setup_job: "FOREIGN KEY (job_id) REFERENCES job_validation_queue(id)",
+              },
               onMount: async ({ _db }) => {
                 await _db.none(
                   "CREATE TABLE job_validation_target (id serial PRIMARY KEY, job_id UUID)",
@@ -763,7 +766,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               tableHooks: {
                 ...options.tableHooks,
                 [table]: {
-                  afterEach: [{ commands: { update: 1 }, validate: () => action() }],
+                  afterEach: [
+                    { commands: { update: 1 }, preventRecursion: true, validate: () => action() },
+                  ],
                 },
               },
             });
@@ -944,6 +949,118 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           );
         }
       });
+      await t.test(
+        "job links run normal hooks and reruns prevent only their own job recursion",
+        async () => {
+          const trigger = definitions.process!.trigger;
+          if (trigger.type !== "row") throw new Error("Expected a row trigger");
+          const originalColumns = trigger.columns;
+          const beforeLinks: string[] = [];
+          const afterLinks: string[] = [];
+          const afterAllLinks: string[] = [];
+          const committedLinks: string[] = [];
+          let rejectLink = false;
+          trigger.columns = undefined;
+          definitions.observeLink = defineJob({
+            trigger: { type: "row", table, on: ["update"], columns: ["job_id"] },
+            run: async () => {},
+          });
+          try {
+            await instance!.update(
+              {
+                jobs: { tableName: queueName, definitions },
+                tableHooks: {
+                  ...options.tableHooks,
+                  [table]: {
+                    beforeEach: [
+                      {
+                        commands: { update: 1 },
+                        changedFields: ["job_id"],
+                        validate: ({ command, data }) => {
+                          if (command !== "update") return;
+                          if (rejectLink) throw new Error("Reject job link hook");
+                          beforeLinks.push(String(data.job_id));
+                          return { row: { ...data, note: "from link hook" } };
+                        },
+                      },
+                    ],
+                    afterEach: [
+                      ...options.tableHooks![table]!.afterEach!,
+                      {
+                        commands: { insert: 1 },
+                        validate: ({ row }) => {
+                          assert(row.job_id);
+                        },
+                      },
+                      {
+                        commands: { update: 1 },
+                        changedFields: ["job_id"],
+                        validate: ({ row }) => {
+                          afterLinks.push(row.job_id!);
+                        },
+                      },
+                    ],
+                    afterAll: [
+                      {
+                        commands: { update: 1 },
+                        changedFields: ["job_id"],
+                        validate: ({ rows }) => {
+                          afterAllLinks.push(...rows.map((row) => row.job_id!));
+                          return Promise.resolve();
+                        },
+                      },
+                    ],
+                    afterCommit: [
+                      {
+                        commands: { update: 1 },
+                        changedFields: ["job_id"],
+                        run: ({ rows }) => {
+                          committedLinks.push(...rows.map((row) => row.job_id!));
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+              true,
+            );
+            const { row, job } = await insert();
+            assert.equal(row.note, "from link hook");
+            await status(job.id, "succeeded");
+            const rerun = await instance!.jobs.rerun(job.id);
+            await status(rerun.jobId, "succeeded");
+            const expectedLinks = [job.id, rerun.jobId];
+            assert.deepEqual(beforeLinks, expectedLinks);
+            assert.deepEqual(afterLinks, expectedLinks);
+            assert.deepEqual(afterAllLinks, expectedLinks);
+            assert.deepEqual(committedLinks, expectedLinks);
+            const rowJobs = await records("owner = $1:json", [{ id: row.id }]);
+            assert.deepEqual(
+              rowJobs.filter((job) => job.job_name === "process").map((job) => job.id),
+              expectedLinks,
+            );
+            assert.equal(rowJobs.filter((job) => job.job_name === "observeLink").length, 2);
+            for (const rowJob of rowJobs) await status(rowJob.id, "succeeded");
+            const beforeRejection = (await records()).length;
+            rejectLink = true;
+            await assert.rejects(insert({ note: "rejected by link hook" }), {
+              message: "Reject job link hook",
+            });
+            assert.equal(await instance!.db[table].count({ note: "rejected by link hook" }), 0);
+            assert.equal((await records()).length, beforeRejection);
+          } finally {
+            trigger.columns = originalColumns;
+            delete definitions.observeLink;
+            await instance!.update(
+              {
+                jobs: { tableName: queueName, definitions },
+                tableHooks: options.tableHooks,
+              },
+              true,
+            );
+          }
+        },
+      );
       await t.test(
         "detached reruns start a new transaction after their parent finishes",
         async () => {

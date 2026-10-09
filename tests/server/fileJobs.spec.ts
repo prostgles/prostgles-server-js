@@ -37,7 +37,7 @@ export const testFileJobs = async (db: DB) => {
         transactions: true,
         onReady: () => {},
         tableConfig: {
-          [files]: { columns: { notes: "TEXT" } },
+          [files]: { columns: { notes: "TEXT", job_id: "UUID REFERENCES prostgles_jobs(id)" } },
         },
         fileTable: {
           tableName: files,
@@ -80,6 +80,10 @@ export const testFileJobs = async (db: DB) => {
         },
         jobs: {
           definitions: {
+            link: defineJob({
+              trigger: { type: "row", table: files, on: ["insert"], jobIdColumn: "job_id" },
+              run: async () => {},
+            }),
             ingest: defineJob({
               trigger: { type: "row", table: `${files}_versions`, on: ["insert"] },
               run: async ({ row, dbo }) => {
@@ -117,6 +121,10 @@ export const testFileJobs = async (db: DB) => {
       assert.equal(processed.length, 0);
       finishUpload();
       const file = await inserting;
+      assert(file.job_id);
+      assert.equal((await instance.jobs.get(file.job_id))?.job_name, "link");
+      const rerun = await instance.jobs.rerun(file.job_id);
+      assert.equal((await fileTable.findOne({ id: file.id }))!.job_id, rerun.jobId);
       pendingUpload = undefined;
       // A later upload must not change the earlier job's input.
       await fileTable.update(
@@ -162,7 +170,7 @@ export const testFileJobs = async (db: DB) => {
 
 type FileJobTestSchema = {
   files: {
-    columns: FileTableRow & { notes: string | null };
+    columns: FileTableRow & { notes: string | null; job_id: string | null };
     insertColumns: Partial<FileTableInsertRow> &
       Pick<FileTableInsertRow, "data" | "original_name"> & { notes?: string | null };
   };

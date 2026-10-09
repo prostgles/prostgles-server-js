@@ -15,11 +15,15 @@ export const getJobTableConfig = (
     throw new Error("The jobs table cannot also be defined in tableConfig");
   }
   return {
-    ...tableConfig,
     [tableName]: {
       ...jobTableConfig,
-      indexes: Object.fromEntries(Object.entries(jobTableConfig.indexes).map(([name, index]) =>
-        [`${tableName}_${name}`, index])),
+      indexes: Object.fromEntries(
+        Object.entries(jobTableConfig.indexes).map(([name, index]) => [
+          `${tableName}_${name}`,
+          index,
+        ]),
+      ),
     },
+    ...tableConfig,
   };
 };

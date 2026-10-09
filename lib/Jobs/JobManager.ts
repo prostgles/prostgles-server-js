@@ -73,13 +73,6 @@ export class JobManager {
     },
   };
 
-  hasRowTrigger = (table: string, command: "insert" | "update" | "delete") =>
-    command !== "delete" &&
-    Object.values(this.prostgles.opts.jobs?.definitions ?? {}).some(
-      ({ trigger }) =>
-        trigger.type === "row" && trigger.table === table && trigger.on.includes(command),
-    );
-
   validate = () => validateJobDefinitions(this.prostgles, this.prostgles.dboBuilder.tables);
 
   start = () => {

@@ -5,6 +5,7 @@ import { getJobDefinition } from "./getJobDefinition";
 import type { JobRecord, JobTransaction } from "./JobTypes";
 import { getJobTableHandler } from "./getJobTableHandler";
 import { getJobParams } from "./getJobParams";
+import { runTableHook } from "../ExecutionContext";
 
 /** Called only by configured triggers and reruns, inside their originating transaction. */
 export const enqueueJob = async (
@@ -31,23 +32,25 @@ export const enqueueJob = async (
     definition.trigger.type === "row" ? definition.trigger.jobIdColumn : undefined;
   const rowTable =
     jobIdColumn !== undefined && table !== null ? transaction.dbx[table]! : undefined;
-  const ownerFilter = {
-    $and: Object.entries(owner).map(([column, value]) => ({ [column]: { $eq: value } })),
-  };
+  const ownerFilter =
+    table !== null && prostgles.isMedia(table) ?
+      { id: owner.id }
+    : {
+        $and: Object.entries(owner).map(([column, value]) => ({ [column]: { $eq: value } })),
+      };
   if (rowTable && options.reason === "rerun") {
     // Match row-trigger lock ordering: the owner row before the job advisory lock.
     await rowTable.find(ownerFilter, { select: "", limit: null, forUpdate: true });
   }
   const setJobId = async (jobId: string) => {
     if (!rowTable || jobIdColumn === undefined) return { jobId, ownerRow: undefined };
-    // Internal bookkeeping must not recursively enqueue update-triggered jobs.
-    const ownerRow = await rowTable.update(
-      ownerFilter,
-      { [jobIdColumn]: jobId },
-      { returning: "*", multi: false },
-      undefined,
-      { bypassHooks: true },
-    );
+    const updateOwner = () =>
+      rowTable.update(ownerFilter, { [jobIdColumn]: jobId }, { returning: "*", multi: false });
+    // Reruns start outside the generated job hook; give their link update the same ancestry.
+    const ownerRow =
+      options.reason === "rerun" ?
+        await runTableHook(rowTable, [owner], updateOwner, { hookKey: `job:${name}` })
+      : await updateOwner();
     return { jobId, ownerRow: ownerRow || undefined };
   };
   // Serialize conflicts for this row without serializing writes to unrelated rows.
