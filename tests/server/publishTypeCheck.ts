@@ -108,9 +108,9 @@ export const testPublishTypes = () => {
         insert: {
           fields: "*",
           returningFields: { name: 1 },
-          validate: ({ row }) => {
-            if (row.name === "a") row.name = "b";
-            return row;
+          postValidate: ({ row }) => {
+            row.id satisfies number;
+            if (row.name === "fail") throw new Error("Rejected insert");
           },
         },
       },

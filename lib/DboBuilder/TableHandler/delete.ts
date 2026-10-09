@@ -13,6 +13,7 @@ import type { TableHandler } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
 import { runTableHook } from "../../ExecutionContext";
+import { captureMutation } from "../../TableHooks/captureMutation";
 
 export async function _delete(
   this: TableHandler,
@@ -99,24 +100,14 @@ export async function _delete(
     queryWithoutRLS += filterOpts.where;
     await validate?.(filterOpts.filter);
 
-    const FULL_ROW_KEY = "_prostgles_full_row" as const;
-    const fullRowReturning =
-      hasAfterChecks ? `to_jsonb(${this.escapedName}.*) as ${FULL_ROW_KEY}` : undefined;
     let returningQuery = "";
     if (returning !== undefined) {
       queryType = "any";
-      if (!returningFields) {
-        throw "Returning disallowed";
-      }
+      if (!returningFields) throw "Returning disallowed";
       returningQuery = this.makeReturnQuery(
         await this.prepareReturning(returning, this.parseFieldFilter(returningFields)),
       );
-      if (hasAfterChecks) {
-        returningQuery += `, ${fullRowReturning}`;
-      }
       queryWithoutRLS += returningQuery;
-    } else if (hasAfterChecks) {
-      queryWithoutRLS += ` RETURNING ${fullRowReturning}`;
     }
 
     // TODO - delete orphaned files
@@ -185,7 +176,10 @@ export async function _delete(
       });
       return result;
     }
-    const deletedRows = await queryPromise().catch((err) =>
+    const { result: deletedRows, mutations } = await (
+      hasAfterChecks ?
+        captureMutation(this, localParams, queryWithRLS + (returningQuery ? "" : " RETURNING 1"))
+      : queryPromise().then((result) => ({ result, mutations: [] }))).catch((err) =>
       rejectWithPGClientError(err, {
         type: "tableMethod",
         localParams,
@@ -194,25 +188,19 @@ export async function _delete(
       }),
     );
 
+    if (isOneOrNone && deletedRows.length > 1) {
+      throw new Error(`More than 1 row deleted: ${deletedRows.length} rows affected`);
+    }
     if (hasAfterChecks) {
-      const fullRows = deletedRows.map((d) => {
-        const fullRow = d[FULL_ROW_KEY] as AnyObject | undefined;
-        if (!fullRow) throw "Missing full row for after checks";
-        return fullRow;
-      });
-
       await executeAfterHooksCheckAndPostValidation({
         tableHandler: this,
         operation,
         localParams,
-        rows: fullRows,
+        rows: mutations.map((mutation) => mutation.row),
         data: [],
+        changedFields: mutations.map((mutation) => mutation.changedFields),
       });
     }
-
-    const originalReturnRows = deletedRows.map(
-      ({ [FULL_ROW_KEY]: _, ...originalReturn }) => originalReturn,
-    );
 
     await this._log({
       command: "delete",
@@ -220,7 +208,8 @@ export async function _delete(
       data: { filter, params },
       duration: Date.now() - start,
     });
-    return isOneOrNone ? originalReturnRows[0] : originalReturnRows;
+    const returningRows = hasAfterChecks && !returningQuery ? [] : deletedRows;
+    return isOneOrNone ? returningRows[0] : returningRows;
   } catch (e) {
     await this._log({
       command: "delete",

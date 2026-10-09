@@ -65,14 +65,9 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import type { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
 import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
-import { getFileTableConfig } from "./StorageClient/getFileTableConfig";
-import { getJobTableConfig } from "./Jobs/getJobTableConfig";
 import { dirname } from "path";
-import { getAuditTableConfig } from "./Audit/getAuditTableConfig";
 import { parseAuditConfig } from "./Audit/parseAuditConfig";
-import { getAuditTriggerConfig } from "./Audit/getAuditTriggerConfig";
-import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
-import { isManagedTriggerName } from "./TableConfig/managedTriggerNames";
+import { getMergedTableConfig } from "./TableConfig/getMergedTableConfig";
 import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
 import { JobManager } from "./Jobs/JobManager";
 
@@ -146,25 +141,7 @@ export class Prostgles {
   }
 
   get mergedTableConfig() {
-    for (const [tableName, table] of Object.entries(this.opts.tableConfig ?? {})) {
-      for (const name of Object.keys(table.triggers ?? {})) {
-        if (isManagedTriggerName(name)) {
-          throw new Error(`Trigger ${tableName}.${name} uses a prefix reserved for prostgles`);
-        }
-      }
-    }
-    const config = getFileTableConfig(this);
-    const tableConfig = getJobTableConfig(this, getAuditTableConfig(this, config.tableConfig));
-    const audit = this.resolvedAuditConfig;
-    if (tableConfig && audit) {
-      for (const [name, auditConfig] of Object.entries(getAuditTriggerConfig(audit))) {
-        tableConfig[name] = {
-          ...tableConfig[name],
-          triggers: { ...tableConfig[name]?.triggers, ...auditConfig.triggers },
-        };
-      }
-    }
-    return { ...config, tableConfig };
+    return getMergedTableConfig(this);
   }
 
   isMedia(tableName: string) {
@@ -349,13 +326,7 @@ export class Prostgles {
   refreshDBO = async () => {
     this.loaded = false;
     await this.cleanupContext();
-    await this.runSchemaQueries(async () => {
-      await this.rebuildDBO();
-      if (this.opts.audit) {
-        await syncTableTriggers(this);
-        await this.rebuildDBO();
-      }
-    });
+    await this.tableConfigurator!.refresh();
     await this.jobs.validate();
     await this.createContext({ type: "dbo.refresh" });
     this.loaded = true;

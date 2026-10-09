@@ -1,5 +1,5 @@
 import type { Prostgles } from "../Prostgles";
-import type { JobRecord, Jobs } from "./JobTypes";
+import type { JobRecord, Jobs, JobTransaction } from "./JobTypes";
 import { enqueueJob } from "./enqueueJob";
 import { runJob } from "./runJob";
 import { jobError } from "./jobUtils";
@@ -15,7 +15,7 @@ export class JobManager {
     return this.prostgles.opts.jobs?.tableName ?? "prostgles_jobs";
   }
   get tableSQL() {
-    const table = this.prostgles.dboBuilder.dbo[this.tableName];
+    const table = this.prostgles.dboBuilder.dboMap.get(this.tableName);
     if (!table) throw new Error(`Job table ${this.tableName} is not available in schemaFilter`);
     return table.escapedName;
   }
@@ -48,20 +48,28 @@ export class JobManager {
       );
     },
     rerun: async (id, params = {}, options) => {
-      const job = await getJobTableHandler(this.prostgles).findOne({ id });
-      if (!job) throw new Error("Job not found");
       const clientReq = this.getClientRequest(options?.userId);
       const userId =
         clientReq ?
           (await this.prostgles.publishParser!.getPublishParams(clientReq, undefined)).user?.id
         : undefined;
-      return this.prostgles.dboBuilder.getTX((dbx, t) =>
-        enqueueJob(this.prostgles, { dbx, t }, job.job_name, job.owner, {
+      const rerun = async (transaction: JobTransaction) => {
+        const job = await getJobTableHandler(this.prostgles, transaction).findOne({ id });
+        if (!job) throw new Error("Job not found");
+        const { jobId } = await enqueueJob(this.prostgles, transaction, job.job_name, job.owner, {
           params: { ...job.params, ...params },
           reason: "rerun",
           userId,
-        }),
-      );
+        });
+        return { jobId };
+      };
+      const builder = this.prostgles.dboBuilder;
+      const transaction = builder.getActiveTransaction();
+      if (!transaction) return builder.getTX((dbx, t) => rerun({ dbx, t }));
+      return rerun(transaction).catch((error: unknown) => {
+        builder.failTransaction(transaction.t, error);
+        throw error;
+      });
     },
   };
 

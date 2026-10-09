@@ -50,8 +50,18 @@ export const validateJobDefinitions = async (prostgles: Prostgles, tables: Table
           `Invalid row trigger for ${name}: expected a table with a primary key and valid columns`,
         );
       }
+      if (
+        trigger.jobIdColumn !== undefined &&
+        !table.columns.some((c) => c.name === trigger.jobIdColumn && !c.is_pkey)
+      ) {
+        throw new Error(
+          `Invalid jobIdColumn for ${name}: expected an existing non-primary-key column`,
+        );
+      }
       if (trigger.when) {
-        await prostgles.dboBuilder.dbo[table.name]!.find(trigger.when, { returnType: "statement" });
+        await prostgles.dboBuilder.dboMap
+          .get(table.name)!
+          .find(trigger.when, { select: "", limit: 0 });
       }
       // Validate untyped JavaScript configurations too.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

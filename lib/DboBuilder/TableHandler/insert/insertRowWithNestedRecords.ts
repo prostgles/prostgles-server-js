@@ -4,6 +4,7 @@ import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
 import type { LocalParams, TableHandlers } from "../../DboBuilder";
 import type { TableHandler } from "../TableHandler";
 import type { ReferenceColumnInsert } from "./getReferenceColumnInserts";
+import type { InsertedRowWithInfo } from "./insert";
 import { getInsertTableRules } from "./getInsertTableRules";
 
 type InsertNestedRecordsArgs = {
@@ -24,8 +25,10 @@ export async function insertRowWithNestedRecords(
     colInserts,
     dbTX,
     rootOnConflict,
+    preparedUpsertRow,
   }: {
     row: AnyObject;
+    preparedUpsertRow: InsertedRowWithInfo | undefined;
     extraKeys: string[];
     colInserts: ReferenceColumnInsert<boolean>[];
     dbTX: TableHandlers;
@@ -107,6 +110,7 @@ export async function insertRowWithNestedRecords(
       }
     : tableRules,
     localParams,
+    preparedUpsertRow && [preparedUpsertRow],
   );
   let returnData: AnyObject | undefined;
   const returning = insertParams?.returning;

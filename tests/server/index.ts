@@ -16,6 +16,13 @@ const http = require("http").createServer(app);
 testPublishTypes();
 
 const isClientTest = process.env.TEST_TYPE === "client";
+if (
+  process.env.TEST_TYPE === "server" &&
+  process.env.TEST_NAME &&
+  !["conflictUpdates", "jobs", "hooks", "audit"].includes(process.env.TEST_NAME)
+) {
+  throw new Error(`Unknown server test group: ${process.env.TEST_NAME}`);
+}
 const io = !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
 const ioWatchSchema =
   !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
@@ -26,6 +33,9 @@ import { isomorphicQueries } from "../isomorphicQueries.spec";
 import { testBackgroundJobs } from "./backgroundJobs.spec";
 import { testFileJobs } from "./fileJobs.spec";
 import { testConflictUpdates } from "./conflictUpdates.spec";
+import { testTableHookRecursion } from "./tableHookRecursion.spec";
+import { testExecutionContext } from "./executionContext.spec";
+import { testAudit } from "./audit.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
@@ -458,6 +468,17 @@ void (async () => {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
+          if (process.env.TEST_NAME === "audit") {
+            await testAudit(db);
+            stopTest();
+            return;
+          }
+          if (process.env.TEST_NAME === "hooks") {
+            await testExecutionContext(db);
+            await testTableHookRecursion(db);
+            stopTest();
+            return;
+          }
           if (process.env.TEST_NAME === "conflictUpdates") {
             await testConflictUpdates(db);
             stopTest();

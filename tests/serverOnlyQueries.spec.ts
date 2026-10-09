@@ -16,6 +16,8 @@ import { testTableConfigValidation } from "./server/tableConfig.spec";
 import { testBackgroundJobs } from "./server/backgroundJobs.spec";
 import { testFileJobs } from "./server/fileJobs.spec";
 import { testConflictUpdates } from "./server/conflictUpdates.spec";
+import type { DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
+import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 export const serverOnlyQueries = async (
   db: DBHandlerServer,
@@ -113,6 +115,95 @@ export const serverOnlyQueries = async (
       });
       const expect1 = await db.items!.count(rowData);
       if (expect1 !== 1) throw "db.tx failed";
+    });
+
+    await test("forUpdate locks selected rows until commit or rollback", async () => {
+      const typedDb = db as unknown as DBOFullyTyped<DBGeneratedSchema>;
+      const rows = await typedDb.items.insertMany(
+        [{ name: "lock first" }, { name: "lock second" }],
+        { returning: "*" },
+      );
+      const ids = rows.map((row) => row.id);
+      const filter = { id: { $in: ids } };
+      const lockRow = (id: number) =>
+        pgDb.any("SELECT id FROM items WHERE id = $1 FOR UPDATE NOWAIT", [id]);
+      const hasMessage = (message: string) => (error: unknown) =>
+        JSON.stringify(error).includes(message);
+      try {
+        await assert.rejects(
+          typedDb.items.find(filter, { forUpdate: true }),
+          hasMessage("requires a transaction"),
+        );
+        assert.equal((await typedDb.items.find(filter, { forUpdate: false })).length, 2);
+        const linked = await typedDb.items2.insert(
+          { items_id: ids[0], name: rows[0]!.name },
+          { returning: "*" },
+        );
+        for (const rollback of [false, true]) {
+          const rollbackError = new Error("rollback locked rows");
+          const transaction = typedDb.tx(async (dbx) => {
+            const selected = await dbx.items.find(filter, {
+              select: { id: 1 },
+              orderBy: { id: 1 },
+              limit: 1,
+              forUpdate: true,
+            });
+            selected satisfies { id: number }[];
+            // @ts-expect-error Locked reads preserve the selected return type.
+            selected[0]!.name;
+            assert.deepEqual(selected, [{ id: ids[0] }]);
+            await assert.rejects(lockRow(ids[0]!), { code: "55P03" });
+            await lockRow(ids[1]!);
+            const second = await dbx.items.findOne(
+              { id: ids[1] },
+              { select: { id: 1 }, forUpdate: true },
+            );
+            second satisfies { id: number } | undefined;
+            assert.deepEqual(second, { id: ids[1] });
+            await assert.rejects(lockRow(ids[1]!), { code: "55P03" });
+            const joined = await dbx.items.findOne(
+              { id: ids[0] },
+              {
+                select: { id: 1, items2: "*" },
+                forUpdate: true,
+              },
+            );
+            assert.equal(joined?.items2[0]?.id, linked.id);
+            await pgDb.any("SELECT id FROM items2 WHERE id = $1 FOR UPDATE NOWAIT", [linked.id]);
+            assert.equal(await dbx.items.findOne({ id: -1 }, { forUpdate: true }), undefined);
+            if (rollback) throw rollbackError;
+          });
+          if (rollback) await assert.rejects(transaction, (error) => error === rollbackError);
+          else await transaction;
+          await lockRow(ids[0]!);
+          await lockRow(ids[1]!);
+        }
+        await db.tx!(async (dbx) => {
+          await assert.rejects(
+            dbx.items!.find(filter, { forUpdate: "yes" as unknown as boolean }),
+            hasMessage("forUpdate"),
+          );
+          await assert.rejects(
+            dbx.items!.find(filter, { select: { count: { $countAll: [] } }, forUpdate: true }),
+            hasMessage("aggregations"),
+          );
+          await assert.rejects(
+            dbx.items!.find(filter, { groupBy: true, forUpdate: true }),
+            hasMessage("groupBy"),
+          );
+          await assert.rejects(
+            dbx.v_items!.find({}, { forUpdate: true }),
+            hasMessage("only supported on tables"),
+          );
+          await assert.rejects(
+            dbx.items!.find(filter, { select: { items_multi: "*" }, forUpdate: true }),
+            hasMessage("OR joins"),
+          );
+        });
+      } finally {
+        await typedDb.items2.delete({ items_id: { $in: ids } });
+        await typedDb.items.delete(filter);
+      }
     });
 
     await test("TableConfig onMount works", async () => {

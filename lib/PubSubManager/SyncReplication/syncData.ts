@@ -98,7 +98,7 @@ async function runSyncData(
     await logSyncData("socket?.connected");
     return;
   }
-  const tableHandler = this.dbo[table_name];
+  const tableHandler = this.dboBuilder.dboMap.get(table_name);
   if (!tableHandler?.find) {
     throw `dbo.${table_name}.find missing or not allowed`;
   }

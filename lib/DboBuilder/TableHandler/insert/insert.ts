@@ -10,9 +10,11 @@ import { insertTest } from "../insertTest";
 import { runInsertUpdateQuery } from "../runInsertUpdateQuery";
 import { getInsertQuery } from "./getInsertQuery";
 import { insertNestedRecords } from "./insertNestedRecords";
-import { insertOnConflictUpdate } from "./insertOnConflictUpdate";
 
-export type InsertedRowWithInfo = { row: AnyObject; columnsAddedFromBeforeHooks: string[] };
+export type InsertedRowWithInfo = {
+  row: AnyObject;
+  columnsAddedFromBeforeHooks: string[];
+};
 
 export async function insert(
   this: TableHandler,
@@ -21,6 +23,7 @@ export async function insert(
   param3_unused?: undefined,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
+  preparedNestedRows?: InsertedRowWithInfo[],
 ): Promise<any> {
   const ACTION = "insert";
   const start = Date.now();
@@ -28,21 +31,10 @@ export async function insert(
     const { nestedInsert } = localParams ?? {};
 
     const rule = tableRules?.[ACTION];
-    const { allowedNestedInserts, requiredNestedInserts, validate } = rule ?? {};
+    const { allowedNestedInserts, requiredNestedInserts } = rule ?? {};
     const conflict = insertParams?.onConflict;
     const isConflictUpdate =
       (typeof conflict === "string" ? conflict : conflict?.action) === "DoUpdate";
-    const { jobs } = this.dboBuilder.prostgles;
-    const useConflictFallback =
-      isConflictUpdate &&
-      Boolean(
-        tableRules ||
-        (["insert", "update"] as const).some(
-          (name) =>
-            this.getAfterHooksAndChecks({ name, rule: undefined }, localParams).length ||
-            jobs.hasRowTrigger(this.name, name),
-        ),
-      );
 
     /** Post validate and checkFilter require a transaction dbo handler because they need the action result */
     if (
@@ -51,10 +43,17 @@ export async function insert(
         localParams,
         isArray(rowOrRows) ? rowOrRows : [rowOrRows],
       ).shouldWrap ||
-      (useConflictFallback && !this.getTransaction(localParams))
+      (isConflictUpdate && !this.getTransaction(localParams))
     ) {
       return this.dboBuilder.getTX((t) =>
-        t[this.name]?.[ACTION](rowOrRows, insertParams, param3_unused, tableRules, localParams),
+        t[this.name]?.[ACTION](
+          rowOrRows,
+          insertParams,
+          param3_unused,
+          tableRules,
+          localParams,
+          preparedNestedRows,
+        ),
       );
     }
 
@@ -104,13 +103,13 @@ export async function insert(
 
     validateInsertParams(insertParams);
     let conflictReturningFields: string[] | undefined;
-    if (useConflictFallback) {
+    if (isConflictUpdate) {
       if (tableRules && !tableRules.update) {
         throw new Error(`update rules missing for ${this.name} needed for onConflict "DoUpdate"`);
       }
-      if (insertParams?.returnType?.startsWith("statement") || localParams?.returnQuery) {
+      if (tableRules?.update?.dynamicFields?.length) {
         throw new Error(
-          "onConflict DoUpdate with publish rules, after hooks or row jobs cannot return SQL statements",
+          `ON CONFLICT DO UPDATE is not supported with update.dynamicFields on ${this.name}. Use an explicit update or a server function.`,
         );
       }
       const insertReturningFields = this.parseFieldFilter(returningFields);
@@ -133,14 +132,20 @@ export async function insert(
     const tx = transaction?.t || this.db;
 
     const preparedRows = await Promise.allSettled(
-      rows.map(async (input) => {
+      rows.map(async (input, index) => {
+        if (preparedNestedRows) return { ...preparedNestedRows[index]!, row: input };
         const { preValidate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) {
           throw "tableConfigurator missing";
         }
 
-        const beforeResult = await this.beforeEach(input, localParams, "insert", undefined);
+        const beforeResult = await this.beforeEach(
+          input,
+          localParams,
+          isConflictUpdate ? "insertOnConflictDoUpdate" : "insert",
+          undefined,
+        );
         let row = beforeResult.row;
 
         if (preValidate) {
@@ -157,7 +162,10 @@ export async function insert(
           });
         }
 
-        return { row, columnsAddedFromBeforeHooks: beforeResult.columnsAdded };
+        return {
+          row,
+          columnsAddedFromBeforeHooks: beforeResult.columnsAdded,
+        };
       }),
     );
     const preValidatedRows: InsertedRowWithInfo[] = preparedRows.map((result) => {
@@ -189,38 +197,14 @@ export async function insert(
       insertParams,
       localParams,
       tableRules,
-      validate,
     };
-    if (useConflictFallback) {
-      const result = await insertOnConflictUpdate({
-        ...commonArgs,
-        rows: isArray(data) ? data : [data],
-        returningFields: conflictReturningFields,
-        isMultiInsert,
-      });
-      await this._log({
-        command: "insert",
-        localParams,
-        data: { rowOrRows, param2: insertParams },
-        duration: Date.now() - start,
-      });
-      return result;
+    if (isArray(data) && !data.length) {
+      throw "Empty insert. Provide data";
     }
-    if (isArray(data)) {
-      if (!data.length) {
-        throw "Empty insert. Provide data";
-      }
-
-      ({ query } = await getInsertQuery({
-        ...commonArgs,
-        rows: data,
-      }));
-    } else {
-      ({ query } = await getInsertQuery({
-        ...commonArgs,
-        rows: [data],
-      }));
-    }
+    ({ query } = await getInsertQuery({
+      ...commonArgs,
+      rows: isArray(data) ? data : [data],
+    }));
 
     const queryWithoutUserRLS = query;
     const queryWithRLS = withUserRLS(localParams, query, !!this.getTransaction(localParams));
@@ -246,7 +230,9 @@ export async function insert(
       localParams,
       queryWithoutUserRLS,
       tableHandler: this,
-      returningFields,
+      returningFields: isConflictUpdate ? conflictReturningFields : returningFields,
+      conflictUpdateRule: isConflictUpdate ? tableRules?.update : undefined,
+      isConflictUpdate,
       data:
         isArray(preValidatedRowOrRows) ?
           preValidatedRowOrRows.map((d) => d.row)

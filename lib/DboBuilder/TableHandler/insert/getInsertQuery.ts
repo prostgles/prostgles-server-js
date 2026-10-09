@@ -1,15 +1,10 @@
-import {
-  asName,
-  isObject,
-  type AnyObject,
-  type FieldFilter,
-  type InsertParams,
-} from "prostgles-types";
+import { isObject, type AnyObject, type FieldFilter, type InsertParams } from "prostgles-types";
 import { prepareNewData } from "../DataValidator";
 import type { TableHandler } from "../TableHandler";
-import type { ParsedTableRule, ValidateRowBasic } from "../../../PublishParser/PublishParser";
+import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
 import type { LocalParams } from "../../DboBuilder";
 import type { InsertedRowWithInfo } from "./insert";
+import { getConflictUpdateQuery } from "./getConflictUpdateQuery";
 
 export const getInsertQuery = async ({
   rows,
@@ -17,10 +12,8 @@ export const getInsertQuery = async ({
   forcedData,
   fields,
   tableRules,
-  localParams,
   insertParams,
-  validate,
-  conflictUpdateAsDoNothing = false,
+  localParams,
 }: {
   tableHandler: TableHandler;
   rows: (InsertedRowWithInfo | undefined)[];
@@ -29,10 +22,7 @@ export const getInsertQuery = async ({
   tableRules: ParsedTableRule | undefined;
   localParams: LocalParams | undefined;
   insertParams: InsertParams | undefined;
-  validate: ValidateRowBasic | undefined;
-  conflictUpdateAsDoNothing?: boolean;
 }) => {
-  const transaction = tableHandler.getTransaction(localParams);
   const { removeDisallowedFields = false } = insertParams ?? {};
   const preparedData = rows.map((rowWithInfo) => {
     const { row: _row, columnsAddedFromBeforeHooks = [] } = rowWithInfo ?? {};
@@ -57,15 +47,10 @@ export const getInsertQuery = async ({
   });
 
   const allowedCols = Array.from(new Set(preparedData.flatMap((d) => d.allowedCols)));
-  const dbTx = transaction?.dbTX || tableHandler.dboBuilder.dbo;
-  const tx = transaction?.t || tableHandler.db;
   const { getQuery, validatedRows } = await tableHandler.dataValidator.parse({
     command: "insert",
     rows: preparedData.map((d) => d.data),
     allowedCols,
-    dbTx,
-    validationOptions: { validate, localParams },
-    tx,
   });
   const query = getQuery();
   const { onConflict } = insertParams ?? {};
@@ -99,18 +84,19 @@ export const getInsertQuery = async ({
         throw "Cannot on conflict DoUpdate. No conflict columns could be determined. Please specify conflictColumns in onConflict param.";
       }
 
-      const nonConflictColumns = allowedCols
-        .filter((c) => !conflictColumns!.includes(c))
-        .map((v) => asName(v));
-
-      if (nonConflictColumns.length === 0) {
-        throw "No non conflict columns to update for onConflict=DoUpdate";
-      }
       conflict_query =
-        ` ON CONFLICT (${conflictColumns.map(asName).join(", ")}) ` +
-        (conflictUpdateAsDoNothing ? "DO NOTHING" : (
-          `DO UPDATE SET ${nonConflictColumns.map((k) => `${k} = EXCLUDED.${k}`).join(", ")}`
-        ));
+        " " +
+        (await getConflictUpdateQuery({
+          table: tableHandler,
+          tableRules,
+          localParams,
+          rows: validatedRows,
+          conflictColumns,
+          removeDisallowedFields,
+          columnsAddedFromBeforeHooks: [
+            ...new Set(rows.flatMap((row) => row?.columnsAddedFromBeforeHooks ?? [])),
+          ],
+        }));
     }
   }
   return { query: query + conflict_query, conflictColumns, validatedRows };

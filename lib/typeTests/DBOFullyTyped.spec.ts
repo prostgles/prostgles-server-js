@@ -82,8 +82,7 @@ void describe("DBOFullyTyped test", async () => {
       );
 
       (await db.items2.find({}, { select: { items_id: 1 }, returnType: "values" })) satisfies (
-        | number
-        | null
+        number | null
       )[];
 
       const publish: Publish<DBGeneratedSchema> = {
@@ -94,10 +93,6 @@ void describe("DBOFullyTyped test", async () => {
               //@ts-expect-error
               bad_col: 1,
             },
-            validate: (row) => ({
-              ...row,
-              h: [""],
-            }),
           },
         },
       };

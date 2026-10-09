@@ -6,6 +6,8 @@ import {
   DEFAULT_SYNC_THROTTLE,
 } from "../PubSubManager/PubSubManagerUtils";
 import { initTableConfig } from "./initTableConfig";
+import { runSQLFile } from "./runSQLFile";
+import { syncTableTriggers } from "./syncTableTriggers";
 import type { ColExtraInfo, ColumnConfig, LangToTranslation } from "./TableConfigTypes";
 
 /**
@@ -131,7 +133,39 @@ export class TableConfigurator {
 
   prevInitQueryHistory?: string[];
   initialising = false;
-  init = initTableConfig.bind(this);
+  init = () =>
+    this.prostgles.runSchemaQueries(async () => {
+      await runSQLFile(this.prostgles);
+      this.prostgles.preparingTableConfig = true;
+      try {
+        await this.prostgles.rebuildDBO();
+        await initTableConfig.call(this);
+      } finally {
+        this.prostgles.preparingTableConfig = false;
+        this.initialising = false;
+      }
+      await this.syncTriggers();
+    });
+
+  refresh = () =>
+    this.prostgles.runSchemaQueries(async () => {
+      await this.prostgles.rebuildDBO();
+      await this.syncTriggers();
+    });
+
+  sync = () =>
+    this.prostgles.runSchemaQueries(async () => {
+      await syncTableTriggers(this);
+      const hooks = this.prostgles.mergedTableConfig.tableHooks;
+      for (const table of this.prostgles.dboBuilder.dboMap.values()) {
+        table.hooks = hooks?.[table.name];
+      }
+    });
+
+  private syncTriggers = async () => {
+    await syncTableTriggers(this);
+    if (this.prostgles.opts.audit) await this.prostgles.rebuildDBO();
+  };
 }
 
 export const parseI18N = <Config extends LangToTranslation>(params: {

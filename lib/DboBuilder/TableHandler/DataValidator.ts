@@ -1,9 +1,7 @@
 import type { AnyObject, FieldFilter } from "prostgles-types/dist";
 import { asName, getKeys, isEmpty, isObject, pickKeys } from "prostgles-types/dist";
-import type { DBHandlerServer } from "../../Prostgles";
-import type { ValidateRowArgsCommon, ValidateRowBasic } from "../../PublishParser/PublishParser";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
-import type { LocalParams, TableSchemaColumn } from "../DboBuilder";
+import type { TableSchemaColumn } from "../DboBuilder";
 import { pgp } from "../DboBuilder";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
 import { validateKeys } from "../ViewHandler/ViewHandler";
@@ -31,13 +29,7 @@ type ParsedRowFieldData = {
 type ParseDataArgs = {
   rows: AnyObject[];
   allowedCols: string[];
-  dbTx: DBHandlerServer;
-  tx: ValidateRowArgsCommon["tx"];
   command: "update" | "insert";
-  validationOptions: {
-    localParams: undefined | LocalParams;
-    validate: undefined | ValidateRowBasic;
-  };
 };
 
 export class DataValidator {
@@ -61,6 +53,8 @@ export class DataValidator {
     return {
       validatedRows,
       parsedRowFieldData,
+      getAssignments: (getValue?: (field: ParsedRowFieldData) => string) =>
+        parsedRowFieldData.map((row) => getUpdateAssignments(row, getValue)),
       getQuery: () => getQuery(command, parsedRowFieldData, this.tableHandler.escapedName),
     };
   };
@@ -88,16 +82,18 @@ const getQuery = (
     const query =
       parsedRowFieldData
         .map((rowParts) => {
-          return (
-            `UPDATE ${escapedTableName} SET ` +
-            rowParts.map((r) => `${r.escapedCol} = ${r.escapedVal} `).join(",\n")
-          );
+          return `UPDATE ${escapedTableName} SET ` + getUpdateAssignments(rowParts);
         })
         .join(";\n") + " ";
 
     return query;
   }
 };
+
+const getUpdateAssignments = (
+  rowParts: ParsedRowFieldData[],
+  getValue: (field: ParsedRowFieldData) => string = ({ escapedVal }) => escapedVal,
+) => rowParts.map((field) => `${field.escapedCol} = ${getValue(field)}`).join(",\n");
 
 type PrepareFieldValuesArgs = {
   row: AnyObject | undefined;
@@ -206,40 +202,22 @@ export const prepareNewData = ({
 /**
  * Ensures:
  *  - allowedCols are valid and checked against data
- *  - validate()
  *  - update is not empty
  *  - no duplicate column names ( could update with $func and plain value for same column )
  */
 const getValidatedRowFieldData = async (
-  { allowedCols, rows, validationOptions, dbTx, tx, command }: ParseDataArgs,
+  { allowedCols, rows, command }: ParseDataArgs,
   tableHandler: TableHandler,
 ) => {
   if (!allowedCols.length && command === "update") {
     throw "allowedColumns cannot be empty";
   }
   const validatedData = await Promise.all(
-    rows.map(async (nonValidatedRow) => {
-      let row = pickKeys(nonValidatedRow, allowedCols);
-      const initialRowKeys = Object.keys(row);
-      if (validationOptions.validate) {
-        if (!validationOptions.localParams) {
-          throw "localParams missing for validate";
-        }
-        row = await validationOptions.validate({
-          row,
-          dbx: dbTx,
-          tx,
-          localParams: validationOptions.localParams,
-          command,
-          data: row,
-        });
-      }
-      const keysAddedDuringValidate = Object.keys(row).filter(
-        (newKey) => !initialRowKeys.includes(newKey),
-      );
+    rows.map((nonValidatedRow) => {
+      const row = pickKeys(nonValidatedRow, allowedCols);
 
       const getColumn = (fieldName: string) => {
-        if (!allowedCols.concat(keysAddedDuringValidate).includes(fieldName)) {
+        if (!allowedCols.includes(fieldName)) {
           throw `Unexpected/Disallowed column name: ${fieldName}`;
         }
         const column = tableHandler.columns.find((c) => c.name === fieldName);

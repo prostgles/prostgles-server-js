@@ -320,7 +320,7 @@ export class PubSubManager {
       onData,
     } = sub; //, subOne = false
     const { name: table_name } = table_info;
-    const tableHandler = this.dbo[table_name];
+    const tableHandler = this.dboBuilder.dboMap.get(table_name);
     if (!onData && !socket) {
       throw new Error("Subscription must have either localFuncs or socket");
     }

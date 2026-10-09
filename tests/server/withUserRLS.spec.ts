@@ -100,7 +100,7 @@ export const testWithUserRLS = async (
   });
 
   const table = dbo.rec!;
-  await test("subscription and sync reads isolate users with a real RLS policy", async () => {
+  await test("locking, subscription and sync reads isolate users with a real RLS policy", async () => {
     const manager = await table.dboBuilder.getPubSubManager();
     const rollback = new Error("rollback RLS fixture");
     await assert.rejects(
@@ -110,7 +110,7 @@ export const testWithUserRLS = async (
         await tx.none(`
         CREATE ROLE ${role};
         GRANT USAGE ON SCHEMA public, prostgles TO ${role};
-        GRANT SELECT ON rec TO ${role};
+        GRANT SELECT, UPDATE ON rec TO ${role};
         INSERT INTO rec (id) VALUES (-42001), (-42002);
         ALTER TABLE rec ENABLE ROW LEVEL SECURITY;
         CREATE POLICY rls_test ON rec USING (id = prostgles.user('tenant_id')::integer);
@@ -128,6 +128,22 @@ export const testWithUserRLS = async (
           const table_rules = {
             select: { fields: "*", filterFields: "*", orderByFields: "*" },
           } as const;
+          for (const forUpdate of [false, true]) {
+            const selectParams = { select: ["id"], forUpdate };
+            for (const command of ["find", "findOne"] as const) {
+              await assert.rejects(
+                () => table[command]({}, selectParams, undefined, undefined, params),
+                (error: unknown) =>
+                  JSON.stringify(error).includes(
+                    "localParams isRemoteRequest and missing tableRule",
+                  ),
+              );
+              assert.deepEqual(
+                await table[command]({}, selectParams, undefined, table_rules, params),
+                command === "find" ? expected : expected[0],
+              );
+            }
+          }
           const result = await manager.getSubData({
             table_info: { name: "rec" },
             filter: {},
@@ -387,10 +403,7 @@ export const testWithUserRLS = async (
       const app = express();
       const http = createServer(app);
       let instance:
-        | Pick<
-            Awaited<ReturnType<typeof prostgles>>,
-            "db" | "destroy" | "getClientDBHandlers"
-          >
+        | Pick<Awaited<ReturnType<typeof prostgles>>, "db" | "destroy" | "getClientDBHandlers">
         | undefined;
       const afterCommitResults: {
         ids: number[];
@@ -421,34 +434,40 @@ export const testWithUserRLS = async (
           publish: "*",
           tableHooks: {
             [tableName]: {
-              beforeEach: [{
-                commands: { update: 1 },
-                changedFields: ["value"],
-                validate: () => {
-                  updateHooks.push("beforeEach");
-                  return Promise.resolve();
+              beforeEach: [
+                {
+                  commands: { update: 1 },
+                  changedFields: ["value"],
+                  validate: () => {
+                    updateHooks.push("beforeEach");
+                    return Promise.resolve();
+                  },
                 },
-              }],
-              afterEach: [{
-                commands: { update: 1 },
-                changedFields: ["value"],
-                validate: ({ row }) => {
-                  updateHooks.push("afterEach");
-                  if (row.value === "reject afterEach") throw new Error("afterEach rejection");
-                  return Promise.resolve();
+              ],
+              afterEach: [
+                {
+                  commands: { update: 1 },
+                  changedFields: ["value"],
+                  validate: ({ row }) => {
+                    updateHooks.push("afterEach");
+                    if (row.value === "reject afterEach") throw new Error("afterEach rejection");
+                    return Promise.resolve();
+                  },
                 },
-              }],
-              afterAll: [{
-                commands: { update: 1 },
-                changedFields: ["value"],
-                validate: ({ rows }) => {
-                  updateHooks.push("afterAll");
-                  if (rows.some((row) => row.value === "reject afterAll")) {
-                    throw new Error("afterAll rejection");
-                  }
-                  return Promise.resolve();
+              ],
+              afterAll: [
+                {
+                  commands: { update: 1 },
+                  changedFields: ["value"],
+                  validate: ({ rows }) => {
+                    updateHooks.push("afterAll");
+                    if (rows.some((row) => row.value === "reject afterAll")) {
+                      throw new Error("afterAll rejection");
+                    }
+                    return Promise.resolve();
+                  },
                 },
-              }],
+              ],
               afterCommit: [
                 {
                   commands: { insert: 1, update: 1 },
@@ -499,40 +518,43 @@ export const testWithUserRLS = async (
           onReady: () => {},
         });
 
-        await t.test("afterCommit runs after commit, filters changed fields and skips rollback", async () => {
-          assert(instance);
-          const committedIds = [-44001, -44002];
-          await instance.db[tableName]!.insertMany!(
-            committedIds.map((id) => ({ id, value: "initial" })),
-          );
-          assert.deepEqual(afterCommitResults, [
-            {
-              ids: committedIds,
-              committedRowCount: committedIds.length,
+        await t.test(
+          "afterCommit runs after commit, filters changed fields and skips rollback",
+          async () => {
+            assert(instance);
+            const committedIds = [-44001, -44002];
+            await instance.db[tableName]!.insertMany!(
+              committedIds.map((id) => ({ id, value: "initial" })),
+            );
+            assert.deepEqual(afterCommitResults, [
+              {
+                ids: committedIds,
+                committedRowCount: committedIds.length,
+                hasTransactionalHandlers: false,
+                context: { source: "afterCommit" },
+              },
+            ]);
+            await instance.db[tableName]!.update!({ id: committedIds[0] }, { other: "ignored" });
+            assert.equal(afterCommitResults.length, 1);
+            await instance.db[tableName]!.update!({ id: committedIds[0] }, { value: "updated" });
+            assert.deepEqual(afterCommitResults[1], {
+              ids: [committedIds[0]],
+              committedRowCount: 1,
               hasTransactionalHandlers: false,
               context: { source: "afterCommit" },
-            },
-          ]);
-          await instance.db[tableName]!.update!({ id: committedIds[0] }, { other: "ignored" });
-          assert.equal(afterCommitResults.length, 1);
-          await instance.db[tableName]!.update!({ id: committedIds[0] }, { value: "updated" });
-          assert.deepEqual(afterCommitResults[1], {
-            ids: [committedIds[0]],
-            committedRowCount: 1,
-            hasTransactionalHandlers: false,
-            context: { source: "afterCommit" },
-          });
+            });
 
-          const rollback = new Error("rollback afterCommit test");
-          await assert.rejects(
-            instance.db.tx(async (dbx) => {
-              await dbx[tableName]!.insert!({ id: -44003, value: "rolled back" });
-              throw rollback;
-            }),
-            (error) => error === rollback,
-          );
-          assert.equal(afterCommitResults.length, 2);
-        });
+            const rollback = new Error("rollback afterCommit test");
+            await assert.rejects(
+              instance.db.tx(async (dbx) => {
+                await dbx[tableName]!.insert!({ id: -44003, value: "rolled back" });
+                throw rollback;
+              }),
+              (error) => error === rollback,
+            );
+            assert.equal(afterCommitResults.length, 2);
+          },
+        );
 
         await t.test("clearing a watched field runs before, after and commit hooks", async () => {
           assert(instance);
@@ -544,56 +566,76 @@ export const testWithUserRLS = async (
           assert.deepEqual(afterCommitResults.at(-1)!.ids, [-44001]);
         });
 
-        await t.test("client updateBatch runs hooks atomically in implicit and explicit transactions", async () => {
-          assert(instance);
-          const handlers = await instance.getClientDBHandlers({ userId: requestUser.id }, undefined);
-          await assert.rejects(handlers.clientDb[tableName]!.updateBatch!(
-            [[{ id: -44002 }, { value: "reject afterEach" }]],
-            // Untrusted options must not bypass hooks by resembling a SQL-only request.
-            { returnType: "statement-invalid" as "statement" },
-          ));
-          for (const explicitTransaction of [false, true]) {
-            const previousCalls = afterCommitResults.length;
-            updateHooks.length = 0;
-            const runBatch = async (clientDb: typeof handlers.clientDb) => {
-              const result = await clientDb[tableName]!.updateBatch!([
-                [{ id: -44001 }, { value: "first" }],
-                [{ id: -44002 }, { value: "second" }],
-              ]);
-              assert.equal(result, null);
-              if (explicitTransaction) assert.equal(afterCommitResults.length, previousCalls);
-            };
-            if (explicitTransaction) await handlers.withClientDbTx(runBatch);
-            else await runBatch(handlers.clientDb);
-            assert.deepEqual(updateHooks, [
-              "beforeEach", "afterEach", "afterAll",
-              "beforeEach", "afterEach", "afterAll",
-            ]);
-            assert.deepEqual(afterCommitResults.slice(previousCalls).map(({ ids }) => ids), [
-              [-44001], [-44002],
-            ]);
-
-            for (const hook of ["afterEach", "afterAll"]) {
-              const runRejectedBatch = (clientDb: typeof handlers.clientDb) =>
-                clientDb[tableName]!.updateBatch!([
-                  [{ id: -44001 }, { value: "must roll back" }],
-                  [{ id: -44002 }, { value: `reject ${hook}` }],
+        await t.test(
+          "client updateBatch runs hooks atomically in implicit and explicit transactions",
+          async () => {
+            assert(instance);
+            const handlers = await instance.getClientDBHandlers(
+              { userId: requestUser.id },
+              undefined,
+            );
+            await assert.rejects(
+              handlers.clientDb[tableName]!.updateBatch!(
+                [[{ id: -44002 }, { value: "reject afterEach" }]],
+                // Untrusted options must not bypass hooks by resembling a SQL-only request.
+                { returnType: "statement-invalid" as "statement" },
+              ),
+            );
+            for (const explicitTransaction of [false, true]) {
+              const firstValue = explicitTransaction ? "first explicit" : "first";
+              const secondValue = explicitTransaction ? "second explicit" : "second";
+              const previousCalls = afterCommitResults.length;
+              updateHooks.length = 0;
+              const runBatch = async (clientDb: typeof handlers.clientDb) => {
+                const result = await clientDb[tableName]!.updateBatch!([
+                  [{ id: -44001 }, { value: firstValue }],
+                  [{ id: -44002 }, { value: secondValue }],
                 ]);
-              await assert.rejects(
-                explicitTransaction ? handlers.withClientDbTx(runRejectedBatch)
-                : runRejectedBatch(handlers.clientDb),
-              );
-              const rows = await instance.db[tableName]!.find!({}, {
-                select: ["id", "value"], orderBy: "id",
-              });
-              assert.deepEqual(rows, [
-                { id: -44002, value: "second" },
-                { id: -44001, value: "first" },
+                assert.equal(result, null);
+                if (explicitTransaction) assert.equal(afterCommitResults.length, previousCalls);
+              };
+              if (explicitTransaction) await handlers.withClientDbTx(runBatch);
+              else await runBatch(handlers.clientDb);
+              assert.deepEqual(updateHooks, [
+                "beforeEach",
+                "afterEach",
+                "afterAll",
+                "beforeEach",
+                "afterEach",
+                "afterAll",
               ]);
-              assert.equal(afterCommitResults.length, previousCalls + 2);
+              assert.deepEqual(
+                afterCommitResults.slice(previousCalls).map(({ ids }) => ids),
+                [[-44001], [-44002]],
+              );
+
+              for (const hook of ["afterEach", "afterAll"]) {
+                const runRejectedBatch = (clientDb: typeof handlers.clientDb) =>
+                  clientDb[tableName]!.updateBatch!([
+                    [{ id: -44001 }, { value: "must roll back" }],
+                    [{ id: -44002 }, { value: `reject ${hook}` }],
+                  ]);
+                await assert.rejects(
+                  explicitTransaction ?
+                    handlers.withClientDbTx(runRejectedBatch)
+                  : runRejectedBatch(handlers.clientDb),
+                );
+                const rows = await instance.db[tableName]!.find!(
+                  {},
+                  {
+                    select: ["id", "value"],
+                    orderBy: "id",
+                  },
+                );
+                assert.deepEqual(rows, [
+                  { id: -44002, value: secondValue },
+                  { id: -44001, value: firstValue },
+                ]);
+                assert.equal(afterCommitResults.length, previousCalls + 2);
+              }
             }
-          }
-        });
+          },
+        );
 
         const url = `http://127.0.0.1:${address.port}/rls-context/db/${tableName}/delete`;
         const deleteRequest = async (sid?: string) => {

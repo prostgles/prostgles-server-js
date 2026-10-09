@@ -66,6 +66,9 @@
 - **functions** <span style="color: grey">optional</span> <span style="color: green;">ServerFunctionDefinitions</span>
 
   Server-side functions that can be invoked by the client
+- **jobs** <span style="color: grey">optional</span> <span style="color: green;">JobsOptions</span>
+
+  Durable jobs triggered by row changes or schedules.
 - **testRulesOnConnect** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
   If true then will test all table methods on each socket connect.

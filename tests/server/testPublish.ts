@@ -121,11 +121,6 @@ export const testPublish: Publish<DBGeneratedSchema> = ({ user, sid }) => {
       insert: {
         fields: { added: 0 },
         returningFields: { name: 1 },
-        validate: ({ row }) => {
-          if (row.name === "a") row.name = "b";
-          row.added = new Date().toUTCString();
-          return row;
-        },
         checkFilter: {
           $and: [{ name: { "<>": "fail-check" } }],
         },

@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import type { AnyObject } from "prostgles-types";
+import { asName, type AnyObject } from "prostgles-types";
 import prostgles, {
   type InitResult,
   type ProstglesInitOptions,
@@ -36,9 +36,9 @@ export const testTableHookRecursion = async (db: DB) => {
       let instance: InitResult | undefined;
       try {
         await db.none(`CREATE SCHEMA ${schema};
-        CREATE TABLE ${table} (id INTEGER, value INTEGER);
+        CREATE TABLE ${table} (id INTEGER, value INTEGER, payload JSONB, amount BIGINT DEFAULT 9007199254740992, location GEOMETRY(Point, 4326) DEFAULT ST_GeomFromText('POINT(1 2)', 4326));
         CREATE TABLE ${otherTable} (id INTEGER, value INTEGER);
-        INSERT INTO ${table} VALUES (1, 0), (2, 0), (3, 0);
+        INSERT INTO ${table} (id, value) VALUES (1, 0), (2, 0), (3, 0);
         INSERT INTO ${otherTable} VALUES (2, 0);`);
         instance = await prostgles({
           dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
@@ -235,6 +235,426 @@ export const testTableHookRecursion = async (db: DB) => {
               await dbx[table]!.update({ id: 1 }, { value: 2 });
               assert.deepEqual(calls, [1, 2, 1]);
             });
+          },
+        );
+        await t.test(
+          "actual changed fields work without keys and preserve bigint precision",
+          async () => {
+            const each: AnyObject[] = [];
+            const all: AnyObject[][] = [];
+            const committed: AnyObject[][] = [];
+            setHooks({
+              [table]: {
+                afterEach: [
+                  {
+                    commands: { insert: 1, update: 1, delete: 1 },
+                    changedFields: ["amount"],
+                    validate: ({ row }) => {
+                      each.push(row);
+                    },
+                  },
+                ],
+                afterAll: [
+                  {
+                    commands: { update: 1 },
+                    changedFields: ["amount"],
+                    validate: ({ rows }) => {
+                      all.push(rows);
+                      return Promise.resolve();
+                    },
+                  },
+                ],
+                afterCommit: [
+                  {
+                    commands: { update: 1 },
+                    changedFields: ["amount"],
+                    run: ({ rows }) => {
+                      committed.push(rows);
+                    },
+                  },
+                ],
+              },
+            });
+            await dbo[table]!.update({ id: 1 }, { amount: "9007199254740992" });
+            assert.equal(each.length, 0);
+            await dbo[table]!.update({ id: 1 }, { id: 101, amount: "9007199254740993" });
+            assert.equal(each.length, 1);
+            assert.equal(each[0]!.id, 101);
+            assert.equal(each[0]!.amount, "9007199254740993");
+            assert.equal(
+              each[0]!.location,
+              (await db.one(`SELECT location FROM ${table} WHERE id = 101`)).location,
+            );
+            assert.deepEqual(all, [each]);
+            assert.deepEqual(committed, [each]);
+            each.length = 0;
+            all.length = 0;
+            committed.length = 0;
+            await dbo[table]!.update({}, { amount: "9007199254740993" });
+            assert.deepEqual(each.map((row) => row.id).sort(), [2, 3]);
+            assert.equal(all[0]!.length, 2);
+            assert.equal(committed[0]!.length, 2);
+            each.length = 0;
+            await dbo[table]!.delete({ id: 101 });
+            assert.equal(each[0]!.amount, "9007199254740993");
+            assert.equal(each[0]!.id, 101);
+          },
+        );
+
+        await t.test("database BEFORE triggers contribute actual changed fields", async () => {
+          const changed: string[] = [];
+          const jsonChanges: number[] = [];
+          setHooks({
+            [table]: {
+              afterEach: [
+                {
+                  commands: { update: 1 },
+                  changedFields: ["amount"],
+                  validate: ({ row }) => {
+                    changed.push(row.amount);
+                  },
+                },
+                {
+                  commands: { update: 1 },
+                  changedFields: ["payload"],
+                  validate: ({ row }) => {
+                    jsonChanges.push(row.id);
+                  },
+                },
+              ],
+            },
+          });
+          await db.none(`CREATE FUNCTION ${schema}.change_amount() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN NEW.amount := OLD.amount + 1; NEW.payload := 'null'::jsonb; RETURN NEW; END $$;
+            CREATE TRIGGER change_amount BEFORE UPDATE ON ${table}
+            FOR EACH ROW EXECUTE FUNCTION ${schema}.change_amount();`);
+          await dbo[table]!.update({ id: 2 }, { value: 17 });
+          assert.deepEqual(changed, ["9007199254740994"]);
+          assert.deepEqual(jsonChanges, [2]);
+          await dbo[table]!.update({ id: 2 }, { value: 17 });
+          assert.deepEqual(jsonChanges, [2]);
+          await db.none(`DROP TRIGGER change_amount ON ${table}`);
+        });
+
+        await t.test(
+          "empty writes, rollback, raw SQL and trigger writes keep their boundaries",
+          async () => {
+            const rows: AnyObject[] = [];
+            const batches: number[] = [];
+            setHooks({
+              [table]: {
+                afterEach: [
+                  {
+                    commands: { insert: 1, update: 1 },
+                    validate: ({ row }) => {
+                      rows.push(row);
+                    },
+                  },
+                ],
+                afterAll: [
+                  {
+                    commands: { update: 1 },
+                    validate: ({ rows }) => {
+                      batches.push(rows.length);
+                      return Promise.resolve();
+                    },
+                  },
+                ],
+              },
+            });
+            await dbo[table]!.update({ id: -1 }, { value: 0 });
+            assert.deepEqual(batches, [0]);
+            await db.none(`CREATE FUNCTION ${schema}.extra_update() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN UPDATE ${table} SET value = NEW.value + 1 WHERE id = NEW.id; RETURN NULL; END $$;
+            CREATE TRIGGER extra_update AFTER INSERT ON ${table}
+            FOR EACH ROW EXECUTE FUNCTION ${schema}.extra_update();`);
+            await dbo[table]!.insert({ id: 200, value: 1 });
+            assert.deepEqual(
+              rows.map((row) => row.value),
+              [1],
+            );
+            assert.equal((await dbo[table]!.findOne({ id: 200 }))!.value, 2);
+            await db.none(`UPDATE ${table} SET value = 3 WHERE id = 200`);
+            assert.equal(rows.length, 1);
+            await assert.rejects(
+              dbo.tx!(async (dbx) => {
+                await dbx[table]!.update({ id: 200 }, { value: 4 });
+                throw new Error("Rollback capture");
+              }),
+              { message: "Rollback capture" },
+            );
+            rows.length = 0;
+            await dbo[table]!.update({ id: 200 }, { value: 5 });
+            assert.deepEqual(
+              rows.map((row) => row.value),
+              [5],
+            );
+          },
+        );
+        await t.test(
+          "delete row/value return types reject multiple rows and roll back",
+          async () => {
+            const captured: number[] = [];
+            setHooks({
+              [otherTable]: {
+                afterEach: [
+                  {
+                    commands: { delete: 1 },
+                    validate: ({ row }) => {
+                      captured.push(row.id);
+                    },
+                  },
+                ],
+              },
+            });
+            await db.none(`INSERT INTO ${otherTable} VALUES (901, 0), (902, 0)`);
+            for (const returnType of ["row", "value"] as const) {
+              await assert.rejects(
+                dbo[otherTable]!.delete(
+                  { id: { $in: [901, 902] } },
+                  { returning: "*", returnType },
+                ),
+                { message: "More than 1 row deleted: 2 rows affected" },
+              );
+              assert.equal(await dbo[otherTable]!.count({ id: { $in: [901, 902] } }), 2);
+              assert.deepEqual(captured, []);
+            }
+            const deleted = await dbo[otherTable]!.delete(
+              { id: 901 },
+              { returning: "*", returnType: "row" },
+            );
+            assert.equal(deleted.id, 901);
+            assert.deepEqual(await dbo[otherTable]!.delete({ id: 902 }), []);
+            assert.deepEqual(captured, [901, 902]);
+          },
+        );
+
+        await t.test("table config repairs disabled and modified capture triggers", async () => {
+          const captured: number[] = [];
+          setHooks({
+            [otherTable]: {
+              afterEach: [
+                {
+                  commands: { delete: 1 },
+                  validate: ({ row }) => {
+                    captured.push(row.id);
+                  },
+                },
+              ],
+            },
+          });
+          const trigger = await db.one<{ name: string; function_name: string }>(
+            `
+            SELECT tgname AS name, tgfoid::regproc::text AS function_name FROM pg_trigger
+            WHERE tgrelid = $1::regclass AND tgname LIKE 'prostgles_capture_%' AND (tgtype & 8) = 8`,
+            [otherTable],
+          );
+          await db.none(`INSERT INTO ${otherTable} VALUES (903, 0), (904, 0);
+            ALTER TABLE ${otherTable} DISABLE TRIGGER ${asName(trigger.name)}`);
+          await instance!.update({ tableHooks }, true);
+          await dbo[otherTable]!.delete({ id: 903 });
+          await db.none(`CREATE OR REPLACE FUNCTION ${trigger.function_name}() RETURNS trigger
+            LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`);
+          await instance!.update({ tableHooks }, true);
+          await dbo[otherTable]!.delete({ id: 904 });
+          assert.deepEqual(captured, [903, 904]);
+        });
+
+        await t.test("publish capture is configured before concurrent upserts", async () => {
+          setHooks({});
+          await instance!.update({ tableHooks: undefined }, true);
+          const validated: number[] = [];
+          await (dbo[otherTable] as TableHandler).update(
+            { id: 2 },
+            { value: 1 },
+            undefined,
+            {
+              update: {
+                fields: "*",
+                filterFields: "*",
+                returningFields: "*",
+                checkFilter: { value: 1 },
+                postValidate: ({ row }) => {
+                  validated.push(row.id);
+                },
+              },
+            },
+            {},
+          );
+          assert.deepEqual(validated, [2]);
+          assert.equal(
+            (
+              await db.one<{ count: number }>(
+                `SELECT count(*)::int FROM pg_trigger
+            WHERE tgrelid = $1::regclass AND tgname LIKE 'prostgles_capture_%'`,
+                [otherTable],
+              )
+            ).count,
+            4,
+          );
+          await db.none(`ALTER TABLE ${otherTable} ADD PRIMARY KEY (id)`);
+          await instance!.update({ publish: "*" });
+          assert.equal(
+            (
+              await db.one<{ count: number }>(
+                `SELECT count(*)::int FROM pg_trigger
+            WHERE tgrelid = $1::regclass AND tgname LIKE 'prostgles_capture_%'`,
+                [otherTable],
+              )
+            ).count,
+            4,
+          );
+          const results = await Promise.allSettled(
+            [905, 906].map((id) =>
+              dbo.tx!(async (dbx) => {
+                await (dbx[otherTable] as TableHandler).insert(
+                  { id, value: 1 },
+                  { onConflict: { action: "DoUpdate", conflictColumns: ["id"] } },
+                  undefined,
+                  {
+                    insert: { fields: "*", returningFields: "*", checkFilter: { value: 1 } },
+                    update: {
+                      fields: "*",
+                      filterFields: "*",
+                      returningFields: "*",
+                      checkFilter: { value: 1 },
+                    },
+                  },
+                  {},
+                );
+                await new Promise((resolve) => setTimeout(resolve, 100));
+              }),
+            ),
+          );
+          assert.deepEqual(
+            results.filter((result) => result.status === "rejected"),
+            [],
+          );
+          assert.equal(await dbo[otherTable]!.count({ id: { $in: [905, 906] } }), 2);
+          await instance!.update({ publish: undefined, tableHooks }, true);
+        });
+
+        await t.test("instances with different hooks share capture triggers", async () => {
+          const captured: number[] = [];
+          const otherCaptured: number[] = [];
+          await instance!.update({
+            tableHooks: {
+              [table]: {
+                afterEach: [
+                  {
+                    commands: { update: 1 },
+                    validate: ({ row }) => {
+                      captured.push(row.id);
+                    },
+                  },
+                ],
+              },
+            },
+          });
+          const otherInstance = await prostgles({
+            dbConnection: {
+              ...getConnectionDetails(db),
+              options: `-c search_path=${schema},public`,
+            } as unknown as ProstglesInitOptions["dbConnection"],
+            schemaFilter: { [schema]: 1 },
+            tableHooks: {
+              records: {
+                afterEach: [
+                  {
+                    commands: { update: 1 },
+                    validate: ({ row }) => {
+                      otherCaptured.push(row.id);
+                    },
+                  },
+                ],
+              },
+            },
+            onReady: () => {},
+          });
+          try {
+            await instance!.db.tx(async (dbx) => {
+              await dbx[table]!.update!({ id: 3 }, { value: 7 });
+            });
+            assert.deepEqual(captured, [3]);
+            await otherInstance.db.records!.update!({ id: 3 }, { value: 8 });
+            assert.deepEqual(otherCaptured, [3]);
+            assert.deepEqual(captured, [3]);
+          } finally {
+            await otherInstance.destroy();
+          }
+        });
+
+        await t.test(
+          "capture triggers share table config setup and survive hook removal",
+          async () => {
+            setHooks({
+              [table]: {
+                afterEach: [
+                  { commands: { update: 1 }, changedFields: ["amount"], validate: () => {} },
+                ],
+              },
+            });
+            await instance!.update(
+              {
+                tableHooks,
+                tableConfig: {
+                  [table]: {
+                    triggers: {
+                      application_insert: {
+                        functionSchema: schema,
+                        type: "after",
+                        actions: ["insert"],
+                        forEach: "row",
+                        query: "BEGIN RETURN NULL; END;",
+                      },
+                    },
+                  },
+                },
+              },
+              true,
+            );
+            const getTriggers = () =>
+              db.any<{ oid: number; name: string }>(
+                "SELECT oid, tgname AS name FROM pg_trigger WHERE tgrelid = $1::regclass ORDER BY oid",
+                [table],
+              );
+            const before = await getTriggers();
+            assert.equal(
+              before.filter(({ name }) => name.startsWith("prostgles_capture_")).length,
+              4,
+            );
+            instance = await instance!.restart();
+            assert.deepEqual(await getTriggers(), before);
+            await instance.db[table]!.update!({ id: 2 }, { amount: "9007199254741999" });
+            // Changing the requested fields does not replace triggers or lose application triggers.
+            setHooks({
+              [table]: {
+                afterEach: [{ commands: { update: 1 }, validate: () => {} }],
+              },
+            });
+            await instance.db[table]!.update!({ id: 2 }, { value: 2 });
+            assert.deepEqual(await getTriggers(), before);
+            const updatedRows: number[] = [];
+            await instance.update({
+              tableHooks: {
+                [table]: {
+                  afterEach: [
+                    {
+                      commands: { update: 1 },
+                      validate: ({ row }) => {
+                        updatedRows.push(row.id);
+                      },
+                    },
+                  ],
+                },
+              },
+            });
+            await instance.db[table]!.update!({ id: 3 }, { value: 3 });
+            assert.deepEqual(updatedRows, [3]);
+            await instance.update({ tableHooks: undefined }, true);
+            assert.deepEqual(await getTriggers(), before);
+            await instance.db[table]!.update!({ id: 3 }, { value: 4 });
+            assert.deepEqual(updatedRows, [3]);
           },
         );
       } finally {

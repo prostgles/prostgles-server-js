@@ -26,6 +26,8 @@ export type BaseTableDefinition = {
 
   triggers?: {
     [triggerName: string]: {
+      /** Defaults to the current schema when omitted. */
+      functionSchema?: string;
       /**
        * Use "before" when you need to change the data before the action
        */

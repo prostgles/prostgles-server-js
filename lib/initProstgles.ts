@@ -1,4 +1,3 @@
-import { syncTableTriggers } from "./TableConfig/syncTableTriggers";
 import type { ExecutionContext } from "./ExecutionContext";
 import { deferDbQueries } from "./deferDbQueries";
 import type pgPromise from "pg-promise";
@@ -15,7 +14,6 @@ import { getIsSuperUser } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import type { PermissionScope } from "./PublishParser/PublishParser";
 import { SchemaWatch } from "./SchemaWatch/SchemaWatch";
-import { runSQLFile } from "./TableConfig/runSQLFile";
 import { updateConfiguration, type clientOnlyUpdateKeys } from "./updateConfiguration";
 import { sleep } from "./utils/utils";
 import { getAdminClient } from "./DboBuilder/runSql/getAdminClient";
@@ -230,25 +228,10 @@ export const initProstgles = async function (
     await this.cleanupContext();
 
     await this.tableConfigurator?.destroy();
-    await this.runSchemaQueries(async () => {
-      /* 2. Execute any SQL file if provided */
-      await runSQLFile(this);
-      this.preparingTableConfig = true;
-      try {
-        await this.rebuildDBO();
-        await this.initTableConfig(reason);
-      } finally {
-        this.preparingTableConfig = false;
-      }
-      await syncTableTriggers(this);
-      if (this.opts.audit) await this.rebuildDBO();
-    });
+    await this.initTableConfig(reason);
     await this.tableConfigurator?.setTableOnMounts();
     // onMount may create additional targets; validate joins against the completed schema.
-    await this.runSchemaQueries(async () => {
-      await this.rebuildDBO();
-      await syncTableTriggers(this);
-    });
+    await this.tableConfigurator!.refresh();
     await this.jobs.validate();
     await this.createContext(reason);
     this.initRestApi();

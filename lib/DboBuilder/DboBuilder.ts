@@ -1,4 +1,5 @@
 import type pg from "pg-promise/typescript/pg-subset";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { SQLHandler, SQLOptions } from "prostgles-types";
 import { getSerialisableError, tryCatchV2 } from "prostgles-types";
 import { getDBGeneratedSchema } from "../DBSchemaBuilder/getDBGeneratedSchema";
@@ -144,6 +145,18 @@ export class DboBuilder {
   private readonly onCommitCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
   private readonly onRollbackCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
   private readonly transactionFailures = new WeakMap<object, { error: unknown }>();
+  private readonly transactionStorage = new AsyncLocalStorage<{
+    dbx: DbTxTableHandlers;
+    t: NonNullable<LocalParams["tx"]>["t"];
+  }>();
+
+  getActiveTransaction = () => {
+    const transaction = this.transactionStorage.getStore();
+    // Jobs called from hooks share their transaction; detached work must not reuse it.
+    return transaction && this.onCommitCallbacksByTransaction.has(transaction.t) ?
+        transaction
+      : undefined;
+  };
 
   failTransaction = (transaction: object, error: unknown) => {
     this.transactionFailures.set(transaction, { error });
@@ -200,6 +213,7 @@ export class DboBuilder {
   };
 
   destroy = async () => {
+    this.transactionStorage.disable();
     return this._pubSubManager?.destroy();
   };
 
@@ -286,6 +300,8 @@ export class DboBuilder {
     );
     this.prepareShortestJoinPaths();
 
+    const { tableConfig, tableHooks } = this.prostgles.mergedTableConfig;
+    this.dboMap = new Map();
     this.dbo = {};
     this.tablesOrViews.map((tov) => {
       const columnsForTypes = tov.columns.slice(0).sort((a, b) => a.name.localeCompare(b.name));
@@ -303,8 +319,8 @@ export class DboBuilder {
         tableOrViewInfo: tov,
         dboBuilder: this,
         tx: undefined,
-        config: this.prostgles.mergedTableConfig.tableConfig?.[tov.name],
-        hooks: this.prostgles.mergedTableConfig.tableHooks?.[tov.name],
+        config: tableConfig?.[tov.name],
+        hooks: tableHooks?.[tov.name],
         joinPaths: this.shortestJoinPaths,
       });
       this.dbo[tov.name] = tableHandler;
@@ -425,41 +441,43 @@ export class DboBuilder {
   getTX = async <R, TH extends DbTxTableHandlers>(cb: TxCB<Promise<R> | R, TH>) => {
     const onCommitCallbacks: OnCommitCallback[] = [];
     const onRollbackCallbacks: OnCommitCallback[] = [];
-    let transaction: object | undefined;
     let result: R;
     try {
       result = await this.db.tx(async (t) => {
-        transaction = t;
-        this.onCommitCallbacksByTransaction.set(transaction, onCommitCallbacks);
-        this.onRollbackCallbacksByTransaction.set(transaction, onRollbackCallbacks);
+        this.onCommitCallbacksByTransaction.set(t, onCommitCallbacks);
+        this.onRollbackCallbacksByTransaction.set(t, onRollbackCallbacks);
 
         const dbTX: DbTxTableHandlers = {};
+        const { tableConfig, tableHooks } = this.prostgles.mergedTableConfig;
         this.tablesOrViews?.map((tov) => {
           dbTX[tov.name] = new TableHandler({
             db: this.db,
             tableOrViewInfo: tov,
             dboBuilder: this,
             tx: { t, dbTX },
-            config: this.prostgles.mergedTableConfig.tableConfig?.[tov.name],
-            hooks: this.prostgles.mergedTableConfig.tableHooks?.[tov.name],
+            config: tableConfig?.[tov.name],
+            hooks: tableHooks?.[tov.name],
             joinPaths: this.shortestJoinPaths,
           });
         });
 
-        const value = await cb(dbTX as TH, t);
-        const failure = this.transactionFailures.get(t);
-        if (failure) throw failure.error;
-        return value;
+        try {
+          const value = await this.transactionStorage.run({ dbx: dbTX, t }, () =>
+            cb(dbTX as TH, t),
+          );
+          const failure = this.transactionFailures.get(t);
+          if (failure) throw failure.error;
+          return value;
+        } finally {
+          this.onCommitCallbacksByTransaction.delete(t);
+          this.onRollbackCallbacksByTransaction.delete(t);
+        }
       });
     } catch (error) {
-      if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
-      if (transaction) this.onRollbackCallbacksByTransaction.delete(transaction);
       await this.runOnCommitCallbacks(onRollbackCallbacks, "DboBuilder.onRollback");
       throw error;
     }
 
-    if (transaction) this.onCommitCallbacksByTransaction.delete(transaction);
-    if (transaction) this.onRollbackCallbacksByTransaction.delete(transaction);
     await this.runOnCommitCallbacks(onCommitCallbacks);
     return result;
   };

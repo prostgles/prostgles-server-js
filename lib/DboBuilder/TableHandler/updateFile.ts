@@ -42,15 +42,19 @@ export const updateFile = async (
 export const lockFileForUpdate = async (
   tableHandler: TableHandler,
   filter: AnyObject,
-  where: string,
+  permittedWhere: string,
   localParams: LocalParams | undefined,
 ) => {
   getFileUpdateId(filter);
   const transaction = tableHandler.getTransaction(localParams);
   if (!transaction) throw new Error("File updates require a transaction");
-  // Lock the permitted file version before uploading its replacement.
+  // Internal locking uses the validated update condition and the request's RLS context.
   const row = await transaction.t.oneOrNone<{}>(
-    withUserRLS(localParams, `SELECT 1 FROM ${tableHandler.escapedName} ${where} FOR UPDATE`, true),
+    withUserRLS(
+      localParams,
+      `SELECT 1 FROM ${tableHandler.escapedName} ${permittedWhere} FOR UPDATE`,
+      true,
+    ),
   );
   return !!row;
 };

@@ -3,7 +3,6 @@ import type {
   AnyObject,
   ColumnInfo,
   FieldFilter,
-  SelectParams,
   SubscribeParams,
   SubscriptionChannels,
   SubscriptionHandler,
@@ -24,7 +23,7 @@ import { getValidatedTableRules } from "../TableRules/getValidatedTableRules";
 import { getColumns } from "../getColumns";
 import type { Graph } from "../joins/shortestPath";
 import { count } from "./count";
-import { find, type Param3 } from "./find";
+import { find, type Param3, type ServerSelectParams } from "./find";
 import { getAbortSignalKeys } from "./getDbHandlerWithAbort";
 import { getInfo } from "./getInfo";
 import { parseFieldFilter } from "./parseFieldFilter";
@@ -215,7 +214,7 @@ export class ViewHandler {
 
   async findOne(
     filter?: Filter,
-    selectParams?: SelectParams,
+    selectParams?: ServerSelectParams,
     param3?: Param3,
     table_rules?: ParsedTableRule,
     localParams?: LocalParams,

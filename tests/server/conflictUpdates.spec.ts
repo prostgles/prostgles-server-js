@@ -4,10 +4,8 @@ import { test } from "node:test";
 import prostgles, { type InitResult, type ProstglesInitOptions } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import type {
-  UpdateRule,
-  ValidateRowBasic,
-} from "prostgles-server/dist/PublishParser/PublishParser";
+import type { UpdateRule } from "prostgles-server/dist/PublishParser/PublishParser";
+import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
 import type { InsertParams } from "prostgles-types";
 
 export const testConflictUpdates = async (db: DB) => {
@@ -19,7 +17,8 @@ export const testConflictUpdates = async (db: DB) => {
     let rejectHook = false;
     let rejectPostValidate = false;
     let updateRule: UpdateRule | undefined;
-    let insertValidate: ValidateRowBasic | undefined;
+    let transformInsert = false;
+    const beforeCommands: string[] = [];
     const resetRule = () => {
       updateRule = {
         fields: ["value", "owner", "stamp"],
@@ -35,33 +34,51 @@ export const testConflictUpdates = async (db: DB) => {
       events.length = 0;
       rejectHook = false;
       rejectPostValidate = false;
-      insertValidate = undefined;
+      transformInsert = false;
+      beforeCommands.length = 0;
     };
     resetRule();
     try {
       await db.none(`CREATE SCHEMA ${schema}; CREATE TABLE ${table} (
         id INTEGER PRIMARY KEY, value TEXT, owner TEXT DEFAULT 'alice', stamp TEXT,
         secret TEXT DEFAULT 'hidden'
-      );`);
+      ); CREATE TABLE ${schema}.children (id INTEGER PRIMARY KEY, record_id INTEGER REFERENCES ${table}(id));`);
       instance = await prostgles({
         dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
         schemaFilter: { [schema]: 1 },
         transactions: true,
+        joins: "inferred",
         auth: { getUser: () => undefined, findUser: () => ({ id: "alice", type: "user" }) },
         publish: () => ({
+          [`${schema}.children`]: "*",
           [table]: {
             insert: {
               fields: "*",
               returningFields: "*",
               forcedData: { stamp: "inserted" },
               checkFilter: { value: { $ne: "insert-invalid" } },
-              validate: insertValidate,
             },
             update: updateRule,
           },
         }),
         tableHooks: {
           [table]: {
+            beforeEach: [
+              {
+                commands: { insert: 1, update: 1 },
+                validate: async ({ data, tx, command }) => {
+                  beforeCommands.push(command);
+                  if (!transformInsert) return;
+                  return {
+                    row: {
+                      ...data,
+                      id: data.id - 10,
+                      value: (await tx.one("SELECT 'validated' AS value")).value,
+                    },
+                  };
+                },
+              },
+            ],
             afterEach: [
               {
                 commands: { insert: 1, update: 1 },
@@ -85,7 +102,7 @@ export const testConflictUpdates = async (db: DB) => {
                   events.push({ phase: "all", command, ids: rows.map((row) => row.id) });
                   if (command === "update") {
                     const inputs = Array.isArray(data) ? data : [data];
-                    assert(inputs.every((row) => !Object.hasOwn(row, "id")));
+                    assert(inputs.every((row) => Object.hasOwn(row, "id")));
                   }
                   return Promise.resolve();
                 },
@@ -107,7 +124,7 @@ export const testConflictUpdates = async (db: DB) => {
         (await instance!.getClientDBHandlers({ userId: "alice" }, undefined)).clientDb[table]!;
       const seed = async () => {
         resetRule();
-        await db.none(`TRUNCATE ${table}; INSERT INTO ${table} (id, value, owner) VALUES
+        await db.none(`TRUNCATE ${table} CASCADE; INSERT INTO ${table} (id, value, owner) VALUES
           (1, 'old', 'alice'), (2, 'private', 'bob'), (3, 'old', 'alice')`);
       };
       for (const onConflict of [
@@ -127,6 +144,7 @@ export const testConflictUpdates = async (db: DB) => {
             ],
             { onConflict, returning: ["id", "value", "stamp"] },
           );
+          assert.deepEqual(beforeCommands, Array(4).fill("insertOnConflictDoUpdate"));
           assert.deepEqual(rows, [
             { id: 1, value: "one", stamp: "updated" },
             { id: 4, value: "four", stamp: "inserted" },
@@ -150,13 +168,9 @@ export const testConflictUpdates = async (db: DB) => {
           assert.equal(events.filter((event) => event.phase === "each").length, 4);
         });
       }
-      await t.test("insert validation returns the conflict keys and update values", async () => {
+      await t.test("beforeEach transforms the conflict keys and update values", async () => {
         await seed();
-        insertValidate = async ({ row }) => ({
-          ...row,
-          id: row.id - 10,
-          value: (await db.one("SELECT 'validated' AS value")).value,
-        });
+        transformInsert = true;
         const input = [
           { id: 11, value: "one" },
           { id: 14, value: "four" },
@@ -168,6 +182,7 @@ export const testConflictUpdates = async (db: DB) => {
           { id: 1, value: "validated" },
           { id: 4, value: "validated" },
         ]);
+        assert.deepEqual(beforeCommands, ["insertOnConflictDoUpdate", "insertOnConflictDoUpdate"]);
         assert.deepEqual(input, [
           { id: 11, value: "one" },
           { id: 14, value: "four" },
@@ -188,6 +203,26 @@ export const testConflictUpdates = async (db: DB) => {
           assert.deepEqual(events, []);
         },
       );
+      await t.test("joined ownership filters remain native upsert conditions", async () => {
+        await seed();
+        await db.none(`INSERT INTO ${schema}.children VALUES (10, 1)`);
+        const ownership = { $existsJoined: { [`${schema}.children`]: { id: 10 } } };
+        updateRule!.forcedFilter = ownership;
+        updateRule!.checkFilter = ownership;
+        const handler = await client();
+        const updated = await handler.insert!(
+          { id: 1, value: "allowed" },
+          { onConflict: "DoUpdate", returning: ["id", "value"] },
+        );
+        assert.deepEqual(updated, { id: 1, value: "allowed" });
+        events.length = 0;
+        assert.equal(
+          await handler.insert!({ id: 3, value: "blocked" }, { onConflict: "DoUpdate" }),
+          undefined,
+        );
+        assert.deepEqual(events, []);
+        assert.equal((await db.one(`SELECT value FROM ${table} WHERE id = 3`)).value, "old");
+      });
       await t.test("duplicate conflict keys roll back the batch", async () => {
         await seed();
         await assert.rejects(
@@ -216,7 +251,7 @@ export const testConflictUpdates = async (db: DB) => {
         );
         assert(events.every((event) => event.command === "update"));
       });
-      await t.test("changedFields hooks only receive matching update inputs", async () => {
+      await t.test("changedFields ignores same-value assignments", async () => {
         await seed();
         await (
           await client()
@@ -229,7 +264,7 @@ export const testConflictUpdates = async (db: DB) => {
         );
         assert.deepEqual(
           events.filter((event) => event.phase === "owner"),
-          [{ phase: "owner", command: "update", ids: [1] }],
+          [],
         );
       });
       await t.test(
@@ -243,10 +278,22 @@ export const testConflictUpdates = async (db: DB) => {
             ),
           );
           await assert.rejects(
+            (await client()).insert!({ id: 99, secret: "new" }, { onConflict: "DoUpdate" }),
+          );
+          assert.equal(
+            (await db.one(`SELECT count(*)::int AS count FROM ${table} WHERE id = 99`)).count,
+            0,
+          );
+          await assert.rejects(
             (await client()).insert!(
               { id: 1, value: "bad" },
               { onConflict: "DoUpdate", returning: ["secret"] },
             ),
+          );
+          updateRule!.filterFields = [];
+          await assert.rejects(
+            (await client()).insert!({ id: 99, value: "new" }, { onConflict: "DoUpdate" }),
+            { message: /update.filterFields/ },
           );
           updateRule = undefined;
           await assert.rejects(
@@ -289,15 +336,29 @@ export const testConflictUpdates = async (db: DB) => {
         });
       }
       await t.test(
-        "update validation and dynamic fields use the existing update path",
+        "postValidate sees stored conflict updates; dynamic fields are rejected upfront",
         async () => {
           await seed();
-          updateRule!.validate = ({ update }) => ({ ...update, value: "validated" });
-          updateRule!.dynamicFields = [{ filter: { id: 1 }, fields: ["value", "stamp"] }];
+          updateRule!.postValidate = async ({ row, dbx, command }) => {
+            assert.equal(command, "update");
+            assert.equal(row.value, "input");
+            assert.equal((await dbx[table]!.findOne({ id: row.id })).value, "input");
+          };
           const result = await (
             await client()
           ).insert!({ id: 1, value: "input" }, { onConflict: "DoUpdate", returning: ["value"] });
-          assert.deepEqual(result, { value: "validated" });
+          assert.deepEqual(result, { value: "input" });
+          updateRule!.dynamicFields = [{ filter: { id: 1 }, fields: ["value", "stamp"] }];
+          for (const id of [1, 99]) {
+            await assert.rejects(
+              (await client()).insert!({ id, value: "blocked" }, { onConflict: "DoUpdate" }),
+              { message: /update.dynamicFields/ },
+            );
+          }
+          assert.equal(
+            (await db.one(`SELECT count(*)::int AS count FROM ${table} WHERE id = 99`)).count,
+            0,
+          );
         },
       );
       await t.test("server calls without returning still run update-only hooks", async () => {
@@ -364,6 +425,197 @@ export const testConflictUpdates = async (db: DB) => {
           }
         },
       );
+      await t.test("ordinary inserts, updates and DoNothing keep their commands", async () => {
+        await seed();
+        await instance!.update({
+          tableHooks: {
+            [table]: {
+              beforeEach: [
+                {
+                  commands: { insert: 1, update: 1 },
+                  validate: ({ command }) => {
+                    beforeCommands.push(command);
+                  },
+                },
+              ],
+            },
+          },
+        });
+        const handler = instance!.db[table]!;
+        await handler.insert!({ id: 4, value: "insert" });
+        await handler.update!({ id: 4 }, { value: "update" });
+        await handler.insert!({ id: 4, value: "ignored" }, { onConflict: "DoNothing" });
+        assert.deepEqual(beforeCommands, ["insert", "update", "insert"]);
+      });
+      for (const target of ["insert", "update", "both"] as const) {
+        await t.test(
+          `before-only hooks targeted at ${target} enforce conflict outcomes`,
+          async () => {
+            await seed();
+            const callbacks: string[] = [];
+            await instance!.update({
+              tableHooks: {
+                [table]: {
+                  beforeEach: [
+                    {
+                      commands: target === "both" ? { insert: 1, update: 1 } : { [target]: 1 },
+                      changedFields: ["value"],
+                      validate: ({ command, data, onCommit, onRollback }) => {
+                        beforeCommands.push(command);
+                        onCommit(() => {
+                          callbacks.push("commit");
+                        });
+                        onRollback(() => {
+                          callbacks.push("rollback");
+                        });
+                        return { row: { ...data, value: `${data.value}!` } };
+                      },
+                    },
+                  ],
+                },
+              },
+            });
+            const handler = instance!.db[table]!;
+            const fresh = handler.insert!({ id: 4, value: "new" }, { onConflict: "DoUpdate" });
+            if (target === "both") await fresh;
+            else await assert.rejects(fresh, { message: /beforeEach hooks to target both/ });
+            assert.deepEqual(beforeCommands, target === "both" ? ["insertOnConflictDoUpdate"] : []);
+            beforeCommands.length = 0;
+            callbacks.length = 0;
+            const batch = handler.insert!(
+              [
+                { id: 5, value: "new" },
+                { id: 1, value: "changed" },
+              ],
+              { onConflict: "DoUpdate" },
+            );
+            if (target === "both") {
+              await batch;
+              assert.equal(
+                (await db.one(`SELECT value FROM ${table} WHERE id = 1`)).value,
+                "changed!",
+              );
+              assert.deepEqual(beforeCommands, [
+                "insertOnConflictDoUpdate",
+                "insertOnConflictDoUpdate",
+              ]);
+              assert.deepEqual(callbacks, ["commit", "commit"]);
+            } else {
+              await assert.rejects(batch, (error: { message: string }) => {
+                assert.match(error.message, /beforeEach hooks to target both/);
+                return true;
+              });
+              assert.equal((await db.one(`SELECT value FROM ${table} WHERE id = 1`)).value, "old");
+              assert.equal(
+                (await db.one(`SELECT count(*)::int AS count FROM ${table} WHERE id = 5`)).count,
+                0,
+              );
+              assert.deepEqual(callbacks, []);
+            }
+            if (target !== "both") {
+              await instance!.db.tx(async (tx) => {
+                await tx[table]!.insert!({ id: 6, value: "new" });
+                await assert.rejects(
+                  tx[table]!.insert!({ id: 1, value: "caught" }, { onConflict: "DoUpdate" }),
+                );
+              });
+              assert.equal(
+                (await db.one(`SELECT count(*)::int AS count FROM ${table} WHERE id = 6`)).count,
+                1,
+              );
+            }
+            beforeCommands.length = 0;
+            const nested = handler.insert!(
+              {
+                id: 1,
+                value: "nested",
+                [`${schema}.children`]: [{ id: 1 }],
+              },
+              { onConflict: "DoUpdate" },
+            );
+            if (target === "both") {
+              await nested;
+              assert.deepEqual(beforeCommands, ["insertOnConflictDoUpdate"]);
+              assert.equal(
+                (await db.one(`SELECT value FROM ${table} WHERE id = 1`)).value,
+                "nested!",
+              );
+              assert.equal(
+                (await db.one(`SELECT record_id FROM ${schema}.children WHERE id = 1`)).record_id,
+                1,
+              );
+            } else {
+              await assert.rejects(nested, { message: /beforeEach hooks to target both/ });
+              assert.equal(
+                (await db.one(`SELECT count(*)::int AS count FROM ${schema}.children`)).count,
+                0,
+              );
+            }
+            // A hook whose watched fields are absent does not restrict the conflict outcome.
+            await handler.insert!({ id: 1, stamp: "unwatched" }, { onConflict: "DoUpdate" });
+            assert.equal(
+              (await db.one(`SELECT stamp FROM ${table} WHERE id = 1`)).stamp,
+              "unwatched",
+            );
+          },
+        );
+      }
+    } finally {
+      await instance?.destroy();
+      await db.none(`DROP SCHEMA ${schema} CASCADE`);
+    }
+  });
+  await test("conflict updates normalize forcedData like ordinary updates", async () => {
+    const schema = `conflict_normalized_${randomUUID().replaceAll("-", "")}`;
+    let instance: InitResult | undefined;
+    await db.none(`CREATE SCHEMA ${schema}`);
+    try {
+      instance = await prostgles({
+        dbConnection: {
+          ...getConnectionDetails(db),
+          options: `-c search_path=${schema},public`,
+        } as unknown as ProstglesInitOptions["dbConnection"],
+        schemaFilter: { [schema]: 1 },
+        tableConfig: {
+          records: {
+            columns: {
+              id: "INTEGER PRIMARY KEY",
+              value: { isText: true, trimmed: true, lowerCased: true },
+            },
+          },
+        },
+        onReady: () => {},
+      });
+      const handler = instance.db.records as TableHandler;
+      await handler.insert([
+        { id: 1, value: "old" },
+        { id: 2, value: "old" },
+      ]);
+      const rules = {
+        insert: { fields: "*" as const, returningFields: "*" as const },
+        update: {
+          fields: "*" as const,
+          filterFields: "*" as const,
+          returningFields: "*" as const,
+          forcedData: { value: "  NORMALIZED  " },
+        },
+      };
+      const updated = await handler.update(
+        { id: 1 },
+        { value: "input" },
+        { returning: ["value"], multi: false },
+        rules,
+        {},
+      );
+      const upserted = await handler.insert(
+        { id: 2, value: "input" },
+        { onConflict: "DoUpdate", returning: ["value"] },
+        undefined,
+        rules,
+        {},
+      );
+      assert.deepEqual(updated, { value: "normalized" });
+      assert.deepEqual(upserted, updated);
     } finally {
       await instance?.destroy();
       await db.none(`DROP SCHEMA ${schema} CASCADE`);

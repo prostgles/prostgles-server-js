@@ -2,6 +2,20 @@ import type { TableConfig, TableHooks } from "prostgles-server";
 import type { DBGeneratedSchema } from "../DBGeneratedSchema";
 
 export const testTableHooks: TableHooks<DBGeneratedSchema> = {
+  insert_rules: {
+    beforeEach: [
+      {
+        commands: { insert: 1 },
+        validate: ({ data }) => ({
+          row: {
+            ...data,
+            name: data.name === "a" ? "b" : data.name,
+            added: new Date().toUTCString(),
+          },
+        }),
+      },
+    ],
+  },
   rec: {
     beforeEach: [
       {

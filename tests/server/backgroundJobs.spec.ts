@@ -37,6 +37,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     let other: InitResult<JobTestSchema> | undefined;
     let rejectHook = false;
     let rejectSchedule = false;
+    let rowSelectCount = 0;
     const seen: {
       id: string;
       revision: number;
@@ -56,6 +57,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           table,
           on: ["insert", "update"],
           columns: ["revision"],
+          jobIdColumn: "job_id",
           when: { enabled: true },
         },
         params: { size: { jsonbSchema: { type: "number" }, default: 10 } },
@@ -96,6 +98,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
       transactions: true,
       onReady: () => {},
+      onQuery: (_error, { query }) => {
+        if (query.trimStart().startsWith("SELECT") && query.includes('"records"')) rowSelectCount++;
+      },
       jobs: { tableName: queueName, definitions },
       joins: [{ tables: [queueName, table], on: [{ user_id: "owner" }], type: "many-many" }],
       auth: {
@@ -176,9 +181,12 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         [table]: {
           afterEach: [
             {
-              commands: { insert: 1 },
-              validate: () => {
+              commands: { insert: 1, update: 1 },
+              validate: async ({ row, dbx }) => {
                 if (rejectHook) throw new Error("Reject row");
+                const stored = (await dbx[table].findOne({ id: row.id }))!;
+                assert.equal(row.job_id, stored.job_id);
+                assert.equal(row.note, stored.note);
               },
             },
           ],
@@ -205,7 +213,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     };
     const insert = async (data: Partial<JobTestRow> = {}) => {
       const row = await instance!.db[table].insert({ ...data }, { returning: "*" });
-      return { row, job: (await records("owner = $1:json", [{ id: row.id }]))[0]! };
+      const job = (await records("owner = $1:json", [{ id: row.id }]))[0];
+      assert.equal(row.job_id, job?.id ?? null);
+      assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, job?.id ?? null);
+      return { row, job: job! };
     };
     try {
       await t.test("validates jobs after onMount and again on refresh", async () => {
@@ -223,7 +234,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             job_validation_setup: {
               columns: { id: "serial PRIMARY KEY" },
               onMount: async ({ _db }) => {
-                await _db.none("CREATE TABLE job_validation_target (id serial PRIMARY KEY)");
+                await _db.none(
+                  "CREATE TABLE job_validation_target (id serial PRIMARY KEY, job_id UUID)",
+                );
               },
             },
           },
@@ -235,6 +248,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                   type: "row",
                   table: "job_validation_target",
                   on: ["insert"],
+                  jobIdColumn: "job_id",
                   when: { id: { $gt: 0 } },
                 },
                 run: async () => {},
@@ -252,8 +266,12 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(contextsCreated, 1);
           await prgl.refreshDBO();
           assert.equal(contextsCreated, 2);
+          await result.sql("ALTER TABLE job_validation_target DROP COLUMN job_id");
+          await assert.rejects(prgl.refreshDBO(), /Invalid jobIdColumn for process/);
+          assert.equal(contextsCreated, 2);
           await result.sql("DROP TABLE job_validation_target");
           await assert.rejects(prgl.refreshDBO(), /Invalid row trigger for process/);
+          assert(!prgl.dboBuilder.dboMap.has("job_validation_target"));
           assert.equal(contextsCreated, 2);
         } finally {
           await result?.destroy();
@@ -262,16 +280,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       });
       await db.none(`CREATE TABLE ${table} (
         id SERIAL PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, enabled BOOLEAN NOT NULL DEFAULT TRUE,
-        owner TEXT NOT NULL DEFAULT 'alice', mode TEXT, note TEXT, updated TIMESTAMPTZ DEFAULT now()
+        owner TEXT NOT NULL DEFAULT 'alice', mode TEXT, note TEXT, updated TIMESTAMPTZ DEFAULT now(),
+        job_id UUID CHECK (note IS DISTINCT FROM 'reject job link' OR job_id IS NULL)
       )`);
       instance = await prostgles<JobTestSchema>(options);
+      await db.none(`ALTER TABLE ${table} ADD FOREIGN KEY (job_id) REFERENCES ${queue}(id)`);
       assert.equal(instance.getSchema().find(({ name }) => name === queueName)?.schema, "public");
       assert((await instance.getTSSchema()).tsSchema.includes(queueName));
       await t.test("types enforce params, rows and schedule context", () => {
         checkTypes(
           "",
           `
-          import { createJobDefiner, type DBOFullyTyped, type ParamsSchema, type JobsOptions } from "../server/node_modules/prostgles-server";
+          import { createJobDefiner, type DBOFullyTyped, type ParamsSchema, type JobsOptions, type RowTrigger } from "../server/node_modules/prostgles-server";
           import { ROW_ACTIONS_COLUMN } from "../../node_modules/prostgles-types";
           type S = { records: { columns: { id: number; revision: number } }; other: { columns: { name: string } } };
           const checkActions = async (dbo: DBOFullyTyped<S>) => {
@@ -283,6 +303,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             projected[0]![ROW_ACTIONS_COLUMN] satisfies string[];
           };
           const defineJob = createJobDefiner<S>();
+          const invalidTrigger: RowTrigger<S, "records"> = {
+            type: "row", table: "records", on: ["insert"],
+            // @ts-expect-error unknown job ID column
+            jobIdColumn: "missing",
+          };
           const definitions = {
             process: defineJob({
               trigger: { type: "row", table: "records", on: ["insert"], columns: ["revision"] },
@@ -312,7 +337,14 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const before = (await records()).length;
         await assert.rejects(
           instance!.db.tx(async (tx) => {
-            await tx[table].insert({});
+            const row = await tx[table].insert({}, { returning: "*" });
+            const linked = (await tx[table].findOne({ id: row.id }))!;
+            assert(linked.job_id);
+            assert.equal(row.job_id, linked.job_id);
+            assert(await tx[queueName]!.findOne({ id: linked.job_id }));
+            const rerun = await instance!.jobs.rerun(linked.job_id);
+            assert.equal((await tx[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
+            assert(await tx[queueName]!.findOne({ id: rerun.jobId }));
             assert.equal((await records()).length, before);
             await delay(350);
             assert.equal(seen.length, 0);
@@ -322,9 +354,38 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         rejectHook = true;
         await assert.rejects(insert());
         rejectHook = false;
+        await assert.rejects(insert({ note: "reject job link" }));
+        assert.equal(await instance!.db[table].count({ note: "reject job link" }), 0);
         assert.equal((await records()).length, before);
         assert(instance!.db[queueName]);
         await instance!.db.tx(async (tx) => assert.equal(await tx[queueName]!.count(), before));
+      });
+      await t.test("plain returning selections add no reads for linked jobs", async () => {
+        await assert.rejects(
+          instance!.db.tx(async (tx) => {
+            const rows = [{ note: "linked" }, { note: "ignored", enabled: false }];
+            const before = rowSelectCount;
+            await tx[table].insertMany(rows);
+            const readsWithoutReturning = rowSelectCount - before;
+            const beforeReturning = rowSelectCount;
+            const returned = await tx[table].insertMany(rows, { returning: "*" });
+            assert.equal(rowSelectCount - beforeReturning, readsWithoutReturning);
+            assert(returned[0]!.job_id);
+            assert.equal(returned[1]!.job_id, null);
+            const beforeProjection = rowSelectCount;
+            const projected = await tx[table].insertMany(rows, {
+              returning: { job_id: 1, note: 1 },
+            });
+            assert.equal(rowSelectCount - beforeProjection, readsWithoutReturning);
+            assert(projected[0]!.job_id);
+            assert.deepEqual(projected, [
+              { job_id: projected[0]!.job_id, note: "linked" },
+              { job_id: null, note: "ignored" },
+            ]);
+            throw new Error("Rollback returning test");
+          }),
+          { message: "Rollback returning test" },
+        );
       });
       await t.test(
         "filters and real value changes, including bulk updates and changed primary keys",
@@ -335,9 +396,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await status(job.id, "succeeded");
           await instance!.db[table].update({ id: row.id }, { revision: 1, note: "metadata" });
           assert.equal((await records()).length, 1);
-          await instance!.db[table].update({ id: row.id }, { id: row.id + 100, revision: 2 });
+          const returned = await instance!.db[table].update(
+            { id: row.id },
+            { id: row.id + 100, revision: 2 },
+            { returning: { job_id: 1, linkedJob: { $upper: ["job_id"] } }, multi: false },
+          );
           const updated = (await records())[1]!;
+          assert.deepEqual(returned, { job_id: updated.id, linkedJob: updated.id.toUpperCase() });
           assert.deepEqual(updated.owner, { id: row.id + 100 });
+          assert.equal(
+            (await instance!.db[table].findOne({ id: row.id + 100 }))!.job_id,
+            updated.id,
+          );
           await status(updated.id, "succeeded");
           await instance!.db[table].updateBatch([[{ id: row.id + 100 }, { revision: 3 }]]);
           assert.equal((await records()).length, 3);
@@ -447,11 +517,12 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       await t.test(
         "retries preserve checkpoints; fail prevents retries; reruns apply defaults and overrides",
         async () => {
-          const { job } = await insert({ mode: "retry" });
+          const { row, job } = await insert({ mode: "retry" });
           const completed = await status(job.id, "succeeded");
           assert.equal(completed.attempts, 2);
           assert.deepEqual(completed.progress, { done: 1, total: 1 });
           const rerun = await instance!.jobs.rerun(job.id, { size: 20 });
+          assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
           await status(rerun.jobId, "succeeded");
           const run = seen.find((entry) => entry.id === rerun.jobId)!;
           assert.equal(run.reason, "rerun");
@@ -460,6 +531,25 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await assert.rejects(instance!.jobs.rerun(job.id, { unknown: 1 }));
           const permanent = await insert({ mode: "permanent" });
           assert.equal((await status(permanent.job.id, "failed")).attempts, 1);
+        },
+      );
+      await t.test(
+        "job ID writes do not recursively fire unrestricted update triggers",
+        async () => {
+          const trigger = definitions.process!.trigger;
+          assert(trigger.type === "row");
+          const columns = trigger.columns;
+          delete trigger.columns;
+          try {
+            const { row, job } = await insert();
+            await status(job.id, "succeeded");
+            const rerun = await instance!.jobs.rerun(job.id);
+            await status(rerun.jobId, "succeeded");
+            assert.equal((await records("owner = $1:json", [{ id: row.id }])).length, 2);
+            assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
+          } finally {
+            trigger.columns = columns;
+          }
         },
       );
       await t.test("queue serializes each row and re-fetches it at run start", async () => {
@@ -594,17 +684,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const handler = instance!.db[queueName] as unknown as TableHandler;
           const prostgles = handler.dboBuilder.prostgles;
           const clientReq = createServerSideRequest(prostgles, "alice");
-          const updateJob = () => runClientRequest.call(
-            prostgles,
-            {
-              tableName: queueName,
-              command: "update",
-              param1: { id: job.id },
-              param2: { params: { size: 999 } },
-            },
-            clientReq,
-            undefined,
-          );
+          const updateJob = () =>
+            runClientRequest.call(
+              prostgles,
+              {
+                tableName: queueName,
+                command: "update",
+                param1: { id: job.id },
+                param2: { params: { size: 999 } },
+              },
+              clientReq,
+              undefined,
+            );
           const invalid: NonNullable<ProstglesInitOptions<JobTestSchema>["publish"]>[] = [
             ["*", { update: true }],
             ...["insert", "update", "delete"].map((command) => ({
@@ -702,9 +793,17 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             });
             let rerunId = "";
             action = async () => {
+              await instance!.jobs.rerun(job.id);
+              throw new Error("Rollback rerun");
+            };
+            await assert.rejects(update(), { message: "Rollback rerun" });
+            assert.equal((await records()).length, before);
+            assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, job.id);
+            action = async () => {
               rerunId = (await instance!.jobs.rerun(job.id)).jobId;
             };
             await update();
+            assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerunId);
             assert.equal((await status(rerunId, "succeeded")).user_id, "alice");
           } finally {
             await instance!.update({
@@ -763,7 +862,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
         const { row, job } = await insert({ mode: "block" });
         await eventually(() => blocked.has(job.id));
-        await instance!.db[table].update({ id: row.id }, { revision: 2 });
+        await instance!.db[table].update({ id: row.id }, { revision: 2, job_id: null });
+        assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, job.id);
+        assert.deepEqual(await instance!.jobs.rerun(job.id), { jobId: job.id });
         assert.equal((await records("owner = $1:json", [{ id: row.id }])).length, 1);
         await instance!.jobs.cancel(job.id);
         await status(job.id, "cancelled");
@@ -774,6 +875,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         await instance!.db[table].update({ id: replacing.row.id }, { revision: 2, mode: null });
         await status(replacing.job.id, "cancelled");
         const replacement = (await records("owner = $1:json", [{ id: replacing.row.id }]))[1]!;
+        assert.equal(
+          (await instance!.db[table].findOne({ id: replacing.row.id }))!.job_id,
+          replacement.id,
+        );
         await status(replacement.id, "succeeded");
         definitions.process!.timeoutMs = 20;
         definitions.process!.retry = { maxAttempts: 1 };
@@ -811,6 +916,51 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const lost = (await records("status = 'running'"))[0]!;
           await status(lost.id, "succeeded");
           assert.equal((await instance!.jobs.get(lost.id))!.attempts, 2);
+        },
+      );
+      await t.test("hooks and returning include database changes from job ID updates", async () => {
+        await db.none(`CREATE FUNCTION update_linked_note() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN
+            IF NEW.job_id IS DISTINCT FROM OLD.job_id AND NEW.note = 'skip link' THEN RETURN NULL; END IF;
+            IF NEW.job_id IS DISTINCT FROM OLD.job_id THEN NEW.note := 'linked-' || NEW.job_id::text; END IF;
+            RETURN NEW;
+          END $$;
+          CREATE TRIGGER update_linked_note BEFORE UPDATE ON ${table}
+          FOR EACH ROW EXECUTE FUNCTION update_linked_note()`);
+        try {
+          const { row, job } = await insert();
+          assert.equal(row.note, `linked-${job.id}`);
+          await status(job.id, "succeeded");
+          const unlinkedRow = await instance!.db[table].insert(
+            { note: "skip link" },
+            { returning: "*" },
+          );
+          assert.equal(unlinkedRow.job_id, null);
+          const [unlinkedJob] = await records("owner = $1:json", [{ id: unlinkedRow.id }]);
+          await status(unlinkedJob!.id, "succeeded");
+        } finally {
+          await db.none(
+            `DROP TRIGGER update_linked_note ON ${table}; DROP FUNCTION update_linked_note()`,
+          );
+        }
+      });
+      await t.test(
+        "detached reruns start a new transaction after their parent finishes",
+        async () => {
+          const { row, job } = await insert();
+          await status(job.id, "succeeded");
+          let release!: () => void;
+          const gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          let detachedRerun!: Promise<{ jobId: string }>;
+          await instance!.db.tx(() => {
+            detachedRerun = gate.then(() => instance!.jobs.rerun(job.id));
+          });
+          release();
+          const { jobId } = await detachedRerun;
+          await status(jobId, "succeeded");
+          assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, jobId);
         },
       );
       await t.test(
@@ -891,6 +1041,7 @@ type JobTestRow = {
   owner: string;
   mode: string | null;
   note: string | null;
+  job_id: string | null;
   updated: Date | null;
 };
 type JobTestSchema = {

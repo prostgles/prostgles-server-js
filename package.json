@@ -1,6 +1,6 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.654",
+  "version": "4.2.655",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,9 +17,9 @@
     "test:lib": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && npm run lint -- --ignore-pattern tests && tsc && node --trace-uncaught --test dist/**/*.spec.js",
     "test-only": "cd tests/ && ./test.sh",
     "test-quick": "cd tests/ && ./test.sh -quick",
-    "test": "npm run test:lib && npm run test-only",
+    "test": "npm run test:lib && npm run test-only && npm run generate-docs",
     "generate-docs": "rm -f ./docs/*.md && cd docs/utils && npm start",
-    "pushpublish": "npm run generate-docs && npm version patch --git-tag-version false && git push && npm publish",
+    "pushpublish": "npm version patch --git-tag-version false && git push && npm publish",
     "circular-deps": "tsc && npx madge --circular  ."
   },
   "repository": {

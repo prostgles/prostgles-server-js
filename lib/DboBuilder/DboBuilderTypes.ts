@@ -199,6 +199,9 @@ export type LocalParams = {
   /** Used to exclude certain logs */
   noLog?: boolean;
 
+  /** Internal bookkeeping writes bypass table hooks and row jobs. */
+  bypassHooks?: true;
+
   returnQuery?: boolean | "noRLS" | "where-condition";
   returnNewQuery?: boolean;
 

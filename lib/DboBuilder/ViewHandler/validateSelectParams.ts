@@ -1,8 +1,9 @@
 import { getJSONBObjectSchemaValidationError, getKeys, type SelectParams } from "prostgles-types";
+import type { ServerSelectParams } from "./find";
 
 export const validateSelectParams = (
   selectParams: any,
-): selectParams is SelectParams | undefined => {
+): selectParams is ServerSelectParams | undefined => {
   if (selectParams === undefined) {
     return true;
   }
@@ -39,6 +40,7 @@ export const validateSelectParams = (
       groupBy: { type: "boolean", optional: true },
       having: { record: { values: "any" }, optional: true },
       abortSignal: { type: "any", optional: true },
+      forUpdate: { type: "boolean", optional: true },
     },
     selectParams,
     "selectParams",
@@ -46,6 +48,6 @@ export const validateSelectParams = (
   if (selectParamsValidation.error !== undefined) {
     throw `selectParams validation error: ${JSON.stringify(selectParamsValidation.error)}`;
   }
-  selectParamsValidation.data satisfies SelectParams;
+  selectParamsValidation.data satisfies ServerSelectParams;
   return true;
 };

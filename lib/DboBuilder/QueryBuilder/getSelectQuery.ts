@@ -20,6 +20,7 @@ export function getSelectQuery(
   q: NewQuery,
   depth = 0,
   selectParamsGroupBy: boolean,
+  forUpdate = false,
 ): string {
   const rootSelect = q.select
     .filter((s) => s.selected)
@@ -47,6 +48,12 @@ export function getSelectQuery(
 
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
   const hasOrJoins = parsedJoins.some((j) => j.isOrJoin);
+  if (
+    forUpdate &&
+    (hasOrJoins || selectParamsGroupBy || q.select.some((item) => item.type === "aggregation"))
+  ) {
+    throw new Error("forUpdate does not support aggregations, groupBy, or OR joins");
+  }
   const tableExpression = getQuerySourceSQL(q.source);
 
   const joinCtes: string[][] = parsedJoins
@@ -95,6 +102,7 @@ export function getSelectQuery(
     ...(q.having ? [`HAVING ${q.having} `] : []),
     ...(depth || q.limit === null ? [] : [`LIMIT ${q.limit || 0}`]),
     ...(q.offset ? [`OFFSET ${q.offset || 0}`] : []),
+    ...(forUpdate ? [`FOR UPDATE OF ${ROOT_TABLE_ALIAS}`] : []),
   ];
 
   return indentLinesToString(query);

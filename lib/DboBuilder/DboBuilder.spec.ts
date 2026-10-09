@@ -7,6 +7,7 @@ import { DboBuilder } from "./DboBuilder";
 const createDboBuilder = ({ events, logs }: { events: string[]; logs: EventInfo[] }) => {
   const transaction = {};
   const prostgles = {
+    mergedTableConfig: { tableConfig: undefined, tableHooks: undefined },
     getExecution: () => undefined,
     runWithExecution: <T>(_execution: unknown, callback: () => T) => callback(),
     db: {

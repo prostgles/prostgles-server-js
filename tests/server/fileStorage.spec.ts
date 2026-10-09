@@ -5,8 +5,11 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { once } from "node:events";
 import express from "express";
+import pgPromise from "pg-promise";
 import type { DB, DBHandlerServer } from "prostgles-server";
+import type { LocalParams } from "prostgles-server/dist/DboBuilder/DboBuilderTypes";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
+import { lockFileForUpdate } from "prostgles-server/dist/DboBuilder/TableHandler/updateFile";
 import type { CloudStorageClient } from "prostgles-server/dist/StorageClient/StorageClientTypes";
 import { setupFileServeHandler } from "prostgles-server/dist/StorageClient/setupFileServeHandler";
 import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileStorageKey";
@@ -221,26 +224,54 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
         },
       );
 
-      await t.test("PostgreSQL update policies are enforced before uploading", async () => {
-        await db.none(`
+      await t.test(
+        "Internal file locks preserve request RLS and enforce update policies",
+        async () => {
+          await db.none(`
           CREATE ROLE storage_rls_test;
           GRANT USAGE ON SCHEMA public TO storage_rls_test;
           GRANT SELECT, UPDATE ON files TO storage_rls_test;
           ALTER TABLE files ENABLE ROW LEVEL SECURITY;
           CREATE POLICY storage_select ON files FOR SELECT TO storage_rls_test USING (true);
-          CREATE POLICY storage_update ON files FOR UPDATE TO storage_rls_test USING (false);
+          CREATE POLICY storage_update ON files FOR UPDATE TO storage_rls_test
+            USING (
+              NULLIF(current_setting('prostgles.user', true), '')::jsonb ->> 'allow_file_update' = 'true'
+            );
         `);
-        try {
-          const count = uploads;
-          const rows = await files.dboBuilder.getTX(async (tx, pgTx) => {
-            await pgTx.none("SET LOCAL ROLE storage_rls_test");
-            return tx.files!.update({ id: original.id }, fileData("forbidden"), { returning: "*" });
-          });
-          assert.deepEqual(rows, []);
-          assert.equal(uploads, count);
-          assert.equal(read(original), "updated");
-        } finally {
-          await db.none(`
+          try {
+            const count = uploads;
+            const rows = await files.dboBuilder.getTX(async (tx, pgTx) => {
+              await pgTx.none("SET LOCAL ROLE storage_rls_test");
+              const filter = { id: original.id };
+              const permittedWhere = pgPromise.as.format("WHERE id = $1", [original.id]);
+              for (const allowed of [true, false, undefined]) {
+                const params: LocalParams = {
+                  isRemoteRequest: {
+                    clientInfo: undefined,
+                    user:
+                      allowed === undefined ? undefined : (
+                        {
+                          id: "00000000-0000-0000-0000-000000000002",
+                          type: "test",
+                          allow_file_update: allowed,
+                        }
+                      ),
+                  },
+                };
+                assert.equal(
+                  await lockFileForUpdate(tx.files as TableHandler, filter, permittedWhere, params),
+                  allowed === true,
+                );
+              }
+              return tx.files!.update({ id: original.id }, fileData("forbidden"), {
+                returning: "*",
+              });
+            });
+            assert.deepEqual(rows, []);
+            assert.equal(uploads, count);
+            assert.equal(read(original), "updated");
+          } finally {
+            await db.none(`
             DROP POLICY storage_select ON files;
             DROP POLICY storage_update ON files;
             ALTER TABLE files DISABLE ROW LEVEL SECURITY;
@@ -248,8 +279,9 @@ export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
             REVOKE USAGE ON SCHEMA public FROM storage_rls_test;
             DROP ROLE storage_rls_test;
           `);
-        }
-      });
+          }
+        },
+      );
 
       await t.test("RLS-hidden references fail closed during storage cleanup", async () => {
         const role = "storage_cleanup_rls_test";

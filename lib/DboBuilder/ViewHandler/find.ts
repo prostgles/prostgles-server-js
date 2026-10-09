@@ -1,4 +1,4 @@
-import type { AnyObject, SelectParams } from "prostgles-types";
+import type { AnyObject, DBSchema, SelectParams } from "prostgles-types";
 import { isObject } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
@@ -19,10 +19,21 @@ export type Param3 = {
   abortSignalId?: string;
 };
 
+export type ServerSelectParams<
+  T extends AnyObject | void = void,
+  S extends DBSchema | void = void,
+> = SelectParams<T, S> & {
+  /**
+   * Lock this table's matching rows until the transaction ends. Requires a transaction.
+   * Views, aggregations, groupBy, and OR joins are not supported.
+   */
+  forUpdate?: boolean;
+};
+
 export const find = async function (
   this: ViewHandler,
   filter: Filter = {},
-  selectParams?: SelectParams,
+  selectParams?: ServerSelectParams,
   param3?: Param3,
   tableRules?: ParsedTableRule,
   localParams?: LocalParams,
@@ -33,6 +44,10 @@ export const find = async function (
   const command = limit === 1 && returnType === "row" ? "findOne" : "find";
   try {
     validateSelectParams(selectParams);
+    if (selectParams?.forUpdate) {
+      if (!this.getTransaction(localParams)) throw new Error("forUpdate requires a transaction");
+      if (this.isView) throw new Error("forUpdate is only supported on tables");
+    }
 
     const { returnType } = selectParams || {};
 
@@ -81,6 +96,7 @@ export const find = async function (
       newQuery,
       undefined,
       !!selectParamsLimitCheck.groupBy,
+      selectParams?.forUpdate,
     );
 
     const queryWithRLS = withUserRLS(

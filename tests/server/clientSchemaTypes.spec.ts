@@ -446,6 +446,66 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
         await t.test(
+          "forUpdate requires a transaction and preserves client select permissions",
+          async () => {
+            assert(instance);
+            const rows = await instance.db[tableName]!.insertMany!(
+              [
+                { body: "lock-visible", created_by: "user-guest" },
+                { body: "lock-hidden", created_by: "other" },
+              ],
+              { returning: "*" },
+            );
+            const [visible, hidden] = rows;
+            assert(visible && hidden);
+            const filter = { id: { $in: rows.map((row) => row.id) } };
+            const lockRow = (id: number) =>
+              db.any(`SELECT id FROM ${schemaName}.${tableName} WHERE id = $1 FOR UPDATE NOWAIT`, [
+                id,
+              ]);
+            try {
+              for (const command of ["find", "findOne"] as const) {
+                await assert.rejects(
+                  handlers.clientDb[tableName]![command]!(filter, { forUpdate: true }),
+                  (error: unknown) =>
+                    JSON.stringify(error).includes("forUpdate requires a transaction"),
+                );
+                await handlers.withClientDbTx(async (clientDb) => {
+                  const result = await clientDb[tableName]![command]!(filter, {
+                    select: { id: 1 },
+                    forUpdate: true,
+                  });
+                  assert.deepEqual(
+                    result,
+                    command === "find" ? [{ id: visible.id }] : { id: visible.id },
+                  );
+                  await assert.rejects(lockRow(visible.id), { code: "55P03" });
+                  await lockRow(hidden.id);
+                  assert.equal(
+                    await clientDb[tableName]!.findOne!({ id: hidden.id }, { forUpdate: true }),
+                    undefined,
+                  );
+                });
+                await lockRow(visible.id);
+              }
+              const scoped = await instance.getClientDBHandlers(
+                { socket: serverSocket },
+                { tables: { [tableName]: { select: { fields: ["id"] } } } },
+              );
+              await assert.rejects(
+                scoped.withClientDbTx((clientDb) =>
+                  clientDb[tableName]!.findOne!(
+                    { id: visible.id },
+                    { select: { internal: 1 }, forUpdate: true },
+                  ),
+                ),
+              );
+            } finally {
+              await instance.db[tableName]!.delete!(filter);
+            }
+          },
+        );
+        await t.test(
           "function lookups enforce caller permissions before unrestricted execution",
           async () => {
             assert(instance);

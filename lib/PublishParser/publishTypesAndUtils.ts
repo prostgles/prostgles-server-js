@@ -1,5 +1,5 @@
 import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { Filter, LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
+import type { LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
 import type { DB, DBHandlerServer } from "../Prostgles";
 
 export type Awaitable<T> = T | Promise<T>;
@@ -56,10 +56,26 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
 export type UpdateRequestData<R extends AnyObject = AnyObject> =
   UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 
+export type OnCommitCallback<DBO = DBHandlerServer> = (args: {
+  db: DB;
+  dbo: DBO;
+}) => MaybePromise<unknown>;
+export type OnCommit<DBO = DBHandlerServer> = (callback: OnCommitCallback<DBO>) => void;
+
+export type TransactionCallbacks<DBO = DBHandlerServer> = {
+  /** Awaited after the outer transaction commits. Errors are logged. */
+  onCommit: OnCommit<DBO>;
+  /**
+   * Awaited after the outer transaction rejects. Errors are logged.
+   * A failed COMMIT acknowledgement may have committed; verify state before destructive cleanup.
+   */
+  onRollback: OnCommit<DBO>;
+};
+
 export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
-  command: "insert" | "update";
+  command: "insert" | "insertOnConflictDoUpdate" | "update";
   data: Partial<R>;
   filter: AnyObject | undefined;
 };
@@ -99,28 +115,12 @@ export type BeforeEachTsTrigger<R, DBX, Context = undefined> = {
   ) => MaybePromise<void | { row: Partial<R>; hookContext?: AnyObject }>;
 };
 
-export type OnCommitCallback<DBO = DBHandlerServer> = (args: {
-  db: DB;
-  dbo: DBO;
-}) => MaybePromise<unknown>;
-export type OnCommit<DBO = DBHandlerServer> = (callback: OnCommitCallback<DBO>) => void;
-
-export type TransactionCallbacks<DBO = DBHandlerServer> = {
-  /** Awaited after the outer transaction commits. Errors are logged. */
-  onCommit: OnCommit<DBO>;
-  /**
-   * Awaited after the outer transaction rejects. Errors are logged.
-   * A failed COMMIT acknowledgement may have committed; verify state before destructive cleanup.
-   */
-  onRollback: OnCommit<DBO>;
-};
-
 export type AfterEachTsTrigger<R, DBX, Context = undefined, InputDataType = R> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
   preventRecursion?: boolean;
   /**
-   * Will only run this trigger if the insert/update provides non null values for these fields.
+   * On updates, runs only when a listed column actually changes. Inserts and deletes always qualify.
    */
   changedFields?: (keyof R)[];
   validate: (
@@ -167,6 +167,7 @@ export type AfterAllTsTrigger<R, DBX, Context = undefined> = {
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
   preventRecursion?: boolean;
+  /** On updates, runs only for rows with actual changes to a listed column. */
   changedFields?: string[];
   validate: (
     params: ValidateRowsArgsCommon<R, DBX> &
@@ -181,6 +182,7 @@ export type AfterCommitTsTrigger<R, DBO, Context = undefined, ClientSchema = voi
   commands: Partial<Record<"insert" | "update" | "delete", 1>>;
   /** Skip only this hook when it is already in the hook ancestry. Defaults to false. */
   preventRecursion?: boolean;
+  /** On updates, runs only for rows with actual changes to a listed column. */
   changedFields?: (keyof R)[];
   run: (params: {
     /** Committed rows, or the deleted rows' pre-delete state. */
@@ -200,12 +202,6 @@ export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = ValidateRowA
 > & {
   localParams: LocalParams;
 };
-export type ValidateUpdateRowArgs<U = Partial<AnyObject>, F = Filter, DBX = DBHandlerServer> = {
-  update: U;
-  filter: F;
-  dbx: DBX;
-  localParams: LocalParams;
-};
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (
   args: ValidateRowArgs<R, DBOFullyTyped<S>>,
 ) => R | Promise<R>;
@@ -214,12 +210,6 @@ export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (
 ) => void | Promise<void>;
 export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
 export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
-export type ValidateUpdateRow<R extends AnyObject = AnyObject, S extends DBSchema | void = void> = (
-  args: ValidateUpdateRowArgs<Partial<R>, FullFilter<R, S>, DBOFullyTyped<S>>,
-) => Partial<R> | Promise<Partial<R>>;
-export type ValidateUpdateRowBasic = (
-  args: ValidateUpdateRowArgs,
-) => AnyObject | Promise<AnyObject>;
 
 export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | void = void> = {
   /**
@@ -291,14 +281,8 @@ export type InsertRule<
   preValidate?: S extends DBSchema ? ValidateRow<Cols, S> : ValidateRowBasic;
 
   /**
-   * Validation logic to check/update data for each request.
-   * Happens after publish rule checks (for fields, forcedData/forcedFilter) but before insert.
-   */
-  validate?: S extends DBSchema ? ValidateRow<Cols, S> : ValidateRowBasic;
-
-  /**
-   * Validation logic to check/update data after the insert.
-   * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
+   * Runs for each inserted row after SQL, inside the mutation transaction.
+   * Throw to roll back. Use tableHooks.beforeEach to transform input data.
    */
   postValidate?: S extends DBSchema ? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 
@@ -352,13 +336,8 @@ export type UpdateRule<
   returningFields?: SelectRule<Cols>["fields"];
 
   /**
-   * Validation logic to check/update data for each request
-   */
-  validate?: S extends DBSchema ? ValidateUpdateRow<Cols, S> : ValidateUpdateRowBasic;
-
-  /**
-   * Validation logic to check/update data after the insert.
-   * Happens in the same transaction so upon throwing an error the record will be deleted (not committed)
+   * Runs for each updated row after SQL, inside the mutation transaction.
+   * Throw to roll back. Use tableHooks.beforeEach to transform input data.
    */
   postValidate?: S extends DBSchema ? PostValidateRow<Required<Cols>, S> : PostValidateRowBasic;
 

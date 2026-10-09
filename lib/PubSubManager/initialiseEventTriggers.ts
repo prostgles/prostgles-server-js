@@ -12,13 +12,13 @@ export async function initialiseEventTriggers(this: PubSubManager) {
   const { watchSchema } = this.dboBuilder.prostgles.opts;
   if (watchSchema && !(await getIsSuperUser(this.db))) {
     console.warn(
-      "prostgles watchSchema requires superuser db user. Will not watch using event triggers"
+      "prostgles watchSchema requires superuser db user. Will not watch using event triggers",
     );
   }
 
   try {
     /** We use these names because they include schema where necessary */
-    const allTableNames = Object.keys(this.dbo).filter((k) => this.dbo[k]?.tableOrViewInfo);
+    const allTableNames = [...this.dboBuilder.dboMap.keys()];
     const tableFilterQuery =
       allTableNames.length ?
         `OR table_name NOT IN (${allTableNames.map((tblName) => asValue(tblName)).join(", ")})`
@@ -77,7 +77,7 @@ export async function initialiseEventTriggers(this: PubSubManager) {
 
         COMMIT;
       `,
-      { EVENT_TRIGGER_TAGS }
+      { EVENT_TRIGGER_TAGS },
     );
 
     await this.db

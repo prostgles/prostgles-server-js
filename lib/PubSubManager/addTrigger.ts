@@ -26,13 +26,13 @@ export async function addTrigger(
       condition = "TRUE";
     }
 
-    if (this.dbo[table_name]?.tableOrViewInfo.isHyperTable) {
+    if (this.dboBuilder.dboMap.get(table_name)?.tableOrViewInfo.isHyperTable) {
       throw "Triggers do not work on timescaledb hypertables due to bug:\nhttps://github.com/timescale/timescaledb/issues/1084";
     }
 
-    const tableHandler = this.dbo[table_name];
+    const tableHandler = this.dboBuilder.dboMap.get(table_name);
     if (!tableHandler) {
-      throw `Cannot add trigger. Tablehandler for ${table_name} not found`;
+      throw `Cannot add trigger. Table handler for ${table_name} not found`;
     }
 
     const trgVals = {

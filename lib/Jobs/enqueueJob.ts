@@ -27,6 +27,29 @@ export const enqueueJob = async (
   const jobs = getJobTableHandler(prostgles, transaction);
   const table = definition.trigger.type === "row" ? definition.trigger.table : null;
   const tableSQL = prostgles.jobs.tableSQL;
+  const jobIdColumn =
+    definition.trigger.type === "row" ? definition.trigger.jobIdColumn : undefined;
+  const rowTable =
+    jobIdColumn !== undefined && table !== null ? transaction.dbx[table]! : undefined;
+  const ownerFilter = {
+    $and: Object.entries(owner).map(([column, value]) => ({ [column]: { $eq: value } })),
+  };
+  if (rowTable && options.reason === "rerun") {
+    // Match row-trigger lock ordering: the owner row before the job advisory lock.
+    await rowTable.find(ownerFilter, { select: "", limit: null, forUpdate: true });
+  }
+  const setJobId = async (jobId: string) => {
+    if (!rowTable || jobIdColumn === undefined) return { jobId, ownerRow: undefined };
+    // Internal bookkeeping must not recursively enqueue update-triggered jobs.
+    const ownerRow = await rowTable.update(
+      ownerFilter,
+      { [jobIdColumn]: jobId },
+      { returning: "*", multi: false },
+      undefined,
+      { bypassHooks: true },
+    );
+    return { jobId, ownerRow: ownerRow || undefined };
+  };
   // Serialize conflicts for this row without serializing writes to unrelated rows.
   await transaction.t.one("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
     stableStringify([tableSQL, name, table, owner]),
@@ -36,7 +59,7 @@ export const enqueueJob = async (
       job_name: name,
       occurrence: options.occurrence.toISOString(),
     });
-    if (existing) return { jobId: existing.id };
+    if (existing) return { jobId: existing.id, ownerRow: undefined };
   }
   const active = await jobs.findOne(
     {
@@ -47,7 +70,7 @@ export const enqueueJob = async (
     },
     { orderBy: { created_at: 1 } },
   );
-  if (active && definition.onConflict === "skip") return { jobId: active.id };
+  if (active && definition.onConflict === "skip") return setJobId(active.id);
   if (active && definition.onConflict === "replace") {
     await transaction.t.none(
       `
@@ -78,5 +101,5 @@ export const enqueueJob = async (
     delay_ms: definition.retry?.delayMs ?? 1000,
     backoff: definition.retry?.backoff ?? "fixed",
   });
-  return { jobId };
+  return setJobId(jobId);
 };

@@ -177,7 +177,7 @@ export async function testAudit(parentDb: DB) {
           CREATE TRIGGER audit_test_manual AFTER INSERT ON audit_test_source FOR EACH ROW EXECUTE FUNCTION audit_test_manual();`);
         const originalAudit = prgl.opts.audit;
         prgl.opts.audit = { ...audit, tableName: '"audit_events"' };
-        assert.throws(() => prgl.mergedTableConfig, /must exactly match/);
+        assert.throws(() => prgl.resolvedAuditConfig, /must exactly match/);
         prgl.opts.audit = originalAudit;
         assert.equal(prgl.resolvedAuditConfig?.tableName, audit.tableName);
         assert.deepEqual(prgl.resolvedAuditConfig.tables.audit_test_source, {
@@ -203,7 +203,10 @@ export async function testAudit(parentDb: DB) {
         prgl.opts.modifyClientSchema = originalModifyClientSchema;
         const mergedTriggers = prgl.mergedTableConfig.tableConfig!.audit_test_source!.triggers!;
         assert(mergedTriggers.audit_test_custom);
-        assert(Object.keys(mergedTriggers).some((name) => name.startsWith(AUDIT_TRIGGER_PREFIX)));
+        const tableTriggers = await db.any<{ tgname: string }>(
+          "SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_test_source'::regclass",
+        );
+        assert(tableTriggers.some(({ tgname }) => tgname.startsWith(AUDIT_TRIGGER_PREFIX)));
 
         const history = () => db.any(`SELECT * FROM "audit_events" ORDER BY id`);
         assert.equal((await history())[0].new_row.value, "mounted");
@@ -301,7 +304,11 @@ export async function testAudit(parentDb: DB) {
             clientInfo: undefined,
             resolvedPublishObject: { [auditName]: rule },
           });
-        for (const rule of ["*", true, { select: "*", insert: false, update: false, delete: false }] as const) {
+        for (const rule of [
+          "*",
+          true,
+          { select: "*", insert: false, update: false, delete: false },
+        ] as const) {
           const rules = await parseAuditRule(rule);
           assert(rules?.select);
           assert(!rules.insert && !rules.update && !rules.delete);

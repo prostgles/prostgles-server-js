@@ -1,7 +1,11 @@
 import type { TableDefinition } from "../TableConfig/TableConfigTypes";
 
 const shared = {
-  target_table: {}, user_id: {}, occurrence: {}, checkpoint: {}, progress: {},
+  target_table: {},
+  user_id: {},
+  occurrence: {},
+  checkpoint: {},
+  progress: {},
   backoff: { enum: ["fixed", "exponential"] },
   reason: { enum: ["trigger", "rerun"] },
 } as const;
@@ -32,13 +36,21 @@ export const jobTableConfig = {
     created_at: "TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()",
     finished_at: "TIMESTAMPTZ",
   },
-  check: { $or: [
-    { ...shared, status: "pending", error: {} },
-    { ...shared, status: "running", error: {}, lease_token: { $ne: null }, locked_until: { $ne: null } },
-    { ...shared, status: "succeeded", finished_at: { $ne: null } },
-    { ...shared, status: "failed", error: { $ne: null }, finished_at: { $ne: null } },
-    { ...shared, status: "cancelled", error: {}, finished_at: { $ne: null } },
-  ] },
+  check: {
+    $or: [
+      { ...shared, status: "pending", error: {} },
+      {
+        ...shared,
+        status: "running",
+        error: {},
+        lease_token: { $ne: null },
+        locked_until: { $ne: null },
+      },
+      { ...shared, status: "succeeded", finished_at: { $ne: null } },
+      { ...shared, status: "failed", error: { $ne: null }, finished_at: { $ne: null } },
+      { ...shared, status: "cancelled", error: {}, finished_at: { $ne: null } },
+    ],
+  },
   indexes: {
     occurrence: { unique: true, columns: "job_name, occurrence", where: "occurrence IS NOT NULL" },
     pending: { columns: "job_name, run_at", where: "status = 'pending'" },

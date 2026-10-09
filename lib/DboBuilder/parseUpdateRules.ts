@@ -1,10 +1,6 @@
 import type { AnyObject, FieldFilter, UpdateParams } from "prostgles-types";
 import { isDefined } from "prostgles-types";
-import type {
-  UpdateRule,
-  ValidateRowBasic,
-  ValidateUpdateRowBasic,
-} from "../PublishParser/PublishParser";
+import type { UpdateRule } from "../PublishParser/PublishParser";
 import { type ParsedTableRule } from "../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "./DboBuilder";
 import { prepareNewData } from "./TableHandler/DataValidator";
@@ -23,7 +19,6 @@ export async function parseUpdateRules(
   localParams?: LocalParams,
 ): Promise<{
   fields: string[];
-  validateRow?: ValidateRowBasic;
   finalUpdateFilter: AnyObject;
   forcedData?: AnyObject;
   forcedFilter?: AnyObject;
@@ -37,7 +32,6 @@ export async function parseUpdateRules(
 
   let forcedFilter: AnyObject | undefined = {},
     forcedData: AnyObject | undefined = {},
-    validate: ValidateUpdateRowBasic | undefined,
     returningFields: FieldFilter = "*",
     filterFields: FieldFilter | undefined = "*",
     fields: FieldFilter = "*";
@@ -46,7 +40,7 @@ export async function parseUpdateRules(
 
   if (tableRules) {
     if (!tableRules.update) throw "update rules missing for " + this.name;
-    ({ forcedFilter, forcedData, fields, filterFields, validate } = tableRules.update);
+    ({ forcedFilter, forcedData, fields, filterFields } = tableRules.update);
 
     returningFields = tableRules.update.returningFields;
 
@@ -156,28 +150,11 @@ export async function parseUpdateRules(
             tableHandler: this,
             columnsAddedFromBeforeHooks: [],
           });
-          let updateValidate: ValidateRowBasic | undefined;
-          if (validate) {
-            if (!localParams) throw "localParams missing";
-            updateValidate = (args) =>
-              validate!({
-                update: args.row,
-                filter: {},
-                dbx: this.getFinalDbo(localParams),
-                localParams,
-              });
-          }
           const updateQ = (
             await this.dataValidator.parse({
               command: "update",
               rows: [data],
               allowedCols,
-              dbTx: this.tx?.dbTX || this.dboBuilder.dbo,
-              tx: this.getTransaction(localParams)?.t || this.db,
-              validationOptions: {
-                validate: updateValidate,
-                localParams,
-              },
             })
           ).getQuery();
           const query = updateQ + " WHERE FALSE ";
@@ -199,21 +176,8 @@ export async function parseUpdateRules(
   /* Update all allowed fields (fields) except the forcedFilter (so that the user cannot change the forced filter values) */
   const _fields = this.parseFieldFilter(fields);
 
-  let validateRow: ValidateRowBasic | undefined;
-  if (validate) {
-    if (!localParams) throw "localParams missing";
-    validateRow = ({ row }) =>
-      validate({
-        update: row,
-        filter: finalUpdateFilter,
-        localParams,
-        dbx: this.getFinalDbo(localParams),
-      });
-  }
-
   return {
     fields: _fields,
-    validateRow,
     finalUpdateFilter,
     forcedData,
     forcedFilter,

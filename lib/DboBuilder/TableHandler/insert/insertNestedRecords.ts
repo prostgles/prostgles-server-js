@@ -93,7 +93,7 @@ export async function insertNestedRecords(
       throw new Error("dbTX missing for nested insert");
     }
     const insertResult: (AnyObject | undefined)[] = [];
-    for (const { row, colInserts, extraKeys } of insertedRowsWithNestedData) {
+    for (const { row, colInserts, extraKeys, ...beforeInfo } of insertedRowsWithNestedData) {
       const nestedInsertResult = await insertRowWithNestedRecords.bind(this)(
         {
           row,
@@ -101,6 +101,7 @@ export async function insertNestedRecords(
           extraKeys,
           dbTX,
           rootOnConflict,
+          preparedUpsertRow: rootOnConflict === "DoUpdate" ? { ...beforeInfo, row } : undefined,
         },
         {
           localParams,

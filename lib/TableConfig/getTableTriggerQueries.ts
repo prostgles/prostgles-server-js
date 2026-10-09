@@ -2,11 +2,15 @@ import { as } from "pg-promise";
 import { asName } from "prostgles-types";
 import type { DB } from "../initProstgles";
 import type { BaseTableDefinition } from "./TableConfigTypes";
-import { getManagedTriggerName, isManagedTriggerName } from "./managedTriggerNames";
+import {
+  getManagedTriggerName,
+  isManagedTriggerName,
+  MUTATION_TRIGGER_PREFIX,
+} from "./managedTriggerNames";
 
 /** Compare actual definitions so unchanged triggers do not cause schema refreshes. */
 export const getTableTriggerQueries = async (
-  db: DB,
+  db: Pick<DB, "any">,
   tableIdent: string,
   triggers: BaseTableDefinition["triggers"],
 ): Promise<string[]> => {
@@ -15,6 +19,7 @@ export const getTableTriggerQueries = async (
     type: number;
     enabled: string;
     function_name: string;
+    function_schema: string;
     query: string;
     old_table: string | null;
     new_table: string | null;
@@ -24,11 +29,11 @@ export const getTableTriggerQueries = async (
   }>(
     `
     SELECT t.tgname AS name, t.tgtype AS type, t.tgenabled AS enabled,
-      p.proname AS function_name, p.prosrc AS query, t.tgoldtable AS old_table,
+      p.proname AS function_name, n.nspname AS function_schema, p.prosrc AS query, t.tgoldtable AS old_table,
       t.tgnewtable AS new_table, t.tgnargs AS args,
       (t.tgqual IS NULL AND t.tgattr::text = '' AND t.tgconstraint = 0) AS unconditional,
       p.oid = to_regprocedure(quote_ident(p.proname) || '()') AS visible_function
-    FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+    FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE t.tgrelid = to_regclass($1) AND NOT t.tgisinternal AND t.tgparentid = 0
   `,
     [tableIdent],
@@ -37,7 +42,10 @@ export const getTableTriggerQueries = async (
   const desired = new Set<string>();
   const actionBits = { insert: 4, delete: 8, update: 16, truncate: 32 };
   for (const [functionName, trigger] of Object.entries(triggers ?? {})) {
-    const functionIdent = asName(functionName);
+    const functionIdent = [trigger.functionSchema, functionName]
+      .filter((part) => part !== undefined)
+      .map(asName)
+      .join(".");
     let functionAdded = false;
     for (const action of trigger.actions) {
       const name = getManagedTriggerName(functionName, action);
@@ -79,7 +87,9 @@ export const getTableTriggerQueries = async (
         previous.new_table === newTable &&
         !previous.args &&
         previous.unconditional &&
-        previous.visible_function
+        (trigger.functionSchema ?
+          previous.function_schema === trigger.functionSchema
+        : previous.visible_function)
       )
         continue;
       if (!functionAdded) {
@@ -93,8 +103,12 @@ export const getTableTriggerQueries = async (
         ${transitionTables} FOR EACH ${trigger.forEach} EXECUTE FUNCTION ${functionIdent}();`);
     }
   }
+  const hasCaptureConfig = [...desired].some((name) => name.startsWith(MUTATION_TRIGGER_PREFIX));
   for (const trigger of existing) {
     const managed = isManagedTriggerName(trigger.name);
+    // Capture definitions are shared and inert outside a scoped mutation. Another
+    // instance can still need them after this instance removes its hooks/publish.
+    if (trigger.name.startsWith(MUTATION_TRIGGER_PREFIX) && !hasCaptureConfig) continue;
     if (managed && !desired.has(trigger.name)) {
       queries.push(`DROP TRIGGER ${asName(trigger.name)} ON ${tableIdent};`);
     }

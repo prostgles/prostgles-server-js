@@ -1,5 +1,9 @@
 import { enqueueRowJobs } from "../../Jobs/enqueueRowJobs";
-import { JOB_PREVIOUS_ROW } from "../../Jobs/getJobUpdateQuery";
+import {
+  captureMutation,
+  getMutationRowKeyQuery,
+  type CapturedMutation,
+} from "../../TableHooks/captureMutation";
 import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgles-types";
 import { asName, isDefined } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
@@ -9,15 +13,10 @@ import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
-
-export type RunAfterHooks = (
-  args: Parameters<typeof executeAfterHooksCheckAndPostValidation>[0],
-) => void | Promise<void>;
+import { MUTATION_METADATA } from "../../TableHooks/mutationMetadata";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
-  runAfterHooks?: RunAfterHooks;
-  includePreviousRowForJob?: boolean;
   queryWithoutUserRLS: string;
   localParams: LocalParams | undefined;
   fields: FieldFilter | undefined;
@@ -30,7 +29,8 @@ type RunInsertUpdateQueryArgs = {
       data: AnyObject | AnyObject[];
       isMultiInsert: boolean;
       nestedInsertsResultsObj?: undefined;
-      conflictResult?: { skipped: boolean };
+      isConflictUpdate: boolean;
+      conflictUpdateRule: UpdateRule | undefined;
     }
   | {
       command: "update";
@@ -60,8 +60,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
     params?.returning,
     tableHandler.parseFieldFilter(returningFields),
   );
-  const { checkFilter } = rule ?? {};
-  const checkCondition = await (async () => {
+  const getCheckCondition = async (checkFilter: InsertRule["checkFilter"]) => {
     if (!checkFilter) {
       return "FALSE";
     }
@@ -72,23 +71,41 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       filter: checkFilter,
       addWhere: false,
     });
-    return `NOT (${checkCond.where})`;
-  })();
+    return `(${checkCond.where}) IS NOT TRUE`;
+  };
+  const checkCondition = await getCheckCondition(rule?.checkFilter);
+  const conflictUpdateRule = args.command === "insert" ? args.conflictUpdateRule : undefined;
+  const updateCheckCondition = await getCheckCondition(conflictUpdateRule?.checkFilter);
+  const isUpsert = args.command === "insert" && args.isConflictUpdate;
+  // Ordinary publish checks already have the affected rows and a known command.
+  const needsCapture =
+    tableHandler.shouldWrapInTx(
+      { name: command, rule: isUpsert ? rule : undefined },
+      localParams,
+      [],
+    ).hasAfterChecks ||
+    (isUpsert &&
+      tableHandler.shouldWrapInTx({ name: "update", rule: conflictUpdateRule }, localParams, [])
+        .hasAfterChecks);
   const hasReturning = !!returningSelectItems.length;
   const userRLS = withUserRLS(localParams, "", !!tableHandler.getTransaction(localParams));
-  const CHECK_CONDITION_ALIAS = "prostgles_check_condition";
   const RETURNING_ALIAS_PREFIX = "prostgles_returning_";
+  if (
+    [
+      MUTATION_METADATA.checkCondition,
+      MUTATION_METADATA.updateCheckCondition,
+      MUTATION_METADATA.rowKey,
+    ].some((key) => tableHandler.columnSet.has(key))
+  )
+    throw new Error(`Mutation metadata conflicts with a column on ${name}`);
   const returningSelectKeyRemap = new Map<string, string>();
   const query = ` 
     ${userRLS} 
     ${queryWithoutUserRLS}
     RETURNING ${[
       `${tableHandler.escapedName}.*`,
-      ...(args.includePreviousRowForJob ?
-        [
-          `jsonb_build_object('old', ${asName(JOB_PREVIOUS_ROW)},
-        'new', to_jsonb(${asName(tableHandler.tableOrViewInfo.qualifiedNameParts.name)})) AS ${asName(JOB_PREVIOUS_ROW)}`,
-        ]
+      ...(needsCapture ?
+        [`${getMutationRowKeyQuery(tableHandler)} AS ${MUTATION_METADATA.rowKey}`]
       : []),
       getSelectItemQuery(
         returningSelectItems
@@ -116,7 +133,8 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
           })
           .filter(isDefined),
       ),
-      `${checkCondition} as ${CHECK_CONDITION_ALIAS}`,
+      `${checkCondition} as ${MUTATION_METADATA.checkCondition}`,
+      `${updateCheckCondition} as ${MUTATION_METADATA.updateCheckCondition}`,
     ].filter(Boolean)}
   `;
 
@@ -125,14 +143,12 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   const queryType = "any";
 
   const tx = tableHandler.getTransaction(localParams)?.t;
-  const queryPromise: Promise<
-    {
-      [CHECK_CONDITION_ALIAS]: boolean;
-      [key: string]: unknown;
-    }[]
-  > = tx ? tx[queryType](query) : tableHandler.db.tx((t) => t[queryType](query));
-
-  const result = await queryPromise.catch((err: unknown) =>
+  const { result, mutations } = await (
+    needsCapture ?
+      captureMutation<AnyObject>(tableHandler, localParams, query)
+    : (tx ? tx[queryType](query) : tableHandler.db.tx((t) => t[queryType](query))).then(
+        (result) => ({ result, mutations: [] as CapturedMutation[] }),
+      )).catch((err: unknown) =>
     rejectWithPGClientError(err, {
       type: "tableMethod",
       localParams,
@@ -141,23 +157,41 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       prostgles: tableHandler.dboBuilder.prostgles,
     }),
   );
-
-  if (!result.length && args.command === "insert" && args.conflictResult) {
-    args.conflictResult.skipped = true;
-    return;
+  const mutationsByRow = new Map<string, CapturedMutation[]>();
+  for (const mutation of mutations) {
+    const matching = mutationsByRow.get(mutation.rowKey) ?? [];
+    matching.push(mutation);
+    mutationsByRow.set(mutation.rowKey, matching);
   }
-
-  if (checkFilter && result.some((row) => row[CHECK_CONDITION_ALIAS])) {
-    throw new Error(
-      `Insert ${name} records failed the check condition: ${JSON.stringify(checkFilter, null, 2)}`,
-    );
-  }
+  const batches = new Map<
+    "insert" | "update",
+    {
+      rows: AnyObject[];
+      changedFields: (string[] | null)[];
+    }
+  >();
 
   const rowCount = Number(result.length);
   const returningRows = hasReturning ? ([] as AnyObject[]) : undefined;
 
   const tableRows = result.map((row) => {
-    const { [CHECK_CONDITION_ALIAS]: _checkCondition, ...tableRowWithReturning } = row;
+    const {
+      [MUTATION_METADATA.checkCondition]: insertCheckFailed,
+      [MUTATION_METADATA.updateCheckCondition]: updateCheckFailed,
+      [MUTATION_METADATA.rowKey]: rowKey,
+      ...tableRowWithReturning
+    } = row;
+    const mutation = needsCapture ? mutationsByRow.get(rowKey)?.shift() : undefined;
+    if (needsCapture && !mutation) throw new Error(`Missing captured mutation for ${name}`);
+    const actualCommand = mutation?.command ?? command;
+    if (actualCommand === "delete") throw new Error("Unexpected delete in insert/update capture");
+    if (
+      actualCommand === "update" && args.command === "insert" ?
+        updateCheckFailed
+      : insertCheckFailed
+    ) {
+      throw new Error(`${actualCommand} ${name} records failed the check condition`);
+    }
     if (returningRows) {
       const returningRow: AnyObject = {};
       for (const [newAlias, expectedAlias] of returningSelectKeyRemap.entries()) {
@@ -169,22 +203,61 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       returningRows.push(returningRow);
     }
 
-    return tableRowWithReturning;
+    const tableRow = mutation?.row ?? tableRowWithReturning;
+    const batch = batches.get(actualCommand) ?? { rows: [], changedFields: [] };
+    batch.rows.push(tableRow);
+    batch.changedFields.push(mutation?.changedFields ?? null);
+    batches.set(actualCommand, batch);
+    return tableRow;
   });
 
-  await enqueueRowJobs(tableHandler, command, tableRows, localParams);
-  if (args.includePreviousRowForJob)
-    tableRows.forEach((row) => {
-      delete row[JOB_PREVIOUS_ROW];
+  if (!batches.size && !isUpsert) {
+    batches.set(command, { rows: [], changedFields: [] });
+  }
+  const linkedRows = new Map<AnyObject, Record<string, any>>();
+  for (const [actualCommand, { rows, changedFields }] of batches) {
+    const linked = await enqueueRowJobs(
+      tableHandler,
+      actualCommand,
+      rows,
+      localParams,
+      changedFields,
+    );
+    linked?.forEach((owner, row) => linkedRows.set(row, owner));
+  }
+  if (returningRows && linkedRows.size) {
+    const returningExpressions = returningSelectItems.filter((item) => item.type !== "column");
+    for (const [index, row] of tableRows.entries()) {
+      const owner = linkedRows.get(row);
+      if (!owner) continue;
+      const returningRow = returningRows[index]!;
+      for (const item of returningSelectItems) {
+        if (item.type === "column") returningRow[item.alias] = row[item.columnName!];
+      }
+      if (!returningExpressions.length) continue;
+      const where = Object.keys(owner)
+        .map((key, i) => `${asName(key)} = $${i + 1}`)
+        .join(" AND ");
+      const expressionValues = await tx!.one<AnyObject>(
+        `SELECT ${getSelectItemQuery(returningExpressions)} FROM ${tableHandler.escapedName} WHERE ${where}`,
+        Object.values(owner),
+      );
+      Object.assign(returningRow, expressionValues);
+    }
+  }
+  for (const [actualCommand, { rows, changedFields }] of batches) {
+    await executeAfterHooksCheckAndPostValidation({
+      tableHandler,
+      operation:
+        actualCommand === "insert" ?
+          { name: "insert", rule: args.command === "insert" ? args.rule : undefined }
+        : { name: "update", rule: args.command === "update" ? args.rule : conflictUpdateRule },
+      localParams,
+      rows,
+      data,
+      changedFields,
     });
-
-  await (args.runAfterHooks ?? executeAfterHooksCheckAndPostValidation)({
-    tableHandler,
-    operation: command === "insert" ? { name: "insert", rule } : { name: "update", rule },
-    localParams,
-    rows: tableRows,
-    data,
-  });
+  }
 
   let returnMany = false;
   if (args.command === "update") {

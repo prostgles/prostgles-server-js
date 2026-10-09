@@ -57,26 +57,28 @@ export const updateConfiguration = async (
 
   if (isEmpty(newOpts)) return;
 
-  if (
-    optionsThatChanged.every((updatedKey) => nonOnReadyUpdateKeys.some((key) => key === updatedKey))
-  ) {
-    return;
-  }
+  const onlyUpdatesHooks = optionsThatChanged.every((updatedKey) =>
+    nonOnReadyUpdateKeys.some((key) => key === updatedKey),
+  );
+  const onlyUpdatesClients = optionsThatChanged.every((updatedKey) =>
+    clientOnlyUpdateKeys.some((key) => key === updatedKey),
+  );
 
   /**
    * Some of these changes require clients to reconnect
    * While others also affect the server and onReady should be called
    */
-  if (
-    optionsThatChanged.every((updatedKey) => clientOnlyUpdateKeys.some((key) => key === updatedKey))
-  ) {
-    prgl.setupSocketIO();
-  } else {
-    await prgl.init(onReady, {
-      type: "prgl.update",
-      newOpts,
-    });
+  if (onlyUpdatesHooks || onlyUpdatesClients) {
+    if (includes(optionsThatChanged, "tableHooks") || includes(optionsThatChanged, "publish")) {
+      await prgl.tableConfigurator!.sync();
+    }
+    if (onlyUpdatesClients) prgl.setupSocketIO();
+    return;
   }
+  await prgl.init(onReady, {
+    type: "prgl.update",
+    newOpts,
+  });
 };
 
 /**

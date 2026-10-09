@@ -28,7 +28,19 @@ export const createProstgles = <
 };
 export * from "./PublishParser/defineServerFunction";
 export { createJobDefiner } from "./Jobs/JobTypes";
-export type { JobsConfig, JobsOptions, JobDefinition, JobContext, RowTrigger, ScheduleTrigger, ParamsSchema, ParamsOutput, Jobs, JobRecord, JobStatus } from "./Jobs/JobTypes";
+export type {
+  JobsConfig,
+  JobsOptions,
+  JobDefinition,
+  JobContext,
+  RowTrigger,
+  ScheduleTrigger,
+  ParamsSchema,
+  ParamsOutput,
+  Jobs,
+  JobRecord,
+  JobStatus,
+} from "./Jobs/JobTypes";
 export * from "./Auth/AuthTypes";
 export type { ExecutionContext, FunctionInvocation, TriggerInvocation } from "./ExecutionContext";
 
@@ -48,6 +60,7 @@ export type {
 export type { ClientDBHandlerRequest, GetClientDBHandlers } from "./WebsocketAPI/getClientHandlers";
 export type { DBOFullyTyped, DBOFullyTypedClient } from "./DBSchemaBuilder/DBSchemaBuilder";
 export type { DBHandlerServer } from "./Prostgles";
+export type { ServerSelectParams } from "./DboBuilder/ViewHandler/find";
 export type { StorageClient as CloudClient } from "./StorageClient/StorageClientTypes";
 export * from "./StorageClient/getLocalStorageClient";
 export type {

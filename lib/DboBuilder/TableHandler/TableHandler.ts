@@ -29,7 +29,7 @@ import type { JoinPaths } from "../ViewHandler/ViewHandler";
 import { ViewHandler } from "../ViewHandler/ViewHandler";
 import { DataValidator } from "./DataValidator";
 import { _delete } from "./delete";
-import { insert } from "./insert/insert";
+import { insert, type InsertedRowWithInfo } from "./insert/insert";
 import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
@@ -83,7 +83,10 @@ export class TableHandler extends ViewHandler {
     this.is_media = dboBuilder.prostgles.isMedia(this.name);
   }
 
-  getBeforeHooks = (command: "update" | "insert", rows: AnyObject[]) => {
+  getBeforeHooks = (
+    command: "insert" | "insertOnConflictDoUpdate" | "update",
+    rows: AnyObject[],
+  ) => {
     return (
       this.hooks?.beforeEach?.filter((hook) => isApplicableHook(this, rows, hook, command)) ?? []
     );
@@ -92,11 +95,11 @@ export class TableHandler extends ViewHandler {
   beforeEach = async (
     row: AnyObject,
     localParams: LocalParams | undefined,
-    command: "insert" | "update",
+    command: "insert" | "insertOnConflictDoUpdate" | "update",
     filter: AnyObject | undefined,
   ) => {
     const transaction = this.getTransaction(localParams);
-    const hooks = this.getBeforeHooks(command, [row]);
+    const hooks = localParams?.bypassHooks ? [] : this.getBeforeHooks(command, [row]);
     if (hooks.length && transaction && localParams?.isRemoteRequest) {
       await transaction.t.none(withUserRLS(localParams, ""));
     }
@@ -106,6 +109,13 @@ export class TableHandler extends ViewHandler {
     for (const hook of hooks) {
       const isApplicable = isApplicableHook(this, [newRow], hook, command);
       if (!isApplicable) continue;
+      if (command === "insertOnConflictDoUpdate") {
+        if (!hook.commands.insert || !hook.commands.update) {
+          throw new Error(
+            `ON CONFLICT DO UPDATE on ${this.name} requires applicable beforeEach hooks to target both insert and update`,
+          );
+        }
+      }
       const hookResult = await runTableHook(this, [newRow], () =>
         hook.validate({
           ...this.getTransactionCallbacks(localParams),
@@ -158,7 +168,8 @@ export class TableHandler extends ViewHandler {
     if (postValidate && !localParams) {
       throw new Error("Unexpected: no localParams for postValidate");
     }
-    const afterEachHooks = this.hooks?.afterEach
+    const hooks = localParams?.bypassHooks ? undefined : this.hooks;
+    const afterEachHooks = hooks?.afterEach
       ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
@@ -172,7 +183,7 @@ export class TableHandler extends ViewHandler {
       })
       .filter(isDefined);
 
-    const afterAllHooks = this.hooks?.afterAll
+    const afterAllHooks = hooks?.afterAll
       ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
@@ -185,7 +196,7 @@ export class TableHandler extends ViewHandler {
         } as const;
       })
       .filter(isDefined);
-    const afterCommitHooks = this.hooks?.afterCommit
+    const afterCommitHooks = hooks?.afterCommit
       ?.map((hook, index) => {
         const { commands } = hook;
         if (!commands[command.name]) {
@@ -221,9 +232,12 @@ export class TableHandler extends ViewHandler {
     const transaction = this.getTransaction(localParams);
     const hasAfterChecks =
       this.getAfterHooksAndChecks(command, localParams).length > 0 ||
-      this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, command.name);
+      (!localParams?.bypassHooks &&
+        this.dboBuilder.prostgles.jobs.hasRowTrigger(this.name, command.name));
     const hasBeforeHooks =
-      command.name !== "delete" && this.getBeforeHooks(command.name, newRows).length > 0;
+      !localParams?.bypassHooks &&
+      command.name !== "delete" &&
+      this.getBeforeHooks(command.name, newRows).length > 0;
     return {
       shouldWrap:
         !transaction && (hasAfterChecks || hasBeforeHooks || this.hooks?.onInsteadOfDelete),
@@ -246,8 +260,16 @@ export class TableHandler extends ViewHandler {
     param3_unused?: undefined,
     tableRules?: ParsedTableRule,
     _localParams?: LocalParams,
+    preparedNestedRows?: InsertedRowWithInfo[],
   ): Promise<any> {
-    return insert.bind(this)(rowOrRows, param2, param3_unused, tableRules, _localParams);
+    return insert.bind(this)(
+      rowOrRows,
+      param2,
+      param3_unused,
+      tableRules,
+      _localParams,
+      preparedNestedRows,
+    );
   }
   async insertMany(
     rows: AnyObject[],
