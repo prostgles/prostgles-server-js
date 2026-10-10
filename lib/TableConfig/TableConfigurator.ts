@@ -1,6 +1,6 @@
 import type { ColumnInfo } from "prostgles-types";
 import { isObject } from "prostgles-types";
-import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { DB, DBHandlerServerInternal, Prostgles } from "../Prostgles";
 import {
   DEFAULT_SYNC_BATCH_SIZE,
   DEFAULT_SYNC_THROTTLE,
@@ -19,7 +19,7 @@ export class TableConfigurator {
   get config() {
     return this.prostgles.mergedTableConfig.tableConfig ?? {};
   }
-  get dbo(): DBHandlerServer {
+  get dbo(): DBHandlerServerInternal {
     if (!this.prostgles.dbo) throw "this.prostgles.dbo missing";
     return this.prostgles.dbo;
   }

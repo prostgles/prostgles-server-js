@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import { once } from "node:events";
 import express from "express";
 import pgPromise from "pg-promise";
-import type { DB, DBHandlerServer } from "prostgles-server";
+import type { DB, DBHandlerServerInternal } from "prostgles-server";
 import type { LocalParams } from "prostgles-server/dist/DboBuilder/DboBuilderTypes";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
 import { lockFileForUpdate } from "prostgles-server/dist/DboBuilder/TableHandler/updateFile";
@@ -16,7 +16,7 @@ import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileSt
 import { deleteUnreferencedFile } from "prostgles-server/dist/StorageClient/deleteUnreferencedFile";
 import { testFileJobs } from "./fileJobs.spec";
 
-export const testFileStorage = async (dbo: DBHandlerServer, db: DB) => {
+export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
   await testFileJobs(db);
   await test("Managed storage permission and transaction safety", async (t) => {
     const files = dbo.files as TableHandler;

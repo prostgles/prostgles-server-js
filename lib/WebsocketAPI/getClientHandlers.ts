@@ -9,7 +9,7 @@ import {
 } from "prostgles-types";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
-import type { DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServerRestricted } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { Prostgles } from "../Prostgles";
 import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
@@ -19,12 +19,14 @@ import { getClientSchema } from "./getClientSchema";
 
 export type ClientHandlers<S = void> = {
   clientSql: SQLHandler;
-  clientDb: DBOFullyTypedClient<S>;
+  clientDb: DBHandlerServerRestricted<S>;
   /**
    * Runs permission-checked table operations in a transaction. Requires transactions: true.
    * Caught table request errors also roll back the transaction.
    */
-  withClientDbTx: <R>(callback: (clientDb: DBOFullyTypedClient<S>) => R | Promise<R>) => Promise<R>;
+  withClientDbTx: <R>(
+    callback: (clientDb: DBHandlerServerRestricted<S>) => R | Promise<R>,
+  ) => Promise<R>;
   clientMethods: Record<string, ServerFunctionDefinition>;
   clientSchema: ClientSchema;
 };
@@ -39,9 +41,7 @@ export type ClientDBHandlerRequest =
       res?: never;
     };
 
-export type GetClientDBHandlers<ClientSchema = void> = <
-  NarrowedClientSchema = ClientSchema,
->(
+export type GetClientDBHandlers<ClientSchema = void> = <NarrowedClientSchema = ClientSchema>(
   clientReq: ClientDBHandlerRequest,
   scope: PermissionScope | undefined,
 ) => Promise<ClientHandlers<NarrowedClientSchema>>;
@@ -117,7 +117,7 @@ export const getClientHandlers = async <S = void>(
     return sqlHandler(query, params, options);
   }) as SQLHandler;
 
-  const clientDb = getTableHandlers() as unknown as DBOFullyTypedClient<S>;
+  const clientDb = getTableHandlers() as unknown as DBHandlerServerRestricted<S>;
 
   const withClientDbTx: ClientHandlers<S>["withClientDbTx"] = async (callback) => {
     prostgles.checkNotDestroyed();
@@ -134,7 +134,7 @@ export const getClientHandlers = async <S = void>(
         ...getTableHandlers(transactionHandlers, (error) => {
           failure ??= { error };
         }),
-      } as unknown as DBOFullyTypedClient<S>);
+      } as unknown as DBHandlerServerRestricted<S>);
       if (failure) throw failure.error;
       return result;
     });

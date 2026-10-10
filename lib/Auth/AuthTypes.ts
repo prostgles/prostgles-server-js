@@ -24,7 +24,7 @@ import type {
   MaybePromise,
   UserLike,
 } from "prostgles-types";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
@@ -208,7 +208,7 @@ export type LoginWithOAuthConfig<S> = {
    */
   onProviderLoginStart?: (data: {
     provider: IdentityProvider;
-    dbo: DBOFullyTyped<S>;
+    dbo: DBHandlerServer<S>;
     db: DB;
     req: ExpressReq;
     res: ExpressRes;
@@ -223,7 +223,7 @@ export type LoginWithOAuthConfig<S> = {
   onProviderLoginFail?: (data: {
     provider: IdentityProvider;
     error: any;
-    dbo: DBOFullyTyped<S>;
+    dbo: DBHandlerServer<S>;
     db: DB;
     req: ExpressReq;
     res: ExpressRes;
@@ -285,7 +285,7 @@ export type AuthResultOrError<SU = SessionUser> =
 
 export type AuthRequestParams<S, SUser extends SessionUser> = {
   db: DB;
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   getUser: () => Promise<AuthResultWithSID<SUser>>;
 };
 
@@ -318,7 +318,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    */
   getUser: (
     sid: string | undefined,
-    dbo: DBOFullyTyped<S>,
+    dbo: DBHandlerServer<S>,
     db: DB,
     client: LoginClientInfo,
     reqInfo: NetworkClientRequest,
@@ -329,7 +329,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    */
   findUser: (
     userFilter: FullFilter<void, void>,
-    dbo: DBOFullyTyped<S>,
+    dbo: DBHandlerServer<S>,
   ) => Awaitable<SUser["user"] | undefined>;
 
   /**
@@ -355,7 +355,11 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
    * If provided then session info will be saved on socket.__prglCache and reused from there
    */
   cacheSession?: {
-    getSession: (sid: string, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<BasicSession | undefined>;
+    getSession: (
+      sid: string,
+      dbo: DBHandlerServer<S>,
+      db: DB,
+    ) => Awaitable<BasicSession | undefined>;
   };
 };
 
@@ -446,7 +450,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    */
   onMagicLinkOrOTP?: (
     data: MagicLinkOrOTPData,
-    dbo: DBOFullyTyped<S>,
+    dbo: DBHandlerServer<S>,
     db: DB,
     client: LoginClientInfo,
   ) => Awaitable<
@@ -476,11 +480,11 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    */
   login: (
     params: LoginParams,
-    dbo: DBOFullyTyped<S>,
+    dbo: DBHandlerServer<S>,
     db: DB,
     client: LoginClientInfo,
     getMagicLinkUrl: (data: MagicLinkOrOTPData, websiteUrl: string) => string,
   ) => Awaitable<LoginResponse>;
 
-  logout: (sid: string | undefined, dbo: DBOFullyTyped<S>, db: DB) => Awaitable<void>;
+  logout: (sid: string | undefined, dbo: DBHandlerServer<S>, db: DB) => Awaitable<void>;
 };

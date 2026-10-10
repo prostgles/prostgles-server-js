@@ -17,8 +17,8 @@ import { RestApi } from "./RestApi";
 import { TableConfigurator } from "./TableConfig/TableConfigurator";
 
 import type { ClientSocketWithCachedData } from "./DboBuilder/DboBuilder";
-import { DBHandlerServer, DboBuilder } from "./DboBuilder/DboBuilder";
-export { DBHandlerServer };
+import { type DBHandlerServerInternal, DboBuilder } from "./DboBuilder/DboBuilder";
+export type { DBHandlerServerInternal, DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
 export { getEmailSender, getOrSetTransporter, verifySMTPConfig } from "./Auth/sendEmail";
 export { applyTableConfig } from "./TableConfig/applyTableConfig";
@@ -50,7 +50,7 @@ export const TABLE_METHODS = [
 */
 
 export type OnReady = {
-  dbo: DBHandlerServer;
+  dbo: DBHandlerServerInternal;
   db: DB;
 };
 
@@ -68,7 +68,7 @@ import type { TableHandler } from "./DboBuilder/TableHandler/TableHandler";
 import { dirname } from "path";
 import { parseAuditConfig } from "./Audit/parseAuditConfig";
 import { getMergedTableConfig } from "./TableConfig/getMergedTableConfig";
-import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "./DBSchemaBuilder/DBSchemaBuilder";
 import { JobManager } from "./Jobs/JobManager";
 
 export class Prostgles {
@@ -94,7 +94,7 @@ export class Prostgles {
   db?: DB;
   adminClient?: Awaited<ReturnType<typeof getAdminClient>>;
   pgp?: PGP;
-  dbo?: DBHandlerServer;
+  dbo?: DBHandlerServerInternal;
   _dboBuilder?: DboBuilder;
   get dboBuilder(): DboBuilder {
     if (!this._dboBuilder) {
@@ -277,7 +277,7 @@ export class Prostgles {
     try {
       const context = await createContext({
         db: this.db,
-        dbo: this.dbo as DBOFullyTyped<void>,
+        dbo: this.dbo as DBHandlerServer<void>,
         sql: this.dboBuilder.sql,
         tables: this.dboBuilder.tables,
         reason,

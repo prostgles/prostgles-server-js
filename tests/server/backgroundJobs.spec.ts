@@ -2,14 +2,18 @@ import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import pgPromise from "pg-promise";
-import { ROW_ACTIONS_COLUMN } from "prostgles-types";
+import { ROW_ACTIONS_COLUMN, type AnyObject } from "prostgles-types";
 import prostgles, {
   createJobDefiner,
   defineFunction,
+  type DBOFullyTyped,
   type InitResult,
   type JobRecord,
   type JobsConfig,
+  type JobsOptions,
+  type ParamsSchema,
   type ProstglesInitOptions,
+  type RowTrigger,
 } from "prostgles-server";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import type { JobInsertRecord } from "prostgles-server/dist/Jobs/JobTypes";
@@ -20,7 +24,6 @@ import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler
 import { createServerSideRequest } from "prostgles-server/dist/Auth/utils/serverSideRequest";
 import type { AuthClientRequest } from "prostgles-server/dist/Auth/AuthTypes";
 import { runClientRequest } from "prostgles-server/dist/runClientRequest";
-import { checkTypes } from "./clientSchemaTypes.spec";
 
 export const testBackgroundJobs = async (parentDb: DB) => {
   await test("configured jobs", { timeout: 60_000 }, async (t) => {
@@ -106,9 +109,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       auth: {
         getUser: () => undefined,
         findUser: (filter) => {
-          const filters = "$and" in filter ? filter.$and! : [filter];
+          const filters: AnyObject[] = "$and" in filter ? filter.$and! : [filter];
           const id = filters[0]?.id;
-          return typeof id === "string" && id !== "deleted" && filters.every((f) => f.id === id) ?
+          return typeof id === "string" && id !== "deleted" && filters.every((userFilter) => userFilter.id === id) ?
               { id, type: id === "admin" ? "admin" : "member" }
             : undefined;
         },
@@ -291,50 +294,56 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       assert.equal(instance.getSchema().find(({ name }) => name === queueName)?.schema, "public");
       assert((await instance.getTSSchema()).tsSchema.includes(queueName));
       await t.test("types enforce params, rows and schedule context", () => {
-        checkTypes(
-          "",
-          `
-          import { createJobDefiner, type DBOFullyTyped, type ParamsSchema, type JobsOptions, type RowTrigger } from "../server/node_modules/prostgles-server";
-          import { ROW_ACTIONS_COLUMN } from "../../node_modules/prostgles-types";
-          type S = { records: { columns: { id: number; revision: number } }; other: { columns: { name: string } } };
-          const checkActions = async (dbo: DBOFullyTyped<S>) => {
-            const rows = await dbo.records.find({}, { select: { id: 1, [ROW_ACTIONS_COLUMN]: 1 } });
-            rows[0]![ROW_ACTIONS_COLUMN] satisfies string[];
-            // @ts-expect-error the projection excludes revision
-            rows[0]!.revision;
-            const projected = await dbo.records.find({}, { select: [ROW_ACTIONS_COLUMN] });
-            projected[0]![ROW_ACTIONS_COLUMN] satisfies string[];
-          };
-          const defineJob = createJobDefiner<S>();
-          const invalidTrigger: RowTrigger<S, "records"> = {
-            type: "row", table: "records", on: ["insert"],
-            // @ts-expect-error unknown job ID column
-            jobIdColumn: "missing",
-          };
-          const definitions = {
-            process: defineJob({
-              trigger: { type: "row", table: "records", on: ["insert"], columns: ["revision"] },
-              params: { limit: { jsonbSchema: { type: "number" }, default: 10 }, note: { jsonbSchema: { type: "string" }, optional: true } },
-              run: async ({ row, params, dbo }) => {
-                row.revision satisfies number;
-                params.limit satisfies number;
-                params.note satisfies string | undefined;
-                void dbo.other.find;
-                // @ts-expect-error unknown row column
-                void row.name;
-                // @ts-expect-error unknown parameter
-                void params.typo;
-              },
-            }),
-            scheduled: defineJob({ trigger: { type: "schedule", cron: "0 * * * *" }, run: async ({ row }) => { row satisfies undefined; } }),
-          };
-          const options: JobsOptions<S> = { definitions };
-          const invalid: ParamsSchema = {
-            // @ts-expect-error required parameters need a default
-            required: { jsonbSchema: { type: "string" } },
-          };
-        `,
-        );
+        type JobSchema = {
+          records: { columns: { id: number; revision: number } };
+          other: { columns: { name: string } };
+        };
+        const checkActions = async (dbo: DBOFullyTyped<JobSchema>) => {
+          const rows = await dbo.records.find({}, { select: { id: 1, [ROW_ACTIONS_COLUMN]: 1 } });
+          rows[0]![ROW_ACTIONS_COLUMN] satisfies string[];
+          // @ts-expect-error the projection excludes revision
+          rows[0]!.revision;
+          const projected = await dbo.records.find({}, { select: [ROW_ACTIONS_COLUMN] });
+          projected[0]![ROW_ACTIONS_COLUMN] satisfies string[];
+        };
+        const defineJob = createJobDefiner<JobSchema>();
+        const invalidTrigger: RowTrigger<JobSchema, "records"> = {
+          type: "row", table: "records", on: ["insert"],
+          // @ts-expect-error unknown job ID column
+          jobIdColumn: "missing",
+        };
+        const definitions = {
+          process: defineJob({
+            trigger: { type: "row", table: "records", on: ["insert"], columns: ["revision"] },
+            params: {
+              limit: { jsonbSchema: { type: "number" }, default: 10 },
+              note: { jsonbSchema: { type: "string" }, optional: true },
+            },
+            run: async ({ row, params, dbo }) => {
+              row.revision satisfies number;
+              params.limit satisfies number;
+              params.note satisfies string | undefined;
+              await dbo.other.find();
+              // @ts-expect-error unknown row column
+              void row.name;
+              // @ts-expect-error unknown parameter
+              void params.typo;
+            },
+          }),
+          scheduled: defineJob({
+            trigger: { type: "schedule", cron: "0 * * * *" },
+            run: ({ row }) => {
+              row satisfies undefined;
+              return Promise.resolve();
+            },
+          }),
+        };
+        const options: JobsOptions<JobSchema> = { definitions };
+        const invalid: ParamsSchema = {
+          // @ts-expect-error required parameters need a default
+          required: { jsonbSchema: { type: "string" } },
+        };
+        void [checkActions, options, invalid, invalidTrigger];
       });
       await t.test("row and job commit together; rollback and hooks remove the job", async () => {
         const before = (await records()).length;
@@ -631,7 +640,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const subscription = await handler.subscribe(
           { id: job.id },
           { select },
-          (rows: { [ROW_ACTIONS_COLUMN]: string[] }[]) => {
+          (rows) => {
             observedActions = rows[0]?.[ROW_ACTIONS_COLUMN];
           },
           rules,
@@ -695,6 +704,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 command: "update",
                 param1: { id: job.id },
                 param2: { params: { size: 999 } },
+                param3: undefined,
               },
               clientReq,
               undefined,

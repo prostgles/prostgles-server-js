@@ -7,7 +7,7 @@ import prostgles, {
   type ProstglesInitOptions,
   type TableHooks,
 } from "prostgles-server";
-import type { DB, DBHandlerServer } from "prostgles-server/dist/Prostgles";
+import type { DB, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 
@@ -49,7 +49,7 @@ export const testTableHookRecursion = async (db: DB) => {
           tableHooks,
           onReady: () => {},
         });
-        const dbo = instance.db as DBHandlerServer;
+        const dbo = instance.db as DBHandlerServerInternal;
 
         await t.test("hook mutations do not notify schema watchers", async () => {
           const schemaChanges: (string | undefined)[] = [];
@@ -102,7 +102,7 @@ export const testTableHookRecursion = async (db: DB) => {
             await t.test(`${phase}: preventRecursion=${preventRecursion}`, async () => {
               const calls: number[] = [];
               const siblings: number[] = [];
-              const mutate = async (row: AnyObject, dbx: DBHandlerServer) => {
+              const mutate = async (row: AnyObject, dbx: DBHandlerServerInternal) => {
                 calls.push(row.value);
                 if (row.value < 2) {
                   await dbx[table]!.update({ id: row.id }, { value: row.value + 1 });

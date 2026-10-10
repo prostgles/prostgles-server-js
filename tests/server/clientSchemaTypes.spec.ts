@@ -19,7 +19,7 @@ import type { DB } from "prostgles-server/dist/Prostgles";
 import { CHANNELS, ROW_ACTIONS_COLUMN, type AnyObject, type ClientSchema } from "prostgles-types";
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
-import ts from "typescript";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 
 export const testClientSchemaTypes = async (db: DB) => {
   await test(
@@ -268,14 +268,15 @@ export const testClientSchemaTypes = async (db: DB) => {
         await instance.reWriteDBSchema();
         assert.equal((await instance.getTSSchema()).tsSchema, tsSchema);
         assert.equal(io.sockets.sockets.size, 0);
-        checkTypes(
+        checkGeneratedTypes(
           tsSchema,
           `
         import type { TableHandler, InsertDataWithNested, ClientSchemaFor } from "prostgles-types";
-        import type { DBHandlerClient } from "prostgles-client";
-        import type { DBOFullyTypedClient, InitResult, SessionUser } from "../server/node_modules/prostgles-server";
-        import type { RestrictedFunctionContext, UnrestrictedFunctionContext } from "../server/node_modules/prostgles-server/dist/PublishParser/defineServerFunction";
-        import type { getClientHandlers } from "../server/node_modules/prostgles-server/dist/WebsocketAPI/getClientHandlers";
+        import type { DBHandlerClient } from "../../client/node_modules/prostgles-client";
+        import type { DBHandlerServer, DBHandlerServerRestricted, DBOFullyTyped, DBOFullyTypedClient, InitResult, SessionUser } from "prostgles-server";
+        import type { DBOFullyTyped as LegacyDBHandlerServer, DBOFullyTypedClient as LegacyDBHandlerServerRestricted } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
+        import type { RestrictedFunctionContext, UnrestrictedFunctionContext } from "prostgles-server/dist/PublishParser/defineServerFunction";
+        import type { getClientHandlers } from "prostgles-server/dist/WebsocketAPI/getClientHandlers";
         type Name = "${tableName}";
         type FileName = "${fileTableName}";
         declare const guest: TableHandler<GuestDBSchema, Name>;
@@ -288,11 +289,16 @@ export const testClientSchemaTypes = async (db: DB) => {
         declare const adminClient: DBHandlerClient<AdminDBSchema>;
         declare const restricted: RestrictedFunctionContext<GuestDBSchema>;
         declare const unrestricted: UnrestrictedFunctionContext<DBGeneratedSchema>;
-        declare const serverClient: DBOFullyTypedClient<ClientDBSchema>;
+        declare const serverClient: DBHandlerServerRestricted<ClientDBSchema>;
         declare const handlers: Awaited<ReturnType<typeof getClientHandlers<GuestDBSchema>>>;
         declare const instance: InitResult<DBGeneratedSchema, SessionUser, undefined, ClientDBSchema>;
         declare const guestClientSchema: ClientSchemaFor<ClientSchemas, "guest">;
         guestClientSchema satisfies GuestDBSchema;
+        instance.db satisfies DBHandlerServer<DBGeneratedSchema>;
+        instance.db satisfies DBOFullyTyped<DBGeneratedSchema>;
+        instance.db satisfies LegacyDBHandlerServer<DBGeneratedSchema>;
+        serverClient satisfies DBOFullyTypedClient<ClientDBSchema>;
+        serverClient satisfies LegacyDBHandlerServerRestricted<ClientDBSchema>;
         async () => {
           const combinedHandlers = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
           const guestHandlers = await instance.getClientDBHandlers<GuestDBSchema>({ userId: "user-guest" }, undefined);
@@ -983,35 +989,5 @@ export const testClientSchemaTypes = async (db: DB) => {
         await db.none(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
       }
     },
-  );
-};
-
-export const checkTypes = (schema: string, checks: string) => {
-  const filename = path.resolve(__dirname, "../../../client/client-schema-typecheck.ts");
-  const options: ts.CompilerOptions = {
-    strict: true,
-    noEmit: true,
-    skipLibCheck: true,
-    target: ts.ScriptTarget.ES2022,
-    module: ts.ModuleKind.CommonJS,
-    moduleResolution: ts.ModuleResolutionKind.Node10,
-  };
-  const host = ts.createCompilerHost(options);
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const getSourceFile = host.getSourceFile;
-  host.getSourceFile = (name, languageVersion, onError, shouldCreateNewSourceFile) =>
-    name === filename ?
-      ts.createSourceFile(name, schema + checks, languageVersion, true)
-    : getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile);
-  const program = ts.createProgram([filename], options, host);
-  const diagnostics = ts.getPreEmitDiagnostics(program);
-  assert.equal(
-    diagnostics.length,
-    0,
-    ts.formatDiagnosticsWithColorAndContext(diagnostics, {
-      getCanonicalFileName: (name) => name,
-      getCurrentDirectory: () => process.cwd(),
-      getNewLine: () => "\n",
-    }),
   );
 };

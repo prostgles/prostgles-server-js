@@ -2,7 +2,7 @@ import type pgPromise from "pg-promise";
 import type { AnyObject, DBSchema, InsertDataWithNested } from "prostgles-types";
 
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type {
   AfterAllTsTrigger,
   AfterCommitTsTrigger,
@@ -16,7 +16,7 @@ export type TableHooks<S = void, Context = undefined> =
     Partial<{
       [tableName in keyof S]: TableHooksDefinition<
         Required<S[tableName]["columns"]>,
-        DBOFullyTyped<S>,
+        DBHandlerServer<S>,
         Context,
         InsertDataWithNested<S[tableName]["columns"], S, tableName>,
         S

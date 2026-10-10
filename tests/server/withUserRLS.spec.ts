@@ -6,16 +6,16 @@ import express from "express";
 import pgPromise from "pg-promise";
 import prostgles, { type ProstglesInitOptions } from "prostgles-server";
 import { fetchSyncServerData } from "prostgles-server/dist/PubSubManager/SyncReplication/fetchSyncServerData";
-import type { Subscription } from "../../dist/PubSubManager/PubSubManager";
-import type { DB, DBHandlerServer } from "../../dist/Prostgles";
-import type { LocalParams } from "../../dist/DboBuilder/DboBuilderTypes";
+import type { Subscription } from "prostgles-server/dist/PubSubManager/PubSubManager";
+import type { DB, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
+import type { LocalParams } from "prostgles-server/dist/DboBuilder/DboBuilderTypes";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import type { TableHandler } from "../../dist/DboBuilder/TableHandler/TableHandler";
-import type { withUserRLS as WithUserRLS } from "../../dist/DboBuilder/dboBuilderUtils";
-import type { ParsedTableRule } from "../../dist/PublishParser/PublishParser";
+import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
+import type { withUserRLS as WithUserRLS } from "prostgles-server/dist/DboBuilder/dboBuilderUtils";
+import type { ParsedTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
 
 export const testWithUserRLS = async (
-  dbo: DBHandlerServer,
+  dbo: DBHandlerServerInternal,
   db: DB,
   withUserRLS: typeof WithUserRLS,
 ) => {
@@ -620,7 +620,7 @@ export const testWithUserRLS = async (
                     handlers.withClientDbTx(runRejectedBatch)
                   : runRejectedBatch(handlers.clientDb),
                 );
-                const rows = await instance.db[tableName]!.find!(
+                const rows: { id: number; value: string | null }[] = await instance.db[tableName]!.find!(
                   {},
                   {
                     select: ["id", "value"],

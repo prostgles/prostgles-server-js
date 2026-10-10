@@ -1,6 +1,6 @@
-import type { DBOFullyTyped, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer, PublishFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { LocalParams, TableOrViewInfo } from "../DboBuilder/DboBuilder";
-import type { DB, DBHandlerServer } from "../Prostgles";
+import type { DB, DBHandlerServerInternal } from "../Prostgles";
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -56,13 +56,13 @@ export type UpdateRequestDataBatch<R extends AnyObject> = {
 export type UpdateRequestData<R extends AnyObject = AnyObject> =
   UpdateRequestDataOne<R> | UpdateRequestDataBatch<R>;
 
-export type OnCommitCallback<DBO = DBHandlerServer> = (args: {
+export type OnCommitCallback<DBO = DBHandlerServerInternal> = (args: {
   db: DB;
   dbo: DBO;
 }) => MaybePromise<unknown>;
-export type OnCommit<DBO = DBHandlerServer> = (callback: OnCommitCallback<DBO>) => void;
+export type OnCommit<DBO = DBHandlerServerInternal> = (callback: OnCommitCallback<DBO>) => void;
 
-export type TransactionCallbacks<DBO = DBHandlerServer> = {
+export type TransactionCallbacks<DBO = DBHandlerServerInternal> = {
   /** Awaited after the outer transaction commits. Errors are logged. */
   onCommit: OnCommit<DBO>;
   /**
@@ -72,14 +72,14 @@ export type TransactionCallbacks<DBO = DBHandlerServer> = {
   onRollback: OnCommit<DBO>;
 };
 
-export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServerInternal> = {
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
   command: "insert" | "insertOnConflictDoUpdate" | "update";
   data: Partial<R>;
   filter: AnyObject | undefined;
 };
-export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServer, InputDataType = R> = {
+export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServerInternal, InputDataType = R> = {
   row: R;
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
@@ -132,7 +132,7 @@ export type AfterEachTsTrigger<R, DBX, Context = undefined, InputDataType = R> =
   ) => MaybePromise<void>;
 };
 
-export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServer> = {
+export type ValidateRowsArgsCommon<R = AnyObject, DBX = DBHandlerServerInternal> = {
   /**
    * The rows that were inserted/updated/deleted
    * For delete the rows are the ones that were deleted (before delete)
@@ -196,17 +196,17 @@ export type AfterCommitTsTrigger<R, DBO, Context = undefined, ClientSchema = voi
   }) => MaybePromise<unknown>;
 };
 
-export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServer> = ValidateRowArgsCommon<
+export type ValidateRowArgs<R = AnyObject, DBX = DBHandlerServerInternal> = ValidateRowArgsCommon<
   R,
   DBX
 > & {
   localParams: LocalParams;
 };
 export type ValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBHandlerServer<S>>,
 ) => R | Promise<R>;
 export type PostValidateRow<R extends AnyObject = AnyObject, S = void> = (
-  args: ValidateRowArgs<R, DBOFullyTyped<S>>,
+  args: ValidateRowArgs<R, DBHandlerServer<S>>,
 ) => void | Promise<void>;
 export type PostValidateRowBasic = (args: ValidateRowArgs) => void | Promise<void>;
 export type ValidateRowBasic = (args: ValidateRowArgs) => AnyObject | Promise<AnyObject>;
@@ -530,7 +530,7 @@ export type PermissionScope = {
 };
 export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
   sid: string | undefined;
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   db: DB;
   sql: SQLHandler;
   user?: SUser["user"];
@@ -544,7 +544,7 @@ export type PublishParams<S = void, SUser extends SessionUser = SessionUser> = {
     scope: PermissionScope | undefined,
   ) => Promise<ClientHandlers<S>>;
 };
-export type RequestParams = { dbo?: DBHandlerServer; socket?: any };
+export type RequestParams = { dbo?: DBHandlerServerInternal; socket?: any };
 export type PublishAllOrNothing = boolean | "*" | null;
 export type PublishObject = Record<string, PublishTableRule | PublishAllOrNothing>;
 export type ParsedPublishTables = {

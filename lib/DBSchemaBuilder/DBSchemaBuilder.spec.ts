@@ -1,20 +1,20 @@
 import { describe, test } from "node:test";
-import type { DBOFullyTyped, PublishFullyTyped } from "./DBSchemaBuilder";
+import type { DBHandlerServer, PublishFullyTyped } from "./DBSchemaBuilder";
 import type { PublishParams } from "../PublishParser/publishTypesAndUtils";
 import prostgles from "..";
 import type { AuthConfig } from "../Auth/AuthTypes";
 import type { DBSchema } from "prostgles-types";
-import type { DBHandlerServer } from "../Prostgles";
+import type { DBHandlerServerInternal } from "../Prostgles";
 
 void describe("DBSchemaBuilder type tests", async () => {
   await test("Type checks", () => {
     /** Type checks */
     () => {
-      const ddb = {} as DBOFullyTyped;
+      const ddb = {} as DBHandlerServer;
       ddb.dwad?.insert;
       ddb.dwad?.delete;
 
-      const d = {} as DBOFullyTyped<undefined>;
+      const d = {} as DBHandlerServer<undefined>;
       d.dwad?.insert;
       d.dwad?.delete;
 
@@ -68,13 +68,13 @@ void describe("DBSchemaBuilder type tests", async () => {
       /** Test the created schema */
       const c = {} as S;
       const _test: DBSchema = c;
-      const dbt = {} as DBOFullyTyped<S>;
+      const dbt = {} as DBHandlerServer<S>;
 
       void dbt.tx((t) => {
         void t.tbl1.delete();
       });
 
-      const db = {} as DBHandlerServer;
+      const db = {} as DBHandlerServerInternal;
       void db.tx!((t) => {
         void t.wadwa?.find!();
       });

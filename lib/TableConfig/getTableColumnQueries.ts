@@ -1,6 +1,6 @@
 import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
 import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import type { DB, DBHandlerServer } from "../Prostgles";
+import type { DB, DBHandlerServerInternal } from "../Prostgles";
 import { getColumnSQLDefinitionQuery, getTableColumns } from "./getColumnSQLDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import type { TableConfig } from "./TableConfigTypes";
@@ -9,7 +9,7 @@ type Args = {
   db: DB;
   tableConf: TableConfig[string];
   tableName: string;
-  tableHandler: DBHandlerServer[string] | undefined;
+  tableHandler: DBHandlerServerInternal[string] | undefined;
 };
 
 /**

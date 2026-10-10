@@ -15,7 +15,7 @@ import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "./joins/shortestPath";
 import { clone } from "../utils/utils";
 import type {
-  DBHandlerServer,
+  DBHandlerServerInternal,
   DbTxTableHandlers,
   LocalParams,
   SQLHandlerServer,
@@ -54,7 +54,7 @@ export class DboBuilder {
    * @deprecated
    * Use dboMap instead. Will be removed in future versions.
    */
-  dbo: DBHandlerServer;
+  dbo: DBHandlerServerInternal;
 
   dboMap: Map<string, TableHandler> = new Map();
 
@@ -263,7 +263,7 @@ export class DboBuilder {
 
   canSubscribe = false;
   checkingCanSubscribe = false;
-  async build(): Promise<DBHandlerServer> {
+  async build(): Promise<DBHandlerServerInternal> {
     if (!this.canSubscribe && !this.checkingCanSubscribe) {
       this.checkingCanSubscribe = true;
       const subscribeError = await getCreatePubSubManagerError(this);
@@ -335,7 +335,7 @@ export class DboBuilder {
       }
 
       //@ts-ignore
-      this.dbo[TX_KEY] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServer, "sql">>(
+      this.dbo[TX_KEY] = <R, TH extends DbTxTableHandlers & Pick<DBHandlerServerInternal, "sql">>(
         cb: TxCB<Promise<R>, TH>,
       ) => this.getTX(cb);
     }

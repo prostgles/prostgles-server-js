@@ -1,14 +1,9 @@
 {
+	"extends": "../../tsconfig.json",
 	"files": ["index.ts"],
 	"compilerOptions": {
-		"target": "es2022",
-		"lib": [ "es2022", "DOM" ],
-		"esModuleInterop" : true,
-		"module": "commonjs",
-		"ignoreDeprecations": "5.0",
-		"skipLibCheck": true,
-		"strictNullChecks": true,
-		"noUncheckedIndexedAccess": true,
+		"lib": [ "ES2023", "DOM" ],
+    "rootDir": "..",
     "outDir": "dist",
 	},
 	"exclude": [

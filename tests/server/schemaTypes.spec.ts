@@ -2,12 +2,12 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { getDBGeneratedSchema } from "prostgles-server/dist/DBSchemaBuilder/getDBGeneratedSchema";
 import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfigTypes";
-import type { DBHandlerServer } from "prostgles-server";
+import type { DBHandlerServerInternal } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableConfig/TableRowFromColumnDefinitions";
 import { testTableConfig } from "./testTableConfig";
 
-export const testSchemaTypes = async (db: DBHandlerServer, pgDb: DB) => {
+export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => {
   await test("server function return types preserve generated schema references", async () => {
     const { tsSchema } = await db.items!.dboBuilder.getTsDefinitions();
     const arrayReference = 'NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]';

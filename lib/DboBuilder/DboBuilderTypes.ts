@@ -109,12 +109,7 @@ export type DbTxTableHandlers = {
 
 export type SQLHandlerServer = SQLHandler<LocalParams>;
 
-export type DBHandlerServerExtra<
-  TH = TableHandlers,
-  WithTransactions = true,
-> = {} & (WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>);
-
-export type DBHandlerServer<TH = TableHandlers> = TH & {
+export type DBHandlerServerInternal<TH = TableHandlers> = TH & {
   tx?: TX<TH>;
 };
 

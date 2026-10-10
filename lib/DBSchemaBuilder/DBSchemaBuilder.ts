@@ -46,14 +46,14 @@ export type DBHandlerServerWithTx<
   WithTransactions = true,
 > = WithTransactions extends true ? { tx: TX<TH> } : Record<string, never>;
 
-export type DBOFullyTyped<
+export type DBHandlerServer<
   Schema = void,
   WithTransactions = true,
 > = DBTableHandlersFromSchema<Schema> &
   DBHandlerServerWithTx<DBTableHandlersFromSchema<Schema>, WithTransactions>;
 
 /** Publish-aware server wrappers for client requests; transactions and isView are unavailable. */
-export type DBOFullyTypedClient<Schema = void> =
+export type DBHandlerServerRestricted<Schema = void> =
   Schema extends DBSchema ?
     {
       [TName in keyof Schema]:
@@ -61,6 +61,15 @@ export type DBOFullyTypedClient<Schema = void> =
         | (Schema[TName] extends { optional: true } ? undefined : never);
     }
   : Record<string, Partial<Omit<ServerTableHandler, "isView">>>;
+
+/** @deprecated Use DBHandlerServer. */
+export type DBOFullyTyped<Schema = void, WithTransactions = true> = DBHandlerServer<
+  Schema,
+  WithTransactions
+>;
+
+/** @deprecated Use DBHandlerServerRestricted. */
+export type DBOFullyTypedClient<Schema = void> = DBHandlerServerRestricted<Schema>;
 
 export type PublishFullyTyped<Schema = void> =
   Schema extends DBSchema ?

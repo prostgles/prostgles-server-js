@@ -1,7 +1,7 @@
 import type { AnyObject } from "prostgles-types";
 import { CHANNELS, getProperty, isDefined } from "prostgles-types";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilder";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
 import type { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
 import { getClientAuth } from "./getClientAuth";
@@ -70,7 +70,7 @@ export class AuthHandler {
     if (!db || !dbo) {
       throw new Error("dbo or db missing");
     }
-    return { dbo: dbo as DBOFullyTyped, db };
+    return { dbo: dbo as DBHandlerServer, db };
   }
 
   // TODO: tidy

@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type {
-  DBHandlerServer,
+  DBHandlerServerInternal,
   DboBuilder,
   LocalParams,
   ClientSocketWithCachedData,
@@ -186,7 +186,7 @@ export class PubSubManager {
   get db(): DB {
     return this.dboBuilder.db;
   }
-  get dbo(): DBHandlerServer {
+  get dbo(): DBHandlerServerInternal {
     return this.dboBuilder.dbo;
   }
 

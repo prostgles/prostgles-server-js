@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import type { EventInfo } from "../dist/Logging";
+import type { EventInfo } from "./server/node_modules/prostgles-server/dist/Logging";
 import type { DBHandlerClient } from "./client";
 import type { SQLHandler } from "prostgles-types";
 

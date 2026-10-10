@@ -41,8 +41,8 @@ import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
 
 import { spawn } from "child_process";
-import type { DBHandlerServer } from "prostgles-server";
-export type { DBHandlerServer } from "prostgles-server";
+import type { DBHandlerServerInternal } from "prostgles-server";
+export type { DBHandlerServerInternal } from "prostgles-server";
 
 let logs: unknown[] = [];
 const replicationErrors: unknown[] = [];
@@ -490,7 +490,7 @@ void (async () => {
             stopTest();
             return;
           }
-          await serverOnlyQueries(dbo as unknown as DBHandlerServer, db, withUserRLS);
+          await serverOnlyQueries(dbo as unknown as DBHandlerServerInternal, db, withUserRLS);
           log("Server-only query tests successful");
           await isomorphicQueries(dbo, sql, log);
           log("Server isomorphic tests successful");

@@ -5,7 +5,7 @@ import { asName } from "prostgles-types";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ProstglesInitOptions, TableCheck, TableConfig } from "prostgles-server";
-import { checkTypes } from "./clientSchemaTypes.spec";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 import {
   getTableCheckBranches,
   getTableCheckConstraint,
@@ -135,7 +135,7 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         { code: "23514" },
       );
       const { tsSchema } = await backups.dboBuilder.getTsDefinitions();
-      checkTypes(
+      checkGeneratedTypes(
         tsSchema,
         `
         import type { TableHandler } from "prostgles-types";

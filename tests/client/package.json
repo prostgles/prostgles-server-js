@@ -5,14 +5,14 @@
   "main": "index.js",
   "scripts": {
     "start": "tsc-watch --onSuccess \"node dist/client/index.js\"",
-    "build": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && tsc",
+    "build": "rm -rf ./dist/* && tsc",
     "testBasicHooks": "node --test dist/client/basicHooks.spec.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^20.19.43",
-    "prostgles-client": "^4.0.410",
+    "prostgles-client": "^4.0.411",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

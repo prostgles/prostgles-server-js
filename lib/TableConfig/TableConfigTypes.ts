@@ -5,7 +5,7 @@ import type {
   MaybePromise,
   StrictUnion,
 } from "prostgles-types";
-import type { DB, DBHandlerServer } from "../Prostgles";
+import type { DB, DBHandlerServerInternal } from "../Prostgles";
 import type { SyncConfig } from "../PublishParser/PublishParser";
 
 export type ColExtraInfo = {
@@ -193,7 +193,7 @@ export type TableCheck = { $or: readonly TableCheckBranch[] };
  */
 export type TableDefinition<LANG_IDS = { en: 1 }> = BaseTableDefinition & {
   onMount?: (params: {
-    dbo: DBHandlerServer;
+    dbo: DBHandlerServerInternal;
     _db: DB;
   }) => MaybePromise<void | { onUnmount: () => void }>;
   columns?: {

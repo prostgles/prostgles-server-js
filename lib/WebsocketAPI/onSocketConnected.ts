@@ -3,7 +3,7 @@ import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles, TABLE_METHODS } from "../Prostgles";
 import { runClientMethod, runClientRequest } from "../runClientRequest";
 
@@ -51,7 +51,7 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
         });
       });
 
-      void this.opts.onSocketDisconnect?.({ socket, dbo: dbo as DBOFullyTyped, db, getUser });
+      void this.opts.onSocketDisconnect?.({ socket, dbo: dbo as DBHandlerServer, db, getUser });
     });
 
     await this.opts.onLog?.({
@@ -83,7 +83,7 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
       try {
         await this.opts.onSocketConnect({
           socket,
-          dbo: dbo as DBOFullyTyped,
+          dbo: dbo as DBHandlerServer,
           db,
           getUser,
         });

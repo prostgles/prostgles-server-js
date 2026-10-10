@@ -8,7 +8,7 @@ import {
   type InitResult,
   type ProstglesInitOptions,
 } from "prostgles-server";
-import type { DB, DBHandlerServer } from "prostgles-server/dist/Prostgles";
+import type { DB, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 
 export const testExecutionContext = async (db: DB) => {
@@ -20,7 +20,7 @@ export const testExecutionContext = async (db: DB) => {
     const observed: { phase: string; execution: ExecutionContext }[] = [];
     let readExecution: () => ExecutionContext | undefined = () => undefined;
     let readOtherExecution: () => ExecutionContext | undefined = () => undefined;
-    let transaction: DBHandlerServer | undefined;
+    let transaction: DBHandlerServerInternal | undefined;
     let instance: Pick<InitResult, "destroy"> | undefined;
     let other: InitResult | undefined;
     const capture = async (phase: string) => {
@@ -189,7 +189,7 @@ export const testExecutionContext = async (db: DB) => {
         },
       });
       instance = created;
-      const dbo = created.db as unknown as DBHandlerServer;
+      const dbo = created.db as unknown as DBHandlerServerInternal;
       const alice = await created.getClientDBHandlers({ userId: "alice" }, undefined);
       const bob = await created.getClientDBHandlers({ userId: "bob" }, undefined);
       const input = {

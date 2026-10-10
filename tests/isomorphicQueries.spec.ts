@@ -15,7 +15,7 @@ import {
   type CaseSelect,
   type SQLHandler,
 } from "prostgles-types";
-import { type DBOFullyTyped } from "../dist/DBSchemaBuilder/DBSchemaBuilder";
+import { type DBOFullyTyped } from "./server/node_modules/prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 

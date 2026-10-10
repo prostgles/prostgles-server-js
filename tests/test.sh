@@ -4,6 +4,15 @@ set -e # Exit immediately if a command exits with a non-zero status
 
 npm run build 
 
+package_directory=../debug/ci-package
+mkdir -p "$package_directory"
+package_tarball=$(npm pack .. --ignore-scripts --pack-destination "$package_directory" --silent)
+rm -rf server/node_modules/prostgles-server
+mkdir -p server/node_modules/prostgles-server
+tar -xzf "$package_directory/$package_tarball" --strip-components=1 -C server/node_modules/prostgles-server
+
+npm run typecheck
+
 cd client
 npm run build
 node ../checkProstglesTypes.js
@@ -11,12 +20,6 @@ npm run testBasicHooks
 
 
 cd ../server
-
-if [ $# -eq 0 ]; then
-  # no args passed
-  rm -rf ./node-modules
-  npm i
-fi
 
 npm run build
 npm run lint --prefix ../..

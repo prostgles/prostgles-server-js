@@ -1,7 +1,7 @@
 import type pgPromise from "pg-promise";
 import type { AnyObject, DBSchema, FullFilter, JSONB } from "prostgles-types";
 import type { SessionUser } from "../Auth/AuthTypes";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { JSONBColumnDef } from "../TableConfig/TableConfigTypes";
 import type {
@@ -45,7 +45,7 @@ export type JobContext<
   /** Re-fetched at the start of each attempt. Undefined for schedules. */
   row: T extends string ? Required<JobRow<S, T>> : undefined;
   params: ParamsOutput<P>;
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   user: SessionUser["user"] | undefined;
   context: Context;
   run: { id: string; attempt: number; reason: "trigger" | "rerun" | "retry" };

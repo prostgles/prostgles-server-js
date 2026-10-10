@@ -58,8 +58,13 @@ export type {
   PublishParams,
 } from "./PublishParser/publishTypesAndUtils";
 export type { ClientDBHandlerRequest, GetClientDBHandlers } from "./WebsocketAPI/getClientHandlers";
-export type { DBOFullyTyped, DBOFullyTypedClient } from "./DBSchemaBuilder/DBSchemaBuilder";
-export type { DBHandlerServer } from "./Prostgles";
+export type {
+  DBHandlerServer,
+  DBHandlerServerRestricted,
+  DBOFullyTyped,
+  DBOFullyTypedClient,
+} from "./DBSchemaBuilder/DBSchemaBuilder";
+export type { DBHandlerServerInternal } from "./Prostgles";
 export type { ServerSelectParams } from "./DboBuilder/ViewHandler/find";
 export type { StorageClient as CloudClient } from "./StorageClient/StorageClientTypes";
 export * from "./StorageClient/getLocalStorageClient";

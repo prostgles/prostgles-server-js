@@ -6,10 +6,6 @@ Isomorphic PostgreSQL client for [node](http://nodejs.org)
 [![npm version](https://img.shields.io/npm/v/prostgles-server.svg?style=flat)](https://www.npmjs.com/package/prostgles-server)
 ![Tests](https://github.com/prostgles/prostgles-server-js/actions/workflows/main.yml/badge.svg)
 
-### New: JSONB schema runtime validation and TS types
-
-<img src="https://prostgles.com/tsdef2.png" width="600px" style="max-width: 90vw; " />
-
 ## Features
 
 - CRUD operations with end-to-end type safety

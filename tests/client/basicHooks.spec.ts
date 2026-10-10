@@ -5,11 +5,9 @@ import { renderReactHookManual } from "./renderReactHook";
 
 void describe("React hooks", async (t) => {
   await test("useAsyncEffectQueue executes the first and debounces the rest", async (t) => {
-    const start = Date.now();
     const calls: (string | number)[] = [];
     const addCall = (num: number) => {
       calls.push(num);
-      // calls.push(num + "-" + (Date.now() - start));
     };
     const getHookArgs = (step: number) =>
       [

@@ -8,7 +8,10 @@ import type {
   SQLHandler,
 } from "prostgles-types";
 import type { SessionUser } from "../Auth/AuthTypes";
-import type { DBOFullyTyped, DBOFullyTypedClient } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type {
+  DBHandlerServer,
+  DBHandlerServerRestricted,
+} from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB } from "../initProstgles";
 import type { Jobs } from "../Jobs/JobTypes";
 import type { PublishParams } from "./publishTypesAndUtils";
@@ -32,7 +35,7 @@ export type RestrictedFunctionContext<
   SUser extends SessionUser = SessionUser,
   Context = undefined,
 > = FunctionContextBase<S, SUser, Context> & {
-  dbo: DBOFullyTypedClient<S>;
+  dbo: DBHandlerServerRestricted<S>;
   withClientDbTx: ClientHandlers<S>["withClientDbTx"];
 };
 
@@ -41,7 +44,7 @@ export type UnrestrictedFunctionContext<
   SUser extends SessionUser = SessionUser,
   Context = undefined,
 > = FunctionContextBase<S, SUser, Context> & {
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   db: DB;
   sql: SQLHandler;
   getClientDBHandlers: PublishParams<S, SUser>["getClientDBHandlers"];

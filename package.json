@@ -1,9 +1,12 @@
 {
   "name": "prostgles-server",
-  "version": "4.2.657",
+  "version": "4.2.658",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "directories": {
     "dist": "dist"
   },
@@ -11,15 +14,14 @@
     "prepare": "npm run build",
     "start": "tsc --watch",
     "build": "tsc",
-    "typecheck": "tsc --noEmit && npm run typecheck:tests",
-    "typecheck:tests": "tsc --noEmit -p tests/server && tsc --noEmit -p tests/client",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/server && tsc --noEmit -p tests/client",
     "lint": "eslint . --ext .ts --quiet",
-    "test:lib": "rm -rf ./node_modules/* && rm -rf ./dist/* && npm i && npm run lint -- --ignore-pattern tests && tsc && node --trace-uncaught --test dist/**/*.spec.js",
-    "test-only": "cd tests/ && ./test.sh",
-    "test-quick": "cd tests/ && ./test.sh -quick",
-    "test": "npm run test:lib && npm run test-only && npm run generate-docs",
+    "test:setup": "npm ci --prefix tests/client && npm ci --prefix tests/server && npm ci --prefix docs/utils",
+    "test:lib": "rm -rf ./dist && npm run lint -- --ignore-pattern tests && tsc && node --trace-uncaught --test dist/**/*.spec.js",
+    "test:e2e": "cd tests/ && ./test.sh",
+    "test": "npm run test:lib && npm run test:e2e && npm run generate-docs",
     "generate-docs": "rm -f ./docs/*.md && cd docs/utils && npm start",
-    "pushpublish": "npm version patch --git-tag-version false && git push && npm publish",
+    "release": "npm version patch && git push --follow-tags && npm publish",
     "circular-deps": "tsc && npx madge --circular  ."
   },
   "repository": {
@@ -40,8 +42,8 @@
   ],
   "homepage": "https://prostgles.com",
   "dependencies": {
-    "@aws-sdk/client-sesv2": "^3.1128.0",
-    "@aws-sdk/credential-provider-node": "^3.972.82",
+    "@aws-sdk/client-sesv2": "^3.1149.0",
+    "@aws-sdk/credential-provider-node": "^3.972.85",
     "@types/passport": "^1.0.17",
     "@types/passport-facebook": "^3.0.4",
     "@types/passport-github2": "^1.2.9",
@@ -56,8 +58,8 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-microsoft": "^2.1.0",
     "passport-oauth2": "^1.8.0",
-    "pg": "^8.23.0",
-    "pg-cursor": "^2.22.0",
+    "pg": "^8.23.1",
+    "pg-cursor": "^2.22.1",
     "pg-promise": "^12.7.1",
     "prostgles-types": "^4.0.297"
   },
@@ -65,15 +67,15 @@
     "@eslint/js": "^9.22.0",
     "@types/express": "^4.17.25",
     "@types/json-schema": "^7.0.15",
-    "@types/node": "^22.20.1",
-    "@types/nodemailer": "^8.0.1",
+    "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/pg-cursor": "^2.7.2",
     "@types/sharp": "^0.30.5",
     "eslint": "^9.39.5",
-    "prettier": "^3.9.6",
-    "socket.io": "^4.8.3",
+    "prettier": "^3.9.10",
+    "socket.io": "^4.8.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.71.1"
   }
 }

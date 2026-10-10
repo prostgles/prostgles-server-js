@@ -7,9 +7,9 @@ import type { SessionUser } from "./Auth/AuthTypes";
 import { removeExpressRoutesTest } from "./Auth/utils/removeExpressRoute";
 import { DBEventsManager } from "./DBEventsManager";
 import type { DboBuilder } from "./DboBuilder/DboBuilder";
-import type { DBOFullyTyped } from "./DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "./DBSchemaBuilder/DBSchemaBuilder";
 import { getDbConnection } from "./getDbConnection";
-import type { DBHandlerServer, Prostgles } from "./Prostgles";
+import type { DBHandlerServerInternal, Prostgles } from "./Prostgles";
 import { getIsSuperUser } from "./Prostgles";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import type { PermissionScope } from "./PublishParser/PublishParser";
@@ -80,17 +80,17 @@ type OnReadyParamsCommon = {
   reason: OnInitReason;
 };
 export type OnReadyParamsBasic = OnReadyParamsCommon & {
-  dbo: DBHandlerServer;
+  dbo: DBHandlerServerInternal;
   context: any;
 };
 export type OnReadyParams<S, Context = undefined> = OnReadyParamsCommon & {
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   context: Context;
 };
 
 export type ContextCleanup = () => MaybePromise<void>;
 export type CreateContextParams<S> = OnReadyParamsCommon & {
-  dbo: DBOFullyTyped<S>;
+  dbo: DBHandlerServer<S>;
   /** Read at call time; undefined outside a function, client operation, or table hook. */
   getExecution: () => ExecutionContext | undefined;
   onCleanup: (cleanup: ContextCleanup) => void;
@@ -114,7 +114,7 @@ export type InitResult<
 > = {
   /** Inspect, cancel or rerun jobs. Pass userId to enforce client job access. */
   jobs: Jobs;
-  db: DBOFullyTyped<S>;
+  db: DBHandlerServer<S>;
   context: Context;
   sql: SQLHandler;
   _db: DB;
@@ -284,7 +284,7 @@ export const initProstgles = async function (
     const getContext = () => this.context;
     const initResult: InitResult<void, SessionUser, any> = {
       jobs: this.jobs.api,
-      db: this.dbo as DBOFullyTyped,
+      db: this.dbo as DBHandlerServer,
       get context() {
         return getContext();
       },

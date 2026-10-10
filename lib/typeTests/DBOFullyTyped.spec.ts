@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { DBHandlerServer } from "../DboBuilder/DboBuilder";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServerInternal } from "../DboBuilder/DboBuilder";
 import type { Publish } from "../PublishParser/PublishParser";
 import type { DBGeneratedSchema } from "./DBoGenerated";
 import type { TableHandler } from "prostgles-types";
@@ -24,13 +24,13 @@ type DBSchema2 = {
 void describe("DBOFullyTyped test", async () => {
   await test("Type test", () => {
     const f = async () => {
-      const dbo = {} as DBOFullyTyped;
+      const dbo = {} as DBHandlerServer;
       dbo.someTable?.find;
 
-      const dbo1 = {} as DBHandlerServer;
+      const dbo1 = {} as DBHandlerServerInternal;
       dbo1.w?.find;
 
-      const db = {} as DBOFullyTyped<DBGeneratedSchema>;
+      const db = {} as DBHandlerServer<DBGeneratedSchema>;
 
       /** db.tx return type works as expected */
       const txRes = await db.tx((dbTx) => {

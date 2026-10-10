@@ -7,8 +7,8 @@ import {
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { getAuditTableRules } from "../Audit/getAuditTableRules";
-import type { DBOFullyTyped } from "../DBSchemaBuilder/DBSchemaBuilder";
-import type { DB, DBHandlerServer, Prostgles } from "../Prostgles";
+import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { DB, DBHandlerServerInternal, Prostgles } from "../Prostgles";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { applyScopeToTableRules } from "./applyScopeToTableRules";
 import type {
@@ -43,7 +43,7 @@ import { getFunctionRelatedRecords } from "./getFunctionRelatedRecords";
 export class PublishParser {
   parsedPublish: ReturnType<typeof getParsedPublish>;
   publishRawSQL?: any;
-  dbo: DBHandlerServer;
+  dbo: DBHandlerServerInternal;
   db: DB;
   prostgles: Prostgles;
 
@@ -76,7 +76,7 @@ export class PublishParser {
     this.prostgles.checkNotDestroyed();
     return {
       ...sessionUser,
-      dbo: this.dbo as DBOFullyTyped,
+      dbo: this.dbo as DBHandlerServer,
       db: this.db,
       sql: this.prostgles.dboBuilder.sql,
       clientReq,
