@@ -3,7 +3,7 @@ import { asName, type AnyObject } from "prostgles-types";
 import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
 import { needsChangedFields } from "./getMutationTriggerConfig";
-import { asValue } from "../PubSubManager/PubSubManagerUtils";
+import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 import { MUTATION_METADATA } from "./mutationMetadata";
 
 export type CapturedMutation = {
@@ -33,6 +33,7 @@ export const captureMutation = async <Row extends AnyObject>(
   // Send the scope, mutation and reset in one database call: concurrent JS branches
   // sharing this transaction must not overwrite each other's capture scope.
   const results = await t.multi<Row>(`
+    /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
     CREATE TEMP TABLE IF NOT EXISTS prostgles_mutation_outbox (
       sequence bigint GENERATED ALWAYS AS IDENTITY,
       operation_id text NOT NULL, command text NOT NULL,

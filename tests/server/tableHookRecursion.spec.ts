@@ -35,6 +35,7 @@ export const testTableHookRecursion = async (db: DB) => {
         await instance!.update({ tableHooks }, true);
       };
       let instance: InitResult | undefined;
+      let schemaWatcher: InitResult | undefined;
       try {
         await db.none(`CREATE SCHEMA ${schema};
         CREATE TABLE ${table} (id INTEGER, value INTEGER, payload JSONB, amount BIGINT DEFAULT 9007199254740992, location GEOMETRY(Point, 4326) DEFAULT ST_GeomFromText('POINT(1 2)', 4326));
@@ -49,6 +50,52 @@ export const testTableHookRecursion = async (db: DB) => {
           onReady: () => {},
         });
         const dbo = instance.db as DBHandlerServer;
+
+        await t.test("hook mutations do not notify schema watchers", async () => {
+          const schemaChanges: (string | undefined)[] = [];
+          let schemaChanged = () => {};
+          schemaWatcher = await prostgles({
+            dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
+            schemaFilter: { [schema]: 1 },
+            transactions: true,
+            tableHooks: {
+              [otherTable]: {
+                afterEach: [{ commands: { insert: 1, update: 1, delete: 1 }, validate: () => {} }],
+              },
+            },
+            watchSchema: ({ command }) => {
+              schemaChanges.push(command);
+              schemaChanged();
+            },
+            onReady: () => {},
+          });
+          await schemaWatcher.db[otherTable]!.insert!({ id: 999, value: 1 });
+          await schemaWatcher.db.tx(async (dbx) => {
+            await dbx[otherTable]!.update!({ id: 999 }, { value: 2 });
+            await dbx[otherTable]!.delete!({ id: 999 });
+          });
+          await assert.rejects(
+            schemaWatcher.db.tx(async (dbx) => {
+              await dbx[otherTable]!.insert!({ id: 999, value: 3 });
+              throw new Error("Rollback temporary capture");
+            }),
+            { message: "Rollback temporary capture" },
+          );
+          // Each schema change also acts as a barrier for earlier mutation notifications.
+          for (const [query, command] of [
+            [`CREATE TABLE ${schema}.schema_watch_records (id INTEGER)`, "CREATE TABLE"],
+            [`ALTER TABLE ${schema}.schema_watch_records ADD COLUMN value INTEGER`, "ALTER TABLE"],
+            [`DROP TABLE ${schema}.schema_watch_records`, "DROP TABLE"],
+          ] as const) {
+            const notification = new Promise<void>((resolve) => {
+              schemaChanged = resolve;
+            });
+            await db.none(query);
+            await notification;
+            assert.deepEqual(schemaChanges, [command]);
+            schemaChanges.length = 0;
+          }
+        });
 
         for (const phase of ["afterEach", "afterAll", "afterCommit"] as const) {
           for (const preventRecursion of [undefined, false, true]) {
@@ -920,6 +967,7 @@ export const testTableHookRecursion = async (db: DB) => {
           },
         );
       } finally {
+        await schemaWatcher?.destroy();
         await instance?.destroy();
         await db.none(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
       }
