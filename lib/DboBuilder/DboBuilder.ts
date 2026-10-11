@@ -214,6 +214,7 @@ export class DboBuilder {
 
   destroy = async () => {
     this.transactionStorage.disable();
+    this.prostgles.schemaWatch?.destroy();
     return this._pubSubManager?.destroy();
   };
 
@@ -264,7 +265,7 @@ export class DboBuilder {
   canSubscribe = false;
   checkingCanSubscribe = false;
   async build(): Promise<DBHandlerServerInternal> {
-    if (!this.canSubscribe && !this.checkingCanSubscribe) {
+    if (!this.prostgles.opts.disableRealtime && !this.canSubscribe && !this.checkingCanSubscribe) {
       this.checkingCanSubscribe = true;
       const subscribeError = await getCreatePubSubManagerError(this);
       if (subscribeError) {

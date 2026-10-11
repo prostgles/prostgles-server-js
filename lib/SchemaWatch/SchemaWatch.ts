@@ -1,14 +1,12 @@
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { EVENT_TRIGGER_TAGS } from "../Event_Trigger_Tags";
 import type { OnReadyCallbackBasic } from "../initProstgles";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "../PubSubManager/PubSubManagerUtils";
-import type {
-  ValidatedWatchSchemaType} from "./getValidatedWatchSchemaType";
-import {
-  getValidatedWatchSchemaType,
-} from "./getValidatedWatchSchemaType";
+import type { ValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
+import { getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
 const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.map((tag) => tag.split(" ")[0]!).filter(
-  (tag) => tag !== "SELECT"
+  (tag) => tag !== "SELECT",
 ); /** SELECT INTO is not easily detectable with pg-node (command = "SELECT")  */
 
 const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS)).concat([
@@ -18,14 +16,20 @@ const DB_FALLBACK_COMMANDS = Array.from(new Set(COMMAND_FIRST_KEYWORDS)).concat(
 
 export type VoidFunction = () => void;
 
-export type OnSchemaChangeCallback = (event: {
+type SchemaChangeEvent = {
   command: string | undefined;
   query: string;
-}) => void;
+};
+
+export type OnSchemaChangeCallback = (event: SchemaChangeEvent) => void;
 
 export class SchemaWatch {
   dboBuilder: DboBuilder;
   type: ValidatedWatchSchemaType;
+  private readonly schemaChangeTransactions = new WeakSet<object>();
+  private readonly schemaRefreshStorage = new AsyncLocalStorage<Promise<void>>();
+  private pendingSchemaChange: SchemaChangeEvent | undefined;
+  private schemaChangePromise: Promise<void> | undefined;
   private constructor(dboBuilder: DboBuilder) {
     this.dboBuilder = dboBuilder;
     this.type = getValidatedWatchSchemaType(dboBuilder);
@@ -47,10 +51,16 @@ export class SchemaWatch {
     return instance;
   };
 
+  destroy = () => this.schemaRefreshStorage.disable();
+
   /**
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
    */
-  onSchemaChangeFallback: OnSchemaChangeCallback | undefined = ({ command, query }) => {
+  onSchemaChangeFallback:
+    ((event: SchemaChangeEvent, transaction: object | undefined) => void) | undefined = (
+    { command, query },
+    transaction,
+  ) => {
     if (typeof query === "string" && query.includes(EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID)) {
       log("Schema change event excluded from triggers due to EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID");
       return;
@@ -62,19 +72,54 @@ export class SchemaWatch {
     )
       return;
 
-    this.onSchemaChange({ command, query });
+    if (!transaction) return this.onSchemaChange({ command, query });
+    if (this.schemaChangeTransactions.has(transaction)) return;
+    this.dboBuilder.registerOnCommitCallback(transaction, () =>
+      this.onSchemaChange?.({ command, query }),
+    );
+    this.schemaChangeTransactions.add(transaction);
   };
 
-  onSchemaChange: OnSchemaChangeCallback | undefined = async (event) => {
+  onSchemaChange: OnSchemaChangeCallback | undefined = (event) => {
+    const { prostgles } = this.dboBuilder;
+    // Ignore initialization's own SQL while retaining external schema changes.
+    const isRefreshCallback = this.schemaRefreshStorage.getStore() === this.schemaChangePromise;
+    if (
+      !prostgles.opts.watchSchema ||
+      (!prostgles.loaded && (!this.schemaChangePromise || isRefreshCallback))
+    )
+      return;
+
+    this.pendingSchemaChange = event;
+    this.schemaChangePromise ??= Promise.resolve()
+      .then(async () => {
+        try {
+          while (this.pendingSchemaChange) {
+            const pendingEvent = this.pendingSchemaChange;
+            this.pendingSchemaChange = undefined;
+            await this.schemaRefreshStorage.run(this.schemaChangePromise!, () =>
+              this.refreshSchema(pendingEvent),
+            );
+          }
+        } finally {
+          this.schemaChangePromise = undefined;
+        }
+      })
+      .catch((error) => {
+        console.error("watchSchema: Schema refresh failed", error);
+      });
+  };
+
+  private refreshSchema = async (event: SchemaChangeEvent) => {
     const { watchSchema, onReady, tsGeneratedTypesDir } = this.dboBuilder.prostgles.opts;
-    if (watchSchema && this.dboBuilder.prostgles.loaded) {
+    if (watchSchema) {
       log("Schema changed");
       const { query, command } = event;
 
-      void this.dboBuilder.cacheDBTypes(true);
+      await this.dboBuilder.cacheDBTypes(true);
       if (typeof watchSchema === "function") {
         /* Only call the provided func */
-        watchSchema(event);
+        void watchSchema(event);
       } else if (watchSchema === "hotReloadMode") {
         if (tsGeneratedTypesDir) {
           /* Hot reload integration. Will only touch tsGeneratedTypesDir */
@@ -86,7 +131,7 @@ export class SchemaWatch {
       } else {
         /* Full re-init. Sockets must reconnect */
         console.log("watchSchema: Full re-initialisation", { query });
-        void this.dboBuilder.prostgles.init(onReady as OnReadyCallbackBasic, {
+        await this.dboBuilder.prostgles.init(onReady as OnReadyCallbackBasic, {
           type: "schema change",
           query,
           command,

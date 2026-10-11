@@ -37,7 +37,7 @@ export async function runSQL(
     throw "Not allowed to run SQL";
   }
 
-  const { returnType, allowListen, hasParams = true }: SQLOptions = options || ({});
+  const { returnType, allowListen, hasParams = true }: SQLOptions = options || {};
   const { socket } = localParams?.clientReq ?? {};
 
   const db = localParams?.tx?.t || this.db;
@@ -97,7 +97,7 @@ export async function runSQL(
     queryWithoutRLS,
     queryResult,
     allowListen,
-    localParams?.clientReq,
+    localParams,
   );
   if (listenHandlers) {
     return listenHandlers;
@@ -129,15 +129,15 @@ const onSQLResult = async function (
   queryWithoutRLS: string,
   { command }: Omit<SQLResultInfo, "duration">,
   allowListen: boolean | undefined,
-  clientReq: AuthClientRequest | undefined,
+  localParams: LocalParams | undefined,
 ) {
-  this.prostgles.schemaWatch?.onSchemaChangeFallback?.({
-    command,
-    query: queryWithoutRLS,
-  });
+  this.prostgles.schemaWatch?.onSchemaChangeFallback?.(
+    { command, query: queryWithoutRLS },
+    localParams?.tx?.t,
+  );
 
   if (command === "LISTEN") {
-    const { socket } = clientReq || {};
+    const { socket } = localParams?.clientReq || {};
     if (!allowListen)
       throw new Error(
         `Your query contains a LISTEN command. Set { allowListen: true } to get subscription hooks. Or ignore this message`,

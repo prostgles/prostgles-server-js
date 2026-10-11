@@ -6,8 +6,11 @@ import type { DBHandlerServerInternal } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableConfig/TableRowFromColumnDefinitions";
 import { testTableConfig } from "./testTableConfig";
+import { testSchemaWatch } from "./schemaWatch.spec";
 
 export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => {
+  await testSchemaWatch(pgDb);
+
   await test("server function return types preserve generated schema references", async () => {
     const { tsSchema } = await db.items!.dboBuilder.getTsDefinitions();
     const arrayReference = 'NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]';

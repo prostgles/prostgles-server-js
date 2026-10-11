@@ -236,7 +236,8 @@ export const initProstgles = async function (
     await this.createContext(reason);
     this.initRestApi();
 
-    this.schemaWatch = await SchemaWatch.create(this.dboBuilder);
+    // Preserve schema events queued during reinitialization.
+    this.schemaWatch ??= await SchemaWatch.create(this.dboBuilder);
 
     if (this.opts.publish) {
       if (!this.opts.io && !this.opts.restApi) {

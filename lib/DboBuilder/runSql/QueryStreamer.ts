@@ -135,10 +135,10 @@ export class QueryStreamer {
         };
         socket.emit(channel, packet);
         if (reachedEnd) {
-          this.dboBuilder.prostgles.schemaWatch?.onSchemaChangeFallback?.({
-            command: info.command,
-            query: query.query,
-          });
+          this.dboBuilder.prostgles.schemaWatch?.onSchemaChangeFallback?.(
+            { command: info.command, query: query.query },
+            undefined,
+          );
         }
         fieldsWereSent = true;
       };
