@@ -162,8 +162,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
     const tableHandler = this.dbo[tableName];
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
-    if ("check" in tableConf && tableConf.check !== undefined) {
-      // Checked table introspection may reference tables queued earlier in this config.
+    if (tableHandler || ("check" in tableConf && tableConf.check !== undefined)) {
+      // Table introspection may reference tables queued earlier in this config.
       await runQueries();
     }
 

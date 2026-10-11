@@ -1,10 +1,12 @@
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { test } from "node:test";
 import express from "express";
 import prostgles, {
   createJobDefiner,
+  getLocalStorageClient,
   type FileTableInsertRow,
   type FileTableRow,
   type InitResult,
@@ -15,6 +17,57 @@ import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/ge
 import type { FileVersionTableRow } from "prostgles-server/dist/StorageClient/fileTableDefinitions";
 
 export const testFileJobs = async (db: DB) => {
+  await test("file jobs can be enabled after the file table is created", async () => {
+    const database = `file_jobs_${randomUUID().replaceAll("-", "")}`;
+    const defineJob = createJobDefiner<FileJobTestSchema>();
+    let instance: InitResult<FileJobTestSchema> | undefined;
+    let fileTableHandler: InitResult<FileJobTestSchema>["db"]["files"] | undefined;
+    try {
+      await db.none(`CREATE DATABASE ${database}`);
+      instance = await prostgles<FileJobTestSchema>({
+        dbConnection: {
+          ...getConnectionDetails(db),
+          database,
+        } as unknown as ProstglesInitOptions["dbConnection"],
+        transactions: true,
+        onReady: ({ dbo }) => { fileTableHandler = dbo.files; },
+      });
+      await instance.update({
+        fileTable: {
+          tableName: "files",
+          expressApp: express(),
+          storageClient: getLocalStorageClient({ localFolderPath: path.join(__dirname, "media") }),
+        },
+      });
+      await instance.update({
+        tableConfig: {
+          files: {
+            columns: { notes: "TEXT", job_id: "UUID" },
+            constraints: { file_job: "FOREIGN KEY (job_id) REFERENCES prostgles_jobs(id)" },
+          },
+        },
+        jobs: {
+          definitions: {
+            link: defineJob({
+              trigger: { type: "row", table: "files", on: ["insert"], jobIdColumn: "job_id" },
+              run: async () => {},
+            }),
+          },
+        },
+      });
+      assert(fileTableHandler);
+      const file = await fileTableHandler.insert(
+        { data: Buffer.from("queued"), original_name: "queued.txt" },
+        { returning: "*" },
+      );
+      assert(file.job_id);
+      assert.equal((await instance.jobs.get(file.job_id))?.job_name, "link");
+    } finally {
+      await instance?.destroy();
+      await db.none(`DROP DATABASE ${database} WITH (FORCE)`);
+    }
+  });
+
   await test("file jobs start after upload and commit, pin revisions and skip metadata changes", async () => {
     const database = `file_jobs_${randomUUID().replaceAll("-", "")}`;
     const files = "files";
