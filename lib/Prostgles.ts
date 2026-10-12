@@ -182,6 +182,7 @@ export class Prostgles {
       restApi: 1,
       testRulesOnConnect: 1,
       modifyClientSchema: 1,
+      modifyClientFunctionSchema: 1,
       createContext: 1,
     };
     const unknownParams = Object.keys(params).filter(
@@ -313,7 +314,7 @@ export class Prostgles {
       this.dboBuilder = await DboBuilder.create(this);
     }
     this.dbo = this.dboBuilder.dbo;
-    if (this.publishParser) this.initPublishParser();
+    if (this.publishParser && !this.preparingTableConfig) this.initPublishParser();
     await this.opts.onLog?.({
       type: "debug",
       command: "refreshDBO.end",

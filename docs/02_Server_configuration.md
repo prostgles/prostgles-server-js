@@ -185,3 +185,6 @@
 
   Used to add custom metadata to the table and column schemas.
   This metadata is then available in the client schema and can be used for custom logic on the client side.
+- **modifyClientFunctionSchema** <span style="color: grey">optional</span> <span style="color: green;">ModifyClientFunctionSchema</span>
+
+  Adds JSON-serializable metadata to each authorized function schema, without its run handler.

@@ -1,4 +1,9 @@
-import type { DBSchemaTable, FileColumnConfig, MaybePromise } from "prostgles-types";
+import type {
+  ClientServerFunctionSchema,
+  DBSchemaTable,
+  FileColumnConfig,
+  MaybePromise,
+} from "prostgles-types";
 import type {
   AuthConfig,
   AuthRequestParams,
@@ -117,6 +122,11 @@ type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (
   userData: AuthResultWithSID<SUser> | undefined,
   resolvedAuditConfig: ResolvedAuditConfig | undefined,
 ) => MaybePromise<DBSchemaTable>;
+
+type ModifyClientFunctionSchema<SUser extends SessionUser = SessionUser> = (
+  functionSchema: ClientServerFunctionSchema,
+  userData: AuthResultWithSID<SUser> | undefined,
+) => MaybePromise<ClientServerFunctionSchema>;
 
 export type ProstglesInitOptions<
   S = void,
@@ -354,6 +364,8 @@ export type ProstglesInitOptions<
    * This metadata is then available in the client schema and can be used for custom logic on the client side.
    */
   modifyClientSchema?: ModifyClientSchema<SUser>;
+  /** Adds JSON-serializable metadata to each authorized function schema, without its run handler. */
+  modifyClientFunctionSchema?: ModifyClientFunctionSchema<SUser>;
 };
 
 export type TableConfigMigrations = {

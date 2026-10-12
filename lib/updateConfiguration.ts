@@ -29,6 +29,17 @@ export const updateConfiguration = async (
     return;
   }
 
+  const onlyUpdatesHooks = optionsThatChanged.every((updatedKey) =>
+    nonOnReadyUpdateKeys.some((key) => key === updatedKey),
+  );
+  const onlyUpdatesClients = optionsThatChanged.every((updatedKey) =>
+    clientOnlyUpdateKeys.some((key) => key === updatedKey),
+  );
+  if (!onlyUpdatesHooks && !onlyUpdatesClients) {
+    await prgl.init(onReady, { type: "prgl.update", newOpts });
+    return;
+  }
+
   if (includes(optionsThatChanged, "restApi")) {
     prgl.initRestApi();
   }
@@ -57,13 +68,6 @@ export const updateConfiguration = async (
 
   if (isEmpty(newOpts)) return;
 
-  const onlyUpdatesHooks = optionsThatChanged.every((updatedKey) =>
-    nonOnReadyUpdateKeys.some((key) => key === updatedKey),
-  );
-  const onlyUpdatesClients = optionsThatChanged.every((updatedKey) =>
-    clientOnlyUpdateKeys.some((key) => key === updatedKey),
-  );
-
   /**
    * Some of these changes require clients to reconnect
    * While others also affect the server and onReady should be called
@@ -75,10 +79,6 @@ export const updateConfiguration = async (
     if (onlyUpdatesClients) prgl.setupSocketIO();
     return;
   }
-  await prgl.init(onReady, {
-    type: "prgl.update",
-    newOpts,
-  });
 };
 
 /**
@@ -91,6 +91,7 @@ export const clientOnlyUpdateKeys = [
   "functions",
   "publishRawSQL",
   "modifyClientSchema",
+  "modifyClientFunctionSchema",
 ] as const satisfies (keyof UpdatableOptions)[];
 
 const nonOnReadyUpdateKeys = ["tableHooks"] as const satisfies (keyof UpdatableOptions)[];

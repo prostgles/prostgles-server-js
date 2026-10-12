@@ -3,6 +3,7 @@ import {
   getKeys,
   type AnyObject,
   type ClientSchema,
+  type ServerFunctionHandler,
   type SQLHandler,
   type SQLOptions,
   type TableHandler,
@@ -12,7 +13,6 @@ import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
 import type { DBHandlerServerRestricted } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { Prostgles } from "../Prostgles";
-import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
 import { getClientSchema } from "./getClientSchema";
@@ -27,7 +27,7 @@ export type ClientHandlers<S = void> = {
   withClientDbTx: <R>(
     callback: (clientDb: DBHandlerServerRestricted<S>) => R | Promise<R>,
   ) => Promise<R>;
-  clientMethods: Record<string, ServerFunctionDefinition>;
+  clientMethods: ServerFunctionHandler;
   clientSchema: ClientSchema;
 };
 
@@ -140,15 +140,15 @@ export const getClientHandlers = async <S = void>(
     });
   };
 
-  const clientMethods: Record<string, ServerFunctionDefinition> = Object.fromEntries(
-    clientSchema.methods.map(({ name, input, description, output }) => {
+  const clientMethods: ServerFunctionHandler = Object.fromEntries(
+    clientSchema.methods.map(({ name, ...metadata }) => {
       const methodHandler = (input?: unknown) => {
         if (scope && !scope.methods?.[name]) {
           throw new Error(`Method ${name} is not allowed by PermissionScope`);
         }
         return runClientMethod.bind(prostgles)({ name, input }, clientReq);
       };
-      return [name, { name, input, description, output, run: methodHandler }];
+      return [name, { name, ...metadata, run: methodHandler }];
     }),
   );
 

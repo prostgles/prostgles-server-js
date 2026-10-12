@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { test } from "node:test";
 import prostgles, {
@@ -16,9 +17,17 @@ import prostgles, {
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ViewHandler } from "prostgles-server/dist/DboBuilder/ViewHandler/ViewHandler";
 import type { DB } from "prostgles-server/dist/Prostgles";
-import { CHANNELS, ROW_ACTIONS_COLUMN, type AnyObject, type ClientSchema } from "prostgles-types";
+import {
+  CHANNELS,
+  getActionFunctions,
+  ROW_ACTIONS_COLUMN,
+  type AnyObject,
+  type ClientSchema,
+  type ClientServerFunctionSchema,
+} from "prostgles-types";
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
+import type prostglesClient from "../client/node_modules/prostgles-client";
 import { checkGeneratedTypes } from "./checkGeneratedTypes";
 
 export const testClientSchemaTypes = async (db: DB) => {
@@ -105,6 +114,15 @@ export const testClientSchemaTypes = async (db: DB) => {
           io,
           restApi: { expressApp: app, path: "/api" },
           publishRawSQL: ({ user }) => user?.type === "admin",
+          modifyClientFunctionSchema: (functionSchema, userData) => {
+            assert.equal("run" in functionSchema, false);
+            assert.equal(userData?.user?.id, "user-guest");
+            return Promise.resolve({
+              ...functionSchema,
+              rendering: { label: functionSchema.name, result: "json" },
+              clientSchemaUserId: userData.user.id,
+            });
+          },
           auth: {
             sidKeyName: "token",
             onUseOrSocketConnected: (_sid, _client, reqInfo) => {
@@ -192,6 +210,7 @@ export const testClientSchemaTypes = async (db: DB) => {
                   run: () => undefined,
                 }),
                 transactionTest: defineFunction({
+                  description: "Insert a row in a client transaction",
                   input: { fail: "boolean" },
                   run: ({ fail }, { withClientDbTx }) =>
                     withClientDbTx(async (tx) => {
@@ -443,6 +462,8 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.deepEqual(profiles.MemberDBSchema!.tableSchema, guestSchema.tableSchema);
         assert.deepEqual(profiles.UnknownDBSchema!.tableSchema, []);
         assert.deepEqual(profiles.AnonymousDBSchema!.tableSchema, []);
+        assert.deepEqual(profiles.AdminDBSchema!.methods, []);
+        assert.deepEqual(profiles.AnonymousDBSchema!.methods, []);
         const serverSocket = io.sockets.sockets.get(sockets[0]!.id!);
         assert(serverSocket);
         const handlers = await instance.getClientDBHandlers({ socket: serverSocket }, undefined);
@@ -451,6 +472,106 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(typeof handlers.clientDb[tableName]!.upsert, "function");
         assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
+        await t.test(
+          "function schema metadata survives socket, REST and server-user handlers",
+          async () => {
+            assert(instance);
+            const expectedMetadata = {
+              rendering: { label: "transactionTest", result: "json" },
+              clientSchemaUserId: "user-guest",
+            };
+            const expectedSchema = {
+              name: "transactionTest",
+              input: { fail: "boolean" },
+              description: "Insert a row in a client transaction",
+              ...expectedMetadata,
+            } satisfies ClientServerFunctionSchema<typeof expectedMetadata>;
+            assert.deepEqual(
+              guestSchema.methods.find(({ name }) => name === "transactionTest"),
+              expectedSchema,
+            );
+            assert.deepEqual(
+              handlers.clientMethods.transactionTest!.rendering,
+              expectedMetadata.rendering,
+            );
+            const serverUser = await instance.getClientDBHandlers(
+              { userId: "user-guest" },
+              undefined,
+            );
+            assert.deepEqual(
+              serverUser.clientMethods.transactionTest!.rendering,
+              expectedMetadata.rendering,
+            );
+            assert.equal(
+              serverUser.clientMethods.transactionTest!.clientSchemaUserId,
+              "user-guest",
+            );
+            const response = await fetch(`http://127.0.0.1:${address.port}/api/schema`, {
+              method: "POST",
+              headers: { cookie: "token=guest" },
+            });
+            assert.equal(response.status, 200);
+            const restSchema = (await response.json()) as ClientSchema;
+            assert.deepEqual(restSchema.methods, guestSchema.methods);
+
+            const connectClient = createRequire(path.resolve("../client/package.json"))(
+              "prostgles-client",
+            ).default as typeof prostglesClient;
+            const client = await connectClient({
+              endpoint: `http://127.0.0.1:${address.port}`,
+              socketOptions: {
+                path: "/socket.io",
+                transports: ["websocket"],
+                reconnection: false,
+                query: { token: "guest" },
+              },
+            });
+            const { socket } = client;
+            const originalHook = instance.options.modifyClientFunctionSchema;
+            const nextSchema = () =>
+              new Promise<ClientSchema>((resolve) => {
+                socket.once(CHANNELS.SCHEMA, resolve);
+              });
+            try {
+              assert(client.methodSchema && client.methods);
+              assert.deepEqual(
+                client.methodSchema.transactionTest!.rendering,
+                expectedMetadata.rendering,
+              );
+              assert.equal(client.methodSchema.transactionTest!.clientSchemaUserId, "user-guest");
+              assert.deepEqual(client.methodSchema.transactionTest!.input, expectedSchema.input);
+              const callsBeforeRun = lookupCalls;
+              assert.equal(await client.methodSchema.lookupTest!.run({}), callsBeforeRun + 1);
+              assert.equal(await client.methods.lookupTest!({}), callsBeforeRun + 2);
+              const updatedSchema = nextSchema();
+              await instance.update({
+                modifyClientFunctionSchema: (functionSchema) => ({
+                  ...functionSchema,
+                  rendering: { label: "Updated" },
+                }),
+              });
+              const schema = await updatedSchema;
+              assert.deepEqual(
+                schema.methods.find(({ name }) => name === "transactionTest")!.rendering,
+                { label: "Updated" },
+              );
+              const unmodifiedSchema = nextSchema();
+              await instance.update({ modifyClientFunctionSchema: undefined });
+              const rawSchema = await unmodifiedSchema;
+              assert.deepEqual(
+                rawSchema.methods.find(({ name }) => name === "transactionTest"),
+                {
+                  name: expectedSchema.name,
+                  input: expectedSchema.input,
+                  description: expectedSchema.description,
+                },
+              );
+            } finally {
+              socket.disconnect();
+              await instance.update({ modifyClientFunctionSchema: originalHook });
+            }
+          },
+        );
         await t.test(
           "forUpdate requires a transaction and preserves client select permissions",
           async () => {
@@ -529,6 +650,32 @@ export const testClientSchemaTypes = async (db: DB) => {
             try {
               const guest = await instance.getClientDBHandlers({ userId: "user-guest" }, undefined);
               for (const client of [handlers, guest]) {
+                const actions = getActionFunctions(client.clientMethods, table);
+                assert.deepEqual(
+                  actions.map(({ methodName, argName }) => [methodName, argName]),
+                  [
+                    ["alwaysAction", "row"],
+                    ["lookupTest", "row"],
+                    ["lookupTest", "value"],
+                    ["valueAction", "id"],
+                  ],
+                );
+                assert.deepEqual(
+                  actions.find(
+                    ({ methodName, argName }) => methodName === "lookupTest" && argName === "row",
+                  )!.lookup.filter,
+                  { body: { $ne: "lookup-filtered" } },
+                );
+                assert.deepEqual(
+                  getActionFunctions(client.clientMethods, {
+                    ...table,
+                    columns: table.columns.map((column) => ({ ...column, select: false })),
+                  }).map(({ methodName, argName }) => [methodName, argName]),
+                  [
+                    ["alwaysAction", "row"],
+                    ["lookupTest", "row"],
+                  ],
+                );
                 const run = async (input: AnyObject) =>
                   await client.clientMethods.lookupTest!.run(input);
                 const checksBeforeSelect = functionAccessChecks;
@@ -640,9 +787,7 @@ export const testClientSchemaTypes = async (db: DB) => {
             assert.equal(row.created_by, "user-guest");
             assert.equal(await guest.clientDb[tableName]!.count!({ id: row.id }), 1);
             await assert.rejects(guest.clientSql("SELECT 1"));
-            await assert.rejects(
-              () => guest.clientMethods.transactionTest!.run({ fail: true }) as any,
-            );
+            await assert.rejects(() => guest.clientMethods.transactionTest!.run({ fail: true }));
             assert.equal(await guest.clientDb[tableName]!.count!({ body: "function-rollback" }), 0);
             const scoped = await instance.getClientDBHandlers(
               { userId: "user-admin" },
@@ -913,9 +1058,7 @@ export const testClientSchemaTypes = async (db: DB) => {
         });
         assert.equal(committedRow!.created_by, "user-guest");
         assert.deepEqual(functionRow, committedRow);
-        await assert.rejects(
-          () => handlers.clientMethods.transactionTest!.run({ fail: true }) as any,
-        );
+        await assert.rejects(() => handlers.clientMethods.transactionTest!.run({ fail: true }));
         assert.equal(await handlers.clientDb[tableName]!.count!({ body: "function-rollback" }), 0);
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
@@ -972,6 +1115,35 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         await instance.update({ publish: originalPublish });
         assert.equal((await instance.getTSSchema()).tsSchema, tsSchema);
+        await t.test(
+          "schema updates apply table config before validating publish profiles",
+          async () => {
+            assert(instance);
+            const addedTableName = "added_table";
+            await instance.update({
+              tableConfig: {
+                ...instance.options.tableConfig,
+                [addedTableName]: { columns: { id: "serial PRIMARY KEY", value: "text" } },
+              },
+              publish: [
+                {
+                  name: "AddedTableSchema",
+                  userTypes: ["admin"],
+                  publish: { [addedTableName]: { select: { fields: ["id", "value"] } } },
+                },
+              ],
+            });
+            assert(
+              (await instance.getTSSchema()).tsSchema.includes("export type AddedTableSchema"),
+            );
+            const handlers = await instance.getClientDBHandlers(
+              { userId: "user-admin" },
+              undefined,
+            );
+            assert.deepEqual(await handlers.clientDb[addedTableName]!.find!(), []);
+            await instance.update({ publish: originalPublish });
+          },
+        );
         await t.test("server user handlers require configured authentication", async () => {
           assert(instance);
           const handlers = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);

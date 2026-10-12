@@ -1,4 +1,4 @@
-import { isObject, ROW_ACTIONS_COLUMN } from "prostgles-types";
+import { getActionFunctions, ROW_ACTIONS_COLUMN } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { LocalParams, PGIdentifier } from "../DboBuilderTypes";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
@@ -21,19 +21,16 @@ export const getRowActionsField = async (
     clientReq && methods?.size ?
       await publishParser?.getPublishParams(clientReq, undefined)
     : undefined;
+  const actionTable = {
+    name: table.name,
+    columns: allowedFields.map((name) => ({ name, select: true })),
+  };
   const expressions = await Promise.all(
     Array.from(methods ?? []).flatMap(([name, method]) => {
       if (scope && !scope.methods?.[name]) return [];
-      const lookups = Object.values(method.input ?? {}).flatMap((arg) => {
-        if (
-          !isObject(arg) ||
-          (arg.type !== "RowLookup" && arg.type !== "ValueLookup") ||
-          arg.table !== table.name ||
-          (arg.type === "ValueLookup" && !allowedFields.includes(arg.column))
-        )
-          return [];
-        return [replaceContextPlaceholders(arg.filter ?? {}, publishParams, "runtime")];
-      });
+      const lookups = getActionFunctions({ [name]: method }, actionTable).map(({ lookup }) =>
+        replaceContextPlaceholders(lookup.filter ?? {}, publishParams, "runtime"),
+      );
       if (!lookups.length) return [];
       return [
         parseCaseExpression(

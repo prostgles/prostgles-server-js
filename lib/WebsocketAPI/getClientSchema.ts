@@ -45,7 +45,7 @@ export async function getClientSchema(
     );
     const { tables: rawTables = [] } = fullSchema ?? {};
     const { tableSchemaErrors = {} } = fullSchema ?? {};
-    const { modifyClientSchema } = this.opts;
+    const { modifyClientSchema, modifyClientFunctionSchema } = this.opts;
     const tables = await (() => {
       if (!modifyClientSchema) return rawTables;
       const resolvedAuditConfig = this.resolvedAuditConfig;
@@ -92,6 +92,12 @@ export async function getClientSchema(
             const bName = isObject(b) ? b.name : b;
             return aName.localeCompare(bName);
           });
+    const methodsWithMetadata =
+      modifyClientFunctionSchema ?
+        await Promise.all(
+          methodSchema.map((method) => modifyClientFunctionSchema(method, userData)),
+        )
+      : methodSchema;
 
     const authInfo = await this.authHandler.getClientAuth(clientReq);
     if (authInfo === "new-session-redirect") {
@@ -99,7 +105,7 @@ export async function getClientSchema(
     }
 
     const clientSchema: ClientSchema = {
-      methods: methodSchema,
+      methods: methodsWithMetadata,
       tableSchema: tables,
       rawSQL,
       joinTables: joinTables2,

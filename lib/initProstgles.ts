@@ -54,6 +54,7 @@ export type UpdatableOptions<
   | "tsGeneratedTypesDir"
   | "tsGeneratedTypesFunctionsPath"
   | "modifyClientSchema"
+  | "modifyClientFunctionSchema"
   | "createContext"
 >;
 export type OnInitReason =
@@ -234,6 +235,8 @@ export const initProstgles = async function (
     await this.tableConfigurator!.refresh();
     await this.jobs.validate();
     await this.createContext(reason);
+    // Context setup may resolve publish rules that require mutation triggers.
+    await this.tableConfigurator!.sync();
     this.initRestApi();
 
     // Preserve schema events queued during reinitialization.
