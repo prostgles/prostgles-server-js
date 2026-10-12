@@ -16,7 +16,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     const database = `table_check_${process.pid}_${Date.now()}`;
     await parentDb.none(`CREATE DATABASE ${asName(database)}`);
     const pgp = pgPromise();
-    const dbConnection = { ...getConnectionDetails(parentDb), database };
+    const dbConnection = {
+      ...getConnectionDetails(parentDb),
+      database,
+      options: "-c lock_timeout=3000",
+    };
     const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
     const columns = {
       id: "BIGSERIAL PRIMARY KEY",
@@ -39,6 +43,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         { state: "error", error: { $ne: null }, finished_at: { $ne: null } },
       ],
     };
+    const metadataIndex = {
+      columns: "lower(metadata) DESC",
+      where: "metadata IS NOT NULL",
+      concurrently: false,
+    };
     const tableConfig: TableConfig = {
       backup_groups: { columns: { id: "INT PRIMARY KEY" } },
       backup_jobs: {
@@ -49,7 +58,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         },
         check: { $or: [{ state: "queued", group_id: { $ne: null } }] },
       },
-      backups: { columns, check },
+      backups: {
+        columns,
+        check,
+        indexes: { backups_metadata_idx: metadataIndex },
+      },
     };
     let instance: Awaited<ReturnType<Prostgles["init"]>> | undefined;
     const start = async () => {
@@ -196,10 +209,28 @@ export const testTableConfigValidation = async (parentDb: DB) => {
           "SELECT oid FROM pg_constraint WHERE conrelid = 'backups'::regclass AND conname = 'prostgles_row_check'",
         );
       const originalCheck = await getCheck();
+      const originalIndex = await db.one("SELECT 'backups_metadata_idx'::regclass::oid AS oid");
+      await db.none("COMMENT ON INDEX backups_metadata_idx IS NULL");
+      metadataIndex.concurrently = true;
       await instance!.destroy();
       instance = undefined;
-      await start();
+      await db.tx(async (reader) => {
+        // Inspect an uncommented index while its live table is being read and written.
+        await reader.any(
+          "SELECT * FROM backups LEFT JOIN backup_groups ON group_id = backup_groups.id",
+        );
+        await reader.none("UPDATE backups SET metadata = metadata");
+        await start();
+      });
       assert.deepEqual(await getCheck(), originalCheck);
+      assert.deepEqual(
+        await db.one("SELECT 'backups_metadata_idx'::regclass::oid AS oid"),
+        originalIndex,
+      );
+      assert.equal(
+        await db.oneOrNone("SELECT 1 FROM pg_namespace WHERE nspname LIKE 'prostgles_inspect_%'"),
+        null,
+      );
       const subscription = await instance!.db.backups!.subscribe!({}, {}, () => {});
       await subscription.unsubscribe();
       assert.deepEqual(await getCheck(), originalCheck);
@@ -236,7 +267,7 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     } finally {
       await instance?.destroy();
       await db.$pool.end();
-      await parentDb.none(`DROP DATABASE ${asName(database)}`);
+      await parentDb.none(`DROP DATABASE ${asName(database)} WITH (FORCE)`);
     }
   });
 

@@ -167,6 +167,7 @@ export const getTableColumns = ({
       is_nullable = 'YES' as nullable
     FROM information_schema.columns
     WHERE table_name = $1
+      AND pg_table_is_visible(format('%I.%I', table_schema, table_name)::regclass)
   `,
     [table],
   );

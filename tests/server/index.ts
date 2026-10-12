@@ -19,7 +19,7 @@ const isClientTest = process.env.TEST_TYPE === "client";
 if (
   process.env.TEST_TYPE === "server" &&
   process.env.TEST_NAME &&
-  !["conflictUpdates", "jobs", "hooks", "audit", "schemaTypes", "clientSchemaTypes"].includes(
+  !["conflictUpdates", "jobs", "hooks", "audit", "schemaTypes", "clientSchemaTypes", "tableConfig"].includes(
     process.env.TEST_NAME,
   )
 ) {
@@ -40,6 +40,7 @@ import { testExecutionContext } from "./executionContext.spec";
 import { testAudit } from "./audit.spec";
 import { testSchemaTypes } from "./schemaTypes.spec";
 import { testClientSchemaTypes } from "./clientSchemaTypes.spec";
+import { testTableConfigValidation } from "./tableConfig.spec";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
@@ -472,6 +473,11 @@ void (async () => {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
+          if (process.env.TEST_NAME === "tableConfig") {
+            await testTableConfigValidation(db);
+            stopTest();
+            return;
+          }
           if (process.env.TEST_NAME === "clientSchemaTypes") {
             await testClientSchemaTypes(db);
             stopTest();

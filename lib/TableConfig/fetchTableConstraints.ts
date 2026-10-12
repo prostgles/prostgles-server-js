@@ -32,7 +32,7 @@ const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstraintsArg
       SELECT distinct c.conname as name, c.contype as type,
         pg_get_constraintdef(c.oid) as definition, 
         nsp.nspname as schema,
-      (SELECT r.relname from pg_class r where r.oid = c.conrelid) as "table", 
+      rel.relname as "table",
       (SELECT array_agg(attname::text) from pg_attribute 
       where attrelid = c.conrelid and ARRAY[attnum] <@ c.conkey) as cols
       -- (SELECT array_agg(attname::text) from pg_attribute 
@@ -43,6 +43,7 @@ const getColConstraintsQuery = ({ column, table, types }: Omit<ColConstraintsArg
       ON rel.oid = c.conrelid
       INNER JOIN pg_catalog.pg_namespace nsp
       ON nsp.oid = connamespace
+      ${table ? "WHERE pg_table_is_visible(rel.oid)" : ""}
     ) t   
     WHERE TRUE 
   `;

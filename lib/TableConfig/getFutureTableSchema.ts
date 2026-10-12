@@ -1,4 +1,5 @@
 import { asName } from "prostgles-types";
+import { randomUUID } from "crypto";
 import { pgp } from "../DboBuilder/DboBuilder";
 import type { DB } from "../Prostgles";
 import type { ColumnMinimalInfo } from "./getColumnSQLDefinitionQuery";
@@ -28,9 +29,13 @@ export const getFutureTableSchema = async ({
   cols: ColumnMinimalInfo[];
 }> => {
   const { constraints, cols } = await executeSqlWithRollback(db, async (t) => {
-    /** To prevent deadlocks we use a random table name -> Not feasible because named constraints cannot be recreated without dropping the existing ones from actual table */
-    // const tableEsc = asName(tableName.slice(0, 12) + (await t.oneOrNone(`SELECT md5(now()::text) as md5`)).md5);
-
+    // Keep table and constraint names without dropping the live table.
+    const schemaName = `prostgles_inspect_${randomUUID().replaceAll("-", "")}`;
+    await t.none(`CREATE SCHEMA ${asName(schemaName)}`);
+    await t.one(
+      "SELECT set_config('search_path', quote_ident($1) || ', ' || current_setting('search_path'), true)",
+      [schemaName],
+    );
     const tableEsc = asName(tableName);
 
     const consQueries = constraintDefs
@@ -41,7 +46,6 @@ export const getFutureTableSchema = async ({
       .join("\n");
 
     const query = `
-        DROP TABLE IF EXISTS ${tableEsc} CASCADE;
         CREATE TABLE ${tableEsc} (
           ${columnDefs.join(",\n")}
         );

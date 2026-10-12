@@ -5,6 +5,7 @@ import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { executeSqlWithRollback } from "../getFutureTableSchema";
 import { getPGIndexes } from "../getPGIndexes";
 import type { TableConfig } from "../TableConfigTypes";
+import { randomUUID } from "node:crypto";
 
 /**
  * Keep Postgres indexes in sync with table configuration
@@ -19,24 +20,25 @@ export const getIndexesQueries = async (
 ) => {
   const queries: string[] = [];
   if ("indexes" in tableConf && tableConf.indexes) {
-    const currIndexes = await getPGIndexes(db, tableName, "public");
+    const currIndexes = await getPGIndexes(db, tableName);
 
     for (const [
       indexName,
       { columns, concurrently, replace, unique, using, where = "" },
     ] of Object.entries(tableConf.indexes)) {
-      const indexDefinition =
+      const getIndexDefinition = (targetTable: string, concurrent: boolean | undefined) =>
         [
           "CREATE",
           unique && "UNIQUE",
-          concurrently && "CONCURRENTLY",
-          `INDEX ${asName(indexName)} ON ${asName(tableName)}`,
+          concurrent && "CONCURRENTLY",
+          `INDEX ${asName(indexName)} ON ${asName(targetTable)}`,
           using && "USING " + using,
           `(${columns})`,
           where && `WHERE ${where}`,
         ]
           .filter((v) => v)
           .join(" ") + ";";
+      const indexDefinition = getIndexDefinition(tableName, concurrently);
       const indexDefinitionHash = md5(indexDefinition) as string;
       const matchingIndex = currIndexes.find((idx) => idx.indexname === indexName);
       const indexExistsWithDifferentComment =
@@ -44,12 +46,17 @@ export const getIndexesQueries = async (
       let indexExistsWithDifferentDefinition = indexExistsWithDifferentComment;
       if (indexExistsWithDifferentComment && !matchingIndex.description) {
         const futureIndexes = await executeSqlWithRollback(db, async (t) => {
-          await t.any(`DROP INDEX IF EXISTS ${asName(indexName)} CASCADE;`);
-          await t.any(indexDefinition);
-          return getPGIndexes(t, tableName, "public");
+          const temporaryTable = `prostgles_index_${randomUUID().replaceAll("-", "")}`;
+          await t.none(
+            `CREATE TEMP TABLE ${asName(temporaryTable)} (LIKE ${asName(tableName)} INCLUDING GENERATED)`,
+          );
+          await t.none(getIndexDefinition(temporaryTable, false));
+          return getPGIndexes(t, temporaryTable);
         });
         indexExistsWithDifferentDefinition = !futureIndexes.some(
-          (idx) => idx.indexname === indexName && matchingIndex.indexdef === idx.indexdef,
+          (idx) =>
+            idx.indexname === indexName && matchingIndex.indexdef === idx.indexdef &&
+            matchingIndex.unique === idx.unique,
         );
       }
       const indexShouldBeReplaced =
