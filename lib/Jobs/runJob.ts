@@ -13,14 +13,14 @@ export const runJob = async (
 ) => {
   const db = prostgles.db!;
   const tableSQL = prostgles.jobs.tableSQL;
-  const claim = [job.id, job.lease_token];
+  const claim = { jobId: job.id, leaseToken: job.lease_token };
   const owned =
-    "id = $1 AND lease_token = $2 AND status = 'running' AND locked_until > clock_timestamp()";
-  const write = async (set: string, value: unknown) => {
+    "id = ${jobId} AND lease_token = ${leaseToken} AND status = 'running' AND locked_until > clock_timestamp()";
+  const write = async (set: string, values: Record<string, unknown>) => {
     controller.signal.throwIfAborted();
-    const result = await db.oneOrNone(
+    const result = await db.oneOrNone<{ id?: string }>(
       `UPDATE ${tableSQL} SET ${set} WHERE ${owned} AND NOT cancel_requested RETURNING id`,
-      [...claim, value],
+      { ...claim, ...values },
     );
     if (!result) {
       controller.abort(new Error("Job cancelled or lease lost"));
@@ -65,7 +65,7 @@ export const runJob = async (
     const context = await getJobContext(prostgles, definition, job.user_id ?? undefined);
     const row =
       definition.trigger.type === "row" ?
-        await context.dbo[definition.trigger.table]?.findOne?.(job.owner)
+        await context.dbo[definition.trigger.table]?.findOne?.(job.target_row_pkey)
       : undefined;
     if (definition.trigger.type === "row" && !row)
       throw new PermanentJobError("Job row is missing or not permitted");
@@ -79,12 +79,19 @@ export const runJob = async (
         if (
           !Number.isFinite(done) ||
           done < 0 ||
-          (total !== undefined && (!Number.isFinite(total) || total < 0 || done > total))
+          !Number.isFinite(total) ||
+          total < 0 ||
+          done > total
         ) {
-          throw new Error("Invalid job progress");
+          throw new Error(
+            "Invalid job progress. Expecting 0 <= done <= total and total must be finite.",
+          );
         }
-        await write("progress = $3:json", { done, ...(total === undefined ? {} : { total }) });
+        await write("progress_numeric = ${progress:json}", {
+          progress: { done, total },
+        });
       },
+      progressMessage: (message) => write("progress_message = ${message}", { message }),
       checkpoint: {
         get: async <C>() => {
           controller.signal.throwIfAborted();
@@ -97,7 +104,7 @@ export const runJob = async (
         },
         set: async (checkpoint) => {
           assertJobValue(checkpoint);
-          await write("checkpoint = $3:json, has_checkpoint = TRUE", checkpoint);
+          await write("checkpoint = ${checkpoint:json}, has_checkpoint = TRUE", { checkpoint });
         },
       },
       fail: (reason) => {
@@ -130,7 +137,7 @@ export const runJob = async (
   }
   const retry =
     failure && !(failure.error instanceof PermanentJobError) && job.attempts < job.max_attempts;
-  const delay = Math.min(
+  const delayMs = Math.min(
     2_147_483_647,
     job.delay_ms * (job.backoff === "exponential" ? 2 ** (job.attempts - 1) : 1),
   );
@@ -139,12 +146,13 @@ export const runJob = async (
     : retry ? "pending"
     : "failed";
   await db.none(
-    `UPDATE ${tableSQL} SET status = CASE WHEN cancel_requested THEN 'cancelled' ELSE $3 END,
-      error = $4, lease_token = NULL, locked_until = NULL,
-      run_at = clock_timestamp() + $5 * interval '1 millisecond',
-      finished_at = CASE WHEN cancel_requested OR $3 <> 'pending' THEN clock_timestamp() ELSE NULL END
+    `UPDATE ${tableSQL} 
+    SET status = CASE WHEN cancel_requested THEN 'cancelled' ELSE \${status} END,
+      error = \${error:json}, lease_token = NULL, locked_until = NULL,
+      run_at = clock_timestamp() + \${delayMs} * interval '1 millisecond',
+      finished_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN clock_timestamp() ELSE NULL END
     WHERE ${owned}
   `,
-    [...claim, status, failure ? jobError(failure.error) : null, delay],
+    { ...claim, status, error: failure ? jobError(failure.error) : null, delayMs },
   );
 };

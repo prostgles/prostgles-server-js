@@ -43,8 +43,8 @@ export class JobManager {
         `UPDATE ${this.tableSQL} SET cancel_requested = TRUE,
         status = CASE WHEN status = 'pending' THEN 'cancelled' ELSE status END,
         finished_at = CASE WHEN status = 'pending' THEN clock_timestamp() ELSE finished_at END
-        WHERE id = $1 AND status IN ('pending', 'running')`,
-        [id],
+        WHERE id = \${jobId} AND status IN ('pending', 'running')`,
+        { jobId: id },
       );
     },
     rerun: async (id, params = {}, options) => {
@@ -56,7 +56,7 @@ export class JobManager {
       const rerun = async (transaction: JobTransaction) => {
         const job = await getJobTableHandler(this.prostgles, transaction).findOne({ id });
         if (!job) throw new Error("Job not found");
-        const { jobId } = await enqueueJob(this.prostgles, transaction, job.job_name, job.owner, {
+        const { jobId } = await enqueueJob(this.prostgles, transaction, job.job_name, job.target_row_pkey, {
           params: { ...job.params, ...params },
           reason: "rerun",
           userId,

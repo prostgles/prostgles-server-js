@@ -206,8 +206,8 @@ export const testFileJobs = async (db: DB) => {
       assert.equal(
         (
           await instance._db.one<{ count: string }>(
-            "SELECT count(*) FROM prostgles_jobs WHERE target_table = $1",
-            [`${files}_versions`],
+            "SELECT count(*) FROM prostgles_jobs WHERE target_table = ${targetTable}",
+            { targetTable: `${files}_versions` },
           )
         ).count,
         "2",

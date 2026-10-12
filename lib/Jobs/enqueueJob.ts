@@ -12,7 +12,7 @@ export const enqueueJob = async (
   prostgles: Prostgles,
   transaction: JobTransaction,
   name: string,
-  owner: JobRecord["owner"],
+  targetRowPkey: JobRecord["target_row_pkey"],
   options: {
     userId?: string;
     params?: Record<string, unknown>;
@@ -32,42 +32,42 @@ export const enqueueJob = async (
     definition.trigger.type === "row" ? definition.trigger.jobIdColumn : undefined;
   const rowTable =
     jobIdColumn !== undefined && table !== null ? transaction.dbx[table]! : undefined;
-  const ownerFilter =
+  const targetRowFilter =
     table !== null && prostgles.isMedia(table) ?
-      { id: owner.id }
+      { id: targetRowPkey.id }
     : {
-        $and: Object.entries(owner).map(([column, value]) => ({ [column]: { $eq: value } })),
+        $and: Object.entries(targetRowPkey).map(([column, value]) => ({ [column]: { $eq: value } })),
       };
   if (rowTable && options.reason === "rerun") {
-    // Match row-trigger lock ordering: the owner row before the job advisory lock.
-    await rowTable.find(ownerFilter, { select: "", limit: null, forUpdate: true });
+    // Match row-trigger lock ordering: the target row before the job advisory lock.
+    await rowTable.find(targetRowFilter, { select: "", limit: null, forUpdate: true });
   }
   const setJobId = async (jobId: string) => {
-    if (!rowTable || jobIdColumn === undefined) return { jobId, ownerRow: undefined };
-    const updateOwner = () =>
-      rowTable.update(ownerFilter, { [jobIdColumn]: jobId }, { returning: "*", multi: false });
+    if (!rowTable || jobIdColumn === undefined) return { jobId, targetRow: undefined };
+    const updateTargetRow = () =>
+      rowTable.update(targetRowFilter, { [jobIdColumn]: jobId }, { returning: "*", multi: false });
     // Reruns start outside the generated job hook; give their link update the same ancestry.
-    const ownerRow =
+    const targetRow =
       options.reason === "rerun" ?
-        await runTableHook(rowTable, [owner], updateOwner, { hookKey: `job:${name}` })
-      : await updateOwner();
-    return { jobId, ownerRow: ownerRow || undefined };
+        await runTableHook(rowTable, [targetRowPkey], updateTargetRow, { hookKey: `job:${name}` })
+      : await updateTargetRow();
+    return { jobId, targetRow: targetRow || undefined };
   };
   // Serialize conflicts for this row without serializing writes to unrelated rows.
-  await transaction.t.one("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-    stableStringify([tableSQL, name, table, owner]),
-  ]);
+  await transaction.t.one("SELECT pg_advisory_xact_lock(hashtextextended(${advisoryLockKey}, 0))", {
+    advisoryLockKey: stableStringify([tableSQL, name, table, targetRowPkey]),
+  });
   if (options.occurrence) {
     const existing = await jobs.findOne({
       job_name: name,
       occurrence: options.occurrence.toISOString(),
     });
-    if (existing) return { jobId: existing.id, ownerRow: undefined };
+    if (existing) return { jobId: existing.id, targetRow: undefined };
   }
   const active = await jobs.findOne(
     {
       $and: [
-        { job_name: name, target_table: table, owner },
+        { job_name: name, target_table: table, target_row_pkey: targetRowPkey },
         { $or: [{ status: "pending" }, { status: "running" }] },
       ],
     },
@@ -83,11 +83,11 @@ export const enqueueJob = async (
         status = CASE WHEN status = 'pending' THEN 'cancelled' ELSE status END,
         finished_at = CASE WHEN status = 'pending' THEN clock_timestamp() ELSE finished_at END
       WHERE 
-        job_name = $1 
-        AND target_table IS NOT DISTINCT FROM $2 
-        AND owner = $3:json
+        job_name = \${jobName}
+        AND target_table IS NOT DISTINCT FROM \${targetTable}
+        AND target_row_pkey = \${targetRowPkey:json}
         AND status IN ('pending', 'running')`,
-      [name, table, owner],
+      { jobName: name, targetTable: table, targetRowPkey },
     );
   }
   const jobId = randomUUID();
@@ -95,7 +95,7 @@ export const enqueueJob = async (
     id: jobId,
     job_name: name,
     target_table: table,
-    owner,
+    target_row_pkey: targetRowPkey,
     params,
     user_id: options.userId ?? null,
     occurrence: options.occurrence?.toISOString() ?? null,

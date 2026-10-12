@@ -51,7 +51,8 @@ export type JobContext<
   run: { id: string; attempt: number; reason: "trigger" | "rerun" | "retry" };
   /** Cancellation and timeouts are cooperative: handlers must observe this signal. */
   signal: AbortSignal;
-  progress: (done: number, total?: number) => Promise<void>;
+  progress: (done: number, total: number) => Promise<void>;
+  progressMessage: (message: string | null) => Promise<void>;
   checkpoint: { get<C>(): Promise<C | undefined>; set<C>(value: C): Promise<void> };
   fail: (reason: string) => never;
 };
@@ -104,10 +105,10 @@ type DefineJob<S, Context> = {
 export type JobValue =
   null | string | number | boolean | readonly JobValue[] | { readonly [key: string]: JobValue };
 type JobValues = {
-  owner: Record<string, JobValue>;
+  target_row_pkey: Record<string, JobValue>;
   params: Record<string, JobValue>;
   checkpoint: JobValue | null;
-  progress: { done: number; total?: number } | null;
+  error: JobValue;
 };
 export type JobRecord = TableRowFromTableConfig<typeof jobTableConfig, JobValues>;
 export type JobInsertRecord = TableInsertRowFromTableConfig<typeof jobTableConfig, JobValues>;

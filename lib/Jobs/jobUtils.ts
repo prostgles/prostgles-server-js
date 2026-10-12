@@ -1,3 +1,4 @@
+import { getSerialisableError } from "prostgles-types";
 import type { JobValue } from "./JobTypes";
 
 export const assertJobValue: (
@@ -20,6 +21,6 @@ export const assertJobValue: (
 };
 
 export const jobError = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
+  getSerialisableError(error) ?? String(error);
 
 export class PermanentJobError extends Error {}

@@ -29,16 +29,16 @@ export const getJobTableHooks = (
         const primaryKeyNames = table.columns
           .filter((column) => column.is_pkey)
           .map((column) => column.name);
-        const owner = pickKeys(row, primaryKeyNames) as JobRecord["owner"];
-        if (trigger.when && !(await table.findOne({ $and: [owner, trigger.when] }))) return;
-        const { ownerRow } = await enqueueJob(prostgles, { t: transaction.t, dbx }, name, owner, {
+        const targetRowPkey = pickKeys(row, primaryKeyNames) as JobRecord["target_row_pkey"];
+        if (trigger.when && !(await table.findOne({ $and: [targetRowPkey, trigger.when] }))) return;
+        const { targetRow } = await enqueueJob(prostgles, { t: transaction.t, dbx }, name, targetRowPkey, {
           userId: prostgles.getExecution()?.user?.id,
         }).catch((error: unknown) => {
           // A caught enqueue error must not commit the originating row without its job.
           table.dboBuilder.failTransaction(transaction.t, error);
           throw error;
         });
-        if (ownerRow) Object.assign(row, ownerRow);
+        if (targetRow) Object.assign(row, targetRow);
       },
     } satisfies AfterEachTsTrigger<AnyObject, TableHandlers, any> & { hookKey: string };
     const hooks = mergedHooks[trigger.table];
