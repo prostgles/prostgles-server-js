@@ -13,7 +13,7 @@ import type {
   DBHandlerServerRestricted,
 } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DB } from "../initProstgles";
-import type { Jobs } from "../Jobs/JobTypes";
+import type { JobControlFunctionMetadata, Jobs } from "../Jobs/JobTypes";
 import type { PublishParams } from "./publishTypesAndUtils";
 import type { ClientHandlers } from "../WebsocketAPI/getClientHandlers";
 
@@ -58,6 +58,7 @@ export type ServerFunctionDefinition = {
   input?: Record<string, JSONB.FieldType>;
   description?: string;
   unrestrictedDbAccess?: true;
+  jobControl?: JobControlFunctionMetadata;
   run: (...args: any[]) => MaybePromise<unknown>;
 };
 

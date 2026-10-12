@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { pickKeys, stableStringify } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import type { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
+import type { JobControlOperation } from "./Jobs/JobTypes";
 
 export type FunctionInvocation = {
   type: "function";
@@ -20,7 +22,16 @@ export type TriggerInvocation = {
   rowParts: Record<string, unknown>[];
 };
 
-type Invocation = FunctionInvocation | TriggerInvocation;
+export type JobControlInvocation = {
+  type: "jobControl";
+  id: string;
+  jobName: string;
+  operation: JobControlOperation;
+  tableName: string;
+  rowParts: Record<string, unknown>[];
+};
+
+type Invocation = FunctionInvocation | TriggerInvocation | JobControlInvocation;
 
 /** Correlation metadata only; database authorization still uses the explicit caller. */
 export type ExecutionContext = {
@@ -44,12 +55,20 @@ export const runTableHook = <T>(
     hook?.preventRecursion &&
     parent.invocations.some(
       (invocation) =>
-        invocation.type === "trigger" &&
+        invocation.type !== "function" &&
         invocation.tableName === table.name &&
-        hookKeys.get(invocation) === hook.hookKey,
+        hookKeys.get(invocation) === hook.hookKey &&
+        (invocation.type === "trigger" ||
+          rows.every((row) =>
+            invocation.rowParts.some(
+              (primaryKey) =>
+                stableStringify(pickKeys(row, Object.keys(primaryKey))) === stableStringify(primaryKey),
+            ),
+          )),
     )
-  )
+  ) {
     return;
+  }
   const invocation: TriggerInvocation = {
     type: "trigger",
     id: randomUUID(),
@@ -63,7 +82,30 @@ export const runTableHook = <T>(
   );
 };
 
-const hookKeys = new WeakMap<TriggerInvocation, string>();
+/** Record explicit row-job control and suppress its automatic enqueue hook during nested writes. */
+export const runJobControl = <T>(
+  table: ViewHandler,
+  row: Record<string, unknown>,
+  control: Pick<JobControlInvocation, "jobName" | "operation">,
+  callback: () => T,
+): T => {
+  const prostgles = table.dboBuilder.prostgles;
+  const parent = createExecutionContext(prostgles.getExecution());
+  const invocation: JobControlInvocation = {
+    type: "jobControl",
+    id: randomUUID(),
+    ...control,
+    tableName: table.name,
+    rowParts: [row],
+  };
+  hookKeys.set(invocation, `job:${control.jobName}`);
+  return prostgles.runWithExecution(
+    { ...parent, invocations: [...parent.invocations, invocation] },
+    callback,
+  );
+};
+
+const hookKeys = new WeakMap<TriggerInvocation | JobControlInvocation, string>();
 
 export const createExecutionContext = (parent: ExecutionContext | undefined): ExecutionContext =>
   parent ?? {

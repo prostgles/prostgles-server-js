@@ -1,16 +1,18 @@
 import type { Prostgles } from "../Prostgles";
-import type { JobRecord, Jobs, JobTransaction } from "./JobTypes";
-import { enqueueJob } from "./enqueueJob";
+import type { Jobs } from "./JobTypes";
+import { createJobsAPI } from "./createJobsAPI";
 import { runJob } from "./runJob";
 import { jobError } from "./jobUtils";
 import { getJobTableHandler } from "./getJobTableHandler";
 import { claimJob } from "./claimJob";
 import { enqueueSchedules } from "./enqueueSchedules";
-import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
 import { validateJobDefinitions } from "./getJobDefinition";
+import { getJobControlBinding } from "./getJobControlBinding";
 
 export class JobManager {
-  constructor(private readonly prostgles: Prostgles) {}
+  constructor(private readonly prostgles: Prostgles) {
+    this.api = createJobsAPI(prostgles, undefined);
+  }
   get tableName() {
     return this.prostgles.opts.jobs?.tableName ?? "prostgles_jobs";
   }
@@ -25,55 +27,15 @@ export class JobManager {
   private readonly running = new Map<AbortController, Promise<void>>();
   private readonly schedules = new Map<string, string>();
 
-  readonly api: Jobs = {
-    get: async (id, options) => {
-      const clientReq = this.getClientRequest(options?.userId);
-      if (!clientReq) return getJobTableHandler(this.prostgles).findOne({ id });
-      const { clientDb } = await this.prostgles.getClientDBHandlers<
-        Record<string, { columns: JobRecord }>
-      >(clientReq, undefined);
-      const table = clientDb[this.tableName];
-      if (!table?.findOne) throw new Error("Job view is not permitted");
-      return table.findOne({ id });
-    },
-    cancel: async (id) => {
-      const job = await getJobTableHandler(this.prostgles).findOne({ id });
-      if (!job) throw new Error("Job not found");
-      await this.prostgles.db!.none(
-        `UPDATE ${this.tableSQL} SET cancel_requested = TRUE,
-        status = CASE WHEN status = 'pending' THEN 'cancelled' ELSE status END,
-        finished_at = CASE WHEN status = 'pending' THEN clock_timestamp() ELSE finished_at END
-        WHERE id = \${jobId} AND status IN ('pending', 'running')`,
-        { jobId: id },
-      );
-    },
-    rerun: async (id, params = {}, options) => {
-      const clientReq = this.getClientRequest(options?.userId);
-      const userId =
-        clientReq ?
-          (await this.prostgles.publishParser!.getPublishParams(clientReq, undefined)).user?.id
-        : undefined;
-      const rerun = async (transaction: JobTransaction) => {
-        const job = await getJobTableHandler(this.prostgles, transaction).findOne({ id });
-        if (!job) throw new Error("Job not found");
-        const { jobId } = await enqueueJob(this.prostgles, transaction, job.job_name, job.target_row_pkey, {
-          params: { ...job.params, ...params },
-          reason: "rerun",
-          userId,
-        });
-        return { jobId };
-      };
-      const builder = this.prostgles.dboBuilder;
-      const transaction = builder.getActiveTransaction();
-      if (!transaction) return builder.getTX((dbx, t) => rerun({ dbx, t }));
-      return rerun(transaction).catch((error: unknown) => {
-        builder.failTransaction(transaction.t, error);
-        throw error;
-      });
-    },
-  };
+  readonly api: Jobs;
 
-  validate = () => validateJobDefinitions(this.prostgles, this.prostgles.dboBuilder.tables);
+  validate = async () => {
+    await validateJobDefinitions(this.prostgles, this.prostgles.dboBuilder.tables);
+    for (const group of Object.values(this.prostgles.opts.functions ?? {})) {
+      for (const method of Object.values(group.functions))
+        getJobControlBinding(this.prostgles, method);
+    }
+  };
 
   start = () => {
     if (!this.stopped || !this.prostgles.opts.jobs) return;
@@ -125,12 +87,5 @@ export class JobManager {
         this.running.set(controller, work);
       }
     }
-  };
-
-  private getClientRequest = (userId: string | undefined) => {
-    const execution = this.prostgles.getExecution();
-    if (userId !== undefined) return createServerSideRequest(this.prostgles, userId);
-    if (execution?.clientReq) return execution.clientReq;
-    return execution?.user ? createServerSideRequest(this.prostgles, execution.user.id) : undefined;
   };
 }

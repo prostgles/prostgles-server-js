@@ -1,5 +1,4 @@
 import type pg from "pg-promise/typescript/pg-subset";
-import { AsyncLocalStorage } from "node:async_hooks";
 import type { SQLHandler, SQLOptions } from "prostgles-types";
 import { getSerialisableError, tryCatchV2 } from "prostgles-types";
 import { getDBGeneratedSchema } from "../DBSchemaBuilder/getDBGeneratedSchema";
@@ -145,17 +144,18 @@ export class DboBuilder {
   private readonly onCommitCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
   private readonly onRollbackCallbacksByTransaction = new WeakMap<object, OnCommitCallback[]>();
   private readonly transactionFailures = new WeakMap<object, { error: unknown }>();
-  private readonly transactionStorage = new AsyncLocalStorage<{
-    dbx: DbTxTableHandlers;
-    t: NonNullable<LocalParams["tx"]>["t"];
-  }>();
+  private readonly transactionsByHandlers = new WeakMap<object, NonNullable<LocalParams["tx"]>>();
 
-  getActiveTransaction = () => {
-    const transaction = this.transactionStorage.getStore();
-    // Jobs called from hooks share their transaction; detached work must not reuse it.
-    return transaction && this.onCommitCallbacksByTransaction.has(transaction.t) ?
-        transaction
-      : undefined;
+  getTransactionForHandlers = (dbx: object) => {
+    const transaction = this.transactionsByHandlers.get(dbx);
+    if (!transaction || !this.onCommitCallbacksByTransaction.has(transaction.t)) {
+      throw new Error("Expected active transaction handlers from this instance");
+    }
+    return transaction;
+  };
+
+  registerTransactionHandlers = (handlers: object, dbx: object) => {
+    this.transactionsByHandlers.set(handlers, this.getTransactionForHandlers(dbx));
   };
 
   failTransaction = (transaction: object, error: unknown) => {
@@ -213,7 +213,6 @@ export class DboBuilder {
   };
 
   destroy = async () => {
-    this.transactionStorage.disable();
     this.prostgles.schemaWatch?.destroy();
     return this._pubSubManager?.destroy();
   };
@@ -462,14 +461,14 @@ export class DboBuilder {
           });
         });
 
+        this.transactionsByHandlers.set(dbTX, { dbTX, t });
         try {
-          const value = await this.transactionStorage.run({ dbx: dbTX, t }, () =>
-            cb(dbTX as TH, t),
-          );
+          const value = await cb(dbTX as TH, t);
           const failure = this.transactionFailures.get(t);
           if (failure) throw failure.error;
           return value;
         } finally {
+          this.transactionsByHandlers.delete(dbTX);
           this.onCommitCallbacksByTransaction.delete(t);
           this.onRollbackCallbacksByTransaction.delete(t);
         }

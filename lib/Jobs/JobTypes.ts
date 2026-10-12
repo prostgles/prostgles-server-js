@@ -1,7 +1,24 @@
 import type pgPromise from "pg-promise";
-import type { AnyObject, DBSchema, FullFilter, JSONB } from "prostgles-types";
+import type {
+  AnyObject,
+  DBSchema,
+  FullFilter,
+  JobControlOperation,
+  JobStatus,
+  JSONB,
+  MaybePromise,
+} from "prostgles-types";
+export type {
+  JobStatus,
+  JobControlOperation,
+  JobControlFunctionMetadata,
+  JobControlBinding,
+} from "prostgles-types";
 import type { SessionUser } from "../Auth/AuthTypes";
-import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type {
+  DBHandlerServer,
+  DBTableHandlersFromSchema,
+} from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { JSONBColumnDef } from "../TableConfig/TableConfigTypes";
 import type {
@@ -112,9 +129,22 @@ type JobValues = {
 };
 export type JobRecord = TableRowFromTableConfig<typeof jobTableConfig, JobValues>;
 export type JobInsertRecord = TableInsertRowFromTableConfig<typeof jobTableConfig, JobValues>;
-export type JobStatus = JobRecord["status"];
-/** Uses the execution request/user, or an explicit userId. Calls without either are trusted server operations. */
+export const jobControlStatuses: Record<JobControlOperation, readonly JobStatus[]> = {
+  startOrRetry: ["failed", "cancelled"],
+  rerun: ["succeeded"],
+  cancel: ["pending", "running"],
+};
+export type JobControlOptions<S = void, Row extends AnyObject = AnyObject> = {
+  row: AnyObject;
+  operation: JobControlOperation;
+  run?: (row: Row, dbx: DBTableHandlersFromSchema<S>) => MaybePromise<void>;
+};
+/** Uses the execution request/user, or an explicit userId. Calls without either are trusted server operations.
+ * Mutations create their own transaction unless explicitly bound with withTransaction.
+ */
 export type Jobs = {
+  /** Bind to this instance's dbx from dbo.tx, withClientDbTx or a table hook. Rejects after it finishes. */
+  withTransaction: (dbx: object) => Jobs;
   /** User reads obey the jobs table's publish.select fields and filters. */
   get: (id: string, options?: { userId: string }) => Promise<Partial<JobRecord> | undefined>;
   /** Server operation. Expose through a published function to authorize client calls. */
@@ -124,6 +154,11 @@ export type Jobs = {
     id: string,
     params?: Record<string, JobValue>,
     options?: { userId: string },
+  ) => Promise<{ jobId: string }>;
+  /** Requires an execution user. Uses the bound transaction, or creates its own. */
+  control: <S = void, Row extends AnyObject = AnyObject>(
+    name: string,
+    options: JobControlOptions<S, Row>,
   ) => Promise<{ jobId: string }>;
 };
 export type JobTransaction = { t: pgPromise.ITask<{}>; dbx: DbTxTableHandlers };

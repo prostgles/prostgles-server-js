@@ -28,6 +28,7 @@ export const createProstgles = <
 };
 export * from "./PublishParser/defineServerFunction";
 export { createJobDefiner } from "./Jobs/JobTypes";
+export { createJobControlFunctionDefiner } from "./Jobs/createJobControlFunctionDefiner";
 export type {
   JobsConfig,
   JobsOptions,
@@ -40,9 +41,18 @@ export type {
   Jobs,
   JobRecord,
   JobStatus,
+  JobControlOperation,
+  JobControlOptions,
+  JobControlFunctionMetadata,
+  JobControlBinding,
 } from "./Jobs/JobTypes";
 export * from "./Auth/AuthTypes";
-export type { ExecutionContext, FunctionInvocation, TriggerInvocation } from "./ExecutionContext";
+export type {
+  ExecutionContext,
+  FunctionInvocation,
+  TriggerInvocation,
+  JobControlInvocation,
+} from "./ExecutionContext";
 
 export type {
   PublishContextValue,

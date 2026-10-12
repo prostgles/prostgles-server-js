@@ -5,10 +5,13 @@ import pgPromise from "pg-promise";
 import { ROW_ACTIONS_COLUMN, type AnyObject } from "prostgles-types";
 import prostgles, {
   createJobDefiner,
+  createJobControlFunctionDefiner,
   defineFunction,
   type DBOFullyTyped,
+  type ExecutionContext,
   type InitResult,
   type JobRecord,
+  type Jobs,
   type JobsConfig,
   type JobsOptions,
   type ParamsSchema,
@@ -42,6 +45,16 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     let rejectSchedule = false;
     let jobFailure: unknown;
     let rowSelectCount = 0;
+    let rowMutationCount = 0;
+    const controlCallbacks: ExecutionContext[] = [];
+    const controlHooks: ExecutionContext[] = [];
+    let preparationJobs: Jobs | undefined;
+    const getExecution = () => {
+      const handler = instance!.db[table] as unknown as TableHandler;
+      const execution = handler.dboBuilder.prostgles.getExecution();
+      assert(execution);
+      return execution;
+    };
     const seen: {
       id: string;
       revision: number;
@@ -54,7 +67,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     const released = new Set<string>();
     const enqueued = new Set<string>();
     const defineJob = createJobDefiner<JobTestSchema>();
-    const definitions: JobsConfig<JobTestSchema> = {
+    const controlDefinitions = {
       process: defineJob({
         trigger: {
           type: "row",
@@ -116,6 +129,8 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         },
       }),
     };
+    const definitions: JobsConfig<JobTestSchema> = controlDefinitions;
+    const defineJobControl = createJobControlFunctionDefiner<JobTestSchema>()(controlDefinitions);
     const options: ProstglesInitOptions<JobTestSchema> = {
       dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
       transactions: true,
@@ -139,6 +154,26 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         members: {
           userFilter: { id: "alice" },
           functions: {
+            controlRecord: defineJobControl({
+              jobName: "process",
+              operation: "startOrRetry",
+              run: async ({ row, user, dbx, jobs }) => {
+                preparationJobs = jobs;
+                controlCallbacks.push(getExecution());
+                if (row.owner !== user.id || !row.enabled || row.note === "deny control")
+                  throw new Error("Control denied");
+                await dbx.records.update({ id: row.id }, { revision: row.revision + 1 });
+                if (row.note === "reject preparation") throw new Error("Preparation rejected");
+              },
+            }),
+            rerunRecord: defineJobControl({
+              jobName: "process",
+              operation: "rerun",
+            }),
+            cancelRecord: defineJobControl({
+              jobName: "process",
+              operation: "cancel",
+            }),
             rerunJob: defineFunction({
               input: {
                 id: {
@@ -164,8 +199,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 },
                 size: { type: "number", optional: true },
               },
-              run: ({ id, size }, { jobs }) =>
-                jobs.rerun(String(id), size === undefined ? {} : { size }),
+              run: ({ id, size }, { jobs, withClientDbTx }) =>
+                withClientDbTx((dbx) =>
+                  jobs.withTransaction(dbx).rerun(String(id), size === undefined ? {} : { size }),
+                ),
             }),
             cancelJob: defineFunction({
               // Exercise the jobs API in unrestricted contexts as well as rerunJob's restricted context.
@@ -205,6 +242,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             {
               commands: { insert: 1, update: 1 },
               validate: async ({ row, dbx }) => {
+                rowMutationCount++;
+                const execution = getExecution();
+                if (execution.invocations.some(({ type }) => type === "jobControl"))
+                  controlHooks.push(execution);
                 if (rejectHook) throw new Error("Reject row");
                 const stored = (await dbx[table].findOne({ id: row.id }))!;
                 assert.equal(row.job_id, stored.job_id);
@@ -245,6 +286,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const validationDatabase = `${database}_validation`;
         await parentDb.none(`CREATE DATABASE ${validationDatabase}`);
         let contextsCreated = 0;
+        const validationJobs = {
+          process: createJobDefiner()({
+            trigger: {
+              type: "row",
+              table: "job_validation_target",
+              on: ["insert"],
+              jobIdColumn: "job_id",
+              when: { id: { $gt: 0 } },
+            },
+            run: async () => {},
+          }),
+        };
         const prgl = new Prostgles({
           dbConnection: {
             ...getConnectionDetails(db),
@@ -267,16 +320,16 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           },
           jobs: {
             tableName: "job_validation_queue",
-            definitions: {
-              process: {
-                trigger: {
-                  type: "row",
-                  table: "job_validation_target",
-                  on: ["insert"],
-                  jobIdColumn: "job_id",
-                  when: { id: { $gt: 0 } },
-                },
-                run: async () => {},
+            definitions: validationJobs,
+          },
+          functions: {
+            members: {
+              userFilter: { id: "alice" },
+              functions: {
+                control: createJobControlFunctionDefiner()(validationJobs)({
+                  jobName: "process",
+                  operation: "startOrRetry",
+                }),
               },
             },
           },
@@ -290,6 +343,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           result = await prgl.init(() => {}, { type: "init" });
           assert.equal(contextsCreated, 1);
           await prgl.refreshDBO();
+          assert.equal(contextsCreated, 2);
+          const control = prgl.opts.functions!.members!.functions.control!.jobControl!;
+          control.jobName = "missing";
+          await assert.rejects(prgl.refreshDBO(), /Unknown job: missing/);
+          control.jobName = "process";
+          const input = prgl.opts.functions!.members!.functions.control!.input!;
+          input.row = { type: "RowLookup", table: "missing" };
+          await assert.rejects(
+            prgl.refreshDBO(),
+            /Job control lookup must reference job_validation_target/,
+          );
+          input.row = { type: "RowLookup", table: "job_validation_target" };
           assert.equal(contextsCreated, 2);
           await result.sql("ALTER TABLE job_validation_target DROP COLUMN job_id");
           await assert.rejects(prgl.refreshDBO(), /Invalid jobIdColumn for process/);
@@ -382,7 +447,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             assert(linked.job_id);
             assert.equal(row.job_id, linked.job_id);
             assert(await tx[queueName]!.findOne({ id: linked.job_id }));
-            const rerun = await instance!.jobs.rerun(linked.job_id);
+            const rerun = await instance!.jobs.withTransaction(tx).rerun(linked.job_id);
             assert.equal((await tx[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
             assert(await tx[queueName]!.findOne({ id: rerun.jobId }));
             assert.equal((await records()).length, before);
@@ -562,7 +627,17 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(completed.attempts, 2);
           assert.equal(completed.error, null);
           assert.deepEqual(completed.progress_numeric, { done: 1, total: 1 });
+          controlHooks.length = 0;
           const rerun = await instance!.jobs.rerun(job.id, { size: 20 });
+          assert.equal(controlHooks.length, 1);
+          assert.deepEqual(controlHooks[0]!.invocations.map(({ type }) => type), [
+            "jobControl", "trigger",
+          ]);
+          const invocation = controlHooks[0]!.invocations[0]!;
+          assert(invocation.type === "jobControl");
+          assert.equal(invocation.jobName, "process");
+          assert.equal(invocation.operation, "rerun");
+          assert.deepEqual(invocation.rowParts, [{ id: row.id }]);
           assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
           await status(rerun.jobId, "succeeded");
           const run = seen.find((entry) => entry.id === rerun.jobId)!;
@@ -765,6 +840,248 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
       });
       await t.test(
+        "job controls validate and prepare in one callback, start, retry, rerun and cancel atomically",
+        async () => {
+          const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+          for (const [name, rowArg, operation, allowedStatuses] of [
+            ["controlRecord", "row", "startOrRetry", ["failed", "cancelled"]],
+            ["rerunRecord", "row", "rerun", ["succeeded"]],
+            ["cancelRecord", "row", "cancel", ["pending", "running"]],
+          ] as const) {
+            const method = alice.clientSchema.methods.find((method) => method.name === name)!;
+            assert.equal(method.jobControl?.operation, operation);
+            assert.equal(alice.clientMethods[name]!.jobControl?.operation, operation);
+            assert.deepEqual(method.input, { row: { type: "RowLookup", table } });
+            assert.deepEqual(method.jobControl, {
+              jobName: "process",
+              rowArg,
+              operation,
+              allowedStatuses,
+              tableName: queueName,
+              columnName: "job_id",
+            });
+          }
+          const control = (id: number) =>
+            alice.clientMethods.controlRecord!.run({ row: { id } }) as Promise<{ jobId: string }>;
+          const cancel = (id: number) => alice.clientMethods.cancelRecord!.run({ row: { id } });
+          const prostgles = (instance!.db.records as unknown as TableHandler).dboBuilder.prostgles;
+          const asAlice = <T>(run: () => Promise<T>) => prostgles.runWithExecution({
+            runId: randomUUID(),
+            invocations: [],
+            user: { id: "alice", type: "member" },
+            clientReq: createServerSideRequest(prostgles, "alice"),
+          }, run);
+          const manualRow = async (owner = "alice", note: string | null = null, enabled = true) =>
+            db.one<JobTestRow>(
+              `INSERT INTO records (owner, note, enabled, mode) VALUES ($1, $2, $3, 'block') RETURNING *`,
+              [owner, note, enabled],
+            );
+          for (const row of [
+            await manualRow("bob"),
+            await manualRow("alice", null, false),
+            await manualRow("alice", "deny control"),
+          ]) {
+            await assert.rejects(control(row.id));
+            assert.equal((await instance!.db.records.findOne({ id: row.id }))!.job_id, null);
+          }
+          const rejected = await manualRow();
+          for (const note of ["reject preparation", "reject job link"]) {
+            await db.none("UPDATE records SET note = $1 WHERE id = $2", [note, rejected.id]);
+            await assert.rejects(control(rejected.id));
+            assert.equal((await instance!.db.records.findOne({ id: rejected.id }))!.revision, 1);
+            assert.equal(
+              (
+                await records("target_row_pkey = ${targetRowPkey:json}", {
+                  targetRowPkey: { id: rejected.id },
+                })
+              ).length,
+              0,
+            );
+          }
+          await db.none("UPDATE records SET note = NULL WHERE id = $1", [rejected.id]);
+          const row = await manualRow("alice", "prepared");
+          await assert.rejects(
+            alice.clientMethods.controlRecord!.run({ row: { id: row.id }, note: "extra" }),
+          );
+          await assert.rejects(
+            alice.clientMethods.controlRecord!.run({ row: { note: "prepared" } }),
+            /primary key/,
+          );
+          await assert.rejects(cancel(row.id), /Job has not started/);
+          const mutationsBeforeStart = rowMutationCount;
+          controlCallbacks.length = 0;
+          controlHooks.length = 0;
+          const started = await control(row.id);
+          assert(preparationJobs);
+          await assert.rejects(preparationJobs.get(started.jobId), /active transaction/);
+          assert.equal(controlCallbacks.length, 1);
+          const execution = controlCallbacks[0]!;
+          assert.deepEqual(execution.invocations.map(({ type }) => type), ["function", "jobControl"]);
+          const invocation = execution.invocations[1]!;
+          assert(invocation.type === "jobControl");
+          assert.equal(invocation.jobName, "process");
+          assert.equal(invocation.operation, "startOrRetry");
+          assert.equal(invocation.tableName, table);
+          assert.deepEqual(invocation.rowParts, [{ id: row.id }]);
+          assert.equal(controlHooks.length, 2);
+          for (const hookExecution of controlHooks) {
+            assert.equal(hookExecution.runId, execution.runId);
+            assert.equal(hookExecution.user?.id, "alice");
+            assert.deepEqual(hookExecution.invocations.slice(0, -1), execution.invocations);
+            assert.equal(hookExecution.invocations.at(-1)!.type, "trigger");
+          }
+          assert.equal(
+            (instance!.db[table] as unknown as TableHandler).dboBuilder.prostgles.getExecution(),
+            undefined,
+          );
+          assert.equal(
+            rowMutationCount - mutationsBeforeStart,
+            2,
+            "only preparation and job linking mutate the row",
+          );
+          const firstRun = await status(started.jobId, "running");
+          assert.equal(firstRun.user_id, "alice");
+          assert.equal(firstRun.reason, "trigger");
+          assert.deepEqual(firstRun.params, { size: 10 });
+          assert.equal((await instance!.db.records.findOne({ id: row.id }))!.revision, 2);
+          await assert.rejects(control(row.id), /not allowed/);
+          await assert.rejects(
+            asAlice(() => instance!.db.tx(async (dbx) => {
+              await dbx.records.update({ id: row.id }, { note: "must roll back" });
+              try {
+                await instance!.jobs.withTransaction(dbx).control("process", {
+                  row: { id: row.id }, operation: "startOrRetry",
+                });
+              } catch {
+                /* Caught controls still abort their transaction. */
+              }
+            })),
+            /not allowed/,
+          );
+          assert.equal((await instance!.db.records.findOne({ id: row.id }))!.note, "prepared");
+          await assert.rejects(
+            asAlice(() => instance!.db.tx(async (dbx) => {
+              await instance!.jobs.withTransaction(dbx).control("process", {
+                row: { id: row.id }, operation: "cancel",
+              });
+              throw new Error("Roll back cancellation");
+            })),
+            /Roll back cancellation/,
+          );
+          assert.equal((await instance!.jobs.get(started.jobId))!.cancel_requested, false);
+          const mutationsBeforeCancel = rowMutationCount;
+          await cancel(row.id);
+          assert.equal(
+            rowMutationCount,
+            mutationsBeforeCancel,
+            "cancellation does not run row mutation hooks",
+          );
+          await status(started.jobId, "cancelled");
+          const retried = await control(row.id);
+          assert.notEqual(retried.jobId, started.jobId);
+          assert.equal((await status(retried.jobId, "running")).reason, "rerun");
+          released.add(retried.jobId);
+          await status(retried.jobId, "succeeded");
+          await assert.rejects(control(row.id), /not allowed/);
+          await assert.rejects(cancel(row.id), /not allowed/);
+          const rerun = (await alice.clientMethods.rerunRecord!.run({ row: { id: row.id } })) as {
+            jobId: string;
+          };
+          released.add(rerun.jobId);
+          await status(rerun.jobId, "succeeded");
+          assert.equal(
+            (
+              await records("target_row_pkey = ${targetRowPkey:json}", {
+                targetRowPkey: { id: row.id },
+              })
+            ).length,
+            3,
+          );
+          assert.equal((await instance!.db.records.findOne({ id: row.id }))!.job_id, rerun.jobId);
+          await db.none("UPDATE records SET job_id = $1 WHERE id = $2", [rerun.jobId, rejected.id]);
+          await assert.rejects(control(rejected.id), /Linked job does not match/);
+          const changedOwner = await manualRow();
+          const ownerJob = await control(changedOwner.id);
+          await status(ownerJob.jobId, "running");
+          let cancellation: Promise<PromiseSettledResult<unknown>[]> | undefined;
+          await db.tx(async (gate) => {
+            await gate.none("UPDATE records SET owner = 'bob' WHERE id = $1", [changedOwner.id]);
+            cancellation = Promise.allSettled([cancel(changedOwner.id)]);
+            await waitForControlClaims(gate, 1);
+          });
+          assert.equal((await cancellation!)[0]!.status, "rejected");
+          assert.equal((await instance!.jobs.get(ownerJob.jobId))!.cancel_requested, false);
+          released.add(ownerJob.jobId);
+          await status(ownerJob.jobId, "succeeded");
+          const concurrent = await manualRow();
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            let attempts: Promise<PromiseSettledResult<{ jobId: string }>[]> | undefined;
+            await db.tx(async (gate) => {
+              await gate.one("SELECT id FROM records WHERE id = $1 FOR UPDATE", [concurrent.id]);
+              attempts = Promise.allSettled([control(concurrent.id), control(concurrent.id)]);
+              await waitForControlClaims(gate, 2);
+            });
+            const results = await attempts!;
+            assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+            assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+            const jobs = await records("target_row_pkey = ${targetRowPkey:json}", {
+              targetRowPkey: { id: concurrent.id },
+            });
+            assert.equal(jobs.length, attempt);
+            await status(jobs.at(-1)!.id, "running");
+            await cancel(concurrent.id);
+            await status(jobs.at(-1)!.id, "cancelled");
+          }
+        },
+      );
+      await t.test(
+        "job control preparation preserves sibling jobs with single-row read limits",
+        async () => {
+          const [target, sibling] = await db.many<JobTestRow>(
+            "INSERT INTO records (note) VALUES ('control target'), ('control sibling') RETURNING *",
+          );
+          assert(target && sibling);
+          try {
+            await instance!.update({
+              publish: ({ user }) => ({
+                records: { select: { fields: "*", forcedFilter: { owner: user?.id }, maxLimit: 1 } },
+              }),
+              functions: {
+                members: {
+                  userFilter: { id: "alice" },
+                  functions: {
+                    prepareRecords: defineJobControl({
+                      jobName: "process",
+                      operation: "startOrRetry",
+                      run: async ({ row, dbx }) => {
+                        await dbx.records.update(
+                          { id: { $in: [row.id, sibling.id] } },
+                          { revision: 2 },
+                        );
+                      },
+                    }),
+                  },
+                },
+              },
+            });
+            const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+            await alice.clientMethods.prepareRecords!.run({ row: { id: target.id } });
+            for (const originalRow of [target, sibling]) {
+              const row = (await instance!.db.records.findOne({ id: originalRow.id }))!;
+              assert.equal(row.revision, 2);
+              const jobs = await records("target_row_pkey = ${targetRowPkey:json}", {
+                targetRowPkey: { id: row.id },
+              });
+              assert.equal(jobs.length, 1, "each prepared row must enqueue exactly one job");
+              assert.equal(row.job_id, jobs[0]!.id);
+              await status(row.job_id, "succeeded");
+            }
+          } finally {
+            await instance!.update({ publish: options.publish, functions: options.functions });
+          }
+        },
+      );
+      await t.test(
         "queue publishes wildcards as select-only and rejects explicit write rules",
         async () => {
           const { job } = await insert();
@@ -840,8 +1157,8 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             },
             res: {},
           } as AuthClientRequest;
-          let action = async () => {
-            assert.equal(await instance!.jobs.get(job.id), undefined);
+          let action = async (jobs: Jobs) => {
+            assert.equal(await jobs.get(job.id), undefined);
           };
           const publish: PublishFullyTyped<JobTestSchema> = {};
           publish[table] = { update: { fields: ["note"], filterFields: ["id"] } };
@@ -853,7 +1170,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 ...options.tableHooks,
                 [table]: {
                   afterEach: [
-                    { commands: { update: 1 }, preventRecursion: true, validate: () => action() },
+                    {
+                      commands: { update: 1 }, preventRecursion: true,
+                      validate: ({ dbx }) => action(instance!.jobs.withTransaction(dbx)),
+                    },
                   ],
                 },
               },
@@ -865,11 +1185,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             const visiblePublish = { ...publish };
             visiblePublish[queueName] = { select: { fields: ["id"] } };
             await instance!.update({ publish: visiblePublish });
-            action = async () => {
-              assert.deepEqual(await instance!.jobs.get(job.id), { id: job.id });
+            action = async (jobs) => {
+              assert.deepEqual(await jobs.get(job.id), { id: job.id });
             };
             await update();
-            action = () => instance!.jobs.cancel(job.id);
+            action = (jobs) => jobs.cancel(job.id);
             await update();
             assert.equal((await records()).length, before);
             assert.equal((await instance!.jobs.get(job.id))!.cancel_requested, false);
@@ -883,15 +1203,15 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               },
             });
             let rerunId = "";
-            action = async () => {
-              await instance!.jobs.rerun(job.id);
+            action = async (jobs) => {
+              await jobs.rerun(job.id);
               throw new Error("Rollback rerun");
             };
             await assert.rejects(update(), { message: "Rollback rerun" });
             assert.equal((await records()).length, before);
             assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, job.id);
-            action = async () => {
-              rerunId = (await instance!.jobs.rerun(job.id)).jobId;
+            action = async (jobs) => {
+              rerunId = (await jobs.rerun(job.id)).jobId;
             };
             await update();
             assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerunId);
@@ -1154,6 +1474,100 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         },
       );
       await t.test(
+        "bound jobs read their transaction, roll back together and reject expired handlers",
+        async () => {
+          const { row, job } = await insert();
+          await status(job.id, "succeeded");
+          assert.throws(() => instance!.jobs.withTransaction(instance!.db), /active transaction/);
+          const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+          for (const [rollback, useClientHandlers] of [
+            [false, false], [true, false], [false, true], [true, true],
+          ]) {
+            let boundJobs: Jobs | undefined;
+            let handlers: object | undefined;
+            let rerunId = "";
+            const runTransaction = useClientHandlers ? alice.withClientDbTx : instance!.db.tx;
+            const transaction = runTransaction(async (dbx: object) => {
+              handlers = dbx;
+              const jobs = instance!.jobs.withTransaction(dbx);
+              boundJobs = jobs;
+              assert.throws(() => jobs.withTransaction({ ...dbx }), /active transaction/);
+              rerunId = (await jobs.rerun(job.id)).jobId;
+              assert.equal((await jobs.get(rerunId))!.status, "pending");
+              assert.deepEqual(await jobs.get(rerunId, { userId: "alice" }), {
+                id: rerunId, job_name: "process", status: "pending",
+              });
+              assert.equal(await instance!.jobs.get(rerunId), undefined);
+              await jobs.cancel(rerunId);
+              assert.equal((await jobs.get(rerunId))!.status, "cancelled");
+              if (rollback) {
+                try {
+                  await jobs.cancel(randomUUID());
+                } catch {
+                  /* Caught job errors must still abort the transaction. */
+                }
+              }
+            });
+            if (rollback) await assert.rejects(transaction, /Job not found/);
+            else await transaction;
+            assert.equal((await instance!.jobs.get(rerunId))?.status, rollback ? undefined : "cancelled");
+            assert(boundJobs && handlers);
+            const completedHandlers = handlers;
+            assert.throws(() => instance!.jobs.withTransaction(completedHandlers), /active transaction/);
+            await assert.rejects(boundJobs.get(job.id), /active transaction/);
+            await assert.rejects(boundJobs.cancel(job.id), /active transaction/);
+            await assert.rejects(boundJobs.rerun(job.id), /active transaction/);
+            await assert.rejects(boundJobs.control("process", {
+              row: { id: row.id }, operation: "rerun",
+            }), /active transaction/);
+          }
+        },
+      );
+      await t.test("bound jobs keep their explicit transaction inside another transaction", async () => {
+        const first = await insert();
+        const second = await insert();
+        await status(first.job.id, "succeeded");
+        await status(second.job.id, "succeeded");
+        let outerJobId = "";
+        let innerJobId = "";
+        await instance!.db.tx(async (outerDbx) => {
+          const outerJobs = instance!.jobs.withTransaction(outerDbx);
+          await assert.rejects(instance!.db.tx(async (innerDbx) => {
+            const innerJobs = instance!.jobs.withTransaction(innerDbx);
+            outerJobId = (await outerJobs.rerun(first.job.id)).jobId;
+            innerJobId = (await innerJobs.rerun(second.job.id)).jobId;
+            assert.equal(await outerJobs.get(innerJobId), undefined);
+            assert.equal(await innerJobs.get(outerJobId), undefined);
+            throw new Error("Roll back inner transaction");
+          }), /Roll back inner transaction/);
+          assert.equal((await outerJobs.get(outerJobId))!.status, "pending");
+        });
+        await status(outerJobId, "succeeded");
+        assert.equal(await instance!.jobs.get(innerJobId), undefined);
+      });
+      await t.test("standalone jobs in inner transaction callbacks survive outer rollback", async () => {
+        const { job } = await insert();
+        await status(job.id, "succeeded");
+        const builder = (instance!.db.records as unknown as TableHandler).dboBuilder;
+        for (const rollback of [false, true]) {
+          let rerunId = "";
+          await assert.rejects(instance!.db.tx(async () => {
+            const inner = instance!.db.tx((_dbx, transaction) => {
+              const register = rollback ? builder.registerOnRollbackCallback : builder.registerOnCommitCallback;
+              register(transaction, async () => {
+                rerunId = (await instance!.jobs.rerun(job.id)).jobId;
+              });
+              if (rollback) throw new Error("Roll back inner transaction");
+            });
+            if (rollback) await assert.rejects(inner, /Roll back inner transaction/);
+            else await inner;
+            assert(rerunId);
+            throw new Error("Roll back outer transaction");
+          }), /Roll back outer transaction/);
+          await status(rerunId, "succeeded");
+        }
+      });
+      await t.test(
         "detached reruns start a new transaction after their parent finishes",
         async () => {
           const { row, job } = await insert();
@@ -1266,3 +1680,13 @@ const eventually = async (check: () => boolean | Promise<boolean>) => {
     await delay(20);
   }
 };
+
+const waitForControlClaims = (gate: pgPromise.ITask<{}>, count: number) =>
+  eventually(async () => {
+    await gate.one("SELECT pg_stat_clear_snapshot()");
+    const waiting = await gate.one<{ count: number }>(
+      `SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database()
+     AND wait_event_type = 'Lock' AND query ILIKE '%records%FOR UPDATE%'`,
+    );
+    return waiting.count >= count;
+  });

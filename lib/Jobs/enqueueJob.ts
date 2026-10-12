@@ -5,7 +5,6 @@ import { getJobDefinition } from "./getJobDefinition";
 import type { JobRecord, JobTransaction } from "./JobTypes";
 import { getJobTableHandler } from "./getJobTableHandler";
 import { getJobParams } from "./getJobParams";
-import { runTableHook } from "../ExecutionContext";
 
 /** Called only by configured triggers and reruns, inside their originating transaction. */
 export const enqueueJob = async (
@@ -36,7 +35,9 @@ export const enqueueJob = async (
     table !== null && prostgles.isMedia(table) ?
       { id: targetRowPkey.id }
     : {
-        $and: Object.entries(targetRowPkey).map(([column, value]) => ({ [column]: { $eq: value } })),
+        $and: Object.entries(targetRowPkey).map(([column, value]) => ({
+          [column]: { $eq: value },
+        })),
       };
   if (rowTable && options.reason === "rerun") {
     // Match row-trigger lock ordering: the target row before the job advisory lock.
@@ -44,13 +45,11 @@ export const enqueueJob = async (
   }
   const setJobId = async (jobId: string) => {
     if (!rowTable || jobIdColumn === undefined) return { jobId, targetRow: undefined };
-    const updateTargetRow = () =>
-      rowTable.update(targetRowFilter, { [jobIdColumn]: jobId }, { returning: "*", multi: false });
-    // Reruns start outside the generated job hook; give their link update the same ancestry.
-    const targetRow =
-      options.reason === "rerun" ?
-        await runTableHook(rowTable, [targetRowPkey], updateTargetRow, { hookKey: `job:${name}` })
-      : await updateTargetRow();
+    const targetRow = await rowTable.update(
+      targetRowFilter,
+      { [jobIdColumn]: jobId },
+      { returning: "*", multi: false },
+    );
     return { jobId, targetRow: targetRow || undefined };
   };
   // Serialize conflicts for this row without serializing writes to unrelated rows.

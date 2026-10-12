@@ -4,6 +4,7 @@ import type { AuthClientRequest } from "../Auth/AuthTypes";
 import type { Prostgles } from "../Prostgles";
 import type { PermissionScope, PublishParser } from "../PublishParser/PublishParser";
 import { clientCanRunSqlRequest } from "../runClientRequest";
+import { getJobControlBinding } from "../Jobs/getJobControlBinding";
 
 export async function getClientSchema(
   this: Prostgles,
@@ -79,12 +80,12 @@ export async function getClientSchema(
     const methodSchema: ClientSchema["methods"] =
       !methods ?
         []
-        //@ts-ignore
       : Array.from(methods.entries())
           .map(([name, method]) => {
             return {
               name,
-              ...omitKeys(method, ["run"]),
+              ...omitKeys(method, ["run", "jobControl"]),
+              ...(method.jobControl && { jobControl: getJobControlBinding(this, method) }),
             };
           })
           .sort((a, b) => {

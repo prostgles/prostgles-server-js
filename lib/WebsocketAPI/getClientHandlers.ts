@@ -130,11 +130,11 @@ export const getClientHandlers = async <S = void>(
        * Prevent cached authorization errors from committing the transaction.
        */
       let failure: { error: unknown } | undefined;
-      const result = await callback({
-        ...getTableHandlers(transactionHandlers, (error) => {
-          failure ??= { error };
-        }),
-      } as unknown as DBHandlerServerRestricted<S>);
+      const clientDb = getTableHandlers(transactionHandlers, (error) => {
+        failure ??= { error };
+      }) as unknown as DBHandlerServerRestricted<S>;
+      prostgles.dboBuilder.registerTransactionHandlers(clientDb, transactionHandlers);
+      const result = await callback(clientDb);
       if (failure) throw failure.error;
       return result;
     });
