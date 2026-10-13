@@ -6,6 +6,7 @@ import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ProstglesInitOptions, TableCheck, TableConfig } from "prostgles-server";
 import { checkGeneratedTypes } from "./checkGeneratedTypes";
+import { getPubSubManagerInitQuery } from "prostgles-server/dist/PubSubManager/init/getPubSubManagerInitQuery";
 import {
   getTableCheckBranches,
   getTableCheckConstraint,
@@ -233,14 +234,15 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       metadataIndex.concurrently = true;
       await instance!.destroy();
       instance = undefined;
-      await db.tx(async (reader) => {
+      const restartedPrgl = await db.tx(async (reader) => {
         // Inspect an uncommented index while its live table is being read and written.
         await reader.any(
           "SELECT * FROM backups LEFT JOIN backup_groups ON group_id = backup_groups.id",
         );
         await reader.none("UPDATE backups SET metadata = metadata");
-        await start();
+        return start();
       });
+      assert.equal((await restartedPrgl.dboBuilder.getTsDefinitions()).tsSchema, tsSchema);
       assert.deepEqual(await getCheck(), originalCheck);
       assert.deepEqual(
         await db.one("SELECT 'backups_metadata_idx'::regclass::oid AS oid"),
@@ -253,6 +255,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       const subscription = await instance!.db.backups!.subscribe!({}, {}, () => {});
       await subscription.unsubscribe();
       assert.deepEqual(await getCheck(), originalCheck);
+      await instance!.destroy();
+      instance = undefined;
+      const unchangedPrgl = await start();
+      assert.equal(unchangedPrgl.tableConfigurator!.prevInitQueryHistory, undefined);
+      assert.equal((await unchangedPrgl.dboBuilder.getTsDefinitions()).tsSchema, tsSchema);
       await instance!.destroy();
       instance = undefined;
       tableConfig.backups = {
@@ -298,8 +305,10 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
     let instance: Awaited<ReturnType<Prostgles["init"]>> | undefined;
     try {
-      for (const scenario of ["missing versions", "outdated version", "legacy versions"]) {
-        if (scenario === "outdated version") {
+      for (const scenario of ["missing versions", "older package version", "outdated version", "legacy versions"]) {
+        if (scenario === "older package version") {
+          await db.none("UPDATE prostgles.versions SET version = '0.0.0'");
+        } else if (scenario === "outdated version") {
           await db.none("UPDATE prostgles.versions SET version = '0.0.0', schema_md5 = 'outdated'");
         } else if (scenario === "legacy versions") {
           await db.none("ALTER TABLE prostgles.versions DROP COLUMN schema_md5");
@@ -330,6 +339,7 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         // A first subscription initializes PubSub after tableConfig has installed its CHECK.
         const subscription = await instance.db.validated!.subscribe!({}, {}, () => {});
         await subscription.unsubscribe();
+        assert.equal(await getPubSubManagerInitQuery.call(prgl.dboBuilder), undefined, scenario);
         assert.deepEqual(await getChecks(), checks, scenario);
         await db.none("DELETE FROM validated");
         await db.none(`INSERT INTO validated VALUES (1, '{"enabled":true}')`);

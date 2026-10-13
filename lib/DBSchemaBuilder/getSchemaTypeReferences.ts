@@ -72,7 +72,7 @@ export const getSchemaTypeReferences = (
   return references;
 };
 
-/** Array containers are shared built-ins, but their elements can belong to the schema. */
+/** Shared containers can wrap types declared in the schema. */
 const isSchemaType = (
   checker: ts.TypeChecker,
   type: ts.Type,
@@ -88,6 +88,12 @@ const isSchemaType = (
     const elementType = type.getNumberIndexType();
     return !!elementType && isSchemaType(checker, elementType, schemaFile, visited);
   }
+  if (
+    type.aliasTypeArguments?.some((argument) =>
+      isSchemaType(checker, argument, schemaFile, visited),
+    )
+  )
+    return true;
   return !!type
     .getSymbol()
     ?.declarations?.some((declaration) => declaration.getSourceFile() === schemaFile);

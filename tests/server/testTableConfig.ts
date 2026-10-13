@@ -218,6 +218,7 @@ export const testTableConfig: TableConfig<{ en: 1; fr: 1 }> = {
             nullable: true,
             optional: true,
             record: {
+              partial: true,
               keysEnum: ["a", "b"],
               values: { type: { bools: "boolean[]" } },
             },

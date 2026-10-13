@@ -360,7 +360,7 @@ export type DBGeneratedSchema = {
        |  {  ok: string; }
        |  {  err: string; }
        |  {  loading: {  loaded: number;  total: number; }; }
-      table_config?: null | {    referencedTables?: (  {  name: string;  minFiles: number; } )[];   recType?: null | Record<"a" | "b",  {  bools: boolean[]; }>;  };
+      table_config?: null | {    referencedTables?: (  {  name: string;  minFiles: number; } )[];   recType?: null | Partial<Record<"a" | "b",  {  bools: boolean[]; }>>;  };
     };
     
   };
@@ -484,6 +484,7 @@ export type DBSchemaForInsert = {
 export type GeneratedFunctionSchema = { 
   "schemaResult": () => Promise<(undefined | { rows: Array<DBSchema["users"]>; inserts: Array<DBSchemaForInsert["users"]>; selection: Pick<DBSchema["users"], ("id" | "preferences")>; preferences: DBSchema["users"]["preferences"]; optional: Partial<DBSchema["users"]>; unrelated: { nested: { enabled: boolean } }; tags: Array<string>; created: Date })>;
   "schemaArray": () => Promise<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>;
+  "schemaRecord": () => Promise<NonNullable<DBSchema["tjson"]["table_config"]>["recType"]>;
   "schemaArrayElement": () => Promise<NonNullable<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>[number]>;
   "schemaNestedField": () => Promise<{ a: { b: { c: { d: { e: { f: { g: { h: { i: { j: { k: NonNullable<NonNullable<DBSchema["tjson"]["table_config"]>["referencedTables"]>[number] } } } } } } } } } } }>;
   "unrelatedSchema": () => Promise<{ other: string }>;

@@ -76,6 +76,7 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
       schemaResult:
         '(undefined | { rows: Array<DBSchema["users"]>; inserts: Array<DBSchemaForInsert["users"]>; selection: Pick<DBSchema["users"], ("id" | "preferences")>; preferences: DBSchema["users"]["preferences"]; optional: Partial<DBSchema["users"]>; unrelated: { nested: { enabled: boolean } }; tags: Array<string>; created: Date })',
       schemaArray: arrayReference,
+      schemaRecord: 'NonNullable<DBSchema["tjson"]["table_config"]>["recType"]',
       schemaArrayElement: elementReference,
       schemaNestedField: `{ a: { b: { c: { d: { e: { f: { g: { h: { i: { j: { k: ${elementReference} } } } } } } } } } } }`,
       sampleSchemas:

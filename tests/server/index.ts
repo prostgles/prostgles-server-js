@@ -267,6 +267,9 @@ void (async () => {
         functions: {
           schemaResult: defineFunction({ run: (): SchemaResult | undefined => undefined }),
           schemaArray: defineFunction({ run: (): ReferencedTables => [] }),
+          schemaRecord: defineFunction({
+            run: (): NonNullable<AliasedSchema["tjson"]["table_config"]>["recType"] => null,
+          }),
           schemaArrayElement: defineFunction({
             run: (): NonNullable<ReferencedTables>[number] => ({ name: "users", minFiles: 1 }),
           }),
