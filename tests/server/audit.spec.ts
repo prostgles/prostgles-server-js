@@ -1,10 +1,11 @@
+import express from "express";
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
-import pgPromise from "pg-promise";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import express from "express";
+import { test } from "node:test";
+import pgPromise from "pg-promise";
+import type { ProstglesInitOptions, SchemaConfigAudit, TableDefinition } from "prostgles-server";
 import {
   AUDIT_TABLE_COLUMNS,
   AUDIT_TABLE_COLUMN_DEFINITIONS,
@@ -13,14 +14,14 @@ import {
   type AuditTableRow,
   type PublishObject,
 } from "prostgles-server";
-import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
+import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { PublishParser } from "prostgles-server/dist/PublishParser/PublishParser";
 import {
   AUDIT_TRIGGER_PREFIX,
   TABLE_CONFIG_TRIGGER_PREFIX,
 } from "prostgles-server/dist/TableConfig/managedTriggerNames";
-import type { SchemaConfigAudit, TableDefinition, ProstglesInitOptions } from "prostgles-server";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 
 // Keep the public schema and column inference checked alongside the integration tests.
 const typedAudit: SchemaConfigAudit<{
@@ -159,6 +160,26 @@ export async function testAudit(parentDb: DB) {
       let result: Awaited<ReturnType<typeof prgl.init>> | undefined;
       try {
         result = await prgl.init(() => {}, { type: "init" });
+        checkGeneratedTypes(
+          (await prgl.dboBuilder.getTsDefinitions()).tsSchema,
+          `
+          import type { DBHandlerServer } from "prostgles-server";
+          declare const db: DBHandlerServer<DBGeneratedSchema>;
+          declare const auditInput: DBSchemaForInsert["audit_events"];
+          const check = async () => {
+            await db.audit_events.insert(auditInput);
+            const row = await db.audit_events.findOne({}, { select: "*" });
+            if (row) row.table_name satisfies string;
+            // @ts-expect-error Audit history cannot be updated.
+            await db.audit_events.update({}, { table_name: "tampered" });
+            // @ts-expect-error Empty updates are also forbidden.
+            await db.audit_events.update({}, {});
+            // @ts-expect-error Batch updates must respect audit protection.
+            await db.audit_events.updateBatch([[{}, { table_name: "tampered" }]]);
+            await db.audit_test_source.update({}, { value: "updated" });
+          };
+        `,
+        );
         const source = result.db.audit_test_source!;
         if (!prgl.opts.tableConfig) {
           throw new Error("tableConfig is not defined");

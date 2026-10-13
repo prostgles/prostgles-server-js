@@ -19,7 +19,7 @@ const FILE_SCHEMA = {
   data: FILE_DATA_SCHEMA,
 } as const;
 
-export const FILE_SCHEMA_KEYS = getKeys(FILE_SCHEMA);
+export const FILE_SCHEMA_KEYS = [...getKeys(FILE_SCHEMA), "description"] as const;
 
 type AssertFileObjectValid = (row: any) => asserts row is JSONB.GetObjectType<typeof FILE_SCHEMA>;
 
@@ -115,6 +115,7 @@ export const uploadFile = async (
     ...coreInfo,
     original_last_modified,
     cloud_url: url ?? "",
+    local_file_path: filePath ?? null,
     etag: contentHash,
     extension: type.ext,
     url: [fileServeRoute, coreInfo.id].join("/"),

@@ -35,6 +35,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
     const file = {
       data: Buffer.from("This is a string", "utf-8"),
       original_name: "sample_file.txt",
+      description: "Initial description",
     };
     let insertedFile: AnyObject;
     await test("Insert file from nested insert", async () => {
@@ -46,6 +47,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       assert.equal(files.length, 1);
       assert.equal(files[0]!.id, nestedInsert.avatar.id);
       assert.equal(files[0]!.original_name, file.original_name);
+      assert.equal(files[0]!.description, file.description);
       const initialFileStr = fs.readFileSync(fileFolder + files[0]!.storage_key).toString("utf8");
       assert.equal(file.data.toString(), initialFileStr);
       insertedFile = files[0]!;
@@ -133,6 +135,14 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       assert.deepEqual(fs.readdirSync(fileFolder).sort(), before);
     });
 
+    await test("Can update file descriptions without replacing stored bytes", async () => {
+      await db.files!.update!({ id: insertedFile.id }, { description: "Updated description" });
+      const updatedFile = await db.files!.findOne!({ id: insertedFile.id });
+      assert.ok(updatedFile);
+      assert.equal(updatedFile.description, "Updated description");
+      assert.equal(updatedFile.storage_key, insertedFile.storage_key);
+    });
+
     await test("Can update allowed files directly", async () => {
       const newData = {
         data: Buffer.from("# Replacement markdown", "utf-8"),
@@ -146,6 +156,7 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       assert.equal(newFile.id, insertedFile.id);
       assert.equal(newFile.content_type, "text/markdown");
       assert.equal(newFile.extension, "md");
+      assert.equal(newFile.description, "Updated description");
       assert.equal(
         fs
           .readFileSync(fileFolder + newFile.storage_key)

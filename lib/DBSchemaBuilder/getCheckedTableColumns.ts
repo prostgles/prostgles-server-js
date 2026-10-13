@@ -43,7 +43,10 @@ ${columns
           .trim()
           .replace(/;$/, "")
       : values.map((value) => JSON.stringify(value)).join(" | ");
-    const optional = column.has_default || values.includes(null);
+    const optional =
+      column.has_default ||
+      values.includes(null) ||
+      tableConfig.syncConfig?.synced_field === column.name;
     return `      ${escapeTSNames(column.name)}${optional ? "?" : ""}: ${dataType};`;
   })
   .join("\n")}

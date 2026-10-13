@@ -59,7 +59,9 @@ export const getFileTableConfig = (
     ...FILE_TABLE_COLUMN_DEFINITIONS,
     ...(fileTable.versioning && FILE_TABLE_VERSION_COLUMN_DEFINITIONS),
   };
-  const fileColumnDefinitionsColumnNames = getKeys(fileColumnDefinitions);
+  const fileColumnDefinitionsColumnNames = getKeys(fileColumnDefinitions).filter(
+    (column) => column !== "description",
+  );
   const userFileTableConfig = tableConfig?.[fileTableName];
   if (userFileTableConfig) {
     if ("isLookupTable" in userFileTableConfig) {
@@ -160,7 +162,7 @@ export const getFileTableConfig = (
 
             /**
              * File table config can be extended with extra columns.
-             * Allow updates that only target those columns without affecting the core file data
+             * Allow description and custom column updates without affecting the core file data.
              */
             const extraData = omitKeys(insertOrUpdateData, fileColumnDefinitionsColumnNames);
 

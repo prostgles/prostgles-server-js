@@ -109,18 +109,13 @@ export async function getRawColumns(
       const select = !!c.privileges.SELECT;
       const insert = !!c.privileges.INSERT;
       const _delete = !!this.tableOrViewInfo.privileges.delete;
-      let update = !!c.privileges.UPDATE;
+      const update = !!c.privileges.UPDATE;
 
       const prostgles = this.dboBuilder.prostgles;
       const fileConfig = getFileColumnInfo({
         colName: c.name,
         tableHandler: this,
       });
-
-      /** Do not allow updates to file table unless it's to delete fields */
-      if (prostgles.opts.fileTable?.tableName === this.name) {
-        update = false;
-      }
 
       const nonOrderableUD_Types: string[] = [..._PG_geometric, "xml"];
 

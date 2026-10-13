@@ -8,16 +8,25 @@ import {
 } from "./getClientDBGeneratedSchemas";
 import { getColumnTypescriptDefinition } from "./getColumnTypescriptDefinition";
 import { getCheckedTableColumns } from "./getCheckedTableColumns";
+import { FILE_SCHEMA_KEYS } from "../DboBuilder/TableHandler/uploadFile";
+import {
+  FILE_TABLE_COLUMN_DEFINITIONS,
+  FILE_TABLE_VERSION_COLUMN_DEFINITIONS,
+} from "../StorageClient/fileTableDefinitions";
 
 export const getDBGeneratedSchema = ({
   config,
   tablesOrViews,
   clientSchemas,
+  fileTableName,
+  auditTableName,
   skipChecks = false,
 }: {
   config: TableConfig | undefined;
   tablesOrViews: TableSchema[];
   clientSchemas?: ClientSchemaProfiles;
+  fileTableName?: string;
+  auditTableName?: string;
   /** The initial DBO build precedes tableConfig migrations. */
   skipChecks?: boolean;
 }): string => {
@@ -61,6 +70,19 @@ export const getDBGeneratedSchema = ({
         isEmpty(referencedBy) ? "" : `referencedBy: ${JSON.stringify(referencedBy)};`;
       const checkedColumns =
         skipChecks ? undefined : getCheckedTableColumns(config, tableOrView, tablesOrViews);
+      const excludedFileColumns =
+        tableOrView.name === fileTableName ?
+          cols.filter(
+            ({ name }) =>
+              (Object.hasOwn(FILE_TABLE_COLUMN_DEFINITIONS, name) ||
+                Object.hasOwn(FILE_TABLE_VERSION_COLUMN_DEFINITIONS, name)) &&
+              !FILE_SCHEMA_KEYS.some((key) => key === name),
+          )
+        : [];
+      const insertColumns =
+        excludedFileColumns.length ?
+          `insertColumns: ${DB_GENERATED_NAMES.SCHEMA}[${JSON.stringify(tableOrView.name)}]["columns"] extends infer Row ? Row extends unknown ? Omit<Row, ${excludedFileColumns.map(({ name }) => JSON.stringify(name)).join(" | ")}> & { ${excludedFileColumns.map(({ name }) => `${JSON.stringify(name)}?: never`).join("; ")} } : never : never;`
+        : "";
       tables.push(`${escapeTSNames(tableOrView.name)}: {
     columns: ${
       checkedColumns ??
@@ -71,7 +93,7 @@ export const getDBGeneratedSchema = ({
         )
         .join("")}
     }`
-    };
+    };${insertColumns ? `\n    ${insertColumns}` : ""}${tableOrView.name === auditTableName ? "\n    updateColumns: never;" : ""}
     ${referencedByStr}
   };\n  `);
     });
@@ -103,7 +125,7 @@ export type ${DB_GENERATED_NAMES.SCHEMA_OUTPUT} = {
  * Data types as expected when inserting into the database (optional fields might be nullable/with defaults)
  * */
 export type ${DB_GENERATED_NAMES.SCHEMA_INPUT} = {
-  [K in keyof ${DB_GENERATED_NAMES.SCHEMA}]: ${DB_GENERATED_NAMES.SCHEMA}[K]["columns"];
+  [K in keyof ${DB_GENERATED_NAMES.SCHEMA}]: ${DB_GENERATED_NAMES.SCHEMA}[K] extends { insertColumns: infer Input } ? Input : ${DB_GENERATED_NAMES.SCHEMA}[K]["columns"];
 };${clientSchemas ? "\n" + getClientDBGeneratedSchemas(clientSchemas, tablesOrViews, config) : ""}
 `;
 };

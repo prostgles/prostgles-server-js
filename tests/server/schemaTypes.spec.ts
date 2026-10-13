@@ -7,9 +7,61 @@ import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableConfig/TableRowFromColumnDefinitions";
 import { testTableConfig } from "./testTableConfig";
 import { testSchemaWatch } from "./schemaWatch.spec";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 
 export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => {
   await testSchemaWatch(pgDb);
+
+  await test("generated file insert types exclude managed columns and allow custom columns", async () => {
+    const { tsSchema } = await db.files!.dboBuilder.getTsDefinitions();
+    checkGeneratedTypes(tsSchema, `
+      import type { DBHandlerServer } from "prostgles-server";
+      declare const db: DBHandlerServer<DBGeneratedSchema>;
+      const input: DBSchemaForInsert["files"] = {
+        original_name: "schema-types.txt",
+        description: "File description",
+        data: Buffer.from("file schema"),
+        metadata: { description: "custom metadata" },
+      };
+      const check = async () => {
+        await db.files.insert(input);
+        await db.files.insert({ original_name: "schema-types.txt", data: Buffer.from("file schema") });
+        // @ts-expect-error File data is required.
+        await db.files.insert({ original_name: "schema-types.txt" });
+        // @ts-expect-error The original filename is required.
+        await db.files.insert({ data: Buffer.from("file schema") });
+        ${["content_type", "storage_key", "local_file_path", "version", "url"].map((column) => `
+        const with_${column} = { ...input, ${column}: ${column === "version" ? "1" : '"generated"'} };
+        // @ts-expect-error Managed file metadata is rejected even through variables.
+        await db.files.insert(with_${column});
+        // @ts-expect-error The standalone insert schema also rejects managed metadata.
+        const invalid_${column}: DBSchemaForInsert["files"] = with_${column};
+        `).join("\n")}
+        const row = await db.files.findOne({}, { select: "*" });
+        if (row) {
+          row.content_type satisfies string;
+          row.storage_key satisfies string | null;
+          row.local_file_path satisfies string | null;
+          row.version satisfies number;
+        }
+      };
+    `);
+    const input = {
+      original_name: "schema-types.txt",
+      data: Buffer.from("file schema"),
+      metadata: { description: "custom metadata" },
+    };
+    const row = await db.files!.insert(input, { returning: "*" });
+    try {
+      assert.equal(row.original_name, input.original_name);
+      assert.equal(row.content_type, "text/plain");
+      await assert.rejects(db.files!.insert({ ...input, content_type: "text/plain" }));
+      await assert.rejects(db.files!.insert({ ...input, local_file_path: "forbidden" }));
+      await assert.rejects(db.files!.update({ id: row.id }, { local_file_path: "forbidden" }));
+    } finally {
+      await db.files!.delete({ id: row.id });
+    }
+  });
 
   await test("server function return types preserve generated schema references", async () => {
     const { tsSchema } = await db.items!.dboBuilder.getTsDefinitions();

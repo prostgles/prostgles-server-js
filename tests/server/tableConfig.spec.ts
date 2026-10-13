@@ -49,6 +49,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       concurrently: false,
     };
     const tableConfig: TableConfig = {
+      synced_variants: {
+        columns: { id: "SERIAL PRIMARY KEY", state: "TEXT", synced: "BIGINT NOT NULL" },
+        syncConfig: { id_fields: ["id"], synced_field: "synced" },
+        check: { $or: [{ state: "ready", synced: { $ne: null } }] },
+      },
       backup_groups: { columns: { id: "INT PRIMARY KEY" } },
       backup_jobs: {
         columns: {
@@ -148,6 +153,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         { code: "23514" },
       );
       const { tsSchema } = await backups.dboBuilder.getTsDefinitions();
+      const syncedRow = await prgl.dbo!.synced_variants!.insert(
+        { state: "ready" },
+        { returning: "*" },
+      );
+      assert(Number(syncedRow.synced) > 0);
       checkGeneratedTypes(
         tsSchema,
         `
@@ -155,6 +165,15 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         declare const db: TableHandler<DBGeneratedSchema, "backups">;
         declare const client: TableHandler<BackupClientSchema, "backups">;
         declare const row: DBSchema["backups"];
+        const syncedInput: DBSchemaForInsert["synced_variants"] = { state: "ready" };
+        declare const syncedTable: TableHandler<DBGeneratedSchema, "synced_variants">;
+        const checkSynced = async () => {
+          const row = await syncedTable.insert(syncedInput, { returning: "*" });
+          row.synced satisfies string;
+          await syncedTable.insert({ state: "ready", synced: 123 });
+          // @ts-expect-error Required check fields remain required.
+          await syncedTable.insert({});
+        };
         if (row.state === "loading") {
           row.size satisfies null;
           row.error satisfies null;

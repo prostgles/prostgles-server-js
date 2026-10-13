@@ -36,8 +36,9 @@ export const getColumnTypescriptDefinition = ({
     column,
   });
   const { name, is_nullable, has_default } = column;
+  const isSyncedField = config?.[tableOrView.name]?.syncConfig?.synced_field === name;
 
-  return `${escapeTSNames(name)}${is_nullable || has_default ? "?" : ""}: ${dataType}`;
+  return `${escapeTSNames(name)}${is_nullable || has_default || isSyncedField ? "?" : ""}: ${dataType}`;
 };
 
 export const getDataType = ({

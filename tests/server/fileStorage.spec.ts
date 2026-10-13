@@ -74,10 +74,109 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
     ];
     let original = await files.insert(fileData("original"), { returning: "*" });
     try {
+      await t.test("ODT uploads preserve their MIME type and stored bytes", async () => {
+        const data = fs.readFileSync(join(__dirname, "../../../fixtures/sample.odt"));
+        const originalAvatarConfig = config.referencedTables!.users_public_info;
+        config.referencedTables!.users_public_info = {
+          type: "column",
+          referenceColumns: {
+            avatar: { acceptedContentType: ["application/vnd.oasis.opendocument.text"] },
+          },
+        };
+        try {
+          const user = await dbo.users_public_info!.insert(
+            { name: "ODT upload", avatar: { data, original_name: "sample.odt" } },
+            { returning: "*" },
+          );
+          const file = await files.findOne({ id: user.avatar.id });
+          assert.equal(file.content_type, "application/vnd.oasis.opendocument.text");
+          assert.equal(file.extension, "odt");
+          assert.equal(file.local_file_path, join(folder, file.storage_key));
+          assert.deepEqual(fs.readFileSync(join(folder, file.storage_key)), data);
+          const response = await fetch(`http://127.0.0.1:3001${file.url}`, {
+            headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
+          });
+          assert.equal(response.status, 200);
+          assert.equal(response.headers.get("content-type"), file.content_type);
+          assert.deepEqual(Buffer.from(await response.arrayBuffer()), data);
+          await assert.rejects(() =>
+            dbo.users_public_info!.insert({
+              name: "Disallowed file", avatar: fileData("not-an-odt"),
+            }),
+          );
+          await dbo.users_public_info!.delete({ id: user.id });
+          await files.delete({ id: file.id });
+        } finally {
+          config.referencedTables!.users_public_info = originalAvatarConfig!;
+        }
+      });
+
+      await t.test("descriptions support insert, metadata updates and replacement permissions", async () => {
+        const file = await files.insert(
+          { ...fileData("description"), description: "Initial description" },
+          { returning: "*" },
+        );
+        try {
+          assert.equal(file.description, "Initial description");
+          const count = uploads;
+          await files.update({ id: file.id }, { description: "Updated description" });
+          assert.equal(uploads, count);
+          assert.equal((await files.findOne({ id: file.id })).local_file_path, file.local_file_path);
+          await files.update({ id: file.id }, fileData("replacement"));
+          assert.equal((await files.findOne({ id: file.id })).description, "Updated description");
+          await files.update(
+            { id: file.id },
+            { ...fileData("replacement"), description: "Replacement description" },
+          );
+          assert.deepEqual(
+            (await versions(file.id)).map(({ description }) => description),
+            ["Initial description", "Updated description", "Replacement description"],
+          );
+          for (const description of ["", null]) {
+            await files.update({ id: file.id }, { description });
+            assert.equal((await files.findOne({ id: file.id })).description, description);
+          }
+          const before = list();
+          const updateRules = {
+            fields: { description: 0 },
+            filterFields: "*",
+            returningFields: "*",
+          } as const;
+          for (const data of [
+            { description: "Forbidden" },
+            { ...fileData("forbidden"), description: "Forbidden" },
+          ]) {
+            await assert.rejects(() =>
+              files.update({ id: file.id }, data, undefined, { update: updateRules }),
+            );
+          }
+          await assert.rejects(() =>
+            files.insert(
+              { ...fileData("forbidden"), description: "Forbidden" },
+              undefined,
+              undefined,
+              { insert: { fields: { description: 0 }, returningFields: "*" } },
+            ),
+          );
+          assert.equal((await files.findOne({ id: file.id })).description, null);
+          assert.deepEqual(list(), before);
+        } finally {
+          await files.delete({ id: file.id });
+        }
+      });
+
       await t.test("legacy ID-based files remain readable and replaceable", async () => {
+        assert.equal(original.local_file_path, join(folder, original.storage_key));
+        assert.equal((await versions(original.id))[0]!.local_file_path, original.local_file_path);
         fs.renameSync(join(folder, original.storage_key), join(folder, original.id));
-        await db.none("UPDATE files SET storage_key = NULL WHERE id = $1", [original.id]);
-        await fileVersions.update({ file_id: original.id }, { storage_key: original.id });
+        await db.none(
+          "UPDATE files SET storage_key = NULL, local_file_path = NULL WHERE id = $1",
+          [original.id],
+        );
+        await fileVersions.update(
+          { file_id: original.id },
+          { storage_key: original.id, local_file_path: null },
+        );
         const response = await fetch(`http://127.0.0.1:3001/files/${original.id}`, {
           headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
         });
@@ -86,6 +185,11 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
         await files.update({ id: original.id }, fileData("updated"));
         original = await files.findOne({ id: original.id });
         assert.equal(read(original), "updated");
+        assert.equal(original.local_file_path, join(folder, original.storage_key));
+        assert.deepEqual(
+          (await versions(original.id)).map(({ local_file_path }) => local_file_path),
+          [null, original.local_file_path],
+        );
         assert.equal(fs.existsSync(join(folder, original.id)), true);
         assert.deepEqual(
           (await versions(original.id)).map(({ version }) => version),
@@ -495,6 +599,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
         const address = server.address();
         assert.ok(address && typeof address === "object");
         let row = await files.insert(fileData("cloud-original"), { returning: "*" });
+        assert.equal(row.local_file_path, null);
         const download = () =>
           fetch(`http://127.0.0.1:${address.port}/storage-cloud/${row.id}`, {
             headers: { Authorization: `Bearer ${Buffer.from("main").toString("base64")}` },
@@ -520,6 +625,11 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
           await files.update({ id: row.id }, fileData("cloud-updated"));
           row = await files.findOne({ id: row.id });
           assert.equal(row.signed_url, null);
+          assert.equal(row.local_file_path, null);
+          assert.deepEqual(
+            (await versions(row.id)).map(({ local_file_path }) => local_file_path),
+            [null, null],
+          );
           assert.deepEqual(new Set(objects.keys()), new Set([firstKey, row.storage_key]));
           assert.equal(objects.get(row.storage_key)!.toString(), "cloud-updated");
           assert.equal(

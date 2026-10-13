@@ -29,6 +29,7 @@ import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
 import type prostglesClient from "../client/node_modules/prostgles-client";
 import { checkGeneratedTypes } from "./checkGeneratedTypes";
+import { FILE_TABLE_COLUMN_DEFINITIONS } from "prostgles-server/dist/StorageClient/fileTableDefinitions";
 
 export const testClientSchemaTypes = async (db: DB) => {
   await test(
@@ -63,6 +64,9 @@ export const testClientSchemaTypes = async (db: DB) => {
       const tableName = "correspondence";
       const privateTableName = "private_table";
       const fileTableName = "files";
+      const unconstrainedFileColumns = Object.fromEntries(
+        Object.keys(FILE_TABLE_COLUMN_DEFINITIONS).map((column) => [column, {}]),
+      );
       const generatedTypesDir = path.resolve("debug/client-schema-types", suffix);
       try {
         await db.none(`
@@ -100,6 +104,15 @@ export const testClientSchemaTypes = async (db: DB) => {
           transactions: true,
           schemaFilter: { [schemaName]: 1 },
           tableConfig: {
+            [fileTableName]: {
+              columns: { caption: "TEXT", error: "TEXT" },
+              check: {
+                $or: [
+                  { ...unconstrainedFileColumns, caption: null },
+                  { ...unconstrainedFileColumns, caption: { $ne: null }, error: { $ne: null } },
+                ],
+              },
+            },
             [tableName]: {
               syncConfig: { id_fields: ["id"], synced_field: "synced" },
             },
@@ -232,7 +245,11 @@ export const testClientSchemaTypes = async (db: DB) => {
               name: "GuestDBSchema",
               userTypes: ["guest", "member"],
               publish: {
-                [fileTableName]: { select: "*", insert: "*", update: "*" },
+                [fileTableName]: {
+                  select: "*",
+                  insert: "*",
+                  update: { fields: { description: 0 } },
+                },
                 [tableName]: {
                   select: {
                     fields: "*",
@@ -266,6 +283,7 @@ export const testClientSchemaTypes = async (db: DB) => {
               name: "AdminDBSchema",
               userTypes: ["admin"],
               publish: {
+                [fileTableName]: { select: "*", insert: "*", update: "*" },
                 [tableName]: { select: "*", insert: "*", update: "*" },
                 [privateTableName]: { select: "*" },
               },
@@ -300,6 +318,9 @@ export const testClientSchemaTypes = async (db: DB) => {
         type FileName = "${fileTableName}";
         declare const guest: TableHandler<GuestDBSchema, Name>;
         declare const files: TableHandler<GuestDBSchema, FileName>;
+        declare const adminFiles: TableHandler<AdminDBSchema, FileName>;
+        declare const combinedFiles: TableHandler<ClientDBSchema, FileName>;
+        declare const serverFiles: TableHandler<DBGeneratedSchema, FileName>;
         declare const admin: TableHandler<AdminDBSchema, Name>;
         declare const combined: TableHandler<ClientDBSchema, Name>;
         declare const server: TableHandler<${DB_GENERATED_NAMES.SCHEMA}, Name>;
@@ -404,10 +425,39 @@ export const testClientSchemaTypes = async (db: DB) => {
           await combined.insert({ body: "hello", created_by: "admin" });
           // @ts-expect-error read-only profiles do not relax required insert fields
           await combined.insert({});
-          // @ts-expect-error server insert defaults are unchanged
           await server.insert({ body: "hello", created_by: "admin" });
           await server.insert({ body: "hello", created_by: "admin", synced: 1 });
+          const serverInput: DBSchemaForInsert[Name] = { body: "hello", created_by: "admin" };
+          await server.insert(serverInput);
+          // @ts-expect-error Other required server insert columns remain required.
+          await server.insert({ body: "hello" });
+          // @ts-expect-error The sync timestamp retains its numeric type.
+          await server.insert({ body: "hello", created_by: "admin", synced: false });
+          const serverRow = await server.findOne({}, { select: "*" });
+          if (serverRow) serverRow.synced satisfies string;
           await files.insert({ original_name: "hello.txt", data: new Uint8Array() });
+          await files.insert({ original_name: "hello.txt", data: new Uint8Array(), description: "File description" });
+          await adminFiles.update({ id: "file-id" }, { description: null });
+          await combinedFiles.update({ id: "file-id" }, { description: "Allowed by admin" });
+          const descriptionUpdate = { description: "Forbidden" };
+          // @ts-expect-error Description updates are excluded by the guest profile.
+          await files.update({}, descriptionUpdate);
+          // @ts-expect-error Batch updates must respect the same permissions.
+          await files.updateBatch([[{}, descriptionUpdate]]);
+          await files.update({}, { caption: "custom metadata", error: "details" });
+          const checkedFile = { original_name: "hello.txt", data: new Uint8Array(), caption: "custom metadata" };
+          const validFile = { ...checkedFile, error: "details" };
+          validFile satisfies DBSchemaForInsert[FileName];
+          await files.insert(validFile);
+          await serverFiles.insert(validFile);
+          // @ts-expect-error The caption variant requires error details.
+          checkedFile satisfies DBSchemaForInsert[FileName];
+          // @ts-expect-error Server inserts must preserve file check variants.
+          await serverFiles.insert(checkedFile);
+          // @ts-expect-error Client inserts must preserve file check variants.
+          await files.insert(checkedFile);
+          // @ts-expect-error Combined profiles must preserve file check variants.
+          await combinedFiles.insert(checkedFile);
           await files.insert({ id: "file-id", original_name: "hello.txt", original_last_modified: null, data: new Uint8Array() });
           // @ts-expect-error file metadata is generated by the server
           await files.insert({ original_name: "hello.txt", data: new Uint8Array(), content_type: "text/plain" });
@@ -431,6 +481,14 @@ export const testClientSchemaTypes = async (db: DB) => {
       `,
         );
         const originalPublish = instance.options.publish;
+        for (const synced of [undefined, 123]) {
+          const row = await instance.db[tableName]!.insert!(
+            { body: "server-sync-default", created_by: "admin", ...(synced && { synced }) },
+            { returning: "*" },
+          );
+          assert(synced ? Number(row.synced) === synced : Number(row.synced) > 0);
+          await instance.db[tableName]!.delete!({ id: row.id });
+        }
         // await instance.update({ publish: originalPublish });
         const profiles: Record<string, ClientSchema> = {};
         for (const [role, name] of [
@@ -459,6 +517,18 @@ export const testClientSchemaTypes = async (db: DB) => {
         const table = guestSchema.tableSchema.find((t) => t.name === tableName);
         assert(table);
         assert.equal(table.columns.find((c) => c.name === "created_by")?.insert, false);
+        for (const [profile, canUpdateDescription] of [
+          [guestSchema, false],
+          [profiles.AdminDBSchema!, true],
+        ] as const) {
+          const fileTable = profile.tableSchema.find((table) => table.name === fileTableName);
+          assert(fileTable);
+          assert.equal(
+            fileTable.columns.find((column) => column.name === "description")?.update,
+            canUpdateDescription,
+          );
+          assert.equal(fileTable.columns.find((column) => column.name === "caption")?.update, true);
+        }
         assert.deepEqual(profiles.MemberDBSchema!.tableSchema, guestSchema.tableSchema);
         assert.deepEqual(profiles.UnknownDBSchema!.tableSchema, []);
         assert.deepEqual(profiles.AnonymousDBSchema!.tableSchema, []);
@@ -467,6 +537,26 @@ export const testClientSchemaTypes = async (db: DB) => {
         const serverSocket = io.sockets.sockets.get(sockets[0]!.id!);
         assert(serverSocket);
         const handlers = await instance.getClientDBHandlers({ socket: serverSocket }, undefined);
+        await t.test("file writes enforce generated variants and column permissions", async () => {
+          assert(instance);
+          const files = handlers.clientDb[fileTableName]!;
+          const input = { original_name: "checked.txt", data: Buffer.from("checked file") };
+          const file = await files.insert!(
+            { ...input, description: "Keep this description" },
+            { returning: "*" },
+          );
+          try {
+            await assert.rejects(files.update!({ id: file.id }, { description: "Forbidden" }));
+            await assert.rejects(files.insert!({ ...input, caption: "Missing error details" }));
+            await files.update!({ id: file.id }, { caption: "custom metadata", error: "details" });
+            const updated = await files.findOne!({ id: file.id });
+            assert(updated);
+            assert.equal(updated.description, file.description);
+            assert.equal(updated.caption, "custom metadata");
+          } finally {
+            await instance.db[fileTableName]!.delete!({ id: file.id });
+          }
+        });
         assert.equal(privateTableName in handlers.clientDb, false);
         assert.equal("delete" in handlers.clientDb[tableName]!, false);
         assert.equal(typeof handlers.clientDb[tableName]!.upsert, "function");
@@ -963,6 +1053,45 @@ export const testClientSchemaTypes = async (db: DB) => {
         });
         assert.equal(transactionRow!.body, "committed");
         assert.equal(await handlers.clientDb[tableName]!.count!({ id: transactionRow!.id }), 1);
+        await t.test("client handlers bind to an existing server transaction", async () => {
+          assert(instance);
+          assert.throws(
+            () => handlers.getClientDbForTransaction(instance!.db),
+            /Expected active transaction handlers/,
+          );
+          let boundClientDb: typeof handlers.clientDb | undefined;
+          await instance.db.tx(async (dbx, transaction) => {
+            await transaction.none("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+            boundClientDb = handlers.getClientDbForTransaction(dbx);
+            assert.equal(privateTableName in boundClientDb, false);
+            const row = await boundClientDb[tableName]!.insert!(
+              { body: "bound-transaction", created_by: "other" },
+              { returning: "*" },
+            );
+            assert.equal(row.created_by, "user-guest");
+            assert.equal(await dbx[tableName]!.count!({ id: row.id }), 1);
+            assert.equal(await handlers.clientDb[tableName]!.count!({ id: row.id }), 0);
+            await instance!.db[tableName]!.update!(
+              { id: transactionRow!.id },
+              { body: "outside-snapshot" },
+            );
+            assert.equal(
+              (await boundClientDb[tableName]!.findOne!({ id: transactionRow!.id }))!.body,
+              "committed",
+            );
+          });
+          assert(boundClientDb);
+          await assert.rejects(boundClientDb[tableName]!.find!(), /Expected active transaction handlers/);
+          await instance.db[tableName]!.update!({ id: transactionRow!.id }, { body: "committed" });
+          await assert.rejects(
+            instance.db.tx(async (dbx) => {
+              const clientDb = handlers.getClientDbForTransaction(dbx);
+              await clientDb[tableName]!.insert!({ body: "bound-rollback" });
+              await assert.rejects(clientDb[tableName]!.update!({}, { internal: "forbidden" }));
+            }),
+          );
+          assert.equal(await handlers.clientDb[tableName]!.count!({ body: "bound-rollback" }), 0);
+        });
         await instance.db[tableName]!.insert!({ body: "hidden", created_by: "other" });
         await handlers.withClientDbTx(async (tx) => {
           assert.equal(await tx[tableName]!.count!({ body: "hidden" }), 0);
@@ -1044,6 +1173,12 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal("insert" in scopedHandlers.clientDb[tableName]!, false);
         assert.equal("update" in scopedHandlers.clientDb[tableName]!, false);
         assert.equal("upsert" in scopedHandlers.clientDb[tableName]!, false);
+        await instance.db.tx(async (dbx) => {
+          const scopedDb = scopedHandlers.getClientDbForTransaction(dbx);
+          assert.equal(await scopedDb[tableName]!.count!(), 1);
+          assert.equal("insert" in scopedDb[tableName]!, false);
+          assert.equal(privateTableName in scopedDb, false);
+        });
         await scopedHandlers.withClientDbTx(async (tx) => {
           assert.equal(await tx[tableName]!.count!(), 1);
           assert.deepEqual(Object.keys(tx).sort(), Object.keys(scopedHandlers.clientDb).sort());

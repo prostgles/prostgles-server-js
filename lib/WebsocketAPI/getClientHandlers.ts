@@ -21,6 +21,13 @@ export type ClientHandlers<S = void> = {
   clientSql: SQLHandler;
   clientDb: DBHandlerServerRestricted<S>;
   /**
+   * Bind permission-checked table handlers to an active transaction from this instance.
+   * The caller owns the transaction; caught request errors still roll it back.
+   */
+  getClientDbForTransaction: (
+    transactionDb: DBHandlerServerRestricted<S>,
+  ) => DBHandlerServerRestricted<S>;
+  /**
    * Runs permission-checked table operations in a transaction. Requires transactions: true.
    * Caught table request errors also roll back the transaction.
    */
@@ -90,8 +97,11 @@ export const getClientHandlers = async <S = void>(
         const methods = tableMethods.filter((command) => allowedMethods.includes(command));
         const handlers = Object.fromEntries(
           methods.map((command) => {
-            const method = (param1: unknown, param2: unknown, param3: unknown) =>
-              runClientRequest
+            const method = async (param1: unknown, param2: unknown, param3: unknown) => {
+              if (transactionHandlers) {
+                prostgles.dboBuilder.getTransactionForHandlers(transactionHandlers);
+              }
+              return runClientRequest
                 .bind(prostgles)(
                   { command, tableName: table.name, param1, param2, param3 },
                   clientReq,
@@ -102,6 +112,7 @@ export const getClientHandlers = async <S = void>(
                   onRequestError?.(error);
                   throw error;
                 });
+            };
             return [command, method];
           }),
         );
@@ -119,25 +130,24 @@ export const getClientHandlers = async <S = void>(
 
   const clientDb = getTableHandlers() as unknown as DBHandlerServerRestricted<S>;
 
+  const getClientDbForTransaction = (transactionDb: object) => {
+    prostgles.checkNotDestroyed();
+    const transaction = prostgles.dboBuilder.getTransactionForHandlers(transactionDb);
+    const handlers = getTableHandlers(transaction.dbTX, (error) => {
+      prostgles.dboBuilder.failTransaction(transaction.t, error);
+    }) as unknown as DBHandlerServerRestricted<S>;
+    prostgles.dboBuilder.registerTransactionHandlers(handlers, transaction.dbTX);
+    return handlers;
+  };
+
   const withClientDbTx: ClientHandlers<S>["withClientDbTx"] = async (callback) => {
     prostgles.checkNotDestroyed();
     if (!prostgles.opts.transactions) {
       throw new Error("Transactions are not enabled");
     }
-    return prostgles.dboBuilder.getTX(async (transactionHandlers) => {
-      /**
-       * runClientRequest throws authorization errors.
-       * Prevent cached authorization errors from committing the transaction.
-       */
-      let failure: { error: unknown } | undefined;
-      const clientDb = getTableHandlers(transactionHandlers, (error) => {
-        failure ??= { error };
-      }) as unknown as DBHandlerServerRestricted<S>;
-      prostgles.dboBuilder.registerTransactionHandlers(clientDb, transactionHandlers);
-      const result = await callback(clientDb);
-      if (failure) throw failure.error;
-      return result;
-    });
+    return prostgles.dboBuilder.getTX((transactionHandlers) =>
+      callback(getClientDbForTransaction(transactionHandlers)),
+    );
   };
 
   const clientMethods: ServerFunctionHandler = Object.fromEntries(
@@ -152,7 +162,14 @@ export const getClientHandlers = async <S = void>(
     }),
   );
 
-  return { clientDb, clientSql, clientMethods, clientSchema, withClientDbTx };
+  return {
+    clientDb,
+    clientSql,
+    clientMethods,
+    clientSchema,
+    withClientDbTx,
+    getClientDbForTransaction,
+  };
 };
 
 const tableMethods = getKeys({

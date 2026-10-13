@@ -81,6 +81,7 @@ export type DBGeneratedSchema = {
       etag?: string;
       extension?: string;
       id?: string;
+      local_file_path?: null | string;
       metadata?: null | {    description: string;  };
       original_last_modified?: null | string;
       original_name: string;
@@ -91,6 +92,7 @@ export type DBGeneratedSchema = {
       url?: string;
       version?: number;
     };
+    insertColumns: DBGeneratedSchema["files"]["columns"] extends infer Row ? Row extends unknown ? Omit<Row, "added" | "cloud_url" | "content_length" | "content_type" | "deleted" | "deleted_from_storage" | "etag" | "extension" | "local_file_path" | "signed_url" | "signed_url_expires" | "storage_key" | "updated" | "url" | "version"> & { "added"?: never; "cloud_url"?: never; "content_length"?: never; "content_type"?: never; "deleted"?: never; "deleted_from_storage"?: never; "etag"?: never; "extension"?: never; "local_file_path"?: never; "signed_url"?: never; "signed_url_expires"?: never; "storage_key"?: never; "updated"?: never; "url"?: never; "version"?: never } : never : never;
     referencedBy: {"files_versions":["file_id"],"users_public_info":["avatar"]};
   };
   files_versions: {
@@ -107,6 +109,7 @@ export type DBGeneratedSchema = {
       extension?: string;
       file_id: string;
       id?: string;
+      local_file_path?: null | string;
       metadata?: null | {    description: string;  };
       original_last_modified?: null | string;
       original_name: string;
@@ -238,7 +241,7 @@ export type DBGeneratedSchema = {
     columns: {
       flight_number?: null | string;
       id?: number;
-      last_updated: number | string;
+      last_updated?: number | string;
       x?: null | number;
       y?: null | number;
     };
@@ -473,7 +476,7 @@ export type DBSchema = {
  * Data types as expected when inserting into the database (optional fields might be nullable/with defaults)
  * */
 export type DBSchemaForInsert = {
-  [K in keyof DBGeneratedSchema]: DBGeneratedSchema[K]["columns"];
+  [K in keyof DBGeneratedSchema]: DBGeneratedSchema[K] extends { insertColumns: infer Input } ? Input : DBGeneratedSchema[K]["columns"];
 };
 
 

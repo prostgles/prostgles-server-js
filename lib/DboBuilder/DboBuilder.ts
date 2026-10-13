@@ -159,7 +159,9 @@ export class DboBuilder {
   };
 
   failTransaction = (transaction: object, error: unknown) => {
-    this.transactionFailures.set(transaction, { error });
+    if (!this.transactionFailures.has(transaction)) {
+      this.transactionFailures.set(transaction, { error });
+    }
   };
 
   registerOnRollbackCallback = (transaction: object, callback: OnCommitCallback) => {
@@ -360,6 +362,8 @@ export class DboBuilder {
 
     this.tableTsDefinitions = getDBGeneratedSchema({
       config: this.prostgles.mergedTableConfig.tableConfig,
+      fileTableName: this.prostgles.opts.fileTable?.tableName,
+      auditTableName: this.prostgles.opts.audit?.tableName,
       tablesOrViews,
       skipChecks: this.prostgles.preparingTableConfig,
     });
@@ -397,6 +401,8 @@ export class DboBuilder {
     const getSchema = (tablesOrViews: TableSchema[]) => {
       const tableTsDefinitions = getDBGeneratedSchema({
         config: this.prostgles.mergedTableConfig.tableConfig,
+        fileTableName: this.prostgles.opts.fileTable?.tableName,
+        auditTableName: this.prostgles.opts.audit?.tableName,
         clientSchemas,
         tablesOrViews: [
           ...tablesOrViews,

@@ -16,6 +16,7 @@ export const FILE_TABLE_COLUMN_DEFINITIONS = {
   description: `TEXT`,
   url: `TEXT NOT NULL DEFAULT ''`,
   cloud_url: `TEXT`,
+  local_file_path: `TEXT`,
   signed_url: `TEXT`,
   signed_url_expires: `BIGINT`,
   added: `TIMESTAMP NOT NULL DEFAULT NOW()`,

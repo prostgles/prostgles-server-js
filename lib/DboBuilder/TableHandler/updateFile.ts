@@ -36,7 +36,7 @@ export const updateFile = async (
     version: Number(existingFile.version ?? 1) + 1,
     original_last_modified,
   });
-  return { newData: omitKeys(newFile, ["id"]) };
+  return { newData: omitKeys(newFile, ["id", "description"]) };
 };
 
 export const lockFileForUpdate = async (
