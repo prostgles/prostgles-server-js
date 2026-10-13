@@ -821,6 +821,67 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(result, { second: "a2" });
     });
 
+    await test("PostgreSQL text array search", async () => {
+      const id = -101;
+      await db.items.insert({ id, name: "array search", h: ["xxCat cat!", "", "🐈 café CAT"] });
+      const search = (searchTerm: string, options = {}) => db.items.findOne(
+        { id },
+        { select: { matches: { $array_search: ["h", searchTerm, options] } } },
+      );
+      try {
+        const result = await search("cat", { contextChars: 2 });
+        result?.matches[0]?.offset satisfies number | undefined;
+        // @ts-expect-error search results must retain their type
+        result?.matches[0]?.offset satisfies string;
+        assert.deepStrictEqual(result, { matches: [
+          { index: 1, offset: 2, match: "Cat", snippet: "xxCat c" },
+          { index: 1, offset: 6, match: "cat", snippet: "t cat!" },
+          { index: 3, offset: 7, match: "CAT", snippet: "é CAT" },
+        ] });
+        assert.deepStrictEqual(await search("cat", { matchCase: true, contextChars: 0 }), {
+          matches: [{ index: 1, offset: 6, match: "cat", snippet: "cat" }],
+        });
+        assert.deepStrictEqual(await search("cat", { limit: 1 }), {
+          matches: [{ index: 1, offset: 2, match: "Cat", snippet: "xxCat cat!" }],
+        });
+        assert.deepStrictEqual(await search("missing"), { matches: [] });
+
+        const literalTerm = "['%_.*\\";
+        await db.items.update({ id }, { h: [literalTerm + literalTerm, "aaaa"] });
+        assert.deepStrictEqual(await search(literalTerm, { contextChars: 0 }), { matches: [
+          { index: 1, offset: 0, match: literalTerm, snippet: literalTerm },
+          { index: 1, offset: literalTerm.length, match: literalTerm, snippet: literalTerm },
+        ] });
+        assert.deepStrictEqual(await search("aa", { contextChars: 0 }), { matches: [
+          { index: 2, offset: 0, match: "aa", snippet: "aa" },
+          { index: 2, offset: 2, match: "aa", snippet: "aa" },
+        ] });
+
+        for (const pages of [[], null]) {
+          await db.items.update({ id }, { h: pages });
+          assert.deepStrictEqual(await search("cat"), { matches: [] });
+        }
+        await sql!("UPDATE items SET h = '[2:4]={NULL,cat,cat}'::text[] WHERE id = -101");
+        assert.deepStrictEqual(await search("cat", { limit: 1 }), {
+          matches: [{ index: 3, offset: 0, match: "cat", snippet: "cat" }],
+        });
+
+        await assert.rejects(() => search(""));
+        for (const options of [
+          { contextChars: -1 }, { contextChars: 1.5 }, { contextChars: 10001 },
+          { limit: 0 }, { limit: 1.5 }, { limit: 1001 },
+          { matchCase: "true" }, { unknownOption: true },
+        ]) {
+          await assert.rejects(() => search("cat", options));
+        }
+        await assert.rejects(() => db.items.findOne(
+          { id }, { select: { matches: { $array_search: ["missing_column", "cat"] } } },
+        ));
+      } finally {
+        await db.items.delete({ id });
+      }
+    });
+
     /**
      * TODO -> ADD ALL FILTER TYPES
      */

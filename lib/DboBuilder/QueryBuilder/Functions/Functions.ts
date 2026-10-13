@@ -4,6 +4,7 @@ import { asName, includes, isObject, TextFilter_FullTextSearchFilterKeys } from 
 import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
+import { ARRAY_SEARCH } from "./ARRAY_SEARCH";
 import { asFunction, getAggregateQuery } from "./utils";
 import type { ExistsFilterConfig } from "../../DboBuilderTypes";
 const pgp = pgPromise();
@@ -749,7 +750,7 @@ export const FUNCTIONS: FunctionSpec[] = [
       numArgs: 1,
       singleColArg: false,
       getFields: (args: any[]) => [args[1]],
-      getQuery: ({ allowedFields, args, tableAliasRaw: tableAlias }) => {
+      getQuery: ({ args, tableAliasRaw: tableAlias }) => {
         const value = asValue(args[0]) + "",
           seedColumnName = asNameAlias(args[1], tableAlias);
 
@@ -772,6 +773,8 @@ export const FUNCTIONS: FunctionSpec[] = [
       return `${asNameAlias(columnName, tableAlias)}[${asValue(index)}]`;
     },
   }),
+
+  ARRAY_SEARCH,
 
   /* Aggs */
   ...["max", "min", "count", "avg", "json_agg", "jsonb_agg", "string_agg", "array_agg", "sum"].map(
