@@ -1,12 +1,14 @@
 import {
   fromEntries,
   getJSONBSchemaValidationError,
+  getObjectEntries,
   getProperty,
   isObject,
   pickKeys,
   type TableSchema,
 } from "prostgles-types";
 import { isArray } from "../utils/utils";
+import type { TableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type {
   PublishContextValue,
   PublishedResult,
@@ -18,6 +20,7 @@ export const getPublishedObjectFromResult = (
   publish: PublishedResult | undefined,
   tablesOrViews: TableSchema[],
   publishParams: PublishParams | undefined,
+  tableHandlers: TableHandlers,
   contextReplacementMode: "runtime" | "schemaGeneration" = "runtime",
 ): PublishObject => {
   if (!publish) return {};
@@ -48,7 +51,15 @@ export const getPublishedObjectFromResult = (
     const [_, allTableRules] = validation.data;
     return fromEntries(
       tablesOrViews.map((table) => {
-        return [table.name, table.is_view ? pickKeys(allTableRules, ["select"]) : allTableRules];
+        const rules: Partial<typeof allTableRules> = {
+          ...(table.is_view ? pickKeys(allTableRules, ["select"]) : allTableRules),
+        };
+        // Apply restrictions before wildcard rules become explicit table rules.
+        const restrictions = tableHandlers[table.name]?.config?.publish;
+        for (const [command] of getObjectEntries(rules)) {
+          if (restrictions?.[command] === false) delete rules[command];
+        }
+        return [table.name, rules];
       }),
     );
   }

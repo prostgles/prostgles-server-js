@@ -17,6 +17,7 @@ export const getJobTableConfig = (
   return {
     [tableName]: {
       ...jobTableConfig,
+      publish: { insert: false, update: false, delete: false },
       indexes: Object.fromEntries(
         Object.entries(jobTableConfig.indexes).map(([name, index]) => [
           `${tableName}_${name}`,

@@ -23,6 +23,10 @@ export type BaseTableDefinition = {
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
   syncConfig?: SyncConfig;
+  /** Reject explicit publish conflicts and restrict wildcard/inferred permissions.
+   * Does not affect trusted server writes.
+   */
+  publish?: Partial<Record<"select" | "insert" | "update" | "delete", false>>;
 
   triggers?: {
     [triggerName: string]: {

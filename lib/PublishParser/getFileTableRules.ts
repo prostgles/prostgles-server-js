@@ -155,6 +155,7 @@ export async function getFileTableRules(
     tableName: fileTableName,
     clientInfo,
     resolvedPublishObject: { [fileTableName]: fileTableRule },
+    isInferred: true,
   });
   return { rules, allowedInserts: allowedNestedInserts };
 }

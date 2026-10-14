@@ -1103,7 +1103,6 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               undefined,
             );
           const invalid: NonNullable<ProstglesInitOptions<JobTestSchema>["publish"]>[] = [
-            ["*", { update: true }],
             ...["insert", "update", "delete"].map((command) => ({
               [queueName]: { select: "*" as const, [command]: "*" },
             })),
@@ -1111,12 +1110,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           ];
           const valid: typeof invalid = [
             "*",
+            ["*", { select: true, insert: true, update: true, delete: true }],
             { [queueName]: "*" },
             { [queueName]: true },
             () => ({ [queueName]: "*" }),
             { [queueName]: { select: "*", insert: false, update: false, delete: false } },
           ];
           try {
+            await instance!.update({ publish: ["*", { update: true }] });
+            const writeOnlyClient = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+            assert.equal(writeOnlyClient.clientSchema.err, undefined);
+            assert.equal(writeOnlyClient.clientDb[queueName], undefined);
+            await assert.rejects(updateJob());
             for (const publish of invalid) {
               await instance!.update({ publish });
               const client = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);

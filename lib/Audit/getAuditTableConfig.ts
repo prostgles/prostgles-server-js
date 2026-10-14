@@ -41,6 +41,7 @@ export const getAuditTableConfig = (
   }
   return {
     [tableName]: {
+      publish: { insert: false, update: false, delete: false },
       columns: AUDIT_TABLE_COLUMN_DEFINITIONS,
       triggers: getAuditProtection(tableName, ["update", "delete", "truncate"]),
     },

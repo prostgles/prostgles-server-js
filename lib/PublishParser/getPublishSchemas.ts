@@ -22,12 +22,10 @@ export const getPublishSchemas = async (
           publish,
           tablesOrViews,
           undefined,
+          publishParser.dbo,
           "schemaGeneration",
         );
-        const tableNames = getPublishedTableNames(
-          publishParser,
-          resolvedPublishObject,
-        );
+        const tableNames = getPublishedTableNames(publishParser, resolvedPublishObject);
         const tableSchema: DBSchemaTable[] = [];
         for (const tableName of tableNames) {
           const rules = await publishParser.getTableRules({
@@ -42,12 +40,7 @@ export const getPublishSchemas = async (
           tableSchema.push({
             ...getRawInfo.call(table, undefined, rules),
             name: tableName,
-            columns: await getRawColumns.call(
-              table,
-              undefined,
-              undefined,
-              rules,
-            ),
+            columns: await getRawColumns.call(table, undefined, undefined, rules),
           });
         }
         return [name, { tableSchema, userTypes }];

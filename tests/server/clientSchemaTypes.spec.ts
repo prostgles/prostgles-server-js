@@ -13,6 +13,7 @@ import prostgles, {
   getLocalStorageClient,
   type ProstglesInitOptions,
   type PublishContextValue,
+  type PublishedResult,
 } from "prostgles-server";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ViewHandler } from "prostgles-server/dist/DboBuilder/ViewHandler/ViewHandler";
@@ -1081,7 +1082,10 @@ export const testClientSchemaTypes = async (db: DB) => {
             );
           });
           assert(boundClientDb);
-          await assert.rejects(boundClientDb[tableName]!.find!(), /Expected active transaction handlers/);
+          await assert.rejects(
+            boundClientDb[tableName]!.find!(),
+            /Expected active transaction handlers/,
+          );
           await instance.db[tableName]!.update!({ id: transactionRow!.id }, { body: "committed" });
           await assert.rejects(
             instance.db.tx(async (dbx) => {
@@ -1198,6 +1202,190 @@ export const testClientSchemaTypes = async (db: DB) => {
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
         await instance.update({ publish: originalPublish });
+        await t.test("tableConfig publish only restricts client access", async () => {
+          assert(instance);
+          const originalTableConfig = instance.options.tableConfig;
+          const tableConfig = {
+            ...originalTableConfig,
+            [tableName]: {
+              ...originalTableConfig?.[tableName],
+              publish: { insert: false, update: false, delete: false },
+            },
+            [privateTableName]: {
+              publish: { select: false, insert: false, update: false, delete: false },
+            },
+          } satisfies NonNullable<ProstglesInitOptions["tableConfig"]>;
+          const savedInsert = handlers.clientDb[tableName]!.insert!;
+          try {
+            for (const publish of [
+              "*",
+              ["*", { select: true, insert: true, update: true, delete: true }],
+              { [tableName]: "*" },
+              { [tableName]: true },
+              {
+                [tableName]: {
+                  select: { fields: ["body"], forcedFilter: { body: "restricted-row" } },
+                  insert: false,
+                  update: false,
+                  delete: false,
+                },
+              },
+              null,
+            ] satisfies PublishedResult[]) {
+              await instance.update({
+                tableConfig,
+                publish: [{ name: "RestrictedSchema", userTypes: ["admin"], publish }],
+              });
+              const restricted: Awaited<ReturnType<typeof instance.getClientDBHandlers>> =
+                await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+              assert.equal(restricted.clientDb[privateTableName], undefined);
+              const table = restricted.clientDb[tableName];
+              if (!publish) {
+                assert.equal(table, undefined);
+                continue;
+              }
+              assert(table?.find);
+              for (const command of ["insert", "update", "delete", "upsert"] as const) {
+                assert.equal(table[command], undefined);
+              }
+              const row = await instance.db[tableName]!.insert!(
+                { body: "restricted-row", created_by: "admin" },
+                { returning: "*" },
+              );
+              await instance.db[tableName]!.update!({ id: row.id }, { note: "server write" });
+              if (
+                typeof publish === "object" &&
+                !Array.isArray(publish) &&
+                typeof publish[tableName] === "object"
+              ) {
+                assert.deepEqual(await table.find(), [{ body: "restricted-row" }]);
+              }
+              await instance.db[tableName]!.delete!({ id: row.id });
+            }
+            const wildcardPublish = [
+              "*",
+              { select: true, insert: true, update: true, delete: true },
+            ] satisfies PublishedResult;
+            for (const publish of [wildcardPublish, () => wildcardPublish]) {
+              await instance.update({ publish });
+              const restricted: Awaited<ReturnType<typeof instance.getClientDBHandlers>> =
+                await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+              assert.equal(restricted.clientSchema.err, undefined);
+              assert(restricted.clientDb[tableName]!.find);
+              assert.equal(restricted.clientDb[tableName]!.insert, undefined);
+              assert.equal(restricted.clientDb[privateTableName], undefined);
+            }
+            await instance.update({
+              publish: [{ name: "AdminDBSchema", userTypes: ["admin"], publish: "*" }],
+            });
+            await assert.rejects(savedInsert({ body: "forbidden" }));
+            checkGeneratedTypes(
+              (await instance.getTSSchema()).tsSchema,
+              `
+              import type { TableHandler } from "prostgles-types";
+              declare const table: TableHandler<AdminDBSchema, "${tableName}">;
+              table.find();
+              // @ts-expect-error tableConfig disables client inserts
+              table.insert({});
+              // @ts-expect-error tableConfig disables client updates
+              table.update({}, {});
+              // @ts-expect-error tableConfig cannot publish a denied table
+              type Hidden = AdminDBSchema["${privateTableName}"];
+              `,
+            );
+            for (const command of ["select", "insert", "update", "delete"] as const) {
+              for (const rule of [true, "*"] as const) {
+                await assert.rejects(
+                  instance.update({
+                    tableConfig: {
+                      ...tableConfig,
+                      [tableName]: {
+                        ...originalTableConfig?.[tableName],
+                        publish: { [command]: false },
+                      },
+                    },
+                    publish: [
+                      {
+                        name: "ConflictingSchema",
+                        userTypes: ["admin"],
+                        publish: { [tableName]: { [command]: rule } },
+                      },
+                    ],
+                  }),
+                  (error: unknown) =>
+                    String(error).endsWith(
+                      `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publish`,
+                    ),
+                );
+              }
+            }
+            await instance.update({
+              tableConfig,
+              publish: () => ({ [tableName]: { insert: "*" } }),
+            });
+            await assert.rejects(savedInsert({ body: "forbidden" }), {
+              message: `publish.${tableName}.insert is disabled by tableConfig.${tableName}.publish`,
+            });
+            await assert.rejects(
+              instance.update({
+                tableConfig: {
+                  ...tableConfig,
+                  [tableName]: { ...originalTableConfig?.[tableName], publish: { select: false } },
+                },
+                publish: [
+                  {
+                    name: "WriterSchema",
+                    userTypes: ["admin"],
+                    publish: {
+                      [tableName]: {
+                        select: { fields: ["body"] },
+                        update: { fields: ["note", "synced"] },
+                      },
+                    },
+                  },
+                ],
+              }),
+              (error: unknown) =>
+                String(error).endsWith(
+                  `publish.${tableName}.select is disabled by tableConfig.${tableName}.publish`,
+                ),
+            );
+            await instance.update({
+              publish: [
+                {
+                  name: "WriterSchema",
+                  userTypes: ["admin"],
+                  publish: {
+                    [tableName]: {
+                      update: {
+                        fields: ["note", "synced"],
+                        filterFields: ["body"],
+                        returningFields: ["body"],
+                      },
+                    },
+                  },
+                },
+              ],
+            });
+            const writer = await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+            assert.equal(writer.clientDb[tableName]!.find, undefined);
+            const writerRow = await instance.db[tableName]!.insert!(
+              { body: "writer-row", created_by: "admin" },
+              { returning: "*" },
+            );
+            assert.deepEqual(
+              await writer.clientDb[tableName]!.update!(
+                { body: "writer-row" },
+                { note: "allowed" },
+                { returning: "*" },
+              ),
+              [{ body: "writer-row" }],
+            );
+            await instance.db[tableName]!.delete!({ id: writerRow.id });
+          } finally {
+            await instance.update({ tableConfig: originalTableConfig, publish: originalPublish });
+          }
+        });
         await instance.update({
           publish: [{ name: "EmptyDBSchema", userTypes: ["empty"], publish: null }],
         });

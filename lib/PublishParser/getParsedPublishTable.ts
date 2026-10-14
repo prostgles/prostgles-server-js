@@ -8,7 +8,15 @@ import { TABLE_RULE_NO_LIMITS } from "./publishTypesAndUtils";
 
 export async function getParsedPublishTable(
   this: PublishParser,
-  { tableName, clientReq, clientInfo, resolvedPublishObject }: Omit<TableRequest, "scope">,
+  {
+    tableName,
+    clientReq,
+    clientInfo,
+    resolvedPublishObject,
+    isInferred,
+  }: Omit<TableRequest, "scope"> & {
+    isInferred: boolean;
+  },
 ): Promise<ParsedPublishTable | undefined> {
   if (!tableName) {
     throw new Error("tableName is missing in getTableRules");
@@ -43,6 +51,17 @@ export async function getParsedPublishTable(
     };
   }
 
+  const restrictions = tableHandler.config?.publish;
+  if (!isInferred && isObject(rawTableRule)) {
+    for (const [command, allowed] of getObjectEntries(restrictions ?? {})) {
+      if (allowed === false && rawTableRule[command]) {
+        throw new Error(
+          `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publish`,
+        );
+      }
+    }
+  }
+
   const is_view = tableHandler.isView;
 
   /**
@@ -52,7 +71,7 @@ export async function getParsedPublishTable(
 
   const isStarOrTrue = (value: any): value is "*" | true => value === "*" || value === true;
   const { privileges } = tableHandler.tableOrViewInfo;
-  const rawTableRulesObject =
+  const tableRulesObject =
     isStarOrTrue(rawTableRule) ?
       {
         select: privileges.select ? TABLE_RULE_NO_LIMITS.select : undefined,
@@ -61,16 +80,6 @@ export async function getParsedPublishTable(
         delete: privileges.delete ? TABLE_RULE_NO_LIMITS.delete : undefined,
       }
     : rawTableRule;
-
-  const tableRulesObject =
-    readOnlyTableType ?
-      {
-        select: rawTableRulesObject.select,
-        insert: undefined,
-        update: undefined,
-        delete: undefined,
-      }
-    : rawTableRulesObject;
 
   const selectRule =
     !tableRulesObject.select ? undefined
@@ -117,7 +126,7 @@ export async function getParsedPublishTable(
     };
   }
   getObjectEntries(parsedTableRule).forEach(([publishCommand, publishValue]) => {
-    if (!publishValue) {
+    if (!publishValue || restrictions?.[publishCommand] === false) {
       return;
     }
 

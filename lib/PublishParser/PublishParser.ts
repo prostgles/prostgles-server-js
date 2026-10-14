@@ -51,8 +51,6 @@ export class PublishParser {
     this.prostgles = prostgles;
     const { publish } = prostgles.opts;
 
-    this.parsedPublish = getParsedPublish(publish, prostgles.dboBuilder.tablesOrViews ?? []);
-
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.publishRawSQL = prostgles.opts.publishRawSQL;
     const { dbo, db } = prostgles;
@@ -61,6 +59,7 @@ export class PublishParser {
     }
     this.dbo = dbo;
     this.db = db;
+    this.parsedPublish = getParsedPublish(publish, prostgles.dboBuilder.tablesOrViews ?? [], dbo);
   }
 
   async getPublishParams(
@@ -197,6 +196,7 @@ export class PublishParser {
       publishResult,
       this.prostgles.dboBuilder.tablesOrViews ?? [],
       publishParams,
+      this.dbo,
     );
     return publishedObject;
   }
@@ -339,9 +339,12 @@ export class PublishParser {
       tableName,
       clientInfo,
       resolvedPublishObject,
+      isInferred: false,
     });
+    let tableRules = publishRulesExcludingInferredTables;
+    const fileConfig = this.prostgles.opts.fileTable;
     if (audit && isAuditTable) {
-      const auditTableRules = await getAuditTableRules.bind(this)(
+      tableRules = await getAuditTableRules.bind(this)(
         audit,
         publishRulesExcludingInferredTables,
         clientReq,
@@ -349,16 +352,8 @@ export class PublishParser {
         scope,
         resolvedPublishObject,
       );
-      return applyScopeToTableRules(
-        tableName,
-        tableHandler,
-        parsePublishTableRule(auditTableRules),
-        scope,
-      );
-    }
-    const fileConfig = this.prostgles.opts.fileTable;
-    if (isFileVersionTable(fileConfig, tableName)) {
-      const versionRules = await getFileVersionTableRules.bind(this)(
+    } else if (isFileVersionTable(fileConfig, tableName)) {
+      tableRules = await getFileVersionTableRules.bind(this)(
         fileConfig,
         publishRulesExcludingInferredTables,
         clientReq,
@@ -366,14 +361,7 @@ export class PublishParser {
         scope,
         overriddenPublish,
       );
-      return applyScopeToTableRules(
-        tableName,
-        tableHandler,
-        parsePublishTableRule(versionRules),
-        scope,
-      );
-    }
-    if (this.dbo[tableName]?.is_media) {
+    } else if (tableHandler.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
         tableName,
         publishRulesExcludingInferredTables,
@@ -382,20 +370,19 @@ export class PublishParser {
         scope,
         overriddenPublish,
       );
-      return applyScopeToTableRules(
-        tableName,
-        tableHandler,
-        parsePublishTableRule(fileTableRules),
-        scope,
-      );
+      tableRules = fileTableRules;
     }
 
-    return applyScopeToTableRules(
-      tableName,
-      tableHandler,
-      parsePublishTableRule(publishRulesExcludingInferredTables),
-      scope,
-    );
+    const parsedTableRules = parsePublishTableRule(tableRules);
+    const restrictions = tableHandler.config?.publish;
+    if (parsedTableRules && restrictions) {
+      for (const [command, allowed] of getObjectEntries(restrictions)) {
+        if (allowed === false) delete parsedTableRules[command];
+      }
+      if (!Object.values(parsedTableRules).some(Boolean)) return;
+    }
+
+    return applyScopeToTableRules(tableName, tableHandler, parsedTableRules, scope);
   }
 
   getParsedPublishTable = getParsedPublishTable.bind(this);
@@ -404,12 +391,16 @@ export class PublishParser {
   getSchemaFromPublish = getSchemaFromPublish.bind(this);
 }
 
-const getParsedPublish = (publish: Publish | undefined, tablesOrViews: TableSchema[]) => {
+const getParsedPublish = (
+  publish: Publish | undefined,
+  tablesOrViews: TableSchema[],
+  dbo: DBHandlerServerInternal,
+) => {
   if (!publish) return;
   return (
     isPublishProfiles(publish) ? validatePublishProfiles(publish)
     : typeof publish === "function" ? publish
-    : getPublishedObjectFromResult(publish, tablesOrViews, undefined)
+    : getPublishedObjectFromResult(publish, tablesOrViews, undefined, dbo)
   );
 };
 

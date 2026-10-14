@@ -319,11 +319,12 @@ export async function testAudit(parentDb: DB) {
           (t) => t.qualifiedNameParts.name === audit.tableName,
         )!.name;
         const parseAuditRule = (rule: PublishObject[string]) =>
-          parser.getParsedPublishTable({
+          parser.getTableRules({
             tableName: auditName,
             clientReq: undefined,
             clientInfo: undefined,
             resolvedPublishObject: { [auditName]: rule },
+            scope: undefined,
           });
         for (const rule of [
           "*",
@@ -364,6 +365,16 @@ export async function testAudit(parentDb: DB) {
           }),
           /secret.*invalid\/disallowed|invalid\/disallowed.*secret/,
         );
+        await result.update({
+          publish: ["*", { select: true, insert: true, update: true, delete: true }],
+        });
+        const wildcardClient = await result.getClientDBHandlers(clientRequest, undefined);
+        assert.equal(wildcardClient.clientSchema.err, undefined);
+        assert(wildcardClient.clientDb[auditName]!.find);
+        for (const command of ["insert", "update", "delete"] as const) {
+          assert.equal(wildcardClient.clientDb[auditName]![command], undefined);
+        }
+        await result.update({ publish: sourcePublish });
         const sourceClient = await result.getClientDBHandlers(clientRequest, undefined);
         assert(sourceClient.clientSchema.tableSchema.some(({ name }) => name === auditName));
         const clientAudit = sourceClient.clientDb[auditName]!;
@@ -489,6 +500,28 @@ export async function testAudit(parentDb: DB) {
         });
         assert.equal(fileHistory.length, 1);
         assert.equal(fileHistory[0]!.new_row.id, file.id);
+
+        const originalTableConfig = prgl.opts.tableConfig;
+        await result.update({
+          tableConfig: {
+            ...originalTableConfig,
+            [fileTable]: { ...originalTableConfig[fileTable], publish: { select: false } },
+          },
+        });
+        const restrictedFileClient = await result.getClientDBHandlers(clientRequest, undefined);
+        assert.equal(restrictedFileClient.clientSchema.err, undefined);
+        assert.deepEqual(
+          restrictedFileClient.clientSchema.tableSchema.map(({ name }) => name),
+          [documentTable],
+        );
+        await assert.rejects(fileClient.clientDb[fileTable]!.find!());
+        await assert.rejects(
+          fileClient.clientDb[auditName]!.find!({
+            schema_name: "audit_test_main",
+            table_name: fileTable,
+          }),
+        );
+        await result.update({ tableConfig: originalTableConfig });
 
         const triggerOids = () =>
           db.any("SELECT oid FROM pg_trigger WHERE left(tgname, length($1)) = $1 ORDER BY oid", [
