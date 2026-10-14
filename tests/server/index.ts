@@ -19,7 +19,7 @@ const isClientTest = process.env.TEST_TYPE === "client";
 if (
   process.env.TEST_TYPE === "server" &&
   process.env.TEST_NAME &&
-  !["conflictUpdates", "jobs", "hooks", "audit", "schemaTypes", "clientSchemaTypes", "tableConfig"].includes(
+  !["conflictUpdates", "jobs", "hooks", "audit", "schemaTypes", "clientSchemaTypes", "tableConfig", "socketLifecycle"].includes(
     process.env.TEST_NAME,
   )
 ) {
@@ -41,6 +41,9 @@ import { testAudit } from "./audit.spec";
 import { testSchemaTypes } from "./schemaTypes.spec";
 import { testClientSchemaTypes } from "./clientSchemaTypes.spec";
 import { testTableConfigValidation } from "./tableConfig.spec";
+import { testSocketLifecycle } from "./socketLifecycle.spec";
+import { getDbConnection } from "prostgles-server/dist/getDbConnection";
+import { removeExpressRoutesTest } from "prostgles-server/dist/Auth/AuthHandler";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
 import { type DBSchema as AliasedSchema, type DBGeneratedSchema } from "../DBGeneratedSchema";
@@ -105,6 +108,17 @@ const dbConnection = {
 };
 
 void (async () => {
+  if (!isClientTest && process.env.TEST_NAME === "socketLifecycle") {
+    const { db, pgp } = getDbConnection({ dbConnection });
+    try {
+      await removeExpressRoutesTest(app);
+      await testSocketLifecycle(db);
+    } finally {
+      pgp.end();
+      http.close();
+    }
+    return;
+  }
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
     await prostgles<DBGeneratedSchema>({
       dbConnection,

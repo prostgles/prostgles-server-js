@@ -12,7 +12,7 @@ import express from "express";
 
 export const testSocketLifecycle = async (db: DB) => {
   await test(
-    "destroy allows reusing Socket.IO on a running HTTP server",
+    "Socket.IO survives instance replacement and API port changes",
     { timeout: 15000 },
     async () => {
       const app = express();
@@ -118,6 +118,37 @@ export const testSocketLifecycle = async (db: DB) => {
           assert.equal(await (await callHttpMethod(url)).json(), cycle + 1);
           assert.equal(io.listenerCount("connection"), 1);
           pending.socket.close();
+        }
+
+        const connected = connect(url);
+        clients.push(connected.socket);
+        await connected.schema;
+        const replacementApp = express();
+        replacementApp.use(express.json());
+        const replacementHttp = createServer(replacementApp);
+        const replacementIO = new Server(replacementHttp, { path: "/ws-api/restart" });
+        try {
+          replacementHttp.listen(0, "127.0.0.1");
+          await once(replacementHttp, "listening");
+          const replacementAddress = replacementHttp.address();
+          assert(replacementAddress && typeof replacementAddress === "object");
+          const replacementUrl = `http://127.0.0.1:${replacementAddress.port}`;
+
+          // Changing the API port updates both io and restApi, triggering a full init.
+          await instance.update({
+            io: replacementIO,
+            restApi: { expressApp: replacementApp, path: "/lifecycle" },
+          });
+          assert.equal(replacementIO.listenerCount("connection"), 1);
+          const replacement = connect(replacementUrl);
+          clients.push(replacement.socket);
+          await replacement.schema;
+          assert.equal(await callMethod(replacement.socket, "version"), 2);
+          assert.equal(await (await callHttpMethod(replacementUrl)).json(), 2);
+        } finally {
+          await instance.destroy();
+          instance = undefined;
+          await replacementIO.close();
         }
       } finally {
         clients.forEach((client) => client.close());

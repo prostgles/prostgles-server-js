@@ -29,6 +29,13 @@ export const updateConfiguration = async (
     return;
   }
 
+  // Clear old sockets before either update path initializes the replacement IO.
+  if (includes(optionsThatChanged, "io")) {
+    prgl.connectedSockets.forEach((socket) => {
+      socket.disconnect();
+    });
+  }
+
   const onlyUpdatesHooks = optionsThatChanged.every((updatedKey) =>
     nonOnReadyUpdateKeys.some((key) => key === updatedKey),
   );
@@ -52,12 +59,6 @@ export const updateConfiguration = async (
   if (includes(optionsThatChanged, "auth")) {
     prgl.initAuthHandler();
   }
-  if (includes(optionsThatChanged, "io")) {
-    prgl.connectedSockets.forEach((socket) => {
-      socket.disconnect();
-    });
-  }
-
   if (
     includes(optionsThatChanged, "publish") ||
     includes(optionsThatChanged, "tsGeneratedTypesDir") ||
