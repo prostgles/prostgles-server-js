@@ -69,7 +69,8 @@ const stopTest = (err?: unknown) => {
   if (err) {
     console.trace(err);
   }
-  process.exit(err ? 1 : 0);
+  // Let node:test report the final result before closing its open handles.
+  setImmediate(() => process.exit(err ? 1 : process.exitCode || 0));
 };
 
 const sessions: { id: string; user_id: string }[] = [

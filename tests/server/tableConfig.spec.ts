@@ -301,11 +301,16 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     const database = `table_config_validation_${process.pid}_${Date.now()}`;
     await parentDb.none(`CREATE DATABASE ${asName(database)}`);
     const pgp = pgPromise();
-    const dbConnection = { ...getConnectionDetails(parentDb), database };
+    const dbConnection = { ...getConnectionDetails(parentDb), database, max: 1 };
     const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
     let instance: Awaited<ReturnType<Prostgles["init"]>> | undefined;
     try {
-      for (const scenario of ["missing versions", "older package version", "outdated version", "legacy versions"]) {
+      for (const scenario of [
+        "missing versions",
+        "older package version",
+        "outdated version",
+        "legacy versions",
+      ]) {
         if (scenario === "older package version") {
           await db.none("UPDATE prostgles.versions SET version = '0.0.0'");
         } else if (scenario === "outdated version") {
@@ -348,6 +353,22 @@ export const testTableConfigValidation = async (parentDb: DB) => {
           db.none(`UPDATE validated SET value = '{"enabled":"invalid"}' WHERE id = 1`),
           { code: "P0001" },
         );
+
+        // LISTEN holds one connection; reuse the other after registration fails.
+        const connection = await instance._db.one("SELECT pg_backend_pid() AS pid");
+        await db.none(`ALTER TABLE prostgles.app_triggers ADD CONSTRAINT reject_subscription
+          CHECK (condition <> '"id" = 2') NOT VALID`);
+        try {
+          await assert.rejects(() => instance!.db.validated!.subscribe!({ id: 2 }, {}, () => {}), {
+            code: "23514",
+            constraint: "reject_subscription",
+          });
+          assert.deepEqual(await instance._db.one("SELECT pg_backend_pid() AS pid"), connection);
+          assert.equal((await instance.db.validated!.findOne!({ id: 1 }))?.id, 1);
+        } finally {
+          await instance._db.none("ROLLBACK");
+          await db.none("ALTER TABLE prostgles.app_triggers DROP CONSTRAINT reject_subscription");
+        }
         await instance.destroy();
         instance = undefined;
       }

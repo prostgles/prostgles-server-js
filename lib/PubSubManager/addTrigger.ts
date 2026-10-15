@@ -46,13 +46,10 @@ export async function addTrigger(
 
     const TRACKED_COLUMNS = "tracked_columns" as const satisfies keyof AddTriggerParams;
 
-    await this.db.any(
-      `
-      BEGIN WORK;
-      /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-      /* why is this lock level needed? */
-      --LOCK TABLE prostgles.app_triggers IN ACCESS EXCLUSIVE MODE;
-
+    await this.db.tx((transaction) =>
+      transaction.any(
+        `
+      /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ 
       /** app_triggers is not refreshed when tables are dropped */
       DELETE FROM prostgles.app_triggers at
       WHERE app_id = \${appId} 
@@ -93,13 +90,12 @@ export async function addTrigger(
         END 
       WHERE prostgles.app_triggers.columns_info IS NOT NULL
       ;
-
-      COMMIT WORK;
     `,
-      {
-        appId: this.appId,
-        ...trgVals,
-      },
+        {
+          appId: this.appId,
+          ...trgVals,
+        },
+      ),
     );
 
     /** This might be redundant due to trigger on app_triggers */
