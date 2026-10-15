@@ -62,6 +62,7 @@ export const getNewQuery = async (
     return prepareWhere(viewHandler, {
       filter,
       select: undefined,
+      selectParams,
       filterFields: allowedFilterFields,
       tableAlias: selectExpressionAlias,
       localParams,
@@ -237,7 +238,11 @@ export const getNewQuery = async (
     source,
     joins: joinQueries,
     where: filterOpts.where,
-    whereOpts: filterOpts,
+    whereOpts: {
+      ...filterOpts,
+      columnsUsed: [...filterOpts.columnsUsed, ...(havingOpts?.columnsUsed ?? [])],
+      exists: [...filterOpts.exists, ...(havingOpts?.exists ?? [])],
+    },
     having: havingOpts?.condition ?? "",
     isLeftJoin: false,
     limit: prepareLimitQuery(selectParams.limit, validatedRules),

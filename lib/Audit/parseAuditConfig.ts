@@ -2,13 +2,16 @@ import { getEntries, isObject } from "prostgles-types";
 import type { Prostgles } from "../Prostgles";
 import type { ResolvedAuditConfig } from "./AuditTypes";
 import { isArray } from "../utils/utils";
+import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
 
 /** Resolve audit targets and column defaults against the completed schema. */
-export const parseAuditConfig = (prgl: Prostgles): ResolvedAuditConfig | undefined => {
+export const parseAuditConfig = (
+  prgl: Prostgles,
+  tables: TableSchema[] = prgl.dboBuilder.tables,
+): ResolvedAuditConfig | undefined => {
   const { audit } = prgl.opts;
   if (!audit) return undefined;
 
-  const tables = prgl.dboBuilder.tables;
   if (!tables.some((t) => t.name === audit.tableName)) {
     throw new Error(`Audit table name must exactly match a schema table name: ${audit.tableName}`);
   }

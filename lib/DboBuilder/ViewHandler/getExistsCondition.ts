@@ -12,6 +12,7 @@ export async function getExistsCondition(
   eConfig: ExistsFilterConfig,
   rootTableAlias: string | undefined,
   localParams: LocalParams | undefined,
+  rootJoinColumns: Record<string, string> | undefined,
 ): Promise<string> {
   const rootTable = this.name;
   const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
@@ -67,6 +68,7 @@ export async function getExistsCondition(
     localParams,
   });
   const { source: targetSource, where: finalWhere } = whereOpts;
+  eConfig.targetTableColumns = whereOpts.columnsUsed;
 
   let innerQuery = [
     `SELECT 1`,
@@ -81,6 +83,8 @@ export async function getExistsCondition(
       type: "EXISTS",
       finalWhere,
       finalTableExpression: targetSource.expression,
+      rootJoinColumns,
+      targetJoinColumns: targetSource.joinColumns,
     });
     innerQuery = query;
   }

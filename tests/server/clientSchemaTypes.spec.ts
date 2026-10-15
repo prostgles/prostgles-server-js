@@ -12,6 +12,7 @@ import prostgles, {
   defineFunction,
   getLocalStorageClient,
   type ProstglesInitOptions,
+  type Join,
   type PublishContextValue,
   type PublishedResult,
 } from "prostgles-server";
@@ -564,9 +565,34 @@ export const testClientSchemaTypes = async (db: DB) => {
         assert.equal(typeof handlers.clientDb[tableName]!.insertMany, "function");
         assert.equal("updateBatch" in handlers.clientDb[tableName]!, false);
         await t.test(
-          "function schema metadata survives socket, REST and server-user handlers",
+          "function and join schema metadata survives socket, REST and server-user handlers",
           async () => {
             assert(instance);
+            // Publish a parameterized self-join to compare metadata across client transports.
+            const originalTableConfig = instance.options.tableConfig;
+            const namedJoin = {
+              tables: [tableName, tableName],
+              on: [
+                {
+                  $joinName: "nearby",
+                  $params: { distance: "number" as const },
+                  $sql: ({ left, right, params, asValue }) =>
+                    `abs(${left("id")} - ${right("id")}) <= ${asValue(params.distance)}`,
+                },
+              ],
+            } satisfies Join;
+            await instance.update({
+              tableConfig: {
+                ...originalTableConfig,
+                [tableName]: { ...originalTableConfig?.[tableName], getJoins: () => [namedJoin] },
+              },
+            });
+            const expectedJoin = {
+              tables: [tableName, tableName],
+              on: "nearby",
+              paramsSchema: { distance: "number" },
+              supportsMultiHop: true,
+            };
             const expectedMetadata = {
               rendering: { label: "transactionTest", result: "json" },
               clientSchemaUserId: "user-guest",
@@ -604,6 +630,12 @@ export const testClientSchemaTypes = async (db: DB) => {
             assert.equal(response.status, 200);
             const restSchema = (await response.json()) as ClientSchema;
             assert.deepEqual(restSchema.methods, guestSchema.methods);
+            // REST and server-user schemas must expose the configured join.
+            assert(restSchema.joins.some((join) => join.on === "nearby"));
+            assert.deepEqual(
+              serverUser.clientSchema.joins.find((join) => join.on === "nearby"),
+              expectedJoin,
+            );
 
             const connectClient = createRequire(path.resolve("../client/package.json"))(
               "prostgles-client",
@@ -625,6 +657,26 @@ export const testClientSchemaTypes = async (db: DB) => {
               });
             try {
               assert(client.methodSchema && client.methods);
+              // The socket client must expose join metadata and accept parameterized join queries.
+              assert.deepEqual(
+                client.joins?.find((join) => join.on === "nearby"),
+                expectedJoin,
+              );
+              assert.deepEqual(
+                await client.db[tableName]!.find!(
+                  {},
+                  {
+                    select: {
+                      related: {
+                        $leftJoin: [{ table: tableName, on: "nearby", params: { distance: 0 } }],
+                        select: { id: 1 },
+                      },
+                    },
+                    limit: 0,
+                  },
+                ),
+                [],
+              );
               assert.deepEqual(
                 client.methodSchema.transactionTest!.rendering,
                 expectedMetadata.rendering,
@@ -634,14 +686,45 @@ export const testClientSchemaTypes = async (db: DB) => {
               const callsBeforeRun = lookupCalls;
               assert.equal(await client.methodSchema.lookupTest!.run({}), callsBeforeRun + 1);
               assert.equal(await client.methods.lookupTest!({}), callsBeforeRun + 2);
+              // Updating join params must push the new schema to an already connected client.
               const updatedSchema = nextSchema();
               await instance.update({
+                tableConfig: {
+                  ...originalTableConfig,
+                  [tableName]: {
+                    ...originalTableConfig?.[tableName],
+                    getJoins: () => [
+                      {
+                        ...namedJoin,
+                        on: [
+                          {
+                            ...namedJoin.on[0]!,
+                            $params: {
+                              distance: "number",
+                              includeSelf: { type: "boolean", optional: true },
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
                 modifyClientFunctionSchema: (functionSchema) => ({
                   ...functionSchema,
                   rendering: { label: "Updated" },
                 }),
               });
               const schema = await updatedSchema;
+              assert.deepEqual(
+                schema.joins.find((join) => join.on === "nearby"),
+                {
+                  ...expectedJoin,
+                  paramsSchema: {
+                    distance: "number",
+                    includeSelf: { type: "boolean", optional: true },
+                  },
+                },
+              );
               assert.deepEqual(
                 schema.methods.find(({ name }) => name === "transactionTest")!.rendering,
                 { label: "Updated" },
@@ -659,7 +742,10 @@ export const testClientSchemaTypes = async (db: DB) => {
               );
             } finally {
               socket.disconnect();
-              await instance.update({ modifyClientFunctionSchema: originalHook });
+              await instance.update({
+                modifyClientFunctionSchema: originalHook,
+                tableConfig: originalTableConfig,
+              });
             }
           },
         );
@@ -1438,6 +1524,38 @@ export const testClientSchemaTypes = async (db: DB) => {
         );
         await instance.update({ publish: originalPublish });
         assert.equal((await instance.getTSSchema()).tsSchema, tsSchema);
+        await t.test(
+          "wildcard profile generation stays consistent during schema rebuilds",
+          async () => {
+            assert(instance);
+            const addedTableName = "rebuilding_table";
+            const dboBuilder = (instance.db[tableName] as unknown as ViewHandler).dboBuilder;
+            await instance.update({
+              publish: [{ name: "RebuildingSchema", userTypes: ["admin"], publish: "*" }],
+            });
+            try {
+              await db.none(`CREATE TABLE ${schemaName}.${addedTableName} (id SERIAL PRIMARY KEY)`);
+              // Pause after rebuilding the handlers, before replacing the publish parser.
+              await dboBuilder.build();
+              const schemaDuringRebuild = (await instance.getTSSchema()).tsSchema;
+              // Newly added tables stay hidden until handlers and publish rules are both rebuilt.
+              assert(!schemaDuringRebuild.includes(`"${addedTableName}"`));
+              await dboBuilder.prostgles.rebuildDBO();
+              const clientTableDefinition = `"${addedTableName}": ${DB_GENERATED_NAMES.SCHEMA}["${addedTableName}"] & {`;
+              assert((await instance.getTSSchema()).tsSchema.includes(clientTableDefinition));
+              // Removed tables stay in the published snapshot until the rebuild completes too.
+              await db.none(`DROP TABLE ${schemaName}.${addedTableName}`);
+              await dboBuilder.build();
+              assert((await instance.getTSSchema()).tsSchema.includes(clientTableDefinition));
+              await dboBuilder.prostgles.rebuildDBO();
+              assert(!(await instance.getTSSchema()).tsSchema.includes(`"${addedTableName}"`));
+            } finally {
+              await db.none(`DROP TABLE IF EXISTS ${schemaName}.${addedTableName}`);
+              await dboBuilder.prostgles.rebuildDBO();
+              await instance.update({ publish: originalPublish });
+            }
+          },
+        );
         await t.test(
           "schema updates apply table config before validating publish profiles",
           async () => {

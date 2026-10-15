@@ -2,6 +2,8 @@ import type { JoinPath, RawJoinPath } from "prostgles-types";
 import { reverseJoinOn } from "prostgles-types";
 import type { ViewHandler } from "./ViewHandler";
 import type { JoinInfo } from "../DboBuilder";
+import type { ParsedComputedJoin } from "../joins/computedJoins";
+import { resolveComputedJoin } from "../joins/computedJoins";
 
 type parseJoinPathArgs = {
   rawPath: RawJoinPath;
@@ -10,7 +12,12 @@ type parseJoinPathArgs = {
   allowMultiOrJoin?: boolean;
   addShortestJoinIfMissing?: boolean;
 };
-export type ParsedJoinPath = { table: string; on: Record<string, string>[] };
+export type ParsedJoinPath = {
+  table: string;
+  on: Record<string, string>[];
+  computedJoin?: ParsedComputedJoin;
+};
+type ColumnJoinPath = { table: string; on?: Record<string, string>[] };
 
 /**
  * Return a valid join path
@@ -32,11 +39,26 @@ export const parseJoinPath = ({
     if (!prevTable) throw `prevTable missing`;
 
     const pushJoinPath = (targetPath: JoinPath) => {
+      const computedJoin = resolveComputedJoin(viewHandler, prevTable, targetPath);
+      if (computedJoin) {
+        result.push({ table: targetPath.table, on: [], computedJoin });
+        return;
+      }
       const getShortestJoin = i === 1 && cleanPath[0] === "**";
-      const joinInfo = getJoins(viewHandler, prevTable, [targetPath], {
-        allowMultiOrJoin,
-        getShortestJoin,
-      });
+      const joinInfo = getJoins(
+        viewHandler,
+        prevTable,
+        [
+          {
+            table: targetPath.table,
+            on: typeof targetPath.on === "string" ? undefined : targetPath.on,
+          },
+        ],
+        {
+          allowMultiOrJoin,
+          getShortestJoin,
+        },
+      );
 
       joinInfo.paths.forEach((path) => {
         /** Check if join tables are valid */
@@ -63,13 +85,34 @@ export const parseJoinPath = ({
     }
   });
 
-  const missingPath = result.find((r) => !r.on.length || r.on.some((v) => !Object.keys(v).length));
+  if (result.length > 1) {
+    const blockedTable = [rootTable, ...result.map((path) => path.table)].find(
+      (table) =>
+        viewHandler.dboBuilder.prostgles.mergedTableConfig.tableConfig?.[table]
+          ?.allowMultiHopJoins === false,
+    );
+    if (blockedTable) throw new Error(`Multi-hop joins are disabled for table: ${blockedTable}`);
+  }
+  const missingPath = result.find(
+    (r) => !r.computedJoin && (!r.on.length || r.on.some((v) => !Object.keys(v).length)),
+  );
   if (missingPath) {
     throw `Missing join on condition for: ${missingPath.table}`;
   }
 
   return result;
 };
+
+export const getJoinPathColumns = (path: ParsedJoinPath | undefined) => ({
+  source:
+    path?.computedJoin ?
+      [...path.computedJoin.columnsUsed[0]]
+    : (path?.on.flatMap((columnPair) => Object.keys(columnPair)) ?? []),
+  target:
+    path?.computedJoin ?
+      [...path.computedJoin.columnsUsed[1]]
+    : (path?.on.flatMap((columnPair) => Object.values(columnPair)) ?? []),
+});
 
 type Opts = {
   allowMultiOrJoin?: boolean;
@@ -83,7 +126,7 @@ type Opts = {
 const getJoins = (
   viewHandler: ViewHandler,
   source: string,
-  path: JoinPath[],
+  path: ColumnJoinPath[],
   { allowMultiOrJoin = true, getShortestJoin }: Opts = {},
 ): JoinInfo => {
   const [lastItem] = path;
@@ -96,18 +139,21 @@ const getJoins = (
   const target = lastItem.table;
 
   /* Find the join path between tables */
-  const actualPath = getShortestJoin
-    ? viewHandler.joinPaths
+  const actualPath =
+    getShortestJoin ?
+      viewHandler.joinPaths
         .find((j) => {
           return j.t1 === source && j.t2 === target;
         })
         ?.path.map((table) => ({ table, on: undefined }))
         .slice(1)
-    : viewHandler.joinPaths.find((j) => {
-          return j.path.join() === [{ table: source }, ...path].map((p) => p.table).join();
-        })
-      ? path
-      : undefined;
+    : (
+      viewHandler.joinPaths.find((j) => {
+        return j.path.join() === [{ table: source }, ...path].map((p) => p.table).join();
+      })
+    ) ?
+      path
+    : undefined;
 
   if (getShortestJoin && actualPath?.length && lastItem.on?.length) {
     actualPath[actualPath.length - 1]!.on = lastItem.on;
@@ -155,7 +201,7 @@ const getJoins = (
   };
 };
 
-const getValidOn = (requested: JoinPath["on"], possible: ParsedJoinPath["on"]) => {
+const getValidOn = (requested: ColumnJoinPath["on"], possible: ParsedJoinPath["on"]) => {
   if (!requested) {
     return possible.map((v) => Object.entries(v));
   }

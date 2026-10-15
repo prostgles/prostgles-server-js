@@ -6,6 +6,8 @@ import type {
   StrictUnion,
 } from "prostgles-types";
 import type { DB, DBHandlerServerInternal } from "../Prostgles";
+import type { Join } from "../ProstglesTypes";
+import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
 import type { SyncConfig } from "../PublishParser/PublishParser";
 
 export type ColExtraInfo = {
@@ -17,6 +19,10 @@ export type ColExtraInfo = {
 export type LangToTranslation = Record<string, string>;
 
 export type BaseTableDefinition = {
+  /** Relationships generated from the completed schema on each rebuild. */
+  getJoins?: (tables: TableSchema[]) => Join[];
+  /** Set false to reject multi-hop paths containing this table, including either endpoint. Direct joins remain allowed. */
+  allowMultiHopJoins?: boolean;
   info?: {
     label?: string | LangToTranslation;
   };

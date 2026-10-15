@@ -116,6 +116,7 @@ export const prepareWhere = async (
         localParams: isForcedFilterBypass ? undefined : localParams,
         tableRules: isForcedFilterBypass ? undefined : tableRule,
         isHaving,
+        joinColumns: source.joinColumns,
       });
       exists.push(...itemInfo.exists);
       return {

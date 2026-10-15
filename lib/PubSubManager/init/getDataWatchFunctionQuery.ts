@@ -45,7 +45,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                       SELECT app_id, string_agg(DISTINCT table_condition_id::text, ',') as cids
                       FROM prostgles.v_triggers
                       WHERE table_condition_id = ANY(c_ids) 
-                      OR has_errors
+                      OR (has_errors AND table_name = escaped_table)
                       GROUP BY app_id
                   LOOP
                       
@@ -70,8 +70,8 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
 
                   IF has_errors THEN
 
-                    DELETE FROM prostgles.app_triggers;
-                    RAISE NOTICE 'trigger dropped due to exception: % % %', err_text, err_detail, err_hint;
+                    -- Removing registrations here can try to disable the currently executing trigger.
+                    RAISE NOTICE 'data watch condition failed: % % %', err_text, err_detail, err_hint;
 
                   END IF;
                     
@@ -88,7 +88,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
 
   `;
 
-  /** Ensure every execute is followed by EXCEPTION catch to ensure we remove stale schema/faulty triggers */
+  /** Catch invalid subscription conditions so they cannot abort the triggering write. */
   const queryLines = dataWatchFunctionQuery
     .split("\n")
     .map((l) => l.trim())
@@ -100,7 +100,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
       !nextLine.toUpperCase().startsWith("EXCEPTION")
     ) {
       throw new Error(
-        `Every EXECUTE statement in the data watch function must be followed by an EXCEPTION block to catch errors and avoid stale triggers. Problematic line: ${line}`,
+        `Every EXECUTE statement in the data watch function must be followed by an EXCEPTION block to avoid blocking writes. Problematic line: ${line}`,
       );
     }
   });

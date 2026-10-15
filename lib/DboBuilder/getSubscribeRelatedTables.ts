@@ -1,4 +1,5 @@
-import type { AnyObject, ParsedJoinPath, SubscribeParams } from "prostgles-types";
+import type { AnyObject, SubscribeParams } from "prostgles-types";
+import { getJoinPathColumns, type ParsedJoinPath } from "./ViewHandler/parseJoinPath";
 import { asName, isEmpty, reverseParsedPath } from "prostgles-types";
 import type { ParsedTableRule } from "../PublishParser/PublishParser";
 import type { ViewSubscriptionOptions } from "../PubSubManager/PubSubManager";
@@ -9,6 +10,7 @@ import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import { getViewRelatedTables } from "./ViewRelatedTables/getViewRelatedTables";
 import type { AddTriggerParams } from "../PubSubManager/addTrigger";
 import { prepareWhere } from "./ViewHandler/prepareWhere";
+import { getAllViewRelatedTables } from "./ViewRelatedTables/getAllViewRelatedTables";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -26,118 +28,178 @@ export async function getSubscribeRelatedTables(
   this: ViewHandler | TableHandler,
   { filter, localParams, newQuery }: Args,
 ) {
-  let viewOptions: ViewSubscriptionOptions | undefined = undefined;
-  if (this.isView) {
-    viewOptions = await getViewRelatedTables(this, localParams, newQuery);
-    /** Any joined table used within select or filter must also be added a trigger for this recordset */
-  } else {
-    viewOptions = {
-      type: "table",
-      relatedTables: [],
-    };
+  let viewOptions: ViewSubscriptionOptions = { type: "table", relatedTables: [] };
+  let hasComputedJoin = false as boolean;
+  const rootJoinColumns = new Set<string>();
+  const expandedViews = new Set<string>();
+  const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
+  const pushRelatedTable = async (
+    relatedTableName: string,
+    joinPath: ParsedJoinPath[],
+    selectedColumnNames: string[] | undefined,
+    targetTableFilter: Filter,
+  ) => {
+    const relatedTableOrViewHandler = this.dboBuilder.dboMap.get(relatedTableName);
+    if (!relatedTableOrViewHandler) {
+      throw `Table ${relatedTableName} not found`;
+    }
 
-    const dependencyExists = newQuery.select
+    if (relatedTableOrViewHandler.isView) {
+      if (expandedViews.has(relatedTableName)) return;
+      expandedViews.add(relatedTableName);
+      // View predicates can depend on columns that are not exposed by the view.
+      for (const table of await getAllViewRelatedTables(this.dboBuilder, relatedTableName)) {
+        await pushRelatedTable(table.name, [], undefined, {});
+      }
+      return;
+    }
+
+    const reversedJoinFilter =
+      joinPath.length ?
+        {
+          $existsJoined: {
+            path: reverseParsedPath(
+              joinPath.map(({ table, on, computedJoin }) =>
+                computedJoin ?
+                  {
+                    table,
+                    on: computedJoin.definition.$joinName,
+                    params: computedJoin.params,
+                    ...(computedJoin.definition.tables[0] === computedJoin.definition.tables[1] && {
+                      reversed: computedJoin.reversed,
+                    }),
+                  }
+                : { table, on },
+              ),
+              this.name,
+            ),
+            filter: nonExistsFilter,
+          },
+        }
+      : {};
+    // Views can hide changed rows; self joins also need rows outside the trigger's transition tables.
+    const needsUnfilteredTrigger =
+      this.isView ||
+      joinPath.some((path) => this.dboBuilder.dboMap.get(path.table)?.isView) ||
+      (joinPath.length > 0 &&
+        [this.name, ...joinPath.slice(0, -1).map((path) => path.table)].includes(relatedTableName));
+    const filter =
+      needsUnfilteredTrigger ? {}
+      : isEmpty(targetTableFilter) ? reversedJoinFilter
+      : { $and: [targetTableFilter, reversedJoinFilter] };
+    const joinConditionInfo = await prepareWhere(relatedTableOrViewHandler, {
+      filter,
+      select: undefined,
+      addWhere: false,
+      localParams: undefined,
+      tableRule: undefined,
+    });
+
+    const [firstField, ...otherFields] = Array.from(
+      new Set([
+        ...(selectedColumnNames ?? []),
+        ...getJoinPathColumns(joinPath.at(-1)).target,
+        ...joinConditionInfo.columnsUsed,
+      ]),
+    );
+    const tracked_columns: AddTriggerParams["tracked_columns"] =
+      !firstField ? undefined : [firstField, ...otherFields];
+    const condition = joinConditionInfo.where || "TRUE";
+
+    const alreadyPushed = viewOptions.relatedTables.find(
+      (rt) => rt.tableName === relatedTableName && rt.condition === condition,
+    );
+    if (alreadyPushed) {
+      const [firstMerged, ...others] = Array.from(
+        new Set([...(alreadyPushed.tracked_columns ?? []), ...(tracked_columns ?? [])]),
+      );
+      alreadyPushed.tracked_columns =
+        alreadyPushed.tracked_columns && tracked_columns && firstMerged ?
+          [firstMerged, ...others]
+        : undefined;
+      return;
+    }
+    viewOptions.relatedTables.push({
+      tableName: relatedTableName,
+      tableNameEscaped: asName(relatedTableName),
+      tracked_columns,
+      condition,
+    });
+  };
+
+  const pushRelatedPath = async (
+    joinPath: ParsedJoinPath[],
+    selectedColumnNames: string[],
+    targetTableFilter: Filter,
+  ) => {
+    hasComputedJoin ||= joinPath.some((path) => path.computedJoin);
+    getJoinPathColumns(joinPath[0]).source.forEach((column) => rootJoinColumns.add(column));
+    for (const [index, pathItem] of joinPath.entries()) {
+      const isLast = index === joinPath.length - 1;
+      await pushRelatedTable(
+        pathItem.table,
+        joinPath.slice(0, index + 1),
+        isLast ? selectedColumnNames : getJoinPathColumns(joinPath[index + 1]).source,
+        isLast ? targetTableFilter : {},
+      );
+    }
+  };
+
+  const subscribeQuery = async (query: NewQuery, parentPath: ParsedJoinPath[]) => {
+    for (const join of query.joins ?? []) {
+      const joinPath = [...parentPath, ...join.joinPath];
+      const sortAliases = query.orderByItems.flatMap((item) =>
+        item.nested?.joinAlias.raw === join.joinAlias.raw ? [item.nested.selectItemAlias] : [],
+      );
+      await pushRelatedPath(joinPath, getQueryColumns(join, sortAliases), {});
+      await subscribeQuery(join, joinPath);
+    }
+    const dependencyExists = query.select
       .filter((item) => item.selected)
       .flatMap((item) => item.dependencyExists ?? []);
-    const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
-    const pushRelatedTable = async (
-      relatedTableName: string,
-      joinPath: ParsedJoinPath[],
-      selectedColumnNames: string[] | undefined,
-      targetTableFilter: Filter,
-    ) => {
-      const relatedTableOrViewHandler = this.dboBuilder.dboMap.get(relatedTableName);
-      if (!relatedTableOrViewHandler) {
-        throw `Table ${relatedTableName} not found`;
-      }
-
-      if (relatedTableOrViewHandler.isView) {
-        return;
-      }
-
-      viewOptions ??= {
-        type: "table",
-        relatedTables: [],
-      };
-
-      const reversedJoinFilter = {
-        $existsJoined: {
-          path: reverseParsedPath(joinPath, this.name),
-          filter: nonExistsFilter,
-        },
-      };
-      const filter =
-        isEmpty(targetTableFilter) ? reversedJoinFilter : (
-          { $and: [targetTableFilter, reversedJoinFilter] }
+    for (const existsFilter of [...query.whereOpts.exists, ...dependencyExists]) {
+      if (existsFilter.isJoined) {
+        await pushRelatedPath(
+          [...parentPath, ...existsFilter.parsedPath],
+          existsFilter.targetTableColumns,
+          existsFilter.targetTableFilter,
         );
-      const joinConditionInfo = await prepareWhere(relatedTableOrViewHandler, {
-        filter,
-        select: undefined,
-        addWhere: false,
-        localParams: undefined,
-        tableRule: undefined,
-      });
-
-      const relatedTableJoinPathItem = joinPath.at(-1);
-      const joinColumns =
-        relatedTableJoinPathItem?.on.map((columnPair) => Object.values(columnPair)).flat() ?? [];
-
-      const [firstField, ...otherFields] = Array.from(
-        new Set([...(selectedColumnNames ?? []), ...joinColumns, ...joinConditionInfo.columnsUsed]),
-      );
-
-      const tracked_columns: AddTriggerParams["tracked_columns"] =
-        !firstField ? undefined : [firstField, ...otherFields];
-      const condition = joinConditionInfo.where;
-
-      const alreadyPushed = viewOptions.relatedTables.find(
-        (rt) => rt.tableName === relatedTableName && rt.condition === condition,
-      );
-      if (alreadyPushed) {
-        const [firstMerged, ...others] = Array.from(
-          new Set([...(alreadyPushed.tracked_columns ?? []), ...(tracked_columns ?? [])]),
-        );
-        alreadyPushed.tracked_columns = firstMerged ? [firstMerged, ...others] : undefined;
-        return;
-      }
-      viewOptions.relatedTables.push({
-        tableName: relatedTableName,
-        tableNameEscaped: asName(relatedTableName),
-        tracked_columns,
-        condition,
-      });
-    };
-
-    /**
-     * Avoid nested exists error. Will affect performance
-     */
-    for (const j of newQuery.joins ?? []) {
-      await pushRelatedTable(
-        j.table.raw,
-        j.joinPath,
-        j.select
-          .filter((item) => item.selected)
-          .flatMap((item) => [...item.fields, ...(item.dependencyFields ?? [])]),
-        {},
-      );
-    }
-    for (const existsFilter of [...newQuery.whereOpts.exists, ...dependencyExists].filter(
-      (existsFilter) => existsFilter.isJoined,
-    )) {
-      for (const [index, pathItem] of existsFilter.parsedPath.entries()) {
-        const isLast = index === existsFilter.parsedPath.length - 1;
+      } else {
         await pushRelatedTable(
-          pathItem.table,
-          existsFilter.parsedPath.slice(0, index + 1),
-          undefined,
-          isLast ? existsFilter.targetTableFilter : {},
+          existsFilter.targetTable,
+          [],
+          existsFilter.targetTableColumns,
+          existsFilter.targetTableFilter,
         );
       }
     }
-    if (!viewOptions.relatedTables.length) {
-      viewOptions = undefined;
+  };
+  await subscribeQuery(newQuery, []);
+  if (this.isView) {
+    if (hasComputedJoin) {
+      await pushRelatedTable(this.name, [], undefined, {});
+    } else {
+      const rootViewOptions = await getViewRelatedTables(this, localParams, newQuery);
+      rootViewOptions.relatedTables.push(...viewOptions.relatedTables);
+      viewOptions = rootViewOptions;
     }
   }
 
-  return viewOptions;
+  return {
+    viewOptions: viewOptions.relatedTables.length ? viewOptions : undefined,
+    rootJoinColumns: [...rootJoinColumns],
+  };
 }
+
+const getQueryColumns = (query: NewQuery, sortAliases: string[]) => [
+  ...query.select
+    .filter(
+      (item) =>
+        item.selected ||
+        sortAliases.includes(item.alias) ||
+        query.orderByItems.some((sort) => sort.key === item.alias),
+    )
+    .flatMap((item) => [...item.fields, ...(item.dependencyFields ?? [])]),
+  ...query.whereOpts.columnsUsed,
+  ...query.orderByItems.map((item) => item.key).filter((key) => query.allFields.includes(key)),
+];

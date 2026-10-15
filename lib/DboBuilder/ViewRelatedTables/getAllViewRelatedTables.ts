@@ -3,6 +3,9 @@ import type { DboBuilder } from "../DboBuilder";
 
 export const getAllViewRelatedTables = async (dboBuilder: DboBuilder, viewName: string) => {
   const db = dboBuilder.db;
+  const view = dboBuilder.dboMap.get(viewName);
+  if (!view) throw new Error(`View ${viewName} not found`);
+  const { schema, name } = view.tableOrViewInfo.qualifiedNameParts;
   const tables = await db.any<{
     table_name: string;
     table_schema: string;
@@ -16,9 +19,9 @@ export const getAllViewRelatedTables = async (dboBuilder: DboBuilder, viewName: 
     FROM information_schema.view_column_usage vcu
     JOIN pg_class c ON c.relname = vcu.table_name
     JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = vcu.table_schema
-    WHERE vcu.view_name = \${viewName}
+    WHERE vcu.view_schema = \${schema} AND vcu.view_name = \${name}
   `,
-    { viewName },
+    { schema, name },
   );
   return tables
     .map((t) => {

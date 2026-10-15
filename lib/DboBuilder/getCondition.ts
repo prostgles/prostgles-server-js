@@ -29,6 +29,7 @@ export async function getCondition(
     localParams?: LocalParams;
     tableRules?: ParsedTableRule;
     isHaving?: boolean;
+    joinColumns?: Record<string, string>;
   },
 ): Promise<{ exists: ExistsFilterConfig[]; condition: string; columnsUsed: string[] }> {
   const {
@@ -81,7 +82,7 @@ export async function getCondition(
       await Promise.all(
         existsConfigs.map(
           async (existsConfig) =>
-            await getExistsCondition.bind(this)(existsConfig, tableAlias?.escaped, localParams),
+            await getExistsCondition.bind(this)(existsConfig, tableAlias?.escaped, localParams, params.joinColumns),
         ),
       )
     ).join(" AND ");

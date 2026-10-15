@@ -87,6 +87,8 @@ export type {
   OnReadyParams,
 } from "./initProstgles";
 export type {
+  Join,
+  ComputedJoin,
   FileTableConfig,
   ProstglesInitOptions,
   TableConfigMigrations,
@@ -99,6 +101,7 @@ export type { RequestWithUser } from "./Auth/middleware/userContextMiddleware";
 export default prostgles;
 export type { FileTableInsertRow, FileTableRow } from "./StorageClient/getFileTableConfig";
 export { defineJoin };
+export { defineComputedJoin } from "./DboBuilder/joins/defineComputedJoin";
 export {
   AUDIT_TABLE_COLUMN_DEFINITIONS,
   AUDIT_TABLE_COLUMN_NAMES,

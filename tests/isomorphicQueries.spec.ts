@@ -824,20 +824,23 @@ export const isomorphicQueries = async (
     await test("PostgreSQL text array search", async () => {
       const id = -101;
       await db.items.insert({ id, name: "array search", h: ["xxCat cat!", "", "🐈 café CAT"] });
-      const search = (searchTerm: string, options = {}) => db.items.findOne(
-        { id },
-        { select: { matches: { $array_search: ["h", searchTerm, options] } } },
-      );
+      const search = (searchTerm: string, options = {}) =>
+        db.items.findOne(
+          { id },
+          { select: { matches: { $array_search: ["h", searchTerm, options] } } },
+        );
       try {
         const result = await search("cat", { contextChars: 2 });
         result?.matches[0]?.offset satisfies number | undefined;
         // @ts-expect-error search results must retain their type
         result?.matches[0]?.offset satisfies string;
-        assert.deepStrictEqual(result, { matches: [
-          { index: 1, offset: 2, match: "Cat", snippet: "xxCat c" },
-          { index: 1, offset: 6, match: "cat", snippet: "t cat!" },
-          { index: 3, offset: 7, match: "CAT", snippet: "é CAT" },
-        ] });
+        assert.deepStrictEqual(result, {
+          matches: [
+            { index: 1, offset: 2, match: "Cat", snippet: "xxCat c" },
+            { index: 1, offset: 6, match: "cat", snippet: "t cat!" },
+            { index: 3, offset: 7, match: "CAT", snippet: "é CAT" },
+          ],
+        });
         assert.deepStrictEqual(await search("cat", { matchCase: true, contextChars: 0 }), {
           matches: [{ index: 1, offset: 6, match: "cat", snippet: "cat" }],
         });
@@ -848,14 +851,18 @@ export const isomorphicQueries = async (
 
         const literalTerm = "['%_.*\\";
         await db.items.update({ id }, { h: [literalTerm + literalTerm, "aaaa"] });
-        assert.deepStrictEqual(await search(literalTerm, { contextChars: 0 }), { matches: [
-          { index: 1, offset: 0, match: literalTerm, snippet: literalTerm },
-          { index: 1, offset: literalTerm.length, match: literalTerm, snippet: literalTerm },
-        ] });
-        assert.deepStrictEqual(await search("aa", { contextChars: 0 }), { matches: [
-          { index: 2, offset: 0, match: "aa", snippet: "aa" },
-          { index: 2, offset: 2, match: "aa", snippet: "aa" },
-        ] });
+        assert.deepStrictEqual(await search(literalTerm, { contextChars: 0 }), {
+          matches: [
+            { index: 1, offset: 0, match: literalTerm, snippet: literalTerm },
+            { index: 1, offset: literalTerm.length, match: literalTerm, snippet: literalTerm },
+          ],
+        });
+        assert.deepStrictEqual(await search("aa", { contextChars: 0 }), {
+          matches: [
+            { index: 2, offset: 0, match: "aa", snippet: "aa" },
+            { index: 2, offset: 2, match: "aa", snippet: "aa" },
+          ],
+        });
 
         for (const pages of [[], null]) {
           await db.items.update({ id }, { h: pages });
@@ -868,15 +875,23 @@ export const isomorphicQueries = async (
 
         await assert.rejects(() => search(""));
         for (const options of [
-          { contextChars: -1 }, { contextChars: 1.5 }, { contextChars: 10001 },
-          { limit: 0 }, { limit: 1.5 }, { limit: 1001 },
-          { matchCase: "true" }, { unknownOption: true },
+          { contextChars: -1 },
+          { contextChars: 1.5 },
+          { contextChars: 10001 },
+          { limit: 0 },
+          { limit: 1.5 },
+          { limit: 1001 },
+          { matchCase: "true" },
+          { unknownOption: true },
         ]) {
           await assert.rejects(() => search("cat", options));
         }
-        await assert.rejects(() => db.items.findOne(
-          { id }, { select: { matches: { $array_search: ["missing_column", "cat"] } } },
-        ));
+        await assert.rejects(() =>
+          db.items.findOne(
+            { id },
+            { select: { matches: { $array_search: ["missing_column", "cat"] } } },
+          ),
+        );
       } finally {
         await db.items.delete({ id });
       }
@@ -2519,41 +2534,77 @@ export const isomorphicQueries = async (
     });
 
     await test("subscribe triggers with stale schema should fail gracefully and never block other queries", async () => {
-      const sub = await db.various
-        .subscribe(variousId99, { select: { name: 1 } }, (d, err) => {
-          log("various id=99 count", d.length);
-          if (err) {
-            log("Error in subscription callback: " + JSON.stringify(err));
-          }
-        })
-        .catch((e) => {
-          log("subscribe failed with error: " + JSON.stringify(e));
-          return Promise.reject(e);
-        });
-
       const deleteItems = () => sql!(`DELETE FROM various WHERE id = \${id}`, variousId99);
       await deleteItems();
-
-      await tout(2000);
-      await sql?.(`ALTER TABLE various RENAME COLUMN name TO name_old`).catch((e) => {
-        return Promise.reject(e);
+      const subscriptionErrors: unknown[] = [];
+      const sub = await db.various.subscribe(
+        { ...variousId99, name: "test" },
+        { select: { name: 1 } },
+        (_rows, err) => {
+          if (err) subscriptionErrors.push(err);
+        },
+      );
+      // Keep a second table subscribed to verify that one invalid condition cannot block delivery.
+      const healthyFilter = { name: "subscription-condition-error-test" };
+      const healthyUpdates: (string | null | undefined)[] = [];
+      const healthyErrors: unknown[] = [];
+      const healthySub = await db.items.subscribe(healthyFilter, {}, ([row], err) => {
+        if (err) healthyErrors.push(err);
+        healthyUpdates.push(row?.name);
       });
-      const getVariousCount = () =>
-        sql!(`SELECT COUNT(*) FROM various WHERE id = \${id}`, variousId99, {
-          returnType: "value",
-        }).then(Number);
-      const variousId99Count = await getVariousCount();
-      await sql?.(`INSERT INTO various (id, name_old) VALUES (\${id}, 'test')`, {
-        id: variousId99.id,
-        name_old: "test",
-      }).catch(console.error);
-      console.log("ok");
       await tout(2000);
-      console.log("ok");
-      const newVariousId99Count = await getVariousCount();
-      assert.equal(variousId99Count + 1, newVariousId99Count);
-      await deleteItems();
-      await sub.unsubscribe();
+      const registeredTriggers = await getTriggers();
+      // Renaming a filtered column makes the stored trigger condition invalid.
+      await sql!(`ALTER TABLE various RENAME COLUMN name TO name_old`);
+      try {
+        // A stale subscription condition must not abort inserts, updates or deletes.
+        assert.equal(
+          await sql!(
+            `INSERT INTO various (id, name_old) VALUES (\${id}, 'test') RETURNING id`,
+            variousId99,
+            { returnType: "value" },
+          ),
+          variousId99.id,
+        );
+        assert.equal(
+          await sql!(
+            `UPDATE various SET name_old = 'updated' WHERE id = \${id} RETURNING name_old`,
+            variousId99,
+            { returnType: "value" },
+          ),
+          "updated",
+        );
+        assert.equal(
+          await sql!(`DELETE FROM various WHERE id = \${id} RETURNING id`, variousId99, {
+            returnType: "value",
+          }),
+          variousId99.id,
+        );
+        // Report the broken subscription while continuing to notify the healthy subscriber.
+        await db.items.insert(healthyFilter);
+        for (
+          let attempt = 0;
+          attempt < 100 &&
+          (!subscriptionErrors.length || !healthyUpdates.includes(healthyFilter.name));
+          attempt++
+        ) {
+          await tout(20);
+        }
+        assert(subscriptionErrors.length, "The invalid subscription must receive an error");
+        assert(
+          healthyUpdates.includes(healthyFilter.name),
+          "Other tables must still notify subscribers",
+        );
+        assert.deepStrictEqual(healthyErrors, []);
+        // Handling the condition error must preserve the registered subscription triggers.
+        assert.deepStrictEqual(await getTriggers(), registeredTriggers);
+      } finally {
+        await sub.unsubscribe();
+        await healthySub.unsubscribe();
+        await sql!(`ALTER TABLE various RENAME COLUMN name_old TO name`);
+        await deleteItems();
+        await db.items.delete(healthyFilter);
+      }
       await expectNoTriggers();
     });
   });

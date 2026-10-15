@@ -1,12 +1,12 @@
 import { isEqual, reverseJoinOn } from "prostgles-types";
 import type { DboBuilder } from "../DboBuilder";
-import type { Join } from "../../ProstglesTypes";
-import { JOIN_TYPES } from "../../ProstglesTypes";
+import type { ColumnJoin as Join } from "../../ProstglesTypes";
 import type { Graph } from "./shortestPath";
 import { findShortestPath } from "./shortestPath";
 import type { JoinPaths } from "../ViewHandler/ViewHandler";
 import { getInferredJoins } from "./getInferredJoins";
 import { sortedArraysMatch } from "../../utils/utils";
+import { prepareComputedJoins } from "./computedJoins";
 
 type Result = {
   joinGraph?: Graph | undefined;
@@ -15,7 +15,19 @@ type Result = {
 };
 
 export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
-  const { joins: joinConfigFromOpts } = dboBuilder.prostgles.opts;
+  const configuredJoins = [
+    ...(Array.isArray(dboBuilder.prostgles.opts.joins) ? dboBuilder.prostgles.opts.joins : []),
+    ...Object.values(
+      dboBuilder.prostgles.preparingTableConfig ?
+        {}
+      : (dboBuilder.prostgles.mergedTableConfig.tableConfig ?? {}),
+    ).flatMap((table) => table.getJoins?.(dboBuilder.tablesOrViews ?? []) ?? []),
+  ];
+  const columnJoins = prepareComputedJoins(dboBuilder, configuredJoins);
+  const joinConfigFromOpts =
+    columnJoins.length || Array.isArray(dboBuilder.prostgles.opts.joins) ?
+      columnJoins
+    : dboBuilder.prostgles.opts.joins;
   if (!joinConfigFromOpts) {
     return {
       joins: [],
@@ -72,14 +84,17 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
         JSON.stringify(joinConfig),
     );
   }
-  const joins = structuredClone(joinConfig).map((join) => {
-    if (join.tables[0] !== join.tables[1]) return join;
+  // Snapshot caller-owned column joins once; table handlers only read this configuration.
+  const joins = structuredClone(joinConfig)
+    .filter((join) => join.on.length)
+    .map((join) => {
+      if (join.tables[0] !== join.tables[1]) return join;
 
-    return {
-      ...join,
-      on: getUniqueJoinConditions([...join.on, ...reverseJoinOn(join.on)]),
-    };
-  });
+      return {
+        ...join,
+        on: getUniqueJoinConditions([...join.on, ...reverseJoinOn(join.on)]),
+      };
+    });
 
   // Validate joins
   try {
@@ -114,16 +129,6 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
         });
       });
     });
-
-    // 4 find incorrect/missing join types
-    const expected_types =
-      " \n\n-> Expecting: " + JOIN_TYPES.map((t) => JSON.stringify(t)).join(` | `);
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    const mt = joins.find((j) => !j.type);
-    if (mt) throw "Join type missing for: " + JSON.stringify(mt, null, 2) + expected_types;
-
-    const it = joins.find((j) => !JOIN_TYPES.includes(j.type));
-    if (it) throw "Incorrect join type for: " + JSON.stringify(it, null, 2) + expected_types;
   } catch (e: any) {
     const errMsg =
       ((joinConfig as any) === "inferred" ? "INFERRED " : "") + "JOINS VALIDATION ERROR \n-> " + e;

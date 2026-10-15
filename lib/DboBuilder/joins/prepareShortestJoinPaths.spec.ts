@@ -8,13 +8,13 @@ void test("duplicate configured table pairs are rejected even during table confi
   const join: Join = {
     tables: ["conditions", "members"],
     on: [{ project_id: "project_id" }],
-    type: "many-many",
   };
   for (const preparingTableConfig of [false, true]) {
     for (const override of [false, true]) {
       for (const tables of [join.tables, [...join.tables].reverse() as Join["tables"]]) {
         const builder = {
           prostgles: {
+            mergedTableConfig: {},
             preparingTableConfig,
             opts: { joins: [join, { ...join, tables, override }] },
           },
@@ -32,13 +32,13 @@ void test("duplicate configured table pairs are rejected even during table confi
 void test("configured joins are deferred only during table configuration", () => {
   const builder = {
     prostgles: {
+      mergedTableConfig: {},
       preparingTableConfig: true,
       opts: {
         joins: [
           {
             tables: ["conditions", "members"],
             on: [{ project_id: "project_id" }],
-            type: "many-many",
           },
         ],
       },
@@ -57,10 +57,9 @@ void test("existing configured joins remain available during table configuration
   const join = {
     tables: ["conditions", "members"],
     on: [{ project_id: "project_id" }],
-    type: "many-many",
   };
   const builder = {
-    prostgles: { preparingTableConfig: true, opts: { joins: [join] } },
+    prostgles: { mergedTableConfig: {}, preparingTableConfig: true, opts: { joins: [join] } },
     tablesOrViews: ["conditions", "members"].map((name) => ({
       name,
       columns: [{ name: "project_id" }],

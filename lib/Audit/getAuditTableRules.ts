@@ -1,5 +1,5 @@
 import { as } from "pg-promise";
-import { asName, fromEntries, isDefined, isEmpty, isObject } from "prostgles-types";
+import { asName, fromEntries, getKeys, isDefined, isEmpty, isObject } from "prostgles-types";
 import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { Filter, LocalParams } from "../DboBuilder/DboBuilder";
 import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
@@ -13,6 +13,11 @@ import type {
 import { AUDIT_TABLE_COLUMN_NAMES, type AuditTableRow } from "./AuditTable";
 import type { ResolvedAuditConfig } from "./AuditTypes";
 import { prepareWhere } from "../DboBuilder/ViewHandler/prepareWhere";
+
+const AUDIT_JOIN_COLUMNS = {
+  old_id: "prostgles_audit_join_old_id",
+  new_id: "prostgles_audit_join_new_id",
+};
 
 export const getAuditTableRules = async function (
   this: PublishParser,
@@ -56,6 +61,7 @@ export const getAuditTableRules = async function (
 
         return {
           handler: tableHandler,
+          sourceCondition: getSourceTableCondition(tableHandler),
           additionalForcedCondition: await getSourceAuditCondition(
             tableHandler,
             rules.select.forcedFilter,
@@ -75,34 +81,40 @@ export const getAuditTableRules = async function (
   }
 
   const validateRequest = (filter: Filter) => {
-    const requiredTableNameFilterValue = getRequiredStringFilter(
+    const { schema_name, table_name } = getExactStringFilters(
       filter,
       [AUDIT_TABLE_COLUMN_NAMES.schema_name, AUDIT_TABLE_COLUMN_NAMES.table_name],
       this.prostgles.keywords.$and,
     );
-    if (!requiredTableNameFilterValue) {
-      throw new Error("Audit queries require an exact schema_name and table_name filter");
-    }
-    const { schema_name, table_name } = requiredTableNameFilterValue;
-    const [matchingAuditedTableRules, ...otherMatches] = auditedTableRules.filter(
-      ({ handler: { tableOrViewInfo } }) => {
-        const sourceName = tableOrViewInfo.qualifiedNameParts;
-        return sourceName.name === table_name && sourceName.schema === schema_name;
-      },
-    );
-    if (otherMatches.length) {
-      throw new Error("Invalid audit table filter: multiple matching rules found");
-    }
-    if (!matchingAuditedTableRules) {
-      throw new Error("Invalid audit table filter: no matching rules found");
-    }
-    const { additionalForcedCondition, tableColumnOverrides } = matchingAuditedTableRules;
-    const tableExpression = getTableExpression(
-      auditTableHandler,
-      tableColumnOverrides,
-      additionalForcedCondition,
-    );
-    return { tableExpression };
+    const matchingRules = auditedTableRules.filter(({ handler: { tableOrViewInfo } }) => {
+      const sourceName = tableOrViewInfo.qualifiedNameParts;
+      return (
+        (table_name === undefined || sourceName.name === table_name) &&
+        (schema_name === undefined || sourceName.schema === schema_name)
+      );
+    });
+    const firstRule = matchingRules[0];
+    const columnOverrides =
+      !firstRule ? undefined
+      : matchingRules.length === 1 ? firstRule.tableColumnOverrides
+      : fromEntries(
+          getKeys(firstRule.tableColumnOverrides).map((columnName) => [
+            columnName,
+            `CASE ${matchingRules
+              .map(
+                ({ sourceCondition, tableColumnOverrides }) =>
+                  `WHEN ${sourceCondition} THEN ${tableColumnOverrides[columnName]}`,
+              )
+              .join(" ")} END`,
+          ]),
+        );
+    const condition =
+      matchingRules
+        .map(({ additionalForcedCondition }) => `(${additionalForcedCondition})`)
+        .join(" OR ") || "FALSE";
+    // One scan lets ORDER BY/LIMIT use the audit index before projecting snapshots.
+    const expression = getTableExpression(auditTableHandler, columnOverrides, condition);
+    return { expression, joinColumns: AUDIT_JOIN_COLUMNS };
   };
 
   const select: SelectRule = withTableExpression(
@@ -112,7 +124,7 @@ export const getAuditTableRules = async function (
       orderByFields: "*",
       disableMethods: { subscribe: 1, sync: 1 },
     },
-    (request) => validateRequest(request.filter).tableExpression,
+    (request) => validateRequest(request.filter),
   );
 
   return { ...auditTablePublishRules, select };
@@ -158,12 +170,8 @@ const getSourceAuditCondition = async (
   forcedFilter: Filter | undefined,
   excludedColumns: readonly string[],
 ) => {
-  const { schema, name } = sourceHandler.tableOrViewInfo.qualifiedNameParts;
   const auditColumn = (columnName: keyof AuditTableRow) => asName(columnName);
-  const sourceCondition = [
-    `${auditColumn(AUDIT_TABLE_COLUMN_NAMES.schema_name)} = ${as.text(schema)}`,
-    `${auditColumn(AUDIT_TABLE_COLUMN_NAMES.table_name)} = ${as.text(name)}`,
-  ].join(" AND ");
+  const sourceCondition = getSourceTableCondition(sourceHandler);
   if (!forcedFilter || isEmpty(forcedFilter)) {
     return sourceCondition;
   }
@@ -205,18 +213,16 @@ const getSourceAuditCondition = async (
   return `(${sourceCondition}) AND ${oldRowCondition} AND ${newRowCondition}`;
 };
 
-const canSelect = (rule: PublishObject[string] | undefined) => {
-  return rule === "*" || rule === true || (isObject(rule) && Boolean(rule.select));
+const getSourceTableCondition = (sourceHandler: ViewHandler) => {
+  const { schema, name } = sourceHandler.tableOrViewInfo.qualifiedNameParts;
+  return [
+    `${asName(AUDIT_TABLE_COLUMN_NAMES.schema_name)} = ${as.text(schema)}`,
+    `${asName(AUDIT_TABLE_COLUMN_NAMES.table_name)} = ${as.text(name)}`,
+  ].join(" AND ");
 };
 
-const getRequiredStringFilter = <Key extends keyof AuditTableRow>(
-  filter: Filter,
-  fieldNames: Key[],
-  andKey: string,
-): Record<Key, string> | undefined => {
-  const values = getExactStringFilters(filter, fieldNames, andKey);
-  if (fieldNames.some((fieldName) => !values[fieldName])) return;
-  return values as Record<Key, string>;
+const canSelect = (rule: PublishObject[string] | undefined) => {
+  return rule === "*" || rule === true || (isObject(rule) && Boolean(rule.select));
 };
 
 const getExactStringFilters = <Key extends keyof AuditTableRow>(
@@ -271,7 +277,6 @@ const getTableExpression = (
   additionalCondition: string | undefined,
 ) => {
   const overrides = columnOverrides && !isEmpty(columnOverrides) ? columnOverrides : undefined;
-  if (!overrides && !additionalCondition) return;
 
   const invalidColumns = Object.keys(overrides ?? {}).filter(
     (columnName) => !auditTableHandler.column_names.includes(columnName),
@@ -287,6 +292,11 @@ const getTableExpression = (
         return override ? `${override} AS ${asName(columnName)}` : asName(columnName);
       })
     : ["*"];
+  columns.push(
+    ...Object.entries(AUDIT_JOIN_COLUMNS).map(
+      ([column, alias]) => `${asName(column)} AS ${asName(alias)}`,
+    ),
+  );
   const where = additionalCondition ? ` WHERE ${additionalCondition}` : "";
   return `(SELECT ${columns.join(", ")} FROM ${auditTableHandler.escapedName}${where})`;
 };

@@ -160,6 +160,19 @@ export async function testAudit(parentDb: DB) {
       let result: Awaited<ReturnType<typeof prgl.init>> | undefined;
       try {
         result = await prgl.init(() => {}, { type: "init" });
+        // Audit lookups need indexes for the event ID and both versions of the source key.
+        const auditIndexes = await db.any<{ indexdef: string }>(
+          "SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = $1",
+          [audit.tableName],
+        );
+        for (const column of ["id", "old_id", "new_id"]) {
+          assert(
+            auditIndexes.some(({ indexdef }) =>
+              indexdef.endsWith(`(schema_name, table_name, ${column})`),
+            ),
+            `Missing audit index for ${column}`,
+          );
+        }
         checkGeneratedTypes(
           (await prgl.dboBuilder.getTsDefinitions()).tsSchema,
           `
@@ -177,6 +190,16 @@ export async function testAudit(parentDb: DB) {
             // @ts-expect-error Batch updates must respect audit protection.
             await db.audit_events.updateBatch([[{}, { table_name: "tampered" }]]);
             await db.audit_test_source.update({}, { value: "updated" });
+            // Generated types must retain the selected audit column type through a computed join.
+            const joined = await db.audit_test_source.find({}, {
+              select: { a: 1, history: {
+                $leftJoin: [{ table: "audit_events", on: "default" }],
+                select: { operation: 1 },
+              } },
+            });
+            joined[0]!.history[0]!.operation satisfies string;
+            // @ts-expect-error Computed joins retain the target column type.
+            joined[0]!.history[0]!.operation satisfies number;
           };
         `,
         );
@@ -378,7 +401,6 @@ export async function testAudit(parentDb: DB) {
         const sourceClient = await result.getClientDBHandlers(clientRequest, undefined);
         assert(sourceClient.clientSchema.tableSchema.some(({ name }) => name === auditName));
         const clientAudit = sourceClient.clientDb[auditName]!;
-        await assert.rejects(() => clientAudit.find!({}));
         await assert.rejects(() => clientAudit.find!({ invalid_audit_column: 1 }));
         await assert.rejects(() =>
           clientAudit.find!({}, { select: { invalid_audit_column: 1 } as never }),
@@ -422,6 +444,54 @@ export async function testAudit(parentDb: DB) {
             },
           ],
         );
+        // Unscoped audit reads must combine permitted tables and paginate the combined history.
+        const allVisibleHistory = await clientAudit.find!({}, { orderBy: { id: 1 } });
+        assert.equal(allVisibleHistory.length, 5);
+        assert.deepEqual(
+          await clientAudit.find!({}, { orderBy: { id: -1 }, limit: 2, offset: 1 }),
+          allVisibleHistory.toReversed().slice(1, 3),
+        );
+        assert.deepEqual(
+          [...new Set(allVisibleHistory.map((row) => row.table_name))].sort(),
+          ["audit_test_source", maskedTable].sort(),
+        );
+        // Combined history must hide masked values and internal join columns.
+        assert(!JSON.stringify(allVisibleHistory).includes("mySecret"));
+        assert(
+          allVisibleHistory.every(
+            (row) => !Object.keys(row).some((column) => column.startsWith("prostgles_audit_join_")),
+          ),
+        );
+        // Schema/table filters and counts must use the same inferred audit permissions.
+        assert.deepEqual(
+          await clientAudit.find!({ schema_name: "audit_test_main" }, { orderBy: { id: 1 } }),
+          allVisibleHistory,
+        );
+        assert.deepEqual(
+          await clientAudit.find!({ table_name: "audit_test_source" }, { orderBy: { id: 1 } }),
+          visibleHistory,
+        );
+        assert.deepEqual(await clientAudit.find!({ table_name: "not_published" }), []);
+        assert.equal(await clientAudit.count!({}), 5);
+        // OR filters must not expose history through a masked snapshot field.
+        assert.deepEqual(
+          await clientAudit.find!(
+            {
+              $or: [{ table_name: "audit_test_source" }, { "new_row->>secret": "mySecret" }],
+            },
+            { orderBy: { id: 1 } },
+          ),
+          visibleHistory,
+        );
+        // Internal join columns must also be unavailable when explicitly selected.
+        await assert.rejects(() =>
+          clientAudit.find!(
+            {},
+            {
+              select: { prostgles_audit_join_old_id: 1 } as never,
+            },
+          ),
+        );
         assert.deepEqual(
           (
             await clientAudit.find!({
@@ -463,13 +533,98 @@ export async function testAudit(parentDb: DB) {
           visibleHistory,
         );
 
+        // Unjoined EXISTS can read permitted audit rows without an explicit table filter.
         const clientSource = sourceClient.clientDb.audit_test_source!;
-        await assert.rejects(() =>
-          clientSource.find!({
+        assert.deepEqual(
+          await clientSource.find!({
             $exists: { [auditName]: { operation: "INSERT" } },
           }),
+          [],
         );
         await source.insert!({ a: 3, b: "one" });
+        // Audit joins advertise and enforce the multi-hop restriction in both directions.
+        const historyPath = [{ table: auditName, on: "default" }];
+        const auditJoins = sourceClient.clientSchema.joins.filter((join) =>
+          join.tables.includes(auditName),
+        );
+        assert(auditJoins.length);
+        assert(auditJoins.every((join) => !join.supportsMultiHop));
+        for (const [handler, path] of [
+          [clientSource, [...historyPath, { table: "audit_test_source", on: "default" }]],
+          [clientAudit, [{ table: "audit_test_source", on: "default" }, ...historyPath]],
+        ] as const) {
+          await assert.rejects(
+            () =>
+              handler.find!(
+                {},
+                {
+                  select: { joined: { $leftJoin: [...path], select: "*" } },
+                },
+              ),
+            { message: /Multi-hop joins are disabled for table:/ },
+          );
+          await assert.rejects(
+            () =>
+              handler.find!({
+                $existsJoined: { path: [...path], filter: {} },
+              }),
+            { message: /Multi-hop joins are disabled for table:/ },
+          );
+        }
+        // Direct history joins remain available and return only published source-key fields.
+        assert.deepEqual(
+          await clientSource.find!(
+            {},
+            {
+              select: {
+                a: 1,
+                history: { $leftJoin: historyPath, select: { operation: 1, new_id: 1 } },
+              },
+            },
+          ),
+          [{ a: 3, history: [{ operation: "INSERT", new_id: { a: 3 } }] }],
+        );
+        assert.deepEqual(
+          await clientSource.find!({
+            $existsJoined: { path: historyPath, filter: { operation: "INSERT" } },
+          }),
+          [{ a: 3 }],
+        );
+        // Joined filters must not match the unpublished part of a composite source key.
+        assert.deepEqual(
+          await clientSource.find!({
+            $existsJoined: { path: historyPath, filter: { "new_id->>b": "one" } },
+          }),
+          [],
+        );
+        // Reverse audit joins must also work in filters, CASE expressions and filtered aggregates.
+        const matchingSource = {
+          $existsJoined: {
+            path: [{ table: "audit_test_source", on: "default" }],
+            filter: { a: 3 },
+          },
+        };
+        assert.deepEqual(
+          await clientAudit.find!(matchingSource, {
+            select: { operation: 1, new_id: 1 },
+          }),
+          [{ operation: "INSERT", new_id: { a: 3 } }],
+        );
+        assert.deepEqual(
+          await clientAudit.find!(matchingSource, {
+            select: { matches: { $case: [[matchingSource, true]], $else: false } },
+          }),
+          [{ matches: true }],
+        );
+        assert.deepEqual(
+          await clientAudit.find!(
+            {},
+            {
+              select: { total: { $count: [], $filter: matchingSource } },
+            },
+          ),
+          [{ total: "1" }],
+        );
         assert.deepEqual(
           await clientSource.find!({
             $exists: {

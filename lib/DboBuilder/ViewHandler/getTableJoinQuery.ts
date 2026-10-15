@@ -1,6 +1,7 @@
 import { asName } from "prostgles-types";
 import type { PGIdentifier } from "../DboBuilder";
 import type { ParsedJoinPath } from "./parseJoinPath";
+import { getComputedJoinSQL } from "../joins/computedJoins";
 
 type getTableJoinsArgs = {
   rootTableAlias: string;
@@ -8,6 +9,8 @@ type getTableJoinsArgs = {
   finalWhere?: string;
   finalTableExpression?: string;
   path: ParsedJoinPath[];
+  rootJoinColumns?: Record<string, string>;
+  targetJoinColumns?: Record<string, string>;
 };
 export const getTableJoinQuery = ({
   path,
@@ -15,6 +18,8 @@ export const getTableJoinQuery = ({
   rootTableAlias,
   finalWhere,
   finalTableExpression,
+  rootJoinColumns,
+  targetJoinColumns,
 }: getTableJoinsArgs): { targetAlias: string; query: string } => {
   const [firstPath] = path;
   if (!firstPath) {
@@ -24,15 +29,24 @@ export const getTableJoinQuery = ({
     getTableJoinAlias(table, pathIndex).escaped;
 
   const query = path
-    .map(({ table, on }, i) => {
+    .map(({ table, on, computedJoin }, i) => {
       const tableName = table;
       const tableAlias = getTableAlias(table, i);
       const prevTableAlias = i === 0 ? rootTableAlias : getTableAlias(path[i - 1]!.table, i - 1);
 
       const onCondition = getJoinOnCondition({
         on,
+        computedJoin,
         leftAlias: prevTableAlias,
         rightAlias: tableAlias,
+        getLeftColName: (column) =>
+          asName(computedJoin && !i ? (rootJoinColumns?.[column] ?? column) : column),
+        getRightColName: (column) =>
+          asName(
+            computedJoin && i === path.length - 1 ?
+              (targetJoinColumns?.[column] ?? column)
+            : column,
+          ),
       });
 
       const isExists = type === "EXISTS";
@@ -49,9 +63,17 @@ export const getTableJoinQuery = ({
         isLast && isExists ?
           `WHERE (${[
             getJoinOnCondition({
-              on: firstPath.on,
+              ...firstPath,
               leftAlias: rootTableAlias,
               rightAlias: getTableAlias(firstPath.table, 0),
+              getLeftColName: (column) =>
+                asName(firstPath.computedJoin ? (rootJoinColumns?.[column] ?? column) : column),
+              getRightColName: (column) =>
+                asName(
+                  firstPath.computedJoin && path.length === 1 ?
+                    (targetJoinColumns?.[column] ?? column)
+                  : column,
+                ),
             }),
             finalWhere,
           ]
@@ -86,6 +108,7 @@ export const getTableJoinAlias = (table: string, pathIndex: number): PGIdentifie
 
 type GetJoinOnConditionArgs = {
   on: Record<string, string>[];
+  computedJoin?: ParsedJoinPath["computedJoin"];
   leftAlias: string;
   rightAlias: string;
   getLeftColName?: (col: string) => string;
@@ -97,7 +120,13 @@ export const getJoinOnConditions = ({
   rightAlias,
   getLeftColName = asName,
   getRightColName = asName,
+  computedJoin,
 }: GetJoinOnConditionArgs) => {
+  if (computedJoin) {
+    return [
+      getComputedJoinSQL(computedJoin, leftAlias, rightAlias, getLeftColName, getRightColName),
+    ];
+  }
   return on.map((constraint) =>
     Object.entries(constraint)
       .map(([leftCol, rightCol]) => {

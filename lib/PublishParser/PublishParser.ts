@@ -2,12 +2,12 @@ import {
   getObjectEntries,
   includes,
   SQL_COMMAND_TABLE_METHODS,
-  type TableSchema,
 } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { getAuditTableRules } from "../Audit/getAuditTableRules";
 import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
+import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
 import type { DB, DBHandlerServerInternal, Prostgles } from "../Prostgles";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { applyScopeToTableRules } from "./applyScopeToTableRules";
@@ -44,6 +44,8 @@ export class PublishParser {
   parsedPublish: ReturnType<typeof getParsedPublish>;
   publishRawSQL?: any;
   dbo: DBHandlerServerInternal;
+  /** Schema generation must use the same metadata snapshot as these handlers. */
+  readonly tablesOrViews: TableSchema[];
   db: DB;
   prostgles: Prostgles;
 
@@ -59,7 +61,8 @@ export class PublishParser {
     }
     this.dbo = dbo;
     this.db = db;
-    this.parsedPublish = getParsedPublish(publish, prostgles.dboBuilder.tablesOrViews ?? [], dbo);
+    this.tablesOrViews = prostgles.dboBuilder.tablesOrViews ?? [];
+    this.parsedPublish = getParsedPublish(publish, this.tablesOrViews, dbo);
   }
 
   async getPublishParams(

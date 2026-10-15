@@ -12,12 +12,14 @@ const GET_TABLE_EXPRESSION = Symbol("getTableExpression");
 const TABLE_EXPRESSION_ALIAS = "prostgles_table_expression";
 
 type SelectRuleWithTableExpression = SelectRule & {
-  [GET_TABLE_EXPRESSION]?: (request: SelectRequestData) => Awaitable<string | undefined>;
+  [GET_TABLE_EXPRESSION]?: (request: SelectRequestData) => Awaitable<string | Pick<QuerySource, "expression" | "joinColumns"> | undefined>;
 };
 
 export type QuerySource = {
   expression: string;
   alias?: PGIdentifier;
+  /** Private source columns used only by registered relationships. */
+  joinColumns?: Record<string, string>;
 };
 
 export const withTableExpression = <T extends SelectRule>(
@@ -45,8 +47,9 @@ export const getQuerySource = async (
     : undefined);
 
   return {
-    expression: tableExpression ?? viewHandler.escapedName,
+    expression: typeof tableExpression === "object" ? tableExpression.expression : tableExpression ?? viewHandler.escapedName,
     alias,
+    joinColumns: typeof tableExpression === "object" ? tableExpression.joinColumns : undefined,
   };
 };
 

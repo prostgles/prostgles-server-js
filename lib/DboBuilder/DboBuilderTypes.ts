@@ -335,6 +335,7 @@ export type ExistsFilterConfig = {
    * Target table filter. target table is the last table from tables
    */
   targetTableFilter: Filter;
+  targetTableColumns: string[];
 } & (
   | {
       isJoined: true;

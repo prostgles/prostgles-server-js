@@ -2,6 +2,7 @@ import type {
   ClientServerFunctionSchema,
   DBSchemaTable,
   FileColumnConfig,
+  JSONB,
   MaybePromise,
 } from "prostgles-types";
 import type {
@@ -106,14 +107,26 @@ export type FileTableConfig = {
   storageClient: StorageClient;
 };
 
-export const JOIN_TYPES = ["one-many", "many-one", "one-one", "many-many"] as const;
+export type ComputedJoin = {
+  $joinName: string;
+  /** Object schema for request params. Undeclared parameters are rejected. */
+  $params?: JSONB.ObjectType["type"];
+  /** Trusted server SQL. Helpers validate and quote columns using the declared table order. */
+  $sql: (args: {
+    left: (column: string) => string;
+    right: (column: string) => string;
+    /** Validated values. Use asValue when interpolating values into SQL. */
+    params: Record<string, unknown>;
+    asValue: (value: unknown) => string;
+  }) => string;
+};
 export type Join = {
   tables: [string, string];
-  on: { [key: string]: string }[]; // Allow multi references to table
-  type: (typeof JOIN_TYPES)[number];
+  on: (Record<string, string> | ComputedJoin)[];
   /** Replace inferred joins for this table pair. Defaults to false. */
   override?: boolean;
 };
+export type ColumnJoin = Omit<Join, "on"> & { on: Record<string, string>[] };
 type Joins = Join[] | "inferred";
 
 type ModifyClientSchema<SUser extends SessionUser = SessionUser> = (

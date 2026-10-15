@@ -44,6 +44,7 @@ export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsF
           isJoined: false,
           existType: key,
           targetTableFilter: filterValue[firstKey],
+          targetTableColumns: [],
           targetTable: firstKey,
         };
         return res;
@@ -73,6 +74,7 @@ export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsF
           allowMultiOrJoin: true,
         }),
         targetTableFilter,
+        targetTableColumns: [],
       };
     });
 

@@ -19,9 +19,18 @@ const isClientTest = process.env.TEST_TYPE === "client";
 if (
   process.env.TEST_TYPE === "server" &&
   process.env.TEST_NAME &&
-  !["conflictUpdates", "jobs", "hooks", "audit", "schemaTypes", "clientSchemaTypes", "tableConfig", "socketLifecycle"].includes(
-    process.env.TEST_NAME,
-  )
+  ![
+    "conflictUpdates",
+    "jobs",
+    "hooks",
+    "audit",
+    "auditBenchmark",
+    "joins",
+    "schemaTypes",
+    "clientSchemaTypes",
+    "tableConfig",
+    "socketLifecycle",
+  ].includes(process.env.TEST_NAME)
 ) {
   throw new Error(`Unknown server test group: ${process.env.TEST_NAME}`);
 }
@@ -38,6 +47,8 @@ import { testConflictUpdates } from "./conflictUpdates.spec";
 import { testTableHookRecursion } from "./tableHookRecursion.spec";
 import { testExecutionContext } from "./executionContext.spec";
 import { testAudit } from "./audit.spec";
+import { testAuditSubscriptionBenchmark } from "./auditSubscriptionBenchmark.spec";
+import { testJoins } from "./joins.spec";
 import { testSchemaTypes } from "./schemaTypes.spec";
 import { testClientSchemaTypes } from "./clientSchemaTypes.spec";
 import { testTableConfigValidation } from "./tableConfig.spec";
@@ -109,11 +120,18 @@ const dbConnection = {
 };
 
 void (async () => {
-  if (!isClientTest && process.env.TEST_NAME === "socketLifecycle") {
+  if (
+    !isClientTest &&
+    ["socketLifecycle", "auditBenchmark"].includes(process.env.TEST_NAME || "")
+  ) {
     const { db, pgp } = getDbConnection({ dbConnection });
     try {
-      await removeExpressRoutesTest(app);
-      await testSocketLifecycle(db);
+      if (process.env.TEST_NAME === "auditBenchmark") {
+        await testAuditSubscriptionBenchmark(db);
+      } else {
+        await removeExpressRoutesTest(app);
+        await testSocketLifecycle(db);
+      }
     } finally {
       pgp.end();
       http.close();
@@ -426,28 +444,23 @@ void (async () => {
       {
         tables: ["items", "items2"],
         on: [{ name: "name" }],
-        type: "many-many",
         override: true,
       },
       {
         tables: ["items2", "items3"],
         on: [{ name: "name" }],
-        type: "many-many",
       },
       {
         tables: ["items4a", "items"],
         on: [{ items_id: "id" }],
-        type: "many-many",
       },
       {
         tables: ["items4a", "items2"],
         on: [{ items2_id: "id" }],
-        type: "many-many",
       },
       {
         tables: ["items_multi", "items"],
         on: [{ items0_id: "id" }, { items1_id: "id" }, { items2_id: "id" }, { items3_id: "id" }],
-        type: "many-many",
       },
     ],
     onReady: async ({ dbo, sql, db }) => {
@@ -508,6 +521,12 @@ void (async () => {
           }
           if (process.env.TEST_NAME === "audit") {
             await testAudit(db);
+            stopTest();
+            return;
+          }
+          if (process.env.TEST_NAME === "joins") {
+            await (dbo as unknown as DBHandlerServerInternal).users!.dboBuilder.getPubSubManager();
+            await testJoins(db);
             stopTest();
             return;
           }

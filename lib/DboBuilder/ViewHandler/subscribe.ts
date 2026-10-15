@@ -69,7 +69,7 @@ async function subscribe(
       table_rules,
       { ...localParams, returnNewQuery: true },
     )) as unknown as NewQuery;
-    const viewOptions = await getSubscribeRelatedTables.bind(this)({
+    const { viewOptions, rootJoinColumns } = await getSubscribeRelatedTables.bind(this)({
       filter,
       selectParams,
       table_rules,
@@ -79,6 +79,8 @@ async function subscribe(
 
     const [firstField, ...otherFields] = Array.from(
       new Set([
+        ...rootJoinColumns,
+        ...newQuery.whereOpts.columnsUsed,
         ...newQuery.select
           .filter((s) => s.selected)
           .flatMap((item) => [...item.fields, ...(item.dependencyFields ?? [])]),

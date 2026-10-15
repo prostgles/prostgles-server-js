@@ -14,7 +14,7 @@ export const getPublishSchemas = async (
     return;
   }
   const entries = publishParser.parsedPublish;
-  const { tablesOrViews = [] } = publishParser.prostgles.dboBuilder;
+  const { tablesOrViews } = publishParser;
   const profiles: ClientSchemaProfiles = fromEntries(
     await Promise.all(
       entries.map(async ({ name, publish, userTypes }) => {

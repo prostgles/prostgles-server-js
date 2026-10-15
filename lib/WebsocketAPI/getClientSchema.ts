@@ -5,6 +5,7 @@ import type { Prostgles } from "../Prostgles";
 import type { PermissionScope, PublishParser } from "../PublishParser/PublishParser";
 import { clientCanRunSqlRequest } from "../runClientRequest";
 import { getJobControlBinding } from "../Jobs/getJobControlBinding";
+import { getClientJoins } from "../DboBuilder/joins/getClientJoins";
 
 export async function getClientSchema(
   this: Prostgles,
@@ -23,6 +24,7 @@ export async function getClientSchema(
       throw "new-session-redirect";
     }
     const { publishParser } = this;
+    const { dboBuilder } = this;
     let fullSchema: Awaited<ReturnType<PublishParser["getSchemaFromPublish"]>> | undefined;
     let publishValidationError;
 
@@ -54,7 +56,7 @@ export async function getClientSchema(
         rawTables.map(async (table) =>
           modifyClientSchema(
             table,
-            this.dboBuilder.dboMap.get(table.name)?.config,
+            dboBuilder.dboMap.get(table.name)?.config,
             userData,
             resolvedAuditConfig,
           ),
@@ -62,14 +64,16 @@ export async function getClientSchema(
       );
     })();
 
+    const joins = getClientJoins(dboBuilder, tablesWithSelectRules);
     const joinTables2: string[][] = [];
-    if (this.opts.joins) {
-      const _joinTables2 = this.dboBuilder
+    if (dboBuilder.joins.length || dboBuilder.computedJoins.length) {
+      const _joinTables2 = dboBuilder
         .getAllJoinPaths()
         .filter((jp) => [jp.t1, jp.t2].every((t) => tablesWithSelectRules.has(t)))
-        .map((jp) => [jp.t1, jp.t2].sort());
+        .map((jp) => [jp.t1, jp.t2].sort())
+        .concat(joins.map((join) => [...join.tables].sort()));
       _joinTables2.map((jt) => {
-        if (!joinTables2.find((_jt) => _jt.join() === jt.join())) {
+        if (!joinTables2.some(([left, right]) => left === jt[0] && right === jt[1])) {
           joinTables2.push(jt);
         }
       });
@@ -110,6 +114,7 @@ export async function getClientSchema(
       tableSchema: tables,
       rawSQL,
       joinTables: joinTables2,
+      joins,
       tableSchemaErrors,
       auth: authInfo.auth,
       version,

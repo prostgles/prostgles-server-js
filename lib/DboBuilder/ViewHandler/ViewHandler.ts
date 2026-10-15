@@ -10,7 +10,7 @@ import type {
 import { asName, isObject, postgresToTsType } from "prostgles-types";
 import type { TableEvent } from "../../Logging";
 import type { DB } from "../../Prostgles";
-import type { Join } from "../../ProstglesTypes";
+import type { ColumnJoin } from "../../ProstglesTypes";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
 import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
@@ -48,7 +48,7 @@ export class ViewHandler {
   columnSet: Set<string>;
   tableOrViewInfo: TableSchema;
   tsColumnDefs: string[] = [];
-  joins: Join[];
+  joins: ColumnJoin[];
   joinGraph?: Graph;
   joinPaths: JoinPaths;
   dboBuilder: DboBuilder;

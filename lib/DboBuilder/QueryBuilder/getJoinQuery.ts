@@ -1,6 +1,6 @@
 import { isDefined, asName } from "prostgles-types";
 import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
-import { parseJoinPath } from "../ViewHandler/parseJoinPath";
+import { getComputedJoinQuery } from "./getComputedJoinQuery";
 import type { NewQuery, NewQueryJoin } from "./QueryBuilder";
 import { type SelectItemValidated } from "./QueryBuilder";
 import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
@@ -46,7 +46,7 @@ const getJoinTable = (
   };
 };
 
-type GetJoinQueryResult = {
+export type GetJoinQueryResult = {
   resultAlias: PGIdentifier;
   firstJoinTableJoinFields: string[];
   isOrJoin: boolean;
@@ -66,18 +66,13 @@ type GetJoinQueryResult = {
   ) target_table
   ON ...condition
  */
-export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
-  const paths = parseJoinPath({
-    rootTable: q1.table.raw,
-    rawPath: q2.joinPath,
-    viewHandler: viewHandler,
-    allowMultiOrJoin: true,
-    addShortestJoinIfMissing: true,
-  });
+export const getJoinQuery = (_viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
+  const paths = q2.joinPath;
 
   if (q2.joins?.length) {
     throw new Error("Nested joins not supported yet");
   }
+  if (paths.some((path) => path.computedJoin)) return getComputedJoinQuery(q1, q2);
   const targetTableAliasRaw = q2.tableAlias?.raw || q2.table.raw;
   const targetTableAlias = asName(targetTableAliasRaw);
 
