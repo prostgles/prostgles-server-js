@@ -51,7 +51,12 @@ export class SchemaWatch {
     return instance;
   };
 
-  destroy = () => this.schemaRefreshStorage.disable();
+  destroy = async () => {
+    this.onSchemaChange = undefined;
+    this.pendingSchemaChange = undefined;
+    await this.schemaChangePromise;
+    this.schemaRefreshStorage.disable();
+  };
 
   /**
    * Fallback for watchSchema in case of not a superuser (cannot add db event listener)
@@ -85,6 +90,7 @@ export class SchemaWatch {
     // Ignore initialization's own SQL while retaining external schema changes.
     const isRefreshCallback = this.schemaRefreshStorage.getStore() === this.schemaChangePromise;
     if (
+      prostgles.destroyed ||
       !prostgles.opts.watchSchema ||
       (!prostgles.loaded && (!this.schemaChangePromise || isRefreshCallback))
     )
@@ -117,6 +123,7 @@ export class SchemaWatch {
       const { query, command } = event;
 
       await this.dboBuilder.cacheDBTypes(true);
+      if (this.dboBuilder.prostgles.destroyed) return;
       if (typeof watchSchema === "function") {
         /* Only call the provided func */
         void watchSchema(event);

@@ -215,7 +215,6 @@ export class DboBuilder {
   };
 
   destroy = async () => {
-    this.prostgles.schemaWatch?.destroy();
     return this._pubSubManager?.destroy();
   };
 

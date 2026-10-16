@@ -265,28 +265,27 @@ export const initProstgles = async function (
 
     /* 5. Finish init and provide DBO object */
     try {
-      if (this.destroyed) {
-        console.trace("Prostgles: Instance is destroyed");
+      if (!this.destroyed) {
+        void onReady(
+          {
+            sql: this.dboBuilder.sql,
+            dbo: this.dbo!,
+            db,
+            tables: this.dboBuilder.tables,
+            reason,
+            context: this.context,
+          },
+          async (...args) => {
+            await updateConfiguration(this, onReady, ...args);
+          },
+        );
       }
-      void onReady(
-        {
-          sql: this.dboBuilder.sql,
-          dbo: this.dbo!,
-          db,
-          tables: this.dboBuilder.tables,
-          reason,
-          context: this.context,
-        },
-        async (...args) => {
-          await updateConfiguration(this, onReady, ...args);
-        },
-      );
     } catch (err) {
       console.error("Prostgles: Error within onReady: \n", err);
     }
 
-    this.loaded = true;
-    this.jobs.start();
+    this.loaded = !this.destroyed;
+    if (this.loaded) this.jobs.start();
     const getContext = () => this.context;
     const initResult: InitResult<void, SessionUser, any> = {
       jobs: this.jobs.api,
@@ -320,6 +319,7 @@ export const initProstgles = async function (
         if (this.destroyed) return true;
         console.log("destroying prgl instance");
         this.destroyed = true;
+        await this.schemaWatch?.destroy();
         if (this.opts.io) {
           this.opts.io.off("connection", this.onSocketConnected);
           // Close transports so clients can reconnect, but keep the caller's server reusable.

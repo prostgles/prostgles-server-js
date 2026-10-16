@@ -21,6 +21,7 @@ export const testSchemaWatch = async (pgDb: DB) => {
       let instance: InitResult | undefined;
       let currentDbo: DBHandlerServerInternal | undefined;
       let schemaChanges = 0;
+      let contextCleanups = 0;
       let duringSchemaRefresh: (() => Promise<void>) | undefined;
       let schemaChangeListener: (() => void) | undefined;
       const waitForSchemaChanges = (expected: number) =>
@@ -45,10 +46,13 @@ export const testSchemaWatch = async (pgDb: DB) => {
           disableRealtime: true,
           transactions: true,
           onQuery: (_error, { query }) => queries.push(String(query)),
-          createContext: async () => {
+          createContext: async ({ onCleanup }) => {
             const callback = duringSchemaRefresh;
             duringSchemaRefresh = undefined;
             await callback?.();
+            onCleanup(() => {
+              contextCleanups++;
+            });
             return undefined;
           },
           onReady: ({ dbo, reason }) => {
@@ -198,6 +202,37 @@ export const testSchemaWatch = async (pgDb: DB) => {
         assert.equal(dboBuilder.canSubscribe, false);
         assert(!queries.some((query) => query.includes("SELECT * FROM prostgles.versions")));
         assert(!queries.some((query) => query.includes("DROP SCHEMA IF EXISTS prostgles")));
+
+        // Shutdown must wait for the active refresh and discard queued schema changes.
+        let resumeClosingRefresh = () => {};
+        const closingRefreshStarted = new Promise<void>((resolve) => {
+          duringSchemaRefresh = async () => {
+            resolve();
+            await new Promise<void>((resume) => {
+              resumeClosingRefresh = resume;
+            });
+            await instance!._db.one("SELECT 1");
+          };
+        });
+        await instance.sql(`ALTER TABLE ${table} ADD COLUMN closing_column TEXT`);
+        await closingRefreshStarted;
+        await instance.sql(`ALTER TABLE ${table} ADD COLUMN queued_column TEXT`);
+        const schemaChangesBeforeDestroy = schemaChanges;
+        const cleanupsBeforeDestroy = contextCleanups;
+        const onSchemaChange = dboBuilder.prostgles.schemaWatch!.onSchemaChange!;
+        const destroying = instance.destroy();
+        try {
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        } finally {
+          resumeClosingRefresh();
+          await destroying;
+        }
+        assert.equal(schemaChanges, schemaChangesBeforeDestroy);
+        assert.equal(contextCleanups, cleanupsBeforeDestroy + 1);
+        const queriesAfterDestroy = queries.length;
+        onSchemaChange({ command: "ALTER", query: "late DDL" });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(queries.length, queriesAfterDestroy);
       } finally {
         await instance?.destroy();
         await pgDb.none(`DROP SCHEMA IF EXISTS ${schema} CASCADE; DROP ROLE IF EXISTS ${role};`);
