@@ -145,6 +145,13 @@ export const testSocketLifecycle = async (db: DB) => {
           await replacement.schema;
           assert.equal(await callMethod(replacement.socket, "version"), 2);
           assert.equal(await (await callHttpMethod(replacementUrl)).json(), 2);
+          const serverSocket = replacementIO.sockets.sockets.get(replacement.socket.id!);
+          assert(serverSocket);
+          instance.invalidateAuth(["another-session"]);
+          assert(serverSocket.connected, "Unrelated sessions stay connected");
+          const revoked = new Promise<string>((resolve) => replacement.socket.once("disconnect", resolve));
+          instance.invalidateAuth(["lifecycle-session"]);
+          assert.equal(await revoked, "transport close");
         } finally {
           await instance.destroy();
           instance = undefined;

@@ -121,6 +121,8 @@ export type InitResult<
   _db: DB;
   pgp: PGP;
   io: ProstglesInitOptions<S, SUser, Context>["io"];
+  /** Drop cached authentication and reconnect affected sessions, removing their subscriptions. */
+  invalidateAuth: (sessionIds: readonly string[]) => void;
   destroy: () => Promise<boolean>;
   /**
    * Generated database public schema TS types for all tables and views
@@ -296,6 +298,15 @@ export const initProstgles = async function (
       _db: db,
       pgp,
       io: this.opts.io,
+      invalidateAuth: (sessionIds) => {
+        const affectedSessions = new Set(sessionIds);
+        for (const socket of [...this.connectedSockets]) {
+          const sid = this.authHandler.getValidatedSid({ socket });
+          if (!sid || !affectedSessions.has(sid)) continue;
+          socket.__prglCache?.delete(this.appId);
+          socket.conn.close();
+        }
+      },
       getTSSchema: this.dboBuilder.getTsDefinitions,
       getSchema: this.dboBuilder.getSchema,
       reWriteDBSchema: () => this.writeDBSchema(true),
