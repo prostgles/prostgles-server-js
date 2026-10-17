@@ -1,13 +1,12 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { getJSONBSchemaValidationErrorAsync, type TableHandler } from "prostgles-types";
-import type { DB, DBHandlerServerInternal } from "./server/node_modules/prostgles-server/dist/Prostgles";
+import type { DB, DBHandlerServer, DBHandlerServerInternal, WithUserRLS } from "./server/serverTypes";
 import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
 import { testSocketLifecycle } from "./server/socketLifecycle.spec";
 import { testJoins } from "./server/joins.spec";
 import { testFileStorage } from "./server/fileStorage.spec";
-import type { withUserRLS as WithUserRLS } from "./server/node_modules/prostgles-server/dist/DboBuilder/dboBuilderUtils";
 import { testSchemaTypes } from "./server/schemaTypes.spec";
 import { testClientSchemaTypes } from "./server/clientSchemaTypes.spec";
 import { testExecutionContext } from "./server/executionContext.spec";
@@ -16,7 +15,6 @@ import { testTableConfigValidation } from "./server/tableConfig.spec";
 import { testBackgroundJobs } from "./server/backgroundJobs.spec";
 import { testFileJobs } from "./server/fileJobs.spec";
 import { testConflictUpdates } from "./server/conflictUpdates.spec";
-import type { DBOFullyTyped } from "./server/node_modules/prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 export const serverOnlyQueries = async (
@@ -118,7 +116,7 @@ export const serverOnlyQueries = async (
     });
 
     await test("forUpdate locks selected rows until commit or rollback", async () => {
-      const typedDb = db as unknown as DBOFullyTyped<DBGeneratedSchema>;
+      const typedDb = db as unknown as DBHandlerServer<DBGeneratedSchema>;
       const rows = await typedDb.items.insertMany(
         [{ name: "lock first" }, { name: "lock second" }],
         { returning: "*" },

@@ -42,8 +42,8 @@
   ],
   "homepage": "https://prostgles.com",
   "dependencies": {
-    "@aws-sdk/client-sesv2": "^3.1149.0",
-    "@aws-sdk/credential-provider-node": "^3.972.85",
+    "@aws-sdk/client-sesv2": "^3.1152.0",
+    "@aws-sdk/credential-provider-node": "^3.972.86",
     "@types/passport": "^1.0.17",
     "@types/passport-facebook": "^3.0.4",
     "@types/passport-github2": "^1.2.9",
@@ -61,7 +61,7 @@
     "pg": "^8.23.1",
     "pg-cursor": "^2.22.1",
     "pg-promise": "^12.7.1",
-    "prostgles-types": "^4.0.303"
+    "prostgles-types": "^4.0.304"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
@@ -76,6 +76,6 @@
     "prettier": "^3.9.10",
     "socket.io": "^4.8.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.71.1"
+    "typescript-eslint": "^8.71.2"
   }
 }

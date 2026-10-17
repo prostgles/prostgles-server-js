@@ -175,6 +175,19 @@ export async function getSubscribeRelatedTables(
     }
   };
   await subscribeQuery(newQuery, []);
+  // The root predicate can miss self-joined rows in transition tables. Its unfiltered
+  // trigger must also track the root's selected, filtered, ordered and joined columns.
+  const selfTrigger = viewOptions.relatedTables.find(
+    (table) => table.tableName === this.name && table.condition === "TRUE",
+  );
+  if (selfTrigger?.tracked_columns) {
+    const [firstField, ...otherFields] = [...new Set([
+      ...selfTrigger.tracked_columns,
+      ...getQueryColumns(newQuery, []),
+      ...rootJoinColumns,
+    ])];
+    selfTrigger.tracked_columns = firstField ? [firstField, ...otherFields] : undefined;
+  }
   if (this.isView) {
     if (hasComputedJoin) {
       await pushRelatedTable(this.name, [], undefined, {});

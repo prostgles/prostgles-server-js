@@ -950,6 +950,17 @@ export const testJoins = async (db: DB) => {
           { members: ["id", "max_event"] },
         );
         await previousMember([{ previous: [{ max_event: 3 }] }]);
+        // A self-EXISTS filter must also track fields selected from the root row.
+        const selfExists = await watch(
+          members,
+          { $existsJoined: { path: reversedSelfPath, filter: { id: 1 } } },
+          { select: { max_event: 1 } },
+        );
+        await selfExists([{ max_event: 4 }]);
+        await members.update!({ id: 2 }, { max_event: 5 });
+        await selfExists([{ max_event: 5 }]);
+        await members.update!({ id: 2 }, { max_event: 4 });
+        await selfExists([{ max_event: 4 }]);
         // Changes to an intermediate member must refresh joined rows and EXISTS results.
         const linked = await watch(
           linkedMembers,

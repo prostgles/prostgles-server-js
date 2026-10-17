@@ -1,10 +1,10 @@
 import test, { describe } from "node:test";
-import { type DBOFullyTyped } from "./server/node_modules/prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "./server/serverTypes";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 export const isomorphicQueriesTyped = async (
-  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
+  db: DBHandlerServer<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
 ) => {
   await describe("isomorphic typed queries", async () => {
     await test("isLookupTable DB Types from colConf", async () => {

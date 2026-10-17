@@ -15,13 +15,12 @@ import {
   type CaseSelect,
   type SQLHandler,
 } from "prostgles-types";
-import { type DBOFullyTyped } from "./server/node_modules/prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
+import type { DBHandlerServer } from "./server/serverTypes";
 import type { DBHandlerClient } from "./client";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
 
 export const isomorphicQueries = async (
-  db: DBOFullyTyped<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
-  // db: DBOFullyTyped | DBHandlerClient,
+  db: DBHandlerServer<DBGeneratedSchema> | DBHandlerClient<DBGeneratedSchema>,
   sql: SQLHandler | undefined,
   log: (msg: string, extra?: any) => void,
   token?: string,
@@ -2073,7 +2072,6 @@ export const isomorphicQueries = async (
       const exists1 = await db[`"""quoted0"""`].find(
         {
           $existsJoined: {
-            //@ts-expect-error
             path: ['"""quoted1"""', '"""quoted2"""'],
             filter: {
               '"id2"': 1,
@@ -2086,7 +2084,6 @@ export const isomorphicQueries = async (
       const exists2 = await db[`"""quoted0"""`].find(
         {
           $existsJoined: {
-            //@ts-expect-error
             path: ['"""quoted1"""', '"""quoted2"""', '"""quoted1"""', '"""quoted2"""'],
             filter: {
               '"id2"': 1,
