@@ -28,7 +28,7 @@ import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/Au
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers, GetClientDBHandlers } from "../WebsocketAPI/getClientHandlers";
 import { isArray } from "../utils/utils";
-import { hasSelectRules } from "./mergeSelectRules";
+import { getSelectFieldIntersection } from "./mergeSelectRules";
 
 export type InsertRequestData = {
   data: object | object[];
@@ -439,11 +439,9 @@ export const parsePublishTableRule = <R extends ParsedPublishTable>(tableRules: 
     orderByFields: tableRules.select.orderByFields ?? tableRules.select.fields,
   };
 
-  // Row-dependent reads cannot grant a static returning/filter allowlist.
-  // Returning falls back to mutation fields; update filters require an explicit grant.
-  const defaultSelectFields = hasSelectRules(selectRules) ? undefined : selectRules?.fields;
-  const defaultSelectFilterFields =
-    hasSelectRules(selectRules) ? undefined : selectRules?.filterFields;
+  // Mutation defaults only include fields granted by every select rule.
+  const defaultSelectFields = getSelectFieldIntersection(selectRules, "fields");
+  const defaultSelectFilterFields = getSelectFieldIntersection(selectRules, "filterFields");
 
   const parsedTableRules: ParsedTableRule | undefined = tableRules && {
     ...tableRules,
@@ -477,8 +475,8 @@ export type PublishTableRule<
    * with NULL and hiding rows matching no rule. [] denies reads. Limits use the minimum,
    * throttles the maximum, and any disableMethods restriction applies to the whole query.
    * Filtering/sorting uses masked selectable fields. Sync is disabled. Mutation
-   * returningFields defaults to the mutation's fields (delete.filterFields for deletes).
-   * update.filterFields must be granted explicitly.
+   * returningFields and update.filterFields default to the intersection of each rule's
+   * fields and filterFields, respectively.
    */
   select?: SelectRule<Col, S> | SelectRule<Col, S>[] | PublishAllOrNothing;
   insert?: InsertRule<Col, S> | PublishAllOrNothing;

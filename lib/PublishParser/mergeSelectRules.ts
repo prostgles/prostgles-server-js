@@ -6,7 +6,9 @@ import type { SelectRule } from "./publishTypesAndUtils";
 import { getSelectRulePushdown } from "./getSelectRulePushdown";
 
 const SELECT_RULES = Symbol("selectRules");
-type MergedSelectRule = SelectRule & { [SELECT_RULES]?: SelectRule[] };
+type MergedSelectRule = SelectRule & {
+  [SELECT_RULES]?: (SelectRule & { fields: string[]; filterFields: string[] })[];
+};
 
 export const mergeSelectRules = (
   table: ViewHandler,
@@ -101,6 +103,19 @@ export const hasSelectRules = (
   rule: SelectRule | undefined,
 ): rule is SelectRule & { [SELECT_RULES]: SelectRule[] } => {
   return !!rule && !!(rule as MergedSelectRule)[SELECT_RULES];
+};
+
+export const getSelectFieldIntersection = (
+  rule: MergedSelectRule | undefined,
+  fieldType: "fields" | "filterFields",
+) => {
+  const rules = rule?.[SELECT_RULES];
+  if (!rules) return rule?.[fieldType];
+  return (
+    rules[0]?.[fieldType].filter((field) =>
+      rules.every((entry) => entry[fieldType].includes(field)),
+    ) ?? []
+  );
 };
 
 export const mergeSelectRuleOptions = (rules: SelectRule[]) => {

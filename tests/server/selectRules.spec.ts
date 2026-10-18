@@ -60,7 +60,7 @@ export const testSelectRules = async (db: DB) => {
       members: {
         select,
         insert: { fields: "*" },
-        update: { fields: ["username"], filterFields: ["id"] },
+        update: { fields: ["username"] },
         delete: { filterFields: ["id"] },
       },
       memberships: { select: { fields: ["id", "member_id"] } },
@@ -527,11 +527,17 @@ export const testSelectRules = async (db: DB) => {
         }
       });
 
-      await t.test("mutations default returning grants to their own fields", async () => {
+      await t.test("mutations default to fields shared by every select rule", async () => {
         await assert.rejects(() =>
           clientMembers.update!({ id: 2 }, { username: "other" }, { returning: ["email"] }),
         );
         await assert.rejects(() => clientMembers.delete!({ id: 3 }, { returning: ["email"] }));
+        await assert.rejects(() =>
+          clientMembers.update!({ username: "other" }, { username: "other" }),
+        );
+        await assert.rejects(() =>
+          clientMembers.update!({ id: 2 }, { username: "other" }, { returning: ["username"] }),
+        );
         assert.equal(await members.count({ id: 3 }), 1);
         try {
           assert.deepEqual(
@@ -544,17 +550,17 @@ export const testSelectRules = async (db: DB) => {
                 is_owner: false,
                 secret: "hidden",
               },
-              { returning: ["email"] },
+              { returning: "*" },
             ),
-            { email: "private" },
+            { id: 4 },
           );
           assert.deepEqual(
             await clientMembers.update!(
               { id: 2 },
               { username: "other" },
-              { returning: ["username"] },
+              { returning: "*" },
             ),
-            [{ username: "other" }],
+            [{ id: 2 }],
           );
           assert.deepEqual(await clientMembers.delete!({ id: 4 }, { returning: ["id"] }), [
             { id: 4 },
@@ -563,6 +569,66 @@ export const testSelectRules = async (db: DB) => {
           await members.delete({ id: 4 });
         }
       });
+
+      await t.test(
+        "mutation intersections normalize fields and preserve explicit grants",
+        async () => {
+          try {
+            await instance.update({
+              publish: {
+                members: {
+                  select: [
+                    { fields: "*" },
+                    { fields: { email: 0, secret: 0 } },
+                    { fields: { id: 1, username: 1 }, filterFields: ["id"] },
+                  ],
+                  update: { fields: ["username"] },
+                },
+              },
+            });
+            const { clientDb } = await instance.getClientDBHandlers(clientRequest, undefined);
+            assert.deepEqual(
+              await clientDb.members!.update!({ id: 2 }, { username: "other" }, { returning: "*" }),
+              [{ id: 2, username: "other" }],
+            );
+            await assert.rejects(() =>
+              clientDb.members!.update!({ username: "other" }, { username: "other" }),
+            );
+            for (const explicitGrants of [false, true]) {
+              await instance.update({
+                publish: {
+                  members: {
+                    select: [{ fields: ["id"] }, { fields: ["username"] }],
+                    update: {
+                      fields: ["username"],
+                      ...(explicitGrants && { filterFields: ["id"], returningFields: ["email"] }),
+                    },
+                  },
+                },
+              });
+              const { clientDb } = await instance.getClientDBHandlers(clientRequest, undefined);
+              const update = () =>
+                clientDb.members!.update!(
+                  { id: 2 },
+                  { username: "other" },
+                  { returning: ["email"] },
+                );
+              if (explicitGrants) {
+                assert.deepEqual(await update(), [{ email: "other@private" }]);
+              } else {
+                await assert.rejects(() =>
+                  clientDb.members!.update!({ id: 2 }, { username: "other" }),
+                );
+                await assert.rejects(() =>
+                  clientDb.members!.update!({}, { username: "other" }, { returning: ["username"] }),
+                );
+              }
+            }
+          } finally {
+            await instance.update({ publish });
+          }
+        },
+      );
 
       await t.test("subscriptions refresh on row and related permission changes", async () => {
         const rules = await parser.getValidatedRequestRuleWusr(
