@@ -25,7 +25,7 @@ export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): Get
     return {
       ...path,
       alias: isLast ? alias : getTableJoinAlias(path.table, index),
-      expression: isLast ? child.source.expression : path.table,
+      source: isLast ? child.source : path.source!,
     };
   });
   const conditions = pathTables.map((path, index) =>
@@ -37,11 +37,10 @@ export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): Get
         : (parent.tableAlias?.escaped ?? parent.table.escaped),
       rightAlias: path.alias.escaped,
       getLeftColName: (column) =>
-        asName(!index ? (parent.source.joinColumns?.[column] ?? column) : column),
-      getRightColName: (column) =>
         asName(
-          index === pathTables.length - 1 ? (child.source.joinColumns?.[column] ?? column) : column,
+          (index ? pathTables[index - 1]!.source : parent.source).joinColumns?.[column] ?? column,
         ),
+      getRightColName: (column) => asName(path.source.joinColumns?.[column] ?? column),
     }),
   );
   const hasAggregates = fields.some((field) => field.type === "aggregation");
@@ -62,8 +61,8 @@ export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): Get
       .join(", ")}`,
     ...pathTables.map((path, index) =>
       index ?
-        `INNER JOIN ${path.expression} ${path.alias.escaped} ON (${conditions[index]})`
-      : `FROM ${path.expression} ${path.alias.escaped}`,
+        `INNER JOIN ${path.source.expression} ${path.alias.escaped} ON (${conditions[index]})`
+      : `FROM ${path.source.expression} ${path.alias.escaped}`,
     ),
     `WHERE ${[conditions[0], child.whereOpts.condition]
       .filter(Boolean)

@@ -5,6 +5,7 @@ import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
 import type { PublishParser, TableRequest } from "./PublishParser";
 import type { ParsedPublishTable } from "./publishTypesAndUtils";
 import { TABLE_RULE_NO_LIMITS } from "./publishTypesAndUtils";
+import { mergeSelectRules } from "./mergeSelectRules";
 
 export async function getParsedPublishTable(
   this: PublishParser,
@@ -84,6 +85,8 @@ export async function getParsedPublishTable(
   const selectRule =
     !tableRulesObject.select ? undefined
     : isStarOrTrue(tableRulesObject.select) ? TABLE_RULE_NO_LIMITS.select
+    : Array.isArray(tableRulesObject.select) ?
+      mergeSelectRules(tableHandler, tableRulesObject.select)
     : tableRulesObject.select;
   const insertRule =
     !tableRulesObject.insert ? undefined
@@ -114,6 +117,7 @@ export async function getParsedPublishTable(
     update: updateRule,
     delete: deleteRule,
   };
+  if (!Object.values(parsedTableRule).some(Boolean)) return;
 
   const cannotBatchUpdate =
     !parsedTableRule.update ||

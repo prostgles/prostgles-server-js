@@ -249,7 +249,7 @@ const getInnerJoinQuery = ({
 
     const isFirst = !i;
     if (isFirst) {
-      const tableExpression = isLast ? q2.source.expression : table.name;
+      const tableExpression = isLast ? q2.source.expression : path.source!.expression;
       return [
         `SELECT `,
         `  /* Join fields + select */`,
@@ -263,7 +263,7 @@ const getInnerJoinQuery = ({
     }
 
     return [
-      `INNER JOIN ${isLast ? q2.source.expression : table.name} ${table.alias}`,
+      `INNER JOIN ${isLast ? q2.source.expression : path.source!.expression} ${table.alias}`,
       `ON ${getJoinOnCondition({
         on: path.on,
         leftAlias: prevTable.alias,
@@ -286,11 +286,7 @@ export type SelectItemNested = SelectItemValidated & {
   query: string;
   isJoinCol: boolean;
 };
-const getNestedSelectFields = ({
-  q,
-  firstJoinTableAlias,
-  _joinFields,
-}: GetSelectFieldsArgs) => {
+const getNestedSelectFields = ({ q, firstJoinTableAlias, _joinFields }: GetSelectFieldsArgs) => {
   const targetTableAlias = q.tableAlias || q.table;
 
   const requiredJoinFields = Array.from(new Set(_joinFields));

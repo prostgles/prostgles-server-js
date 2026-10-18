@@ -7,7 +7,7 @@ type getTableJoinsArgs = {
   rootTableAlias: string;
   type: "INNER" | "LEFT" | "EXISTS";
   finalWhere?: string;
-  finalTableExpression?: string;
+  finalTableExpression: string;
   path: ParsedJoinPath[];
   rootJoinColumns?: Record<string, string>;
   targetJoinColumns?: Record<string, string>;
@@ -27,12 +27,14 @@ export const getTableJoinQuery = ({
   }
   const getTableAlias = (table: string, pathIndex: number) =>
     getTableJoinAlias(table, pathIndex).escaped;
+  const firstJoinColumns = path.length === 1 ? targetJoinColumns : firstPath.source!.joinColumns;
 
   const query = path
-    .map(({ table, on, computedJoin }, i) => {
-      const tableName = table;
+    .map(({ table, on, computedJoin, source }, i) => {
       const tableAlias = getTableAlias(table, i);
       const prevTableAlias = i === 0 ? rootTableAlias : getTableAlias(path[i - 1]!.table, i - 1);
+      const leftJoinColumns = i ? path[i - 1]!.source!.joinColumns : rootJoinColumns;
+      const rightJoinColumns = i === path.length - 1 ? targetJoinColumns : source!.joinColumns;
 
       const onCondition = getJoinOnCondition({
         on,
@@ -40,13 +42,9 @@ export const getTableJoinQuery = ({
         leftAlias: prevTableAlias,
         rightAlias: tableAlias,
         getLeftColName: (column) =>
-          asName(computedJoin && !i ? (rootJoinColumns?.[column] ?? column) : column),
+          asName(computedJoin ? (leftJoinColumns?.[column] ?? column) : column),
         getRightColName: (column) =>
-          asName(
-            computedJoin && i === path.length - 1 ?
-              (targetJoinColumns?.[column] ?? column)
-            : column,
-          ),
+          asName(computedJoin ? (rightJoinColumns?.[column] ?? column) : column),
       });
 
       const isExists = type === "EXISTS";
@@ -69,11 +67,7 @@ export const getTableJoinQuery = ({
               getLeftColName: (column) =>
                 asName(firstPath.computedJoin ? (rootJoinColumns?.[column] ?? column) : column),
               getRightColName: (column) =>
-                asName(
-                  firstPath.computedJoin && path.length === 1 ?
-                    (targetJoinColumns?.[column] ?? column)
-                  : column,
-                ),
+                asName(firstPath.computedJoin ? (firstJoinColumns?.[column] ?? column) : column),
             }),
             finalWhere,
           ]
@@ -81,7 +75,7 @@ export const getTableJoinQuery = ({
             .join(") AND (")})`
         : "";
 
-      const tableSelect = isLast ? (finalTableExpression ?? tableName) : tableName;
+      const tableSelect = isLast ? finalTableExpression : source!.expression;
       if (isExists && isFirst) {
         return [`SELECT 1`, `FROM ${tableSelect} ${tableAlias}`, whereJoinCondition]
           .filter((v) => v)

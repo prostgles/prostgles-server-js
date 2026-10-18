@@ -10,7 +10,6 @@ export type GetUserOrRedirected = AuthResultWithSID | "new-session-redirect";
 
 /**
  * For a given request return the user data if available using the auth handler's getUser method.
- * Use cache data if configured in Auth
  * Used in Publish Parser and AuthHandler
  */
 export async function handleGetUserThrottled(
@@ -34,26 +33,6 @@ export async function handleGetUserThrottled(
     return {
       sid: undefined,
     };
-  }
-  const getSessionForCaching = config.cacheSession?.getSession;
-
-  /** Get cached session if available */
-  const __prglCache =
-    !config.cacheSession ? undefined : (
-      (clientReq.httpReq ?? clientReq.socket).__prglCache?.get(this.prostgles.appId)
-    );
-  if (clientReq.socket && __prglCache) {
-    const { userData, session } = __prglCache;
-    const isValid = this.isNonExpiredSocketSession(clientReq.socket, session);
-    if (isValid) {
-      return {
-        ...userData,
-        sid: session.sid,
-      };
-    } else
-      return {
-        sid: session.sid,
-      };
   }
 
   const result = await throttledAuthCall(async () => {
@@ -86,26 +65,7 @@ export async function handleGetUserThrottled(
       return "new-session-redirect" as const;
     }
 
-    /** Set cached session data */
     const sid = this.getValidatedSid(clientReq);
-    if (getSessionForCaching && sid) {
-      const { db, dbo } = this.dbHandles;
-      const session = await getSessionForCaching(sid, dbo, db);
-      if (session && session.expires && clientInfo?.user) {
-        const __prglCache = {
-          userData: clientInfo,
-          session,
-        };
-        if (clientReq.socket) {
-          clientReq.socket.__prglCache ??= new Map();
-          clientReq.socket.__prglCache.set(this.prostgles.appId, __prglCache);
-        } else {
-          clientReq.httpReq.__prglCache ??= new Map();
-          clientReq.httpReq.__prglCache.set(this.prostgles.appId, __prglCache);
-        }
-      }
-    }
-
     if (clientInfo?.user && sid) {
       return { sid, ...clientInfo };
     }

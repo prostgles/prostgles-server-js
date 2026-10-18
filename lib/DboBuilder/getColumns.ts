@@ -69,7 +69,7 @@ export async function getRawColumns(
 ): Promise<ValidatedColumnInfo[]> {
   const rules = this.getValidatedRules(tableRules, localParams);
 
-  let dynamicUpdateFields = this.column_names;
+  let dynamicUpdateFields = rules.update?.fields ?? [];
 
   if (params && tableRules && isTableHandler(this)) {
     if (
@@ -99,6 +99,7 @@ export async function getRawColumns(
       return [insert, select, update]
         .filter(isDefined)
         .flatMap((rule) => rule.fields)
+        .concat(dynamicUpdateFields)
         .includes(c.name);
     })
     .map((_c) => {
@@ -136,7 +137,6 @@ export async function getRawColumns(
         filter: !!rules.select?.filterFields.includes(c.name),
         update:
           update &&
-          !!rules.update?.fields.includes(c.name) &&
           tableRules?.update?.forcedData?.[c.name] === undefined &&
           c.is_updatable &&
           dynamicUpdateFields.includes(c.name),

@@ -302,7 +302,7 @@ export const initProstgles = async function (
         for (const socket of [...this.connectedSockets]) {
           const sid = this.authHandler.getValidatedSid({ socket });
           if (!sid || !affectedSessions.has(sid)) continue;
-          socket.__prglCache?.delete(this.appId);
+          this.authHandler.clearSocketSession(socket);
           socket.conn.close();
         }
       },

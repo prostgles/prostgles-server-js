@@ -26,14 +26,13 @@ import type {
 } from "prostgles-types";
 import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
-import { type CachedSession } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
 import { GET_AUTH_ROUTE } from "./AuthHandler";
 import type { ServerSideRequest } from "./utils/serverSideRequest";
 
 type Awaitable<T> = T | Promise<T>;
 
-export type ExpressReq = Request & CachedSession;
+export type ExpressReq = Request;
 export type ExpressRes = Response;
 
 export type LoginClientInfo = {
@@ -250,6 +249,9 @@ export type SessionUser<
    * User data sent to the authenticated client
    */
   clientUser: ClientUser;
+
+  /** Validated session metadata used when auth.cacheSession is enabled. */
+  session?: BasicSession;
 };
 
 type AllNeverAndOptional<T> = {
@@ -352,15 +354,10 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   responseThrottle?: number;
 
   /**
-   * If provided then session info will be saved on socket.__prglCache and reused from there
+   * Reuse getUser results per socket when they include session metadata.
+   * Expiry closes the socket. Call invalidateAuth when cached user permissions change.
    */
-  cacheSession?: {
-    getSession: (
-      sid: string,
-      dbo: DBHandlerServer<S>,
-      db: DB,
-    ) => Awaitable<BasicSession | undefined>;
-  };
+  cacheSession?: boolean;
 };
 
 export type LoginResponse =

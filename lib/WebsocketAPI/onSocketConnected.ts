@@ -33,9 +33,10 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
     };
 
     socket.on("disconnect", () => {
+      const sid = this.authHandler.getValidatedSid({ socket });
       void this.opts.onLog?.({
         type: "disconnect",
-        sid: this.authHandler.getValidatedSid({ socket }),
+        sid,
         socketId: socket.id,
         connectedSocketIds: this.connectedSockets.map((s) => s.id),
       });
@@ -51,7 +52,7 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
         });
       });
 
-      void this.opts.onSocketDisconnect?.({ socket, dbo: dbo as DBHandlerServer, db, getUser });
+      void this.opts.onSocketDisconnect?.({ socket, sid, dbo: dbo as DBHandlerServer, db, getUser });
     });
 
     await this.opts.onLog?.({

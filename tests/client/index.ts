@@ -6,7 +6,7 @@ import type { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 import type { ClientFunctionHandler } from "prostgles-client/dist/getMethods";
 import type { DBSchemaTable, SQLHandler } from "prostgles-types";
 import { clientFileTests } from "../clientFileTests.spec";
-import { clientOnlyQueries } from "../clientOnlyQueries.spec";
+import { clientOnlyQueries, clientUserQueries } from "../clientOnlyQueries.spec";
 import { clientRestApi } from "../clientRestApi.spec";
 import { testSyncTriggerCleanup } from "../syncTriggerCleanup.spec";
 import { isomorphicQueries } from "../isomorphicQueries.spec";
@@ -70,6 +70,15 @@ const tests: Record<string, ClientTestSpecV2> = {
       db,
     );
     await clientOnlyQueries(db, sql, auth, log, methods, tableSchema, TEST_NAME);
+    const userClient = await prostgles({
+      endpoint,
+      socketOptions: { ...socketOptions, query: { token: "user" }, reconnection: false },
+    });
+    try {
+      await clientUserQueries(userClient.db, userClient.auth);
+    } finally {
+      userClient.socket.disconnect();
+    }
     await clientHooks(db, reconnectSocket);
   },
   useProstgles: async ({ db, sql }) => {

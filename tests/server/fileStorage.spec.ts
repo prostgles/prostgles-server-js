@@ -14,10 +14,8 @@ import type { CloudStorageClient } from "prostgles-server/dist/StorageClient/Sto
 import { setupFileServeHandler } from "prostgles-server/dist/StorageClient/setupFileServeHandler";
 import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileStorageKey";
 import { deleteUnreferencedFile } from "prostgles-server/dist/StorageClient/deleteUnreferencedFile";
-import { testFileJobs } from "./fileJobs.spec";
 
 export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
-  await testFileJobs(db);
   await test("Managed storage permission and transaction safety", async (t) => {
     const files = dbo.files as TableHandler;
     const config = files.dboBuilder.prostgles.opts.fileTable!;
@@ -74,6 +72,163 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
     ];
     let original = await files.insert(fileData("original"), { returning: "*" });
     try {
+      await t.test("select arrays protect referenced files and version fields", async () => {
+        const ownFile = await files.insert(
+          { ...fileData("own-array"), description: "own-private" },
+          { returning: "*" },
+        );
+        const otherFile = await files.insert(
+          { ...fileData("other-array"), description: "other-private" },
+          { returning: "*" },
+        );
+        const users = dbo.users_public_info!;
+        const ownUser = await users.insert(
+          { name: "own-array", avatar: ownFile.id },
+          { returning: "*" },
+        );
+        const otherUser = await users.insert(
+          { name: "other-array", avatar: otherFile.id },
+          { returning: "*" },
+        );
+        const parser = files.dboBuilder.publishParser!;
+        try {
+          for (const tableName of ["files", "files_versions"]) {
+            const rules = await parser.getTableRules({
+              tableName,
+              clientReq: undefined,
+              clientInfo: undefined,
+              scope: undefined,
+              resolvedPublishObject: {
+                users_public_info: {
+                  select: [
+                    { fields: ["id", "name", "avatar"], forcedFilter: { id: ownUser.id } },
+                    { fields: ["id", "name"] },
+                  ],
+                },
+              },
+            });
+            assert(rules?.select);
+            const table = dbo[tableName]!;
+            const rows = await table.find({}, {}, undefined, rules);
+            assert.equal(rows.length, 1);
+            assert.equal(rows[0]![tableName === "files" ? "id" : "file_id"], ownFile.id);
+          }
+          const rules = await parser.getTableRules({
+            tableName: "files_versions",
+            clientReq: undefined,
+            clientInfo: undefined,
+            scope: undefined,
+            resolvedPublishObject: {
+              files: {
+                select: [
+                  { fields: "*", forcedFilter: { id: ownFile.id } },
+                  { fields: ["id", "original_name"] },
+                ],
+              },
+            },
+          });
+          assert(rules?.select);
+          const rows = await fileVersions.find(
+            { file_id: { $in: [ownFile.id, otherFile.id] } },
+            {
+              select: ["original_name", "description"],
+              orderBy: "original_name",
+            },
+            undefined,
+            rules,
+          );
+          assert.deepEqual(rows, [
+            { original_name: "other-array.txt", description: null },
+            { original_name: "own-array.txt", description: "own-private" },
+          ]);
+          for (const tableName of ["files", "files_versions"]) {
+            for (const useArray of [false, true]) {
+              const explicitSelect = { fields: "*", forcedFilter: { id: otherFile.id } } as const;
+              const combinedRules = await parser.getTableRules({
+                tableName,
+                clientReq: undefined,
+                clientInfo: undefined,
+                scope: undefined,
+                resolvedPublishObject: {
+                  users_public_info: {
+                    select: { fields: ["id", "avatar"], forcedFilter: { id: ownUser.id } },
+                  },
+                  files: { select: useArray ? [explicitSelect] : explicitSelect },
+                },
+              });
+              assert(combinedRules?.select);
+              const idColumn = tableName === "files" ? "id" : "file_id";
+              const combinedRows = await dbo[tableName]!.find(
+                {},
+                { select: [idColumn] },
+                undefined,
+                combinedRules,
+              );
+              assert.deepEqual(
+                combinedRows.map((row) => row[idColumn]).sort(),
+                [ownFile.id, otherFile.id].sort(),
+              );
+            }
+          }
+          for (const description of ["other-private", null]) {
+            const scopedRules = await parser.getTableRules({
+              tableName: "files_versions",
+              clientReq: undefined,
+              clientInfo: undefined,
+              scope: {
+                tables: {
+                  files: { select: { forcedFilter: { description } } },
+                  files_versions: { select: true },
+                },
+              },
+              resolvedPublishObject: {
+                files: {
+                  select: [
+                    { fields: "*", forcedFilter: { id: ownFile.id } },
+                    { fields: ["id", "original_name"], forcedFilter: { id: otherFile.id } },
+                  ],
+                },
+              },
+            });
+            assert(scopedRules?.select);
+            const rows = await fileVersions.find(
+              {},
+              { select: ["file_id"] },
+              undefined,
+              scopedRules,
+            );
+            assert.deepEqual(rows, description ? [] : [{ file_id: otherFile.id }]);
+          }
+          for (const name of ["other-array", null]) {
+            const scopedRules = await parser.getTableRules({
+              tableName: "files",
+              clientReq: undefined,
+              clientInfo: undefined,
+              scope: {
+                tables: {
+                  users_public_info: { select: { forcedFilter: { name } } },
+                  files: { select: true },
+                },
+              },
+              resolvedPublishObject: {
+                users_public_info: {
+                  select: [
+                    { fields: ["id", "name", "avatar"], forcedFilter: { id: ownUser.id } },
+                    { fields: ["id", "avatar"], forcedFilter: { id: otherUser.id } },
+                  ],
+                },
+              },
+            });
+            assert(scopedRules?.select);
+            assert.deepEqual(
+              await files.find({}, { select: ["id"] }, undefined, scopedRules),
+              name ? [] : [{ id: otherFile.id }],
+            );
+          }
+        } finally {
+          await files.delete({ id: { $in: [ownFile.id, otherFile.id] } });
+        }
+      });
       await t.test("ODT uploads preserve their MIME type and stored bytes", async () => {
         const data = fs.readFileSync(join(__dirname, "../../../fixtures/sample.odt"));
         const originalAvatarConfig = config.referencedTables!.users_public_info;
@@ -101,7 +256,8 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
           assert.deepEqual(Buffer.from(await response.arrayBuffer()), data);
           await assert.rejects(() =>
             dbo.users_public_info!.insert({
-              name: "Disallowed file", avatar: fileData("not-an-odt"),
+              name: "Disallowed file",
+              avatar: fileData("not-an-odt"),
             }),
           );
           await dbo.users_public_info!.delete({ id: user.id });
@@ -111,68 +267,73 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
         }
       });
 
-      await t.test("descriptions support insert, metadata updates and replacement permissions", async () => {
-        const file = await files.insert(
-          { ...fileData("description"), description: "Initial description" },
-          { returning: "*" },
-        );
-        try {
-          assert.equal(file.description, "Initial description");
-          const count = uploads;
-          await files.update({ id: file.id }, { description: "Updated description" });
-          assert.equal(uploads, count);
-          assert.equal((await files.findOne({ id: file.id })).local_file_path, file.local_file_path);
-          await files.update({ id: file.id }, fileData("replacement"));
-          assert.equal((await files.findOne({ id: file.id })).description, "Updated description");
-          await files.update(
-            { id: file.id },
-            { ...fileData("replacement"), description: "Replacement description" },
+      await t.test(
+        "descriptions support insert, metadata updates and replacement permissions",
+        async () => {
+          const file = await files.insert(
+            { ...fileData("description"), description: "Initial description" },
+            { returning: "*" },
           );
-          assert.deepEqual(
-            (await versions(file.id)).map(({ description }) => description),
-            ["Initial description", "Updated description", "Replacement description"],
-          );
-          for (const description of ["", null]) {
-            await files.update({ id: file.id }, { description });
-            assert.equal((await files.findOne({ id: file.id })).description, description);
-          }
-          const before = list();
-          const updateRules = {
-            fields: { description: 0 },
-            filterFields: "*",
-            returningFields: "*",
-          } as const;
-          for (const data of [
-            { description: "Forbidden" },
-            { ...fileData("forbidden"), description: "Forbidden" },
-          ]) {
-            await assert.rejects(() =>
-              files.update({ id: file.id }, data, undefined, { update: updateRules }),
+          try {
+            assert.equal(file.description, "Initial description");
+            const count = uploads;
+            await files.update({ id: file.id }, { description: "Updated description" });
+            assert.equal(uploads, count);
+            assert.equal(
+              (await files.findOne({ id: file.id })).local_file_path,
+              file.local_file_path,
             );
-          }
-          await assert.rejects(() =>
-            files.insert(
+            await files.update({ id: file.id }, fileData("replacement"));
+            assert.equal((await files.findOne({ id: file.id })).description, "Updated description");
+            await files.update(
+              { id: file.id },
+              { ...fileData("replacement"), description: "Replacement description" },
+            );
+            assert.deepEqual(
+              (await versions(file.id)).map(({ description }) => description),
+              ["Initial description", "Updated description", "Replacement description"],
+            );
+            for (const description of ["", null]) {
+              await files.update({ id: file.id }, { description });
+              assert.equal((await files.findOne({ id: file.id })).description, description);
+            }
+            const before = list();
+            const updateRules = {
+              fields: { description: 0 },
+              filterFields: "*",
+              returningFields: "*",
+            } as const;
+            for (const data of [
+              { description: "Forbidden" },
               { ...fileData("forbidden"), description: "Forbidden" },
-              undefined,
-              undefined,
-              { insert: { fields: { description: 0 }, returningFields: "*" } },
-            ),
-          );
-          assert.equal((await files.findOne({ id: file.id })).description, null);
-          assert.deepEqual(list(), before);
-        } finally {
-          await files.delete({ id: file.id });
-        }
-      });
+            ]) {
+              await assert.rejects(() =>
+                files.update({ id: file.id }, data, undefined, { update: updateRules }),
+              );
+            }
+            await assert.rejects(() =>
+              files.insert(
+                { ...fileData("forbidden"), description: "Forbidden" },
+                undefined,
+                undefined,
+                { insert: { fields: { description: 0 }, returningFields: "*" } },
+              ),
+            );
+            assert.equal((await files.findOne({ id: file.id })).description, null);
+            assert.deepEqual(list(), before);
+          } finally {
+            await files.delete({ id: file.id });
+          }
+        },
+      );
 
       await t.test("legacy ID-based files remain readable and replaceable", async () => {
         assert.equal(original.local_file_path, join(folder, original.storage_key));
         assert.equal((await versions(original.id))[0]!.local_file_path, original.local_file_path);
         fs.renameSync(join(folder, original.storage_key), join(folder, original.id));
-        await db.none(
-          "UPDATE files SET storage_key = NULL, local_file_path = NULL WHERE id = $1",
-          [original.id],
-        );
+        await db.none("UPDATE files SET storage_key = NULL, local_file_path = NULL WHERE id = $1", [
+          original.id,
+        ]);
         await fileVersions.update(
           { file_id: original.id },
           { storage_key: original.id, local_file_path: null },

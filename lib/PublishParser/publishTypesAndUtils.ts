@@ -28,6 +28,7 @@ import type { AuthClientRequest, LoginClientInfo, SessionUser } from "../Auth/Au
 import type { TableSchemaColumn } from "../DboBuilder/DboBuilderTypes";
 import type { ClientHandlers, GetClientDBHandlers } from "../WebsocketAPI/getClientHandlers";
 import { isArray } from "../utils/utils";
+import { hasSelectRules } from "./mergeSelectRules";
 
 export type InsertRequestData = {
   data: object | object[];
@@ -79,7 +80,11 @@ export type ValidateBeforeRowArgsCommon<R = AnyObject, DBX = DBHandlerServerInte
   data: Partial<R>;
   filter: AnyObject | undefined;
 };
-export type ValidateRowArgsCommon<R = AnyObject, DBX = DBHandlerServerInternal, InputDataType = R> = {
+export type ValidateRowArgsCommon<
+  R = AnyObject,
+  DBX = DBHandlerServerInternal,
+  InputDataType = R,
+> = {
   row: R;
   dbx: DBX;
   tx: pgPromise.ITask<{}> | DB;
@@ -434,24 +439,30 @@ export const parsePublishTableRule = <R extends ParsedPublishTable>(tableRules: 
     orderByFields: tableRules.select.orderByFields ?? tableRules.select.fields,
   };
 
+  // Row-dependent reads cannot grant a static returning/filter allowlist.
+  // Returning falls back to mutation fields; update filters require an explicit grant.
+  const defaultSelectFields = hasSelectRules(selectRules) ? undefined : selectRules?.fields;
+  const defaultSelectFilterFields =
+    hasSelectRules(selectRules) ? undefined : selectRules?.filterFields;
+
   const parsedTableRules: ParsedTableRule | undefined = tableRules && {
     ...tableRules,
     select: selectRules,
     insert: tableRules.insert && {
       ...tableRules.insert,
       returningFields:
-        tableRules.insert.returningFields ?? selectRules?.fields ?? tableRules.insert.fields,
+        tableRules.insert.returningFields ?? defaultSelectFields ?? tableRules.insert.fields,
     },
     update: tableRules.update && {
       ...tableRules.update,
-      filterFields: tableRules.update.filterFields ?? selectRules?.filterFields ?? [],
+      filterFields: tableRules.update.filterFields ?? defaultSelectFilterFields ?? [],
       returningFields:
-        tableRules.update.returningFields ?? selectRules?.fields ?? tableRules.update.fields,
+        tableRules.update.returningFields ?? defaultSelectFields ?? tableRules.update.fields,
     },
     delete: tableRules.delete && {
       ...tableRules.delete,
       returningFields:
-        tableRules.delete.returningFields ?? selectRules?.fields ?? tableRules.delete.filterFields,
+        tableRules.delete.returningFields ?? defaultSelectFields ?? tableRules.delete.filterFields,
     },
   };
   return parsedTableRules;
@@ -461,7 +472,15 @@ export type PublishTableRule<
   Col extends AnyObject = AnyObject,
   S extends DBSchema | void = void,
 > = {
-  select?: SelectRule<Col, S> | PublishAllOrNothing;
+  /**
+   * Arrays grant the union of fields from matching forcedFilters, masking other fields
+   * with NULL and hiding rows matching no rule. [] denies reads. Limits use the minimum,
+   * throttles the maximum, and any disableMethods restriction applies to the whole query.
+   * Filtering/sorting uses masked selectable fields. Sync is disabled. Mutation
+   * returningFields defaults to the mutation's fields (delete.filterFields for deletes).
+   * update.filterFields must be granted explicitly.
+   */
+  select?: SelectRule<Col, S> | SelectRule<Col, S>[] | PublishAllOrNothing;
   insert?: InsertRule<Col, S> | PublishAllOrNothing;
   update?: UpdateRule<Col, S> | PublishAllOrNothing;
   delete?: DeleteRule<Col, S> | PublishAllOrNothing;

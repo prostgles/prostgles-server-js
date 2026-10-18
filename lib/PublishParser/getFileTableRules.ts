@@ -6,6 +6,8 @@ import type { PublishParser } from "./PublishParser";
 import type { ParsedPublishTable, PublishObject, UpdateRule } from "./publishTypesAndUtils";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
 import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
+import { getSelectRules, hasSelectRules, mergeSelectRules } from "./mergeSelectRules";
+import { withExistsTableRules } from "../DboBuilder/ViewHandler/getExistsCondition";
 
 /**
  * Permissions for referencedTables columns are propagated to the file table (even if file table has no permissions)
@@ -76,7 +78,7 @@ export async function getFileTableRules(
             forcedSelectFilters.push({
               $existsJoined: {
                 path,
-                filter: tableRules.select.forcedFilter ?? {},
+                filter: withExistsTableRules(tableRules),
               },
             });
           }
@@ -121,11 +123,27 @@ export async function getFileTableRules(
         };
   };
   if (forcedSelectFilters.length || fileTablePublishRules?.select) {
-    fileTableRule.select = {
-      fields: "*",
-      ...fileTablePublishRules?.select,
-      ...getForcedFilter(fileTablePublishRules?.select, forcedSelectFilters),
-    };
+    const select = fileTablePublishRules?.select;
+    fileTableRule.select =
+      hasSelectRules(select) ?
+        mergeSelectRules(this.dbo[fileTableName]!, [
+          ...getSelectRules(select, this.dbo[fileTableName]!),
+          ...(forcedSelectFilters.length ?
+            [
+              {
+                fields: select.fields,
+                filterFields: select.filterFields,
+                orderByFields: select.orderByFields,
+                forcedFilter: { $or: forcedSelectFilters },
+              },
+            ]
+          : []),
+        ])
+      : {
+          fields: "*",
+          ...select,
+          ...getForcedFilter(select, forcedSelectFilters),
+        };
   }
   if (forcedDeleteFilters.length || fileTablePublishRules?.delete) {
     fileTableRule.delete = {

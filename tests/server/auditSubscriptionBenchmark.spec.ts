@@ -21,7 +21,6 @@ const BENCHMARK_LIMITS = {
   minWritesPerSecond: 100,
 };
 
-// Local only: TEST_NAME=auditBenchmark npm run test-server from tests/server.
 // Set AUDIT_BENCHMARK_REPORT_PATH to save the measurements as JSON.
 export const testAuditSubscriptionBenchmark = async (parentDb: DB) => {
   await test(

@@ -69,13 +69,14 @@ async function subscribe(
       table_rules,
       { ...localParams, returnNewQuery: true },
     )) as unknown as NewQuery;
-    const { viewOptions, rootJoinColumns } = await getSubscribeRelatedTables.bind(this)({
-      filter,
-      selectParams,
-      table_rules,
-      localParams,
-      newQuery,
-    });
+    const { viewOptions, rootJoinColumns, hasRowPermissions } =
+      await getSubscribeRelatedTables.bind(this)({
+        filter,
+        selectParams,
+        table_rules,
+        localParams,
+        newQuery,
+      });
 
     const [firstField, ...otherFields] = Array.from(
       new Set([
@@ -94,7 +95,7 @@ async function subscribe(
       table_info: this.tableOrViewInfo,
       viewOptions,
       table_rules,
-      condition: newQuery.whereOpts.condition,
+      condition: hasRowPermissions ? "TRUE" : newQuery.whereOpts.condition,
       filter: { ...filter },
       selectParams: { ...selectParams },
       subscribeOptions: getValidatedSubscribeOptions(
@@ -103,7 +104,7 @@ async function subscribe(
       ),
       localParams,
       lastPushed: 0,
-      tracked_columns: !firstField ? undefined : [firstField, ...otherFields],
+      tracked_columns: hasRowPermissions || !firstField ? undefined : [firstField, ...otherFields],
       pushRequestedVersion: 0,
     } as const satisfies Partial<AddSubscriptionParams>;
 

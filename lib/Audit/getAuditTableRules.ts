@@ -13,6 +13,7 @@ import type {
 import { AUDIT_TABLE_COLUMN_NAMES, type AuditTableRow } from "./AuditTable";
 import type { ResolvedAuditConfig } from "./AuditTypes";
 import { prepareWhere } from "../DboBuilder/ViewHandler/prepareWhere";
+import { getSelectRules, hasSelectRules } from "../PublishParser/mergeSelectRules";
 
 const AUDIT_JOIN_COLUMNS = {
   old_id: "prostgles_audit_join_old_id",
@@ -59,17 +60,61 @@ export const getAuditTableRules = async function (
           return;
         }
 
+        const hasMaskedFields = hasSelectRules(rules.select);
+        const sourceRule =
+          hasMaskedFields ? { ...rules.select, fields: "*" as const } : rules.select;
+        const selectRules = await Promise.all(
+          getSelectRules(sourceRule, tableHandler).map(async (rule) => ({
+            condition: await getSourceAuditCondition(
+              tableHandler,
+              rule.forcedFilter,
+              excludeColumns,
+            ),
+            overrides: getAuditRowColumnOverrides(
+              tableHandler.parseFieldFilter(rule.fields),
+              idColumns,
+            ),
+          })),
+        );
+        const tableColumnOverrides =
+          selectRules.length === 1 ?
+            selectRules[0]!.overrides
+          : fromEntries(
+              getKeys(selectRules[0]!.overrides).map((column) => [
+                column,
+                selectRules
+                  .map(
+                    ({ condition, overrides }) =>
+                      `(CASE WHEN ${condition} THEN ${overrides[column]} ELSE '{}'::jsonb END)`,
+                  )
+                  .join(" || "),
+              ]),
+            );
+        const scopeCondition =
+          hasMaskedFields && rules.select.forcedFilter ?
+            await getSourceAuditCondition(
+              tableHandler,
+              rules.select.forcedFilter,
+              excludeColumns,
+              tableColumnOverrides,
+            )
+          : "TRUE";
+        const allowedFields = tableHandler.parseFieldFilter(rules.select.fields);
+        const hiddenFields =
+          hasMaskedFields ?
+            tableHandler.column_names.filter((field) => !allowedFields.includes(field))
+          : [];
         return {
           handler: tableHandler,
           sourceCondition: getSourceTableCondition(tableHandler),
-          additionalForcedCondition: await getSourceAuditCondition(
-            tableHandler,
-            rules.select.forcedFilter,
-            excludeColumns,
-          ),
-          tableColumnOverrides: getAuditRowColumnOverrides(
-            tableHandler.parseFieldFilter(rules.select.fields),
-            idColumns,
+          additionalForcedCondition: `(${selectRules.map(({ condition }) => `(${condition})`).join(" OR ")}) AND (${scopeCondition})`,
+          tableColumnOverrides: fromEntries(
+            Object.entries(tableColumnOverrides).map(([column, expression]) => [
+              column,
+              hiddenFields.length ?
+                `(${expression}) - ARRAY[${hiddenFields.map((field) => as.text(field)).join(", ")}]::text[]`
+              : expression,
+            ]),
           ),
         };
       }),
@@ -169,6 +214,7 @@ const getSourceAuditCondition = async (
   sourceHandler: ViewHandler,
   forcedFilter: Filter | undefined,
   excludedColumns: readonly string[],
+  snapshots?: Record<string, string>,
 ) => {
   const auditColumn = (columnName: keyof AuditTableRow) => asName(columnName);
   const sourceCondition = getSourceTableCondition(sourceHandler);
@@ -181,7 +227,7 @@ const getSourceAuditCondition = async (
       typeof AUDIT_TABLE_COLUMN_NAMES.old_row | typeof AUDIT_TABLE_COLUMN_NAMES.new_row,
   ) => {
     const alias = `prostgles_audit_${snapshotColumn}`;
-    const snapshot = auditColumn(snapshotColumn);
+    const snapshot = snapshots?.[snapshotColumn] ?? auditColumn(snapshotColumn);
     const { condition } = await prepareWhere(sourceHandler, {
       filter: forcedFilter,
       select: undefined,

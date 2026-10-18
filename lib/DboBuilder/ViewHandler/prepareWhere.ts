@@ -150,6 +150,10 @@ export const prepareWhere = async (
   if (combinedConditions && addKeywords) {
     combinedConditions = `WHERE ${combinedConditions}`;
   }
+  source.rowPermissionTables = [
+    ...(source.rowPermissionTables ?? []),
+    ...exists.flatMap((filter) => filter.rowPermissionTables ?? []),
+  ];
   return {
     columnsUsed: combinedColumnsUsed,
     condition,

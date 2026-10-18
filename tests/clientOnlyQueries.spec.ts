@@ -660,10 +660,10 @@ export const clientOnlyQueries = async (
     log("auth.user:", auth.user);
 
     assert.equal(auth.loginType, "email+password", "auth.login.withPassword should be defined");
-    const isUser = Boolean(auth.user && auth.user.type !== "public");
+    assert.equal(auth.user?.type, "public");
 
     // Public data
-    await test("Security rules example", { skip: isUser }, async () => {
+    await test("Security rules for public users", async () => {
       log("Checking public data");
       const vQ = await db.items4!.find!({}, { select: { added: 0 } });
       assert.deepStrictEqual(vQ, [
@@ -788,7 +788,7 @@ export const clientOnlyQueries = async (
     //   })
     // })
 
-    await test("Realtime", { skip: isUser }, async () => {
+    await test("Realtime", async () => {
       await testRealtime();
     });
 
@@ -799,7 +799,7 @@ export const clientOnlyQueries = async (
           some_table.sync({}, { handlesOnData: false }, console.log);
         return no data items
     */
-    await test("sync handlesOnData true -> false no data bug", { skip: isUser }, async () => {
+    await test("sync handlesOnData true -> false no data bug", async () => {
       let sync1Planes: AnyObject[] = [];
       let sync2Planes: AnyObject[] = [];
       const sync1 = await db.planes!.sync!({}, { handlesOnData: true }, (planes1, deltas) => {
@@ -817,34 +817,39 @@ export const clientOnlyQueries = async (
       sync1.$unsync();
       sync2.$unsync();
     });
+  });
+};
 
-    // User data
-    await test("Security rules example", { skip: !isUser }, async () => {
-      log("Checking User data");
-      const vQ = await db.items4?.find!();
-      assert.deepStrictEqual(vQ, [
-        { id: 1, public: "public data" },
-        { id: 2, public: "public data" },
-      ]);
+export const clientUserQueries = async (db: Partial<DBHandlerClient>, auth: AuthHandler) => {
+  await test("Security rules for non-public users", async () => {
+    assert.equal(auth.user?.type, "default");
+    const rows = await db.items4!.find!({}, { select: { added: 0 }, orderBy: { id: 1 } });
+    assert.deepStrictEqual(rows, [
+      { id: 1, public: "public data", name: "abc" },
+      { id: 2, public: "public data", name: "abc" },
+      { id: 3, public: "public data d", name: "abcd" },
+    ]);
 
-      await db.items4?.find!({}, { select: { id: 1 }, orderBy: { added: 1 } });
+    await db.items4!.find!({}, { select: { id: 1 }, orderBy: { added: 1 } });
 
-      const dynamicCols = await db.uuid_text!.getColumns!(undefined, {
-        rule: "update",
-        filter: {
-          id: "c81089e1-c4c1-45d7-a73d-e2d613cb7c3e",
-        },
-      });
-      assert.equal(dynamicCols.length, 1);
-      assert.equal(dynamicCols[0]!.name, "id");
-      const defaultCols = await db.uuid_text!.getColumns!(undefined, {
-        rule: "update",
-        filter: {
-          id: "not matching",
-        },
-      });
-      throw defaultCols.map((c) => c.name);
+    await db.uuid_text!.insert!({});
+    const dynamicCols = await db.uuid_text!.getColumns!(undefined, {
+      rule: "update",
+      filter: {
+        id: "c81089e1-c4c1-45d7-a73d-e2d613cb7c3e",
+      },
     });
+    assert.deepStrictEqual(
+      dynamicCols.filter((column) => column.update).map((column) => column.name),
+      ["id"],
+    );
+    const defaultCols = await db.uuid_text!.getColumns!(undefined, {
+      rule: "update",
+      filter: {
+        id: "00000000-0000-0000-0000-000000000000",
+      },
+    });
+    assert.deepStrictEqual(defaultCols.filter((column) => column.update), []);
   });
 };
 

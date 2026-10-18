@@ -1,14 +1,17 @@
 import type { JoinPath, RawJoinPath } from "prostgles-types";
 import { reverseJoinOn } from "prostgles-types";
 import type { ViewHandler } from "./ViewHandler";
-import type { JoinInfo } from "../DboBuilder";
+import type { JoinInfo, LocalParams } from "../DboBuilder";
 import type { ParsedComputedJoin } from "../joins/computedJoins";
 import { resolveComputedJoin } from "../joins/computedJoins";
+import { getQuerySourceSQL, type QuerySource } from "../QueryBuilder/getQuerySource";
+import { prepareWhere } from "./prepareWhere";
 
 type parseJoinPathArgs = {
   rawPath: RawJoinPath;
   rootTable: string;
   viewHandler: ViewHandler;
+  localParams: LocalParams | undefined;
   allowMultiOrJoin?: boolean;
   addShortestJoinIfMissing?: boolean;
 };
@@ -16,19 +19,22 @@ export type ParsedJoinPath = {
   table: string;
   on: Record<string, string>[];
   computedJoin?: ParsedComputedJoin;
+  /** The target uses its own query source; intermediate sources are resolved here. */
+  source: QuerySource | undefined;
 };
 type ColumnJoinPath = { table: string; on?: Record<string, string>[] };
 
 /**
  * Return a valid join path
  */
-export const parseJoinPath = ({
+export const parseJoinPath = async ({
   rawPath,
   rootTable,
   viewHandler,
+  localParams,
   allowMultiOrJoin = false,
   addShortestJoinIfMissing,
-}: parseJoinPathArgs): ParsedJoinPath[] => {
+}: parseJoinPathArgs): Promise<ParsedJoinPath[]> => {
   const result: ParsedJoinPath[] = [];
   let cleanPath = typeof rawPath === "string" ? [{ table: rawPath }] : rawPath;
   if (addShortestJoinIfMissing && cleanPath[0] !== "**") {
@@ -41,7 +47,7 @@ export const parseJoinPath = ({
     const pushJoinPath = (targetPath: JoinPath) => {
       const computedJoin = resolveComputedJoin(viewHandler, prevTable, targetPath);
       if (computedJoin) {
-        result.push({ table: targetPath.table, on: [], computedJoin });
+        result.push({ table: targetPath.table, on: [], computedJoin, source: undefined });
         return;
       }
       const getShortestJoin = i === 1 && cleanPath[0] === "**";
@@ -71,6 +77,7 @@ export const parseJoinPath = ({
         result.push({
           table: path.table,
           on: path.on.map((constraint) => Object.fromEntries(constraint)),
+          source: undefined,
         });
       });
     };
@@ -100,6 +107,34 @@ export const parseJoinPath = ({
     throw `Missing join on condition for: ${missingPath.table}`;
   }
 
+  for (const part of result.slice(0, -1)) {
+    const table = viewHandler.dboBuilder.dboMap.get(part.table)!;
+    const tableRules =
+      localParams?.clientReq ?
+        await viewHandler.dboBuilder.publishParser!.getValidatedRequestRuleWusr(
+          { tableName: part.table, command: "find", clientReq: localParams.clientReq },
+          localParams.scope,
+        )
+      : undefined;
+    const { source, where, exists } = await prepareWhere(table, {
+      filter: {},
+      forcedFilter: tableRules?.select?.forcedFilter,
+      select: undefined,
+      selectParams: {},
+      tableRule: tableRules,
+      localParams,
+    });
+    // Keep forced filters inside the relation, including scope filters on masked values.
+    if (where) {
+      source.expression = `(SELECT * FROM ${getQuerySourceSQL(source)} ${where} OFFSET 0)`;
+      source.rowPermissionTables = [
+        ...(source.rowPermissionTables ?? []),
+        table.name,
+        ...exists.flatMap((filter) => filter.dependencyTables ?? []),
+      ];
+    }
+    part.source = source;
+  }
   return result;
 };
 

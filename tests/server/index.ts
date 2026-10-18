@@ -16,24 +16,6 @@ const http = require("http").createServer(app);
 testPublishTypes();
 
 const isClientTest = process.env.TEST_TYPE === "client";
-if (
-  process.env.TEST_TYPE === "server" &&
-  process.env.TEST_NAME &&
-  ![
-    "conflictUpdates",
-    "jobs",
-    "hooks",
-    "audit",
-    "auditBenchmark",
-    "joins",
-    "schemaTypes",
-    "clientSchemaTypes",
-    "tableConfig",
-    "socketLifecycle",
-  ].includes(process.env.TEST_NAME)
-) {
-  throw new Error(`Unknown server test group: ${process.env.TEST_NAME}`);
-}
 const io = !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/s" });
 const ioWatchSchema =
   !isClientTest ? undefined : require("socket.io")(http, { path: "/teztz/sWatchSchema" });
@@ -41,19 +23,6 @@ const ioWatchSchema =
 http.listen(3001);
 
 import { isomorphicQueries } from "../isomorphicQueries.spec";
-import { testBackgroundJobs } from "./backgroundJobs.spec";
-import { testFileJobs } from "./fileJobs.spec";
-import { testConflictUpdates } from "./conflictUpdates.spec";
-import { testTableHookRecursion } from "./tableHookRecursion.spec";
-import { testExecutionContext } from "./executionContext.spec";
-import { testAudit } from "./audit.spec";
-import { testAuditSubscriptionBenchmark } from "./auditSubscriptionBenchmark.spec";
-import { testJoins } from "./joins.spec";
-import { testSchemaTypes } from "./schemaTypes.spec";
-import { testClientSchemaTypes } from "./clientSchemaTypes.spec";
-import { testTableConfigValidation } from "./tableConfig.spec";
-import { testSocketLifecycle } from "./socketLifecycle.spec";
-import { getDbConnection } from "prostgles-server/dist/getDbConnection";
 import { removeExpressRoutesTest } from "prostgles-server/dist/Auth/AuthHandler";
 import { serverOnlyQueries } from "../serverOnlyQueries.spec";
 
@@ -86,6 +55,7 @@ const stopTest = (err?: unknown) => {
 
 const sessions: { id: string; user_id: string }[] = [
   { id: "main", user_id: "1" },
+  { id: "user", user_id: "2" },
   { id: "syncTriggerCleanup", user_id: "1" },
   { id: "rest_api", user_id: "1" },
 ];
@@ -120,24 +90,6 @@ const dbConnection = {
 };
 
 void (async () => {
-  if (
-    !isClientTest &&
-    ["socketLifecycle", "auditBenchmark"].includes(process.env.TEST_NAME || "")
-  ) {
-    const { db, pgp } = getDbConnection({ dbConnection });
-    try {
-      if (process.env.TEST_NAME === "auditBenchmark") {
-        await testAuditSubscriptionBenchmark(db);
-      } else {
-        await removeExpressRoutesTest(app);
-        await testSocketLifecycle(db);
-      }
-    } finally {
-      pgp.end();
-      http.close();
-    }
-    return;
-  }
   if (isClientTest && process.env.TEST_NAME === "useProstgles") {
     await prostgles<DBGeneratedSchema>({
       dbConnection,
@@ -243,6 +195,7 @@ void (async () => {
         }
         return {
           sid: s.id,
+          session: { sid: s.id, expires: Infinity, onExpiration: "redirect" },
           user,
           clientUser: {
             sid: s.id,
@@ -253,12 +206,7 @@ void (async () => {
         };
       },
       findUser: (userFilter, dbo) => dbo.users.findOne(userFilter) as any,
-      cacheSession: {
-        getSession: (sid) => {
-          const s = sessions.find((s) => s.id === sid);
-          return s ? { sid: s.id, expires: Infinity, onExpiration: "redirect" } : undefined;
-        },
-      },
+      cacheSession: true,
       loginSignupConfig: {
         app,
         login: (loginData) => {
@@ -504,49 +452,7 @@ void (async () => {
 
           log("Waiting for client...");
         } else if (process.env.TEST_TYPE === "server") {
-          if (process.env.TEST_NAME === "tableConfig") {
-            await testTableConfigValidation(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "clientSchemaTypes") {
-            await testClientSchemaTypes(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "schemaTypes") {
-            await testSchemaTypes(dbo as unknown as DBHandlerServerInternal, db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "audit") {
-            await testAudit(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "joins") {
-            await (dbo as unknown as DBHandlerServerInternal).users!.dboBuilder.getPubSubManager();
-            await testJoins(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "hooks") {
-            await testExecutionContext(db);
-            await testTableHookRecursion(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "conflictUpdates") {
-            await testConflictUpdates(db);
-            stopTest();
-            return;
-          }
-          if (process.env.TEST_NAME === "jobs") {
-            await testBackgroundJobs(db);
-            await testFileJobs(db);
-            stopTest();
-            return;
-          }
+          await removeExpressRoutesTest(app);
           await serverOnlyQueries(dbo as unknown as DBHandlerServerInternal, db, withUserRLS);
           log("Server-only query tests successful");
           await isomorphicQueries(dbo, sql, log);

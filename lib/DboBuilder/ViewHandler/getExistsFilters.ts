@@ -1,19 +1,23 @@
 import type { EXISTS_KEY } from "prostgles-types";
 import { EXISTS_KEYS, getKeys } from "prostgles-types";
-import type { ExistsFilterConfig } from "../DboBuilder";
+import type { ExistsFilterConfig, LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
 import { parseJoinPath } from "./parseJoinPath";
 
-export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsFilterConfig[] => {
+export const getExistsFilters = (
+  filter: any,
+  viewHandler: ViewHandler,
+  localParams: LocalParams | undefined,
+): Promise<ExistsFilterConfig[]> => {
   /* Exists join filter */
   const ERR =
     'Invalid exists filter. \nExpecting something like: \n | { $exists: { tableName.tableName2: Filter } } \n  | { $exists: { "**.tableName3": Filter } }\n | { path: string[]; filter: AnyObject }';
-  const existsConfigs: ExistsFilterConfig[] = getKeys(filter)
+  const existsConfigs = getKeys(filter)
     .filter(
       (k): k is (typeof EXISTS_KEYS)[number] =>
         EXISTS_KEYS.includes(k as EXISTS_KEY) && !!Object.keys(filter[k] ?? {}).length,
     )
-    .map((key) => {
+    .map(async (key): Promise<ExistsFilterConfig> => {
       const isJoined = key.toLowerCase().includes("join");
       const filterValue = filter[key];
 
@@ -67,10 +71,11 @@ export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsF
         isJoined: true,
         existType: key,
         path,
-        parsedPath: parseJoinPath({
+        parsedPath: await parseJoinPath({
           rawPath: path,
           rootTable: viewHandler.name,
           viewHandler,
+          localParams,
           allowMultiOrJoin: true,
         }),
         targetTableFilter,
@@ -78,5 +83,5 @@ export const getExistsFilters = (filter: any, viewHandler: ViewHandler): ExistsF
       };
     });
 
-  return existsConfigs;
+  return Promise.all(existsConfigs);
 };

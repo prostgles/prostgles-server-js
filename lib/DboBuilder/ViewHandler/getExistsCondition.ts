@@ -32,7 +32,7 @@ export async function getExistsCondition(
     throw "Unexpected: localParams isRemoteRequest and missing clientReq";
   }
 
-  let targetTableRules: ParsedTableRule | undefined = undefined;
+  let targetTableRules = (targetTableFilter as FilterWithTableRules)[EXISTS_TABLE_RULES];
   const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
   const tableHandler = this.dboBuilder.dboMap.get(targetTable);
   if (!tableHandler) {
@@ -69,6 +69,17 @@ export async function getExistsCondition(
   });
   const { source: targetSource, where: finalWhere } = whereOpts;
   eConfig.targetTableColumns = whereOpts.columnsUsed;
+  eConfig.rowPermissionTables = [
+    ...(targetSource.rowPermissionTables ?? []),
+    ...(eConfig.isJoined ?
+      eConfig.parsedPath.flatMap((part) => part.source?.rowPermissionTables ?? [])
+    : []),
+  ];
+  eConfig.dependencyTables = [
+    ...(eConfig.isJoined ? eConfig.parsedPath.map(({ table }) => table) : [targetTable]),
+    ...eConfig.rowPermissionTables,
+    ...whereOpts.exists.flatMap((filter) => filter.dependencyTables ?? []),
+  ];
 
   let innerQuery = [
     `SELECT 1`,
@@ -91,3 +102,13 @@ export async function getExistsCondition(
 
   return `${isNotExists ? " NOT " : " "} EXISTS ( \n${innerQuery} \n) `;
 }
+
+const EXISTS_TABLE_RULES = Symbol("existsTableRules");
+type FilterWithTableRules = ExistsFilterConfig["targetTableFilter"] & {
+  [EXISTS_TABLE_RULES]?: ParsedTableRule;
+};
+
+/** Internal inferred permissions reuse the target's normalized select rule. */
+export const withExistsTableRules = (tableRules: ParsedTableRule): FilterWithTableRules => ({
+  [EXISTS_TABLE_RULES]: tableRules,
+});

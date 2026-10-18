@@ -44,7 +44,7 @@ export async function getCondition(
 
   const filter = { ...rawFilter };
 
-  const existsConfigs = getExistsFilters(filter, this);
+  const existsConfigs = await getExistsFilters(filter, this, localParams);
   const dependencyColumns = existsConfigs.flatMap((existsConfig) =>
     existsConfig.isJoined ?
       (existsConfig.parsedPath[0]?.on.flatMap((columnPair) => Object.keys(columnPair)) ?? [])
@@ -82,7 +82,12 @@ export async function getCondition(
       await Promise.all(
         existsConfigs.map(
           async (existsConfig) =>
-            await getExistsCondition.bind(this)(existsConfig, tableAlias?.escaped, localParams, params.joinColumns),
+            await getExistsCondition.bind(this)(
+              existsConfig,
+              tableAlias?.escaped,
+              localParams,
+              params.joinColumns,
+            ),
         ),
       )
     ).join(" AND ");

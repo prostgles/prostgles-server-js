@@ -2,15 +2,16 @@ import { strict as assert } from "node:assert";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import prostgles, { type ProstglesInitOptions } from "prostgles-server";
+import prostgles, { type InitResult, type ProstglesInitOptions } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import { CHANNELS, type ClientSchema } from "prostgles-types";
+import { CHANNELS, type ClientSchema, type SubscriptionChannels } from "prostgles-types";
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
 import express from "express";
 
 export const testSocketLifecycle = async (db: DB) => {
+  await testSocketSessionCaching(db);
   await test(
     "Socket.IO survives instance replacement and API port changes",
     { timeout: 15000 },
@@ -167,6 +168,236 @@ export const testSocketLifecycle = async (db: DB) => {
   );
 };
 
+const testSocketSessionCaching = async (db: DB) => {
+  await test(
+    "Socket session caching respects expiry, configuration and invalidation",
+    { timeout: 15000 },
+    async () => {
+      const app = express();
+      app.use(express.json());
+      const http = createServer(app);
+      const io = new Server(http, { path: "/ws-api/restart" });
+      const clients: Socket[] = [];
+      let lookups = 0;
+      let expires: number | undefined = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      let beforeGetUser: (() => Promise<void>) | undefined;
+      let user = { id: "cached-user", type: "test" };
+      const getAuth = (): NonNullable<ProstglesInitOptions["auth"]> => ({
+        sidKeyName: "token",
+        cacheSession: true,
+        getUser: async (sid) => {
+          lookups++;
+          const result = {
+            user,
+            clientUser: user,
+            session:
+              expires === undefined ? undefined : (
+                {
+                  sid: sid!,
+                  expires,
+                  onExpiration: "show_error" as const,
+                }
+              ),
+          };
+          await beforeGetUser?.();
+          return result;
+        },
+        findUser: () => user,
+      });
+      const options = {
+        dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
+        schemaFilter: { socket_cache_test: 1 as const },
+        publish: "*" as const,
+        functions: getFunctions(1),
+        onReady: () => {},
+      };
+      let instance: InitResult | undefined;
+      try {
+        await db.none(
+          "CREATE SCHEMA socket_cache_test; CREATE TABLE socket_cache_test.records (id integer PRIMARY KEY)",
+        );
+        http.listen(0, "127.0.0.1");
+        await once(http, "listening");
+        const address = http.address();
+        assert(address && typeof address === "object");
+        const url = `http://127.0.0.1:${address.port}`;
+        instance = await prostgles({
+          ...options,
+          io,
+          auth: getAuth(),
+          restApi: { expressApp: app, path: "/lifecycle" },
+        });
+        const client = connect(url);
+        clients.push(client.socket);
+        await client.schema;
+        const serverSocket = io.sockets.sockets.get(client.socket.id!);
+        assert(serverSocket);
+        const handlers = await instance.getClientDBHandlers({ socket: serverSocket }, undefined);
+        const initialLookups = lookups;
+        await Promise.all([
+          callMethod(client.socket, "version"),
+          callMethod(client.socket, "version"),
+        ]);
+        assert.equal(lookups, initialLookups, "Socket requests reuse cached auth");
+        await callHttpMethod(url);
+      const afterFirstHttp = lookups;
+      assert(afterFirstHttp > initialLookups);
+        await callHttpMethod(url);
+      assert(lookups > afterFirstHttp, "HTTP requests always authenticate");
+
+      const beforeSecondSocket = lookups;
+        const secondClient = connect(url);
+        clients.push(secondClient.socket);
+        await secondClient.schema;
+        assert.equal(
+          lookups,
+        beforeSecondSocket + 1,
+          "Another socket with the same SID authenticates separately",
+        );
+        secondClient.socket.close();
+        const other = await prostgles({ ...options, auth: getAuth() });
+        try {
+          const beforeOtherInstance = lookups;
+          await other.getClientDBHandlers({ socket: serverSocket }, undefined);
+          assert.equal(
+            lookups,
+            beforeOtherInstance + 1,
+            "Instances do not share cached auth on the same socket",
+          );
+        } finally {
+          await other.destroy();
+        }
+        assert.equal(await callMethod(client.socket, "version"), 1);
+
+        const updateAuth = async (auth = getAuth()) => {
+          const schema = onceSocket(client.socket, CHANNELS.SCHEMA);
+          await instance!.update({ auth });
+          await schema;
+        };
+        expires = undefined;
+        await updateAuth();
+        const beforeUncached = lookups;
+        await callMethod(client.socket, "version");
+        await callMethod(client.socket, "version");
+        assert.equal(
+          lookups,
+          beforeUncached + 2,
+          "Results without session metadata are not cached",
+        );
+        expires = Infinity;
+        await updateAuth({ ...getAuth(), cacheSession: false });
+        const beforeDisabled = lookups;
+        await callMethod(client.socket, "version");
+        await callMethod(client.socket, "version");
+        assert.equal(lookups, beforeDisabled + 2, "Caching is opt-in");
+
+        expires = undefined;
+        await updateAuth();
+        let resume = () => {};
+        const paused = new Promise<void>((resolve) => {
+          beforeGetUser = () => {
+            resolve();
+            return new Promise<void>((resolveLookup) => {
+              resume = resolveLookup;
+            });
+          };
+        });
+        const replacedLookup = assert.rejects(
+          async () => handlers.clientMethods.version!.run(),
+          /authentication was invalidated/,
+        );
+        await paused;
+        beforeGetUser = undefined;
+        expires = Date.now() + 1000;
+        user = { id: "updated-user", type: "test" };
+        await updateAuth();
+        resume();
+        await replacedLookup;
+        const updated = await instance.getClientDBHandlers({ socket: serverSocket }, undefined);
+        assert.equal(updated.clientSchema.auth?.user?.id, "updated-user");
+        expires = Infinity;
+        await updateAuth();
+        await new Promise((resolve) => setTimeout(resolve, 1100));
+        assert(serverSocket.connected, "Replacing auth cancels the old expiry timer");
+
+        expires = Date.now() + 1000;
+        await updateAuth();
+        const channels = await new Promise<SubscriptionChannels>((resolve, reject) => {
+          client.socket.emit(
+            CHANNELS.DEFAULT,
+            {
+              tableName: "socket_cache_test.records",
+              command: "subscribe",
+              param1: {},
+              param2: { throttle: 0 },
+            },
+            (error: unknown, result: SubscriptionChannels) =>
+              error ? reject(error) : resolve(result),
+          );
+        });
+        let deliveries = 0;
+        client.socket.on(channels.channelName, () => {
+          deliveries++;
+        });
+        const firstDelivery = onceSocket(client.socket, channels.channelName);
+        client.socket.emit(channels.channelNameReady);
+        await firstDelivery;
+        const beforeExpiry = lookups;
+        const reason = await onceSocket(client.socket, "disconnect");
+        assert.equal(reason, "transport close", "Idle sessions close without an auth guard");
+        assert.equal(lookups, beforeExpiry, "Expiry requires no incoming auth requests");
+        const deliveriesAtExpiry = deliveries;
+        await db.none("INSERT INTO socket_cache_test.records VALUES (1)");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.equal(deliveries, deliveriesAtExpiry, "Expired subscriptions stop delivering");
+        await assert.rejects(
+          async () => handlers.clientMethods.version!.run(),
+          /authentication was invalidated/,
+        );
+
+        expires = Infinity;
+        const invalidationPaused = new Promise<void>((resolve) => {
+          beforeGetUser = () => {
+            resolve();
+            return new Promise<void>((resolveLookup) => {
+              resume = resolveLookup;
+            });
+          };
+        });
+        const pendingClient = connect(url);
+        clients.push(pendingClient.socket);
+        void pendingClient.schema.catch(() => {});
+        await invalidationPaused;
+      if (!pendingClient.socket.connected) await onceSocket(pendingClient.socket, "connect");
+        const pendingSocket = io.sockets.sockets.get(pendingClient.socket.id!);
+        assert(pendingSocket);
+        const invalidatedLookup = assert.rejects(
+          instance.getClientDBHandlers({ socket: pendingSocket }, undefined),
+          /authentication was invalidated/,
+        );
+        instance.invalidateAuth(["unrelated-session"]);
+        assert(pendingSocket.connected);
+        const disconnected = onceSocket(pendingClient.socket, "disconnect");
+        instance.invalidateAuth(["lifecycle-session"]);
+        beforeGetUser = undefined;
+        resume();
+        await invalidatedLookup;
+        await disconnected;
+        const freshClient = connect(url);
+        clients.push(freshClient.socket);
+        const beforeReconnect = lookups;
+        await freshClient.schema;
+        assert(lookups > beforeReconnect, "Reconnection cannot reuse an invalidated lookup");
+      } finally {
+        clients.forEach((client) => client.close());
+        await instance?.destroy();
+        await io.close();
+        await db.none("DROP SCHEMA IF EXISTS socket_cache_test CASCADE");
+      }
+    },
+  );
+};
+
 const connect = (url: string) => {
   const socket = createClient(url, {
     path: "/ws-api/restart",
@@ -208,3 +439,6 @@ const callHttpMethod = (url: string) =>
     method: "POST",
     headers: { authorization: "Bearer lifecycle-session" },
   });
+
+const onceSocket = (socket: Socket, event: string) =>
+  new Promise<unknown>((resolve) => socket.once(event, resolve));

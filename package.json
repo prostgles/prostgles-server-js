@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/server && tsc --noEmit -p tests/client",
     "lint": "eslint . --ext .ts --quiet",
     "test:setup": "npm ci --prefix tests/client && npm ci --prefix tests/server && npm ci --prefix docs/utils",
-    "test:lib": "rm -rf ./dist && npm run lint -- --ignore-pattern tests && tsc && node --trace-uncaught --test dist/**/*.spec.js",
+    "test:lib": "rm -rf ./dist && npm run lint -- --ignore-pattern tests && tsc && node --trace-uncaught --test \"dist/**/*.spec.js\"",
     "test:e2e": "cd tests/ && ./test.sh",
     "test": "npm run test:lib && npm run test:e2e && npm run generate-docs",
     "generate-docs": "rm -f ./docs/*.md && cd docs/utils && npm start",

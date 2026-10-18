@@ -30,6 +30,11 @@ void describe("Prostgles context", async () => {
       sql: {},
       tables: [],
     } as unknown as DboBuilder;
+    prostgles.tableConfigurator = {
+      refresh: async () => {
+        await prostgles.rebuildDBO();
+      },
+    } as typeof prostgles.tableConfigurator;
 
     await prostgles.refreshDBO();
     assert.deepEqual(prostgles.context, { id: 1 });

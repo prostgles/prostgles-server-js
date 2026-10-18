@@ -127,10 +127,11 @@ export const getNewQuery = async (
         j_isLeftJoin = true;
 
       const joinExpressionAlias = { raw: joinColumnName, escaped: asName(joinColumnName) };
-      const j_path = parseJoinPath({
+      const j_path = await parseJoinPath({
         rawPath: parsedJoin.type === "simple" ? joinColumnName : parsedJoin.params.path,
         rootTable: viewHandler.name,
         viewHandler: viewHandler,
+        localParams,
         allowMultiOrJoin: true,
         addShortestJoinIfMissing: true,
       });
@@ -229,6 +230,7 @@ export const getNewQuery = async (
       })
     );
   const validatedRules = viewHandler.getValidatedRules(tableRules, localParams);
+  source.rowPermissionTables?.push(...(havingOpts?.source.rowPermissionTables ?? []));
 
   const newQuery: NewQuery = {
     allFields: viewHandler.column_names.slice(0),
@@ -258,6 +260,10 @@ export const getNewQuery = async (
 
   if (newQuery.select.some((s) => s.type === "aggregation") && newQuery.joins?.length) {
     throw new Error(`Root query aggregation AND nested joins not allowed`);
+  }
+
+  if (source.getOptimizedExpression) {
+    source.expression = source.getOptimizedExpression(newQuery);
   }
 
   return newQuery;

@@ -1349,6 +1349,7 @@ export const testJoins = async (db: DB) => {
       for (const [rootTable, path, expectedId] of [
         ["members", nextHistoryPath, 4],
         ["events", [{ table: "members", on: "default" }, ...selfPath], 2],
+        ["members", [...historyPath, { table: "members", on: "default" }], 1],
       ] as const) {
         assert.deepEqual(
           await aliasedClient.clientDb[rootTable]!.find!(

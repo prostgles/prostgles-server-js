@@ -9,12 +9,7 @@ import type {
   TableInfo as TInfo,
   UserLike,
 } from "prostgles-types";
-import type {
-  AuthClientRequest,
-  AuthResultWithSID,
-  BasicSession,
-  SessionUser,
-} from "../Auth/AuthTypes";
+import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { BasicCallback } from "../PubSubManager/PubSubManager";
 import type {
   DeleteRule,
@@ -132,15 +127,6 @@ export type TableOrViewInfo = TableInfo &
     is_view: boolean;
   };
 
-export type CachedSessionData = {
-  userData: Omit<SessionUser, "session">;
-  session: BasicSession;
-};
-
-export type CachedSession = {
-  __prglCache?: Map<string, CachedSessionData>;
-};
-
 export type ClientSocketWithCachedData = Socket & {
   readonly id: string;
 
@@ -174,7 +160,7 @@ export type ClientSocketWithCachedData = Socket & {
 
   /** Used for publish error caching */
   prostgles?: Map<string, ClientSchema>;
-} & CachedSession;
+};
 
 export type LocalParams = {
   clientReq?: AuthClientRequest | undefined;
@@ -336,6 +322,8 @@ export type ExistsFilterConfig = {
    */
   targetTableFilter: Filter;
   targetTableColumns: string[];
+  rowPermissionTables?: string[];
+  dependencyTables?: string[];
 } & (
   | {
       isJoined: true;

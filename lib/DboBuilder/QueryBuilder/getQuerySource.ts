@@ -7,12 +7,15 @@ import type {
 } from "../../PublishParser/publishTypesAndUtils";
 import type { PGIdentifier } from "../DboBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
+import type { NewQuery } from "./QueryBuilder";
 
 const GET_TABLE_EXPRESSION = Symbol("getTableExpression");
 const TABLE_EXPRESSION_ALIAS = "prostgles_table_expression";
 
 type SelectRuleWithTableExpression = SelectRule & {
-  [GET_TABLE_EXPRESSION]?: (request: SelectRequestData) => Awaitable<string | Pick<QuerySource, "expression" | "joinColumns"> | undefined>;
+  [GET_TABLE_EXPRESSION]?: (
+    request: SelectRequestData,
+  ) => Awaitable<string | Omit<QuerySource, "alias"> | undefined>;
 };
 
 export type QuerySource = {
@@ -20,6 +23,10 @@ export type QuerySource = {
   alias?: PGIdentifier;
   /** Private source columns used only by registered relationships. */
   joinColumns?: Record<string, string>;
+  /** Tables whose changes can affect row-dependent field permissions. */
+  rowPermissionTables?: string[];
+  /** Refine a permission boundary only after the complete query has been validated. */
+  getOptimizedExpression?: (query: NewQuery) => string;
 };
 
 export const withTableExpression = <T extends SelectRule>(
@@ -47,9 +54,12 @@ export const getQuerySource = async (
     : undefined);
 
   return {
-    expression: typeof tableExpression === "object" ? tableExpression.expression : tableExpression ?? viewHandler.escapedName,
+    ...(typeof tableExpression === "object" ? tableExpression : (
+      {
+        expression: tableExpression ?? viewHandler.escapedName,
+      }
+    )),
     alias,
-    joinColumns: typeof tableExpression === "object" ? tableExpression.joinColumns : undefined,
   };
 };
 

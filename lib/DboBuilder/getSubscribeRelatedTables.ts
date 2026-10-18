@@ -32,7 +32,19 @@ export async function getSubscribeRelatedTables(
   let hasComputedJoin = false as boolean;
   const rootJoinColumns = new Set<string>();
   const expandedViews = new Set<string>();
-  const nonExistsFilter = newQuery.whereOpts.exists.length ? {} : filter;
+  const getRowPermissionTables = (query: NewQuery): string[] => [
+    ...(query.source.rowPermissionTables ?? []),
+    ...query.select.flatMap(
+      (item) => item.dependencyExists?.flatMap((filter) => filter.rowPermissionTables ?? []) ?? [],
+    ),
+    ...(query.joins ?? []).flatMap((join) =>
+      join.joinPath.flatMap((part) => part.source?.rowPermissionTables ?? []),
+    ),
+    ...(query.joins ?? []).flatMap(getRowPermissionTables),
+  ];
+  const rowPermissionTables = getRowPermissionTables(newQuery);
+  const hasRowPermissions = !!rowPermissionTables.length;
+  const nonExistsFilter = hasRowPermissions || newQuery.whereOpts.exists.length ? {} : filter;
   const pushRelatedTable = async (
     relatedTableName: string,
     joinPath: ParsedJoinPath[],
@@ -79,6 +91,7 @@ export async function getSubscribeRelatedTables(
       : {};
     // Views can hide changed rows; self joins also need rows outside the trigger's transition tables.
     const needsUnfilteredTrigger =
+      hasRowPermissions ||
       this.isView ||
       joinPath.some((path) => this.dboBuilder.dboMap.get(path.table)?.isView) ||
       (joinPath.length > 0 &&
@@ -103,7 +116,7 @@ export async function getSubscribeRelatedTables(
       ]),
     );
     const tracked_columns: AddTriggerParams["tracked_columns"] =
-      !firstField ? undefined : [firstField, ...otherFields];
+      hasRowPermissions || !firstField ? undefined : [firstField, ...otherFields];
     const condition = joinConditionInfo.where || "TRUE";
 
     const alreadyPushed = viewOptions.relatedTables.find(
@@ -175,21 +188,27 @@ export async function getSubscribeRelatedTables(
     }
   };
   await subscribeQuery(newQuery, []);
+  // Permission changes may affect rows outside the current client filter or join path.
+  for (const tableName of new Set(rowPermissionTables)) {
+    await pushRelatedTable(tableName, [], undefined, {});
+  }
   // The root predicate can miss self-joined rows in transition tables. Its unfiltered
   // trigger must also track the root's selected, filtered, ordered and joined columns.
   const selfTrigger = viewOptions.relatedTables.find(
     (table) => table.tableName === this.name && table.condition === "TRUE",
   );
   if (selfTrigger?.tracked_columns) {
-    const [firstField, ...otherFields] = [...new Set([
-      ...selfTrigger.tracked_columns,
-      ...getQueryColumns(newQuery, []),
-      ...rootJoinColumns,
-    ])];
+    const [firstField, ...otherFields] = [
+      ...new Set([
+        ...selfTrigger.tracked_columns,
+        ...getQueryColumns(newQuery, []),
+        ...rootJoinColumns,
+      ]),
+    ];
     selfTrigger.tracked_columns = firstField ? [firstField, ...otherFields] : undefined;
   }
   if (this.isView) {
-    if (hasComputedJoin) {
+    if (hasComputedJoin || hasRowPermissions) {
       await pushRelatedTable(this.name, [], undefined, {});
     } else {
       const rootViewOptions = await getViewRelatedTables(this, localParams, newQuery);
@@ -201,6 +220,7 @@ export async function getSubscribeRelatedTables(
   return {
     viewOptions: viewOptions.relatedTables.length ? viewOptions : undefined,
     rootJoinColumns: [...rootJoinColumns],
+    hasRowPermissions,
   };
 }
 

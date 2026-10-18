@@ -3,10 +3,11 @@ import { CHANNELS, getProperty, isDefined } from "prostgles-types";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilder";
 import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
-import type { AuthClientRequest, AuthConfig, BasicSession } from "./AuthTypes";
+import type { AuthClientRequest, AuthConfig } from "./AuthTypes";
 import { getClientAuth } from "./getClientAuth";
 import { login } from "./login";
 import { setupAuthRoutes } from "./setupAuthRoutes";
+import { SocketSessionCache } from "./SocketSessionCache";
 import { getClientRequestIPsInfo } from "./utils/getClientRequestIPsInfo";
 import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 import { handleGetUserThrottled, type GetUserOrRedirected } from "./utils/handleGetUser";
@@ -64,6 +65,7 @@ export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
 export class AuthHandler {
   protected readonly prostgles: Prostgles;
   protected readonly config: AuthConfig | undefined;
+  private readonly socketSessions = new SocketSessionCache();
 
   get dbHandles() {
     const { dbo, db } = this.prostgles;
@@ -121,7 +123,26 @@ export class AuthHandler {
 
   setCookieAndGoToReturnURLIfSet = setCookieAndGoToReturnURLIfSet.bind(this);
   validateSessionAndSetCookie = validateSessionAndSetCookie.bind(this);
-  handleGetUser = handleGetUserThrottled.bind(this);
+  handleGetUser = (clientReq: AuthClientRequest): Promise<GetUserOrRedirected> => {
+    const lookup = () => handleGetUserThrottled.call(this, clientReq);
+    if (!clientReq.socket || !this.config?.cacheSession) return lookup();
+    const { socket } = clientReq;
+    return this.socketSessions.get(socket, this.getValidatedSid(clientReq), lookup, (session) => {
+      if (
+        session.onExpiration === "redirect" &&
+        this.config?.loginSignupConfig?.publicRoutes &&
+        !this.config.loginSignupConfig.disableSocketAuthGuard
+      ) {
+        socket.emit(CHANNELS.AUTH_GUARD, {
+          shouldReload: true,
+          error: "Session has expired",
+        });
+      }
+      socket.conn.close();
+    });
+  };
+
+  clearSocketSession = (socket: ClientSocketWithCachedData) => this.socketSessions.delete(socket);
 
   /**
    * Used by:
@@ -140,6 +161,7 @@ export class AuthHandler {
   };
 
   destroy = () => {
+    this.socketSessions.destroy();
     const app = this.config?.loginSignupConfig?.app;
     const {
       login,
@@ -224,28 +246,6 @@ export class AuthHandler {
   };
 
   getSidAndUserFromRequest = getSidAndUserFromRequest.bind(this);
-
-  isNonExpiredSocketSession = (
-    socket: ClientSocketWithCachedData,
-    session: BasicSession | undefined,
-  ): boolean => {
-    const hasExpired = Boolean(session && session.expires <= Date.now());
-    if (
-      this.config?.loginSignupConfig?.publicRoutes &&
-      !this.config.loginSignupConfig.disableSocketAuthGuard
-    ) {
-      const error = "Session has expired";
-      if (hasExpired) {
-        if (session?.onExpiration === "redirect")
-          socket.emit(CHANNELS.AUTH_GUARD, {
-            shouldReload: true,
-            error,
-          });
-        throw error;
-      }
-    }
-    return Boolean(session && !hasExpired);
-  };
 
   getClientAuth = getClientAuth.bind(this);
 }

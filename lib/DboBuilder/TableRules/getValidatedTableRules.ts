@@ -83,6 +83,7 @@ export function getValidatedTableRules(
 
       const fields = this.parseFieldFilter(tableRules.select.fields);
       res.select = {
+        disableMethods: tableRules.select.disableMethods,
         fields,
         orderByFields:
           tableRules.select.orderByFields ?

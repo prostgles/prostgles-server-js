@@ -4,8 +4,11 @@ import { getJSONBSchemaValidationErrorAsync, type TableHandler } from "prostgles
 import type { DB, DBHandlerServer, DBHandlerServerInternal, WithUserRLS } from "./server/serverTypes";
 import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
+import { testAuditSubscriptionBenchmark } from "./server/auditSubscriptionBenchmark.spec";
 import { testSocketLifecycle } from "./server/socketLifecycle.spec";
 import { testJoins } from "./server/joins.spec";
+import { testSelectRules } from "./server/selectRules.spec";
+import { testSelectBenchmark } from "./server/selectBenchmark.spec";
 import { testFileStorage } from "./server/fileStorage.spec";
 import { testSchemaTypes } from "./server/schemaTypes.spec";
 import { testClientSchemaTypes } from "./server/clientSchemaTypes.spec";
@@ -33,8 +36,11 @@ export const serverOnlyQueries = async (
     await testClientSchemaTypes(pgDb);
     await testFileStorage(db, pgDb);
     await testJoins(pgDb);
+    await testSelectRules(pgDb);
+    await testSelectBenchmark(pgDb);
     await testSocketLifecycle(pgDb);
     await testAudit(pgDb);
+    await testAuditSubscriptionBenchmark(pgDb);
     await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {
       const dbMap = new Map(Object.entries(db)) as Map<string, TableHandler>;
 

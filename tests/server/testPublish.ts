@@ -146,6 +146,7 @@ export const testPublish: Publish<DBGeneratedSchema> = ({ user, sid }) => {
       },
       update: {
         fields: [],
+        filterFields: ["id"],
         dynamicFields: [
           {
             fields: { id: 1 },

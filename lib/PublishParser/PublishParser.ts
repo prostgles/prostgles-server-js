@@ -1,8 +1,4 @@
-import {
-  getObjectEntries,
-  includes,
-  SQL_COMMAND_TABLE_METHODS,
-} from "prostgles-types";
+import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { getAuditTableRules } from "../Audit/getAuditTableRules";
@@ -279,6 +275,13 @@ export class PublishParser {
       ) ?? [];
     if (!rule) {
       throw "Invalid command: " + command;
+    }
+
+    if (
+      (command === "sync" || command === "subscribe" || command === "subscribeOne") &&
+      tableRule.select?.disableMethods?.[command === "sync" ? "sync" : "subscribe"]
+    ) {
+      throw new Error(`Invalid or disallowed command: ${tableName}.${command}`);
     }
 
     if (scope) {

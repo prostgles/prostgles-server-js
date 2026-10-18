@@ -33,6 +33,17 @@ export const testPublishTypes = () => {
         },
       },
       items3: "*",
+      items2: {
+        select: [
+          { fields: ["id"], forcedFilter: { id: 1 } },
+          {
+            fields: {
+              // @ts-expect-error Array rules retain table column checking
+              missing_column: 1,
+            },
+          },
+        ],
+      },
     };
     const p2: ProstglesInitOptions<DBGeneratedSchema>["publish"] = "*";
 

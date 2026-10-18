@@ -3,9 +3,22 @@ import type { AuthClientRequest, AuthResultWithSID } from "../Auth/AuthTypes";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
 import type { FileTableConfig } from "../ProstglesTypes";
 import type { PublishParser } from "./PublishParser";
-import type { ParsedPublishTable, PublishObject } from "./publishTypesAndUtils";
+import type {
+  ParsedPublishTable,
+  ParsedTableRule,
+  PublishObject,
+  SelectRule,
+} from "./publishTypesAndUtils";
+import type { ViewHandler } from "../DboBuilder/ViewHandler/ViewHandler";
+import {
+  getSelectRules,
+  hasSelectRules,
+  mergeSelectRuleOptions,
+  mergeSelectRules,
+} from "./mergeSelectRules";
 import { getFileVersionTableName } from "../StorageClient/fileVersionUtils";
 import type { FileTableRow, FileVersionTableRow } from "../StorageClient/fileTableDefinitions";
+import { withExistsTableRules } from "../DboBuilder/ViewHandler/getExistsCondition";
 
 export const getFileVersionTableRules = async function (
   this: PublishParser,
@@ -39,8 +52,28 @@ export const getFileVersionTableRules = async function (
   const fileHandler = this.dbo[config.tableName];
   if (!fileHandler) throw new Error(`File table not found: ${config.tableName}`);
   const select = explicitRules?.select;
+  const versionRules = getSelectRules(fileRules.select, fileHandler).flatMap((fileSelect) =>
+    (select ? getSelectRules(select, versionHandler) : [undefined]).map((versionSelect) =>
+      getVersionSelectRule(versionHandler, fileHandler, fileSelect, versionSelect, fileRules),
+    ),
+  );
+  return {
+    select:
+      hasSelectRules(fileRules.select) || hasSelectRules(select) ?
+        mergeSelectRules(versionHandler, versionRules)
+      : versionRules[0],
+  };
+};
+
+const getVersionSelectRule = (
+  versionHandler: ViewHandler,
+  fileHandler: ViewHandler,
+  fileSelect: SelectRule,
+  select: SelectRule | undefined,
+  fileRules: ParsedTableRule,
+): SelectRule => {
   const requestedFields = versionHandler.parseFieldFilter(select?.fields ?? "*");
-  const fileSelectFields = fileHandler.parseFieldFilter(fileRules.select.fields);
+  const fileSelectFields = fileHandler.parseFieldFilter(fileSelect.fields);
   const fields = (versionHandler.column_names as (keyof FileVersionTableRow)[]).filter(
     (field) =>
       requestedFields.includes(field) &&
@@ -51,40 +84,26 @@ export const getFileVersionTableRules = async function (
   );
   const requestedFilterFields = versionHandler.parseFieldFilter(select?.filterFields ?? fields);
   const requestedOrderByFields = versionHandler.parseFieldFilter(select?.orderByFields ?? fields);
+  const path = [{ table: fileHandler.name, on: [{ file_id: "id" }] }];
   const inheritedFilter = {
     $existsJoined: {
-      path: [{ table: config.tableName, on: [{ file_id: "id" }] }],
-      filter: fileRules.select.forcedFilter ?? {},
+      path,
+      filter: fileSelect.forcedFilter ?? {},
     },
   };
+  const filters = [inheritedFilter, ...(select?.forcedFilter ? [select.forcedFilter] : [])];
+  if (hasSelectRules(fileRules.select) && fileRules.select.forcedFilter) {
+    filters.push({ $existsJoined: { path, filter: withExistsTableRules(fileRules) } });
+  }
 
   return {
-    select: {
-      ...fileRules.select,
-      ...select,
-      fields: fromEntries(fields.map((field) => [field, 1 as const] as const)),
-      filterFields: fromEntries(
-        fields
-          .filter((field) => requestedFilterFields.includes(field))
-          .map((field) => [field, 1 as const] as const),
-      ),
-      orderByFields: fromEntries(
-        fields
-          .filter((field) => requestedOrderByFields.includes(field))
-          .map((field) => [field, 1 as const] as const),
-      ),
-      forcedFilter:
-        select?.forcedFilter ? { $and: [inheritedFilter, select.forcedFilter] } : inheritedFilter,
-      maxLimit: getMostRestrictiveLimit(fileRules.select.maxLimit, select?.maxLimit),
-      subscribeThrottle: Math.max(
-        fileRules.select.subscribeThrottle ?? 0,
-        select?.subscribeThrottle ?? 0,
-      ),
-      disableMethods: {
-        ...fileRules.select.disableMethods,
-        ...select?.disableMethods,
-      },
-    },
+    ...fileSelect,
+    ...select,
+    ...mergeSelectRuleOptions(select ? [fileSelect, select] : [fileSelect]),
+    fields: toFieldFilter(fields),
+    filterFields: toFieldFilter(fields.filter((field) => requestedFilterFields.includes(field))),
+    orderByFields: toFieldFilter(fields.filter((field) => requestedOrderByFields.includes(field))),
+    forcedFilter: { $and: filters },
   };
 };
 
@@ -94,13 +113,4 @@ const getFileVersionSourceField = (field: keyof FileVersionTableRow): keyof File
   return field;
 };
 
-const getMostRestrictiveLimit = (
-  inheritedLimit: number | null | undefined,
-  explicitLimit: number | null | undefined,
-) => {
-  const limits = [inheritedLimit, explicitLimit].filter(
-    (limit): limit is number => typeof limit === "number",
-  );
-  if (limits.length) return Math.min(...limits);
-  return inheritedLimit === null || explicitLimit === null ? null : undefined;
-};
+const toFieldFilter = (fields: string[]) => fromEntries(fields.map((field) => [field, 1 as const]));

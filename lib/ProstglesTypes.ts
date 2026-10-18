@@ -282,7 +282,11 @@ export type ProstglesInitOptions<
    * Called when a socket disconnects
    */
   onSocketDisconnect?: (
-    args: AuthRequestParams<S, SUser> & { socket: ClientSocketWithCachedData },
+    args: AuthRequestParams<S, SUser> & {
+      socket: ClientSocketWithCachedData;
+      /** Session identifier for cleanup after socket authentication has been cleared. */
+      sid: string | undefined;
+    },
   ) => void | Promise<void>;
 
   /**
