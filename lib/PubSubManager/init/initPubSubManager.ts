@@ -4,6 +4,7 @@ import { getWatchSchemaTagList } from "../../SchemaWatch/getWatchSchemaTagList";
 import { type PubSubManager } from "../PubSubManager";
 import { getPubSubManagerInitQuery } from "./getPubSubManagerInitQuery";
 import { asValue, NOTIF_CHANNEL } from "../PubSubManagerUtils";
+import { startDataNotificationPolling } from "../startDataNotificationPolling";
 export const REALTIME_TRIGGER_CHECK_QUERY =
   "prostgles-server internal query used to manage realtime triggers";
 
@@ -81,6 +82,7 @@ export async function initPubSubManager(this: PubSubManager): Promise<PubSubMana
   );
 
   await this.initialiseEventTriggers();
+  this.stopDataNotificationPolling = startDataNotificationPolling(this);
 
   return this;
 }

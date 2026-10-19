@@ -218,6 +218,7 @@ export class PubSubManager {
   }
   appCheckFrequencyMS = 10 * 1000;
   appCheck?: ReturnType<typeof setInterval>;
+  stopDataNotificationPolling: (() => Promise<void>) | undefined;
 
   destroyed = false;
   destroy = async () => {
@@ -225,6 +226,7 @@ export class PubSubManager {
     if (this.appCheck) {
       clearInterval(this.appCheck);
     }
+    await this.stopDataNotificationPolling?.();
     await this.postgresNotifListenManager?.destroy();
     await this._log({
       type: "syncOrSub",

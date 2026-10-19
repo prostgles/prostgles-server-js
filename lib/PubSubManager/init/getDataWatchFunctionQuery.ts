@@ -1,6 +1,6 @@
 import { DB_OBJ_NAMES } from "./getPubSubManagerInitQuery";
 import { getAppCheckQuery } from "../orphanTriggerCheck";
-import { asValue, DELIMITER, NOTIF_CHANNEL, NOTIF_TYPE } from "../PubSubManagerUtils";
+import { asValue, DELIMITER, NOTIF_TYPE } from "../PubSubManagerUtils";
 
 /**
  * Error:
@@ -49,9 +49,9 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                       GROUP BY app_id
                   LOOP
                       
-                      PERFORM pg_notify( 
-                        ${asValue(NOTIF_CHANNEL.preffix)} || v_trigger.app_id , 
-                        LEFT(concat_ws(
+                      PERFORM ${DB_OBJ_NAMES.data_notification_func}(
+                        v_trigger.app_id,
+                        concat_ws(
                           ${asValue(DELIMITER)},
 
                           ${asValue(NOTIF_TYPE.data)}, 
@@ -63,7 +63,7 @@ export const getDataWatchFunctionQuery = (debugMode: boolean | undefined) => {
                           END,
                           COALESCE(changed_columns_by_trigger_id::TEXT, '')
                           ${debugMode ? ", COALESCE(current_query(), 'current_query ??'), ' ', query" : ""}
-                        ), 7999/4) -- Some chars are 2bytes -> 'Ω'
+                        )
                       );
                   END LOOP;
 

@@ -16,6 +16,7 @@ import { getDataWatchFunctionQuery } from "./getDataWatchFunctionQuery";
 export const DB_OBJ_NAMES = {
   trigger_add_remove_func: "prostgles.trigger_add_remove_func",
   data_watch_func: "prostgles.prostgles_trigger_function",
+  data_notification_func: "prostgles.enqueue_data_notification",
   schema_watch_func: "prostgles.schema_watch_func",
   schema_watch_trigger: "prostgles_schema_watch_trigger_new",
   schema_watch_trigger_drop: "prostgles_schema_watch_trigger_new_drop",
@@ -98,8 +99,9 @@ BEGIN
         -- Keep application dependencies on the validator and helper functions intact.
         DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.schema_watch_func}() CASCADE;
         DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.data_watch_func}() CASCADE;
+        DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.data_notification_func}(TEXT, TEXT);
         DROP FUNCTION IF EXISTS ${DB_OBJ_NAMES.trigger_add_remove_func}() CASCADE;
-        DROP TABLE IF EXISTS prostgles.app_triggers, prostgles.apps, prostgles.versions CASCADE;
+        DROP TABLE IF EXISTS prostgles.data_notifications, prostgles.app_triggers, prostgles.apps, prostgles.versions CASCADE;
 
         ${CREATE_VALIDATE_SCHEMA_FUNCTION_SQL}
 
@@ -201,6 +203,25 @@ BEGIN
           check_frequency_ms  INTEGER NOT NULL  
         );
         COMMENT ON TABLE prostgles.apps IS 'Keep track of prostgles server apps connected to db to combine common triggers. Heartbeat used due to no logout triggers in postgres';
+
+        CREATE UNLOGGED TABLE prostgles.data_notifications (
+          app_id TEXT NOT NULL REFERENCES prostgles.apps(id) ON DELETE CASCADE,
+          id BIGINT GENERATED ALWAYS AS IDENTITY,
+          payload TEXT NOT NULL,
+          PRIMARY KEY (app_id, id)
+        );
+        COMMENT ON TABLE prostgles.data_notifications IS 'Transient committed data changes polled per app; subscriptions and syncs refresh after reconnection';
+
+        -- Writers need no additional table privileges; condition checks still run as the writer.
+        CREATE OR REPLACE FUNCTION ${DB_OBJ_NAMES.data_notification_func}(
+          notification_app_id TEXT, notification_payload TEXT
+        ) RETURNS VOID AS $$
+          INSERT INTO prostgles.data_notifications (app_id, payload)
+          -- Lock before inserting so concurrent orphan cleanup can safely remove the app.
+          SELECT id, notification_payload FROM prostgles.apps
+          WHERE id = notification_app_id
+          FOR KEY SHARE;
+        $$ LANGUAGE SQL SECURITY DEFINER SET search_path = pg_catalog;
 
         CREATE TABLE IF NOT EXISTS prostgles.app_triggers (
           /* Stable notification IDs, capped at JavaScript's maximum safe integer. */
@@ -395,9 +416,9 @@ BEGIN
                   FOR app IN 
                     SELECT * FROM prostgles.apps
                   LOOP
-                    PERFORM pg_notify( 
-                      ${asValue(NOTIF_CHANNEL.preffix)} || app.id, 
-                      LEFT(concat_ws(
+                    PERFORM ${DB_OBJ_NAMES.data_notification_func}(
+                      app.id,
+                      concat_ws(
                         ${asValue(DELIMITER)}, 
                         ${asValue(NOTIF_TYPE.data_trigger_change)},
                         json_build_object(
@@ -405,7 +426,7 @@ BEGIN
                           'duration', (EXTRACT(EPOCH FROM now()) * 1000) - start_time,
                           'query', ${debugMode ? "LEFT(current_query(), 400)" : "'Only shown in debug mode'"}
                         )
-                      )::TEXT, 7999/4)
+                      )::TEXT
                     );
                   END LOOP;
                 END IF;

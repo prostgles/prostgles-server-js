@@ -17,6 +17,7 @@ export class PostgresNotifListenManager {
   db_channel_name: string;
   isListening: any;
   client?: pg.IClient;
+  onReconnect: (() => void) | undefined;
 
   static create = (
     db_pg: DB,
@@ -96,10 +97,7 @@ export class PostgresNotifListenManager {
           .none(
             `/* prostgles-server internal query used for subscriptions and schema hot reload */ \nLISTEN $1~`,
             db_channel_name,
-          )
-          .catch((error) => {
-            console.log("PostgresNotifListenManager: unexpected error: ", error); // unlikely to ever happen
-          });
+          );
       },
       removeListeners = (client: pg.IClient) => {
         client.removeListener("notification", this.notifListener);
@@ -111,6 +109,8 @@ export class PostgresNotifListenManager {
 
         this.reconnect(5000, 10) // retry 10 times, with 5-second intervals
           .then(() => {
+            if (this.destroyed) return;
+            this.onReconnect?.();
             console.log("PostgresNotifListenManager: Successfully Reconnected");
           })
           .catch(() => {
@@ -124,16 +124,34 @@ export class PostgresNotifListenManager {
 
     return new Promise((resolve, reject) => {
       setTimeout(() => {
+        if (this.destroyed) {
+          reject("Destroyed");
+          return;
+        }
         this.db_pg
           .connect({ direct: true, onLost: onConnectionLost })
-          .then((obj) => {
+          .then(async (obj) => {
+            if (this.destroyed) {
+              await obj.done();
+              throw "Destroyed";
+            }
             this.connection = obj; // global connection is now available
+            try {
+              await setListeners(obj.client, this.notifListener, this.db_channel_name);
+            } catch (error) {
+              removeListeners(obj.client);
+              await obj.done();
+              this.connection = undefined;
+              throw error;
+            }
             resolve(obj);
-            return setListeners(obj.client, this.notifListener, this.db_channel_name);
           })
           .catch((error) => {
             /** Database was destroyed */
-            if (this.destroyed || (error && error.code === "3D000")) return;
+            if (this.destroyed || (error && error.code === "3D000")) {
+              reject(error);
+              return;
+            }
             console.log("PostgresNotifListenManager: Error Connecting:", error);
             if (--maxAttempts) {
               this.reconnect(delay, maxAttempts).then(resolve).catch(reject);

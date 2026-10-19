@@ -1187,38 +1187,13 @@ export const isomorphicQueries = async (
         return;
       }
       await expectNoTriggers();
-      const checkLocks = async () => {
-        const locks = await sql!(
-          `
-          WITH locks AS (
-            SELECT pid, pg_blocking_pids(pid) as blocking_pids, wait_event, wait_event_type, query, 
-            (
-              SELECT query FROM pg_stat_activity pa
-              WHERE pa.pid = ANY(pg_blocking_pids(l.pid))
-              LIMIT 1
-            ) as blocking_query
-            FROM pg_stat_activity l
-            WHERE cardinality(pg_blocking_pids(pid)) > 0
-          )
-          SELECT *
-          FROM locks l 
-        `,
-          {},
-          { returnType: "rows" },
-        );
-        if (locks.length) {
-          log("Locks: " + JSON.stringify(locks));
-        }
-        return locks;
-      };
       const updateInTx = async (id: number) => {
         await db.various.insert({ id, name: `slowtx${id}` }, { returning: "*" });
-        await checkLocks();
         await sql!(
           `
           BEGIN;
             UPDATE various
-            SET name = 'slowtx${id}'
+            SET name = name || '.'
             WHERE id = \${id};
           SELECT pg_sleep(0.01);
           COMMIT;
@@ -1227,7 +1202,7 @@ export const isomorphicQueries = async (
           { id },
         );
       };
-      const expectedDuration = 4000;
+      const expectedDuration = 3000;
       const UPDATE_COUNT = 1_000;
       const updateAll = async () => {
         const start = Date.now();
@@ -1237,24 +1212,24 @@ export const isomorphicQueries = async (
         await db.various.delete({ id: { ">": 100 } });
         return duration;
       };
-      const duration1 = await updateAll();
+      const updateDuration = await updateAll();
       const duration11 = await updateAll();
       assert.equal(
-        duration1 < expectedDuration,
+        updateDuration < expectedDuration,
         true,
-        `Update should take less than ${expectedDuration} seconds but took ${duration1}`,
+        `Update should take less than ${expectedDuration} ms but took ${updateDuration}`,
       );
       const callOffsets: number[] = [];
       const start = Date.now();
       const sub = await db.various.subscribe({ id: { ">": -1 } }, {}, (_items) => {
         callOffsets.push(Date.now() - start);
       });
-      const duration2 = await updateAll();
+      const updateDurationWithActiveSubscription = await updateAll();
       await tout(2000);
       assert.equal(
-        duration2 < expectedDuration,
+        updateDurationWithActiveSubscription < expectedDuration,
         true,
-        `Update should take less than ${expectedDuration} seconds but took ${duration2}`,
+        `Update should take less than ${expectedDuration} ms but took ${updateDurationWithActiveSubscription}`,
       );
 
       const callLimit = 100;
@@ -1264,23 +1239,17 @@ export const isomorphicQueries = async (
         // Gets throttled due to out of order pushSubData rejections
         `Expecting callOffsets.length to be less than ${callLimit} but got ${callOffsets.length}`,
       );
-      const allowedPercentage = 1;
+      const allowedPercentage = 0.5;
       assert.equal(
-        duration2 < duration1 + duration1 * allowedPercentage,
+        updateDurationWithActiveSubscription < updateDuration + updateDuration * allowedPercentage,
         true,
         `duration2 should be within ${allowedPercentage * 100}% of duration1 but got ` +
-          duration2 +
+          updateDurationWithActiveSubscription +
           " vs " +
-          duration1 +
+          updateDuration +
           " duration11: " +
           duration11,
       );
-      // const offetsHigherThanExpected = callOffsets.filter((offset) => offset > expectedDuration);
-      // assert.equal(
-      //   offetsHigherThanExpected.length,
-      //   0,
-      //   `Offsets should not be higher than ${expectedDuration}ms but found: ${offetsHigherThanExpected}`
-      // );
       await sub.unsubscribe();
     });
 
