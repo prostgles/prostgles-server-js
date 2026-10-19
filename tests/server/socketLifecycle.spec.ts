@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
+import path from "node:path";
 import { test } from "node:test";
 import prostgles, { type InitResult, type ProstglesInitOptions } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
@@ -9,6 +11,7 @@ import { CHANNELS, type ClientSchema, type SubscriptionChannels } from "prostgle
 import { Server } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
 import express from "express";
+import type prostglesClient from "../client/node_modules/prostgles-client";
 
 export const testSocketLifecycle = async (db: DB) => {
   await testSocketSessionCaching(db);
@@ -388,6 +391,107 @@ const testSocketSessionCaching = async (db: DB) => {
         const beforeReconnect = lookups;
         await freshClient.schema;
         assert(lookups > beforeReconnect, "Reconnection cannot reuse an invalidated lookup");
+
+        await instance.update({
+          auth: { ...getAuth(), cacheSession: false },
+          publishRawSQL: () => true,
+        });
+        const connectClient = createRequire(
+          path.resolve("../client/package.json"),
+        )("prostgles-client").default as typeof prostglesClient;
+        const requestSocket = createClient(url, {
+          path: "/ws-api/restart",
+          transports: ["websocket"],
+          reconnection: false,
+          query: { token: "lifecycle-session" },
+        });
+        clients.push(requestSocket);
+        const requestClient = await connectClient({
+          socket: requestSocket,
+          onReady: () => {},
+        });
+        const disconnectListeners =
+          requestSocket.listeners("disconnect").length;
+        assert.deepEqual(
+          await requestClient.db["socket_cache_test.records"]!.find!(),
+          [{ id: 1 }],
+        );
+        assert.deepEqual(await requestClient.sql!("SELECT 1 AS value", {}, { returnType: "rows" }), [
+          { value: 1 },
+        ]);
+        assert.equal(await requestClient.methods!.version!(), 1);
+        await assert.rejects(() =>
+          requestClient.sql!("SELECT * FROM missing_lifecycle_table"),
+        );
+        assert.equal(
+          requestSocket.listeners("disconnect").length,
+          disconnectListeners,
+        );
+
+        // Simulate a suspended tab whose heartbeat expired before its timer ran.
+        requestSocket.io.engine["_pingTimeoutTime"] = Date.now() - 1;
+        const bufferedUpdate = requestClient.sql!(
+          "UPDATE socket_cache_test.records SET id = 2 WHERE id = 1",
+        );
+        requestSocket.emit("unrelated-buffered-event", "preserved");
+        await assert.rejects(bufferedUpdate, /Socket disconnected/);
+        assert.deepEqual(
+          requestSocket.sendBuffer.map(({ data }) => data),
+          [["unrelated-buffered-event", "preserved"]],
+          "Only the rejected request is removed from the send buffer",
+        );
+        const unrelatedEvent = new Promise<unknown>((resolve) => {
+          io.once("connection", (socket) => socket.once("unrelated-buffered-event", resolve));
+        });
+        const reconnectedSchema = onceSocket(requestSocket, CHANNELS.SCHEMA);
+        requestSocket.connect();
+        await reconnectedSchema;
+        assert.equal(await unrelatedEvent, "preserved");
+        assert.deepEqual(
+          await requestClient.db["socket_cache_test.records"]!.find!(),
+          [{ id: 1 }],
+          "Rejected writes are not replayed after reconnecting",
+        );
+
+        let pendingLookups = 0;
+        let resumeRequests = () => {};
+        const requestsReleased = new Promise<void>((resolve) => {
+          resumeRequests = resolve;
+        });
+        const requestsPaused = new Promise<void>((resolve) => {
+          beforeGetUser = async () => {
+            if (++pendingLookups === 3) resolve();
+            await requestsReleased;
+          };
+        });
+        const requests = [
+          () => requestClient.db["socket_cache_test.records"]!.find!(),
+          () => requestClient.sql!("SELECT 1"),
+          () => requestClient.methods!.version!(),
+        ];
+        const pendingRequests = requests.map((request) =>
+          assert.rejects(request, /Socket disconnected/),
+        );
+        try {
+          await requestsPaused;
+          instance.invalidateAuth(["lifecycle-session"]);
+          await Promise.all(pendingRequests);
+          assert.equal(
+            requestSocket.listeners("disconnect").length,
+            disconnectListeners,
+          );
+          await Promise.all(
+            requests.map((request) => assert.rejects(request, /Socket disconnected/)),
+          );
+          assert.equal(
+            requestSocket.sendBuffer.length,
+            0,
+            "Disconnected calls are not queued",
+          );
+        } finally {
+          beforeGetUser = undefined;
+          resumeRequests();
+        }
       } finally {
         clients.forEach((client) => client.close());
         await instance?.destroy();
