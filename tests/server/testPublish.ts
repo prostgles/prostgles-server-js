@@ -77,7 +77,16 @@ export const testPublish: Publish<DBGeneratedSchema> = ({ user, sid }) => {
     very_slow_items: "*",
     planes: {
       select: sid === "client_only" ? { fields: { last_updated: false } } : "*",
-      update: "*",
+      update: {
+        fields: "*",
+        checkFilter: { x: { $gte: 0 } },
+        postValidate: async ({ row, dbx }) => {
+          const updated = await dbx.planes.findOne({ id: row.id });
+          if (updated?.x !== row.x) {
+            throw new Error("Sync postValidate must see the update in its transaction");
+          }
+        },
+      },
       insert: "*",
       delete: "*",
       // sync: {

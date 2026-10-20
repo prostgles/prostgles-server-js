@@ -204,13 +204,25 @@ export const getSyncUtilFunctions = ({
 
               return [syncSafeFilter, omitKeys(rowToUpdate, id_fields)];
             });
-            await tableHandlerTx.updateBatch(
-              batchUpdates,
-              { removeDisallowedFields: true },
-              undefined,
-              table_rules,
-              localParams,
-            );
+            if (table_rules.update.checkFilter || table_rules.update.postValidate) {
+              for (const [filter, data] of batchUpdates) {
+                await tableHandlerTx.update(
+                  filter,
+                  data,
+                  { removeDisallowedFields: true },
+                  table_rules,
+                  localParams,
+                );
+              }
+            } else {
+              await tableHandlerTx.updateBatch(
+                batchUpdates,
+                { removeDisallowedFields: true },
+                undefined,
+                table_rules,
+                localParams,
+              );
+            }
           } else {
             rowsToUpdate = [];
           }
