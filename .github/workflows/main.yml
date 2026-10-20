@@ -11,7 +11,7 @@ on:
 jobs:
   vm-job:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 10
     strategy:
       matrix:
         node-version: [22.x, 24.x]

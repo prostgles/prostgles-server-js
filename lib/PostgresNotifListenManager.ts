@@ -8,7 +8,7 @@ export type PrglNotifListener = (args: {
   channel: string;
   payload: string;
   name: string;
-}) => void;
+}) => void | Promise<void>;
 
 export class PostgresNotifListenManager {
   connection?: pgPromise.IConnected<{}, pg.IClient>;
@@ -37,7 +37,13 @@ export class PostgresNotifListenManager {
     if (!db_channel_name)
       throw "PostgresNotifListenManager: db_pg OR notifListener OR db_channel_name MISSING";
     this.db_pg = db_pg;
-    this.notifListener = notifListener;
+    this.notifListener = async (notification) => {
+      try {
+        await notifListener(notification);
+      } catch (error) {
+        console.error("PostgresNotifListenManager: Notification listener failed:", error);
+      }
+    };
     this.db_channel_name = db_channel_name;
 
     if (!noInit) void this.init();

@@ -14,6 +14,10 @@ import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
 import { withTableExpression } from "prostgles-server/dist/DboBuilder/QueryBuilder/getQuerySource";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
+import {
+  NOTIF_CHANNEL,
+  NOTIF_TYPE,
+} from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
 
 export const testJoins = async (db: DB) => {
   const clientRequest = {
@@ -216,7 +220,7 @@ export const testJoins = async (db: DB) => {
     }
   });
 
-  await test("computed joins support params, subscriptions, pagination and publish rules", async () => {
+  await test("computed joins support params, subscriptions, pagination and publish rules", async (context) => {
     // Cover plain views, quoted schema names and views built on other views.
     const viewPairs = [
       { memberView: "member_view", eventView: "event_view" },
@@ -1485,6 +1489,37 @@ export const testJoins = async (db: DB) => {
             },
           }),
         /Invalid computed join column/,
+      );
+      await context.test(
+        "handles notification rejections after an invalid configuration update",
+        { timeout: 5_000 },
+        async (notificationContext) => {
+          const logError = console.error;
+          const notificationError = new Promise<unknown>((resolve) => {
+            notificationContext.mock.method(
+              console,
+              "error",
+              (message: unknown, ...details: unknown[]) => {
+                logError(message, ...details);
+                if (message === "PostgresNotifListenManager: Notification listener failed:") {
+                  resolve(details[0]);
+                }
+              },
+            );
+          });
+          const pubSubManager = await (
+            members as unknown as TableHandler
+          ).dboBuilder.getPubSubManager();
+          assert(pubSubManager.postgresNotifListenManager?.isReady);
+          await db.any("SELECT pg_notify($1, $2)", [
+            NOTIF_CHANNEL.getFull(pubSubManager.appId),
+            NOTIF_TYPE.data_trigger_change,
+          ]);
+          assert.match(
+            String(await notificationError),
+            /Invalid computed join column: events.missing/,
+          );
+        },
       );
     } finally {
       await instance.destroy();
