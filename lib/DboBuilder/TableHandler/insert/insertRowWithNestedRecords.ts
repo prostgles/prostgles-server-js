@@ -139,18 +139,18 @@ export async function insertRowWithNestedRecords(
       : [row[targetTable]]) as AnyObject[];
 
     /** check */
-    if (childDataItems.some((d) => !isObject(d))) {
+    if (childDataItems.some((childData) => !isObject(childData))) {
       throw "Expected array of objects";
     }
 
-    const childInsert = async (cdata: AnyObject | AnyObject[], tableName: string) => {
-      return referencedInsert(this, dbTX, localParams, tableName, cdata, rootOnConflict);
+    const childInsert = async (childData: AnyObject | AnyObject[], tableName: string) => {
+      return referencedInsert(this, dbTX, localParams, tableName, childData, rootOnConflict);
     };
 
     const joinPath = getJoinPath(this, targetTable);
 
     const { path } = joinPath;
-    const [tbl1, tbl2, tbl3] = path;
+    const [rootTableName, referencingTableName, indirectTargetTableName] = path;
     targetTableRules = await getInsertTableRules(
       this,
       targetTable,
@@ -158,37 +158,63 @@ export async function insertRowWithNestedRecords(
       localParams?.scope,
     );
 
-    const cols2 = this.dboBuilder.dboMap.get(tbl2!)?.columns || [];
-    if (!this.dboBuilder.dboMap.get(tbl2!)) throw "Invalid/disallowed table: " + tbl2;
-    const colsRefT1 = cols2.filter((c) =>
-      c.references?.some((rc) => rc.cols.length === 1 && rc.ftable === tbl1),
+    const referencingTableColumns =
+      this.dboBuilder.dboMap.get(referencingTableName!)?.columns || [];
+    if (!this.dboBuilder.dboMap.get(referencingTableName!))
+      throw "Invalid/disallowed table: " + referencingTableName;
+    const columnsReferencingRoot = referencingTableColumns.filter((column) =>
+      column.references?.some(
+        (reference) => reference.cols.length === 1 && reference.ftable === rootTableName,
+      ),
     );
 
     if (!path.length) {
       throw "Nested inserts join path not found for " + [this.name, targetTable].join(", ");
     } else if (path.length === 2) {
-      if (targetTable !== tbl2) throw "Did not expect this";
+      if (targetTable !== referencingTableName) throw "Did not expect this";
 
-      if (!colsRefT1.length) {
-        throw `Target table ${tbl2} does not reference any columns from the root table ${this.name}. Cannot insert nested data`;
+      if (!columnsReferencingRoot.length) {
+        throw `Target table ${referencingTableName} does not reference any columns from the root table ${this.name}. Cannot insert nested data`;
       }
 
-      insertedChildren = await childInsert(
-        childDataItems.map((d) => {
-          const result = { ...d };
-          colsRefT1.map((col) => {
-            result[col.references![0]!.cols[0]!] = fullRootResult[col.references![0]!.fcols[0]!];
-          });
-          return result;
-        }),
+      const { allowedNestedInserts } = targetTableRules.insert ?? {};
+      const referencingColumn = columnsReferencingRoot.find(
+        ({ name }) =>
+          !allowedNestedInserts ||
+          allowedNestedInserts.some(({ table, column }) => table === this.name && column === name),
+      );
+      insertedChildren = await referencedInsert(
+        this,
+        dbTX,
+        {
+          ...localParams,
+          nestedInsert: {
+            depth: (localParams?.nestedInsert?.depth ?? 0) + 1,
+            previousData: fullRootResult,
+            previousTable: this.name,
+            referencingColumn: referencingColumn?.name,
+          },
+        },
         targetTable,
+        childDataItems.map((childData) => {
+          const childRow = { ...childData };
+          columnsReferencingRoot.map((column) => {
+            childRow[column.references![0]!.cols[0]!] =
+              fullRootResult[column.references![0]!.fcols[0]!];
+          });
+          return childRow;
+        }),
+        rootOnConflict,
       );
     } else if (path.length === 3) {
-      if (targetTable !== tbl3) throw "Did not expect this";
-      const colsRefT3 = cols2.filter((c) =>
-        c.references?.some((rc) => rc.cols.length === 1 && rc.ftable === tbl3),
+      if (targetTable !== indirectTargetTableName) throw "Did not expect this";
+      const columnsReferencingTarget = referencingTableColumns.filter((column) =>
+        column.references?.some(
+          (reference) =>
+            reference.cols.length === 1 && reference.ftable === indirectTargetTableName,
+        ),
       );
-      if (!colsRefT1.length || !colsRefT3.length)
+      if (!columnsReferencingRoot.length || !columnsReferencingTarget.length)
         throw "Incorrectly referenced or missing columns for nested insert";
 
       const fileTable = this.dboBuilder.prostgles.opts.fileTable?.tableName;
@@ -196,21 +222,17 @@ export async function insertRowWithNestedRecords(
         throw "Only media allowed to have nested inserts more than 2 tables apart";
       }
 
-      /* We expect tbl2 to have only 2 columns (media_id and foreign_id) */
+      /* We expect the linking table to have only 2 columns (media_id and foreign_id) */
       if (!(
-        cols2.filter((c) => c.references?.[0]?.ftable === fileTable).length === 1 &&
-        cols2.filter((c) => c.references?.[0]?.ftable === tableHandler.name).length === 1
+        referencingTableColumns.filter((column) => column.references?.[0]?.ftable === fileTable)
+          .length === 1 &&
+        referencingTableColumns.filter(
+          (column) => column.references?.[0]?.ftable === tableHandler.name,
+        ).length === 1
       )) {
-        console.log({
-          tbl1,
-          tbl2,
-          tbl3,
-          name: tableHandler.name,
-          tthisName: this.name,
-        });
         throw (
           "Second joining table (" +
-          tbl2 +
+          referencingTableName +
           ")  not of expected format. Must contain exactly one reference column for each table (file table and target table)  "
         );
       }
@@ -218,17 +240,17 @@ export async function insertRowWithNestedRecords(
       insertedChildren = await childInsert(childDataItems, targetTable);
 
       /* Insert in key_lookup table */
-      for (const t3Child of insertedChildren) {
-        const tbl2Row: AnyObject = {};
+      for (const insertedFile of insertedChildren) {
+        const linkingRow: AnyObject = {};
 
-        colsRefT3.map((col) => {
-          tbl2Row[col.name] = t3Child[col.references![0]!.fcols[0]!];
+        columnsReferencingTarget.map((column) => {
+          linkingRow[column.name] = insertedFile[column.references![0]!.fcols[0]!];
         });
-        colsRefT1.map((col) => {
-          tbl2Row[col.name] = fullRootResult[col.references![0]!.fcols[0]!];
+        columnsReferencingRoot.map((column) => {
+          linkingRow[column.name] = fullRootResult[column.references![0]!.fcols[0]!];
         });
 
-        await childInsert(tbl2Row, tbl2!);
+        await childInsert(linkingRow, referencingTableName!);
       }
     } else {
       console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
@@ -242,13 +264,13 @@ export async function insertRowWithNestedRecords(
         "*",
         targetTableHandler.parseFieldFilter(targetTableRules.insert?.returningFields),
       );
-      const clientTargetInserts = insertedChildren.map((d) => {
-        const _d = { ...d };
-        const res: AnyObject = {};
-        targetReturning.map((r) => {
-          res[r.alias] = _d[r.alias];
+      const clientTargetInserts = insertedChildren.map((insertedChild) => {
+        const childRow = { ...insertedChild };
+        const returnedChild: AnyObject = {};
+        targetReturning.map((returningItem) => {
+          returnedChild[returningItem.alias] = childRow[returningItem.alias];
         });
-        return res;
+        return returnedChild;
       });
 
       returnData![targetTable] =
