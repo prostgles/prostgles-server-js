@@ -20,7 +20,6 @@ import type { ClientSocketWithCachedData } from "./DboBuilder/DboBuilder";
 import { type DBHandlerServerInternal, DboBuilder } from "./DboBuilder/DboBuilder";
 export type { DBHandlerServerInternal, DBHandlerServer };
 export type PGP = pgPromise.IMain<{}, pg.IClient>;
-export { getEmailSender, getOrSetTransporter, verifySMTPConfig } from "./Auth/sendEmail";
 export { applyTableConfig } from "./TableConfig/applyTableConfig";
 
 import { CHANNELS, tryCatchV2 } from "prostgles-types";

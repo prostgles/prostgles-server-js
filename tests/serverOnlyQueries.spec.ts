@@ -6,6 +6,7 @@ import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
 import { testAuditSubscriptionBenchmark } from "./server/auditSubscriptionBenchmark.spec";
 import { testSocketLifecycle } from "./server/socketLifecycle.spec";
+import { testSyncSchema } from "./server/syncSchema.spec";
 import { testJoins } from "./server/joins.spec";
 import { testSelectRules } from "./server/selectRules.spec";
 import { testSelectBenchmark } from "./server/selectBenchmark.spec";
@@ -43,6 +44,7 @@ export const serverOnlyQueries = async (
     await testSelectRules(pgDb);
     await testSelectBenchmark(pgDb);
     await testSocketLifecycle(pgDb);
+    await testSyncSchema(pgDb, db);
     await testAudit(pgDb);
     await testAuditSubscriptionBenchmark(pgDb);
     await test("getJSONBSchemaValidationErrorAsync with real db handlers", async () => {

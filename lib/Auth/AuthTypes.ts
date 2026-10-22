@@ -1,5 +1,4 @@
 import type { Express, Request, Response } from "express";
-import type Mail from "nodemailer/lib/mailer";
 import type { AuthenticateOptions } from "passport";
 import type {
   Profile as FacebookProfile,
@@ -80,36 +79,6 @@ export type ThirdPartyProviders = {
     displayName?: string;
     displayIconPath?: string;
   };
-};
-
-type TLSConfig = {
-  rejectUnauthorized?: boolean;
-  servername?: string;
-};
-export type SMTPConfig =
-  | {
-      type: "smtp";
-      host: string;
-      port: number;
-      secure?: boolean;
-      user: string;
-      pass: string;
-      tls?: TLSConfig;
-    }
-  | {
-      type: "aws-ses";
-      region: string;
-      accessKeyId: string;
-      secretAccessKey: string;
-    };
-
-export type Email = {
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-  text?: string;
-  attachments?: { filename: string; content: string }[] | Mail.Attachment[];
 };
 
 type PasswordRegisterResponse =
