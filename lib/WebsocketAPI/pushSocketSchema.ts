@@ -4,11 +4,16 @@ import type { Prostgles } from "../Prostgles";
 import { runClientSqlRequest } from "../runClientRequest";
 import { makeSocketError } from "./onSocketConnected";
 export async function pushSocketSchema(this: Prostgles, socket: ClientSocketWithCachedData) {
-  const isDestroyed = () => this.destroyed;
-  if (isDestroyed()) return;
+  const { authHandler } = this;
+  const isInvalidated = () =>
+    this.destroyed ||
+    this.authHandler !== authHandler ||
+    !socket.connected ||
+    socket.conn.readyState !== "open";
+  if (isInvalidated()) return;
   try {
     const clientSchema = await this.getClientSchema({ socket }, undefined);
-    if (isDestroyed()) return;
+    if (isInvalidated()) return;
     socket.prostgles ??= new Map();
     socket.prostgles.set(this.appId, clientSchema);
     if (clientSchema.rawSQL) {
@@ -38,10 +43,10 @@ export async function pushSocketSchema(this: Prostgles, socket: ClientSocketWith
       duration: -1,
       data: { socketId: socket.id, clientSchema },
     });
-    if (isDestroyed()) return;
+    if (isInvalidated()) return;
     socket.emit(CHANNELS.SCHEMA, clientSchema);
   } catch (err: any) {
-    if (isDestroyed()) return;
+    if (isInvalidated()) return;
     socket.emit(CHANNELS.SCHEMA, { err: getSerialisableError(err) });
   }
 }

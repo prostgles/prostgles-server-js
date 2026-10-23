@@ -323,6 +323,29 @@ const testSocketSessionCaching = async (db: DB) => {
         await new Promise((resolve) => setTimeout(resolve, 1100));
         assert(serverSocket.connected, "Replacing auth cancels the old expiry timer");
 
+        let resumeInitialAuth = () => {};
+        const initialAuthPaused = new Promise<void>((resolve) => {
+          beforeGetUser = () => {
+            resolve();
+            return new Promise<void>((resumeLookup) => {
+              resumeInitialAuth = resumeLookup;
+            });
+          };
+        });
+        const reloadingClient = connect(url);
+        clients.push(reloadingClient.socket);
+        void reloadingClient.schema.catch(() => {});
+        await initialAuthPaused;
+        beforeGetUser = undefined;
+        await instance.update({ auth: getAuth() });
+        resumeInitialAuth();
+        assert.equal(
+          (await reloadingClient.schema).auth?.user?.id,
+          "updated-user",
+          "Connecting sockets receive the current schema when auth changes during their lookup",
+        );
+        reloadingClient.socket.close();
+
         expires = Date.now() + 1000;
         await updateAuth();
         const channels = await new Promise<SubscriptionChannels>((resolve, reject) => {
