@@ -50,8 +50,12 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     const controlHooks: ExecutionContext[] = [];
     let preparationJobs: Jobs | undefined;
     const getExecution = () => {
-      const handler = instance!.db[table] as unknown as TableHandler;
-      const execution = handler.dboBuilder.prostgles.getExecution();
+      const execution = [instance, other]
+        .map((worker) => {
+          const handler = worker?.db[table] as unknown as TableHandler | undefined;
+          return handler?.dboBuilder.prostgles.getExecution();
+        })
+        .find((execution) => execution);
       assert(execution);
       return execution;
     };
@@ -62,6 +66,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       reason: string;
       user?: string;
       params: unknown;
+      execution: ExecutionContext;
     }[] = [];
     const blocked = new Set<string>();
     const released = new Set<string>();
@@ -98,6 +103,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             reason: run.reason,
             user: user?.id,
             params,
+            execution: getExecution(),
           });
           if (row.mode === "block") {
             blocked.add(run.id);
@@ -673,6 +679,18 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const run = seen.find((entry) => entry.id === rerun.jobId)!;
           assert.equal(run.reason, "rerun");
           assert.deepEqual(run.params, { size: 20 });
+          const attempts = seen.filter(({ id }) => id === job.id || id === rerun.jobId);
+          assert.equal(attempts.length, 4);
+          for (const { id, execution } of attempts) {
+            assert.deepEqual(execution.invocations, [
+              {
+                type: "function",
+                id,
+                functionName: "process",
+                relatedRecords: [{ argName: "row", tableName: table, rowPart: { id: row.id } }],
+              },
+            ]);
+          }
           await assert.rejects(instance!.jobs.rerun(job.id, { size: "wrong" }));
           await assert.rejects(instance!.jobs.rerun(job.id, { unknown: 1 }));
           const permanent = await insert({ mode: "permanent" });
@@ -1739,6 +1757,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             trigger: { type: "schedule", cron: "* * * * * *" },
             run: async ({ row, run, progress }) => {
               assert.equal(row, undefined);
+              assert.deepEqual(getExecution().invocations, [
+                { type: "function", id: run.id, functionName: "schedule", relatedRecords: [] },
+              ]);
               scheduled.push(run.id);
               await progress(1, 1);
             },

@@ -37,8 +37,10 @@ export const runJob = async (
       heartbeatWork = (async () => {
         const row = await db.oneOrNone<{ cancel_requested: boolean }>(
           `
-          UPDATE ${tableSQL} SET locked_until = clock_timestamp() + interval '30 seconds'
-          WHERE ${owned} RETURNING cancel_requested
+          UPDATE ${tableSQL} 
+            SET locked_until = clock_timestamp() + interval '30 seconds'
+          WHERE ${owned} 
+          RETURNING cancel_requested
         `,
           claim,
         );
@@ -117,7 +119,21 @@ export const runJob = async (
         ...createExecutionContext(undefined),
         user: context.user,
         invocations: [
-          { type: "function", id: job.id, functionName: job.job_name, relatedRecords: [] },
+          {
+            type: "function",
+            id: job.id,
+            functionName: job.job_name,
+            relatedRecords:
+              definition.trigger.type === "row" ?
+                [
+                  {
+                    argName: "row",
+                    tableName: definition.trigger.table,
+                    rowPart: job.target_row_pkey,
+                  },
+                ]
+              : [],
+          },
         ],
       },
       () => definition.run(jobContext),
