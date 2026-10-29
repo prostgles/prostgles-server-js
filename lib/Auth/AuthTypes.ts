@@ -28,7 +28,7 @@ import type {
 import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
 import type { DB } from "../Prostgles";
-import { GET_AUTH_ROUTE } from "./AuthHandler";
+import { getAuthRoute } from "./AuthHandler";
 import type { ServerSideRequest } from "./utils/serverSideRequest";
 
 type Awaitable<T> = T | Promise<T>;
@@ -361,12 +361,13 @@ export const getMagicLinkUrl = ({
   loginSignupConfig: AuthConfig["loginSignupConfig"];
 }) => {
   if (data.type === "magic-link") {
-    return `${GET_AUTH_ROUTE(loginSignupConfig, "magicLinkWithId")}/${data.id}`;
+    return new URL(
+      `${getAuthRoute(loginSignupConfig, "magicLinks")}/${encodeURIComponent(data.id)}`,
+      websiteUrl,
+    ).toString();
   }
   const { code, email } = data;
-  const confirmationUrl = new URL(
-    `${websiteUrl}${GET_AUTH_ROUTE(loginSignupConfig, "magicLinks")}`,
-  );
+  const confirmationUrl = new URL(`${websiteUrl}${getAuthRoute(loginSignupConfig, "magicLinks")}`);
   confirmationUrl.searchParams.set("email", email);
   confirmationUrl.searchParams.set("code", code);
   return confirmationUrl.toString();

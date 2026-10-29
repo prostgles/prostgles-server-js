@@ -5,7 +5,11 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test } from "node:test";
 import express from "express";
-import prostgles, { type InitResult, type ProstglesInitOptions } from "prostgles-server";
+import prostgles, {
+  getMagicLinkUrl,
+  type InitResult,
+  type ProstglesInitOptions,
+} from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import { isObject, type AuthOutput, type AuthSocketSchema } from "prostgles-types";
@@ -445,13 +449,19 @@ export const testAuthContract = async (db: DB) => {
       await context.test(
         "magic links support GET, redirects and explicit token responses",
         async () => {
+          const magicLinkUrl = getMagicLinkUrl({
+            websiteUrl: endpoint,
+            data: { type: "magic-link", id: "link-id", returnToken: false },
+            loginSignupConfig: undefined,
+          });
+          assert.equal(magicLinkUrl, `${endpoint}/magic-link/link-id`);
           for (const path of [
-            "/magic-link/link-id",
-            "/magic-link/link-id?returnToken=true",
+            magicLinkUrl,
+            `${magicLinkUrl}?returnToken=true`,
             "/magic-link?id=link-id&returnURL=%2Fjson",
             "/magic-link?email=user%40example.com&code=login-code",
           ]) {
-            const response = await fetch(endpoint + path, { redirect: "manual" });
+            const response = await fetch(new URL(path, endpoint), { redirect: "manual" });
             assert.equal(response.status, 302);
             assert.match(
               response.headers.get("set-cookie") ?? "",

@@ -1,5 +1,5 @@
 import type { AnyObject } from "prostgles-types";
-import { CHANNELS, getProperty, isDefined } from "prostgles-types";
+import { CHANNELS, fromEntries, getEntries, getProperty, isDefined } from "prostgles-types";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilder";
 import type { DBHandlerServer } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { Prostgles } from "../Prostgles";
@@ -44,22 +44,15 @@ export const AUTH_ROUTES = {
   magicLinks: "/magic-link",
   magicLinkWithId: "/magic-link/:id",
 } as const;
-export const GET_AUTH_ROUTE = (
+export const getAuthRoute = (
   conf: AuthConfig["loginSignupConfig"],
   route: keyof typeof AUTH_ROUTES,
 ) => {
   const basePath = conf?.authRoutesBasePath || "";
   return `${basePath}${AUTH_ROUTES[route]}`;
 };
-export const GET_ALL_AUTH_ROUTES = (conf: AuthConfig["loginSignupConfig"]) => {
-  return Object.fromEntries(
-    Object.entries(AUTH_ROUTES).map(([key]) => [
-      key,
-      GET_AUTH_ROUTE(conf, key as keyof typeof AUTH_ROUTES),
-    ]),
-  ) as {
-    [K in keyof typeof AUTH_ROUTES]: string;
-  };
+export const getAllAuthRoutes = (conf: AuthConfig["loginSignupConfig"]) => {
+  return fromEntries(getEntries(AUTH_ROUTES).map(([key]) => [key, getAuthRoute(conf, key)]));
 };
 
 export class AuthHandler {
@@ -90,7 +83,7 @@ export class AuthHandler {
   }
 
   get authRoutes() {
-    return GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
+    return getAllAuthRoutes(this.config?.loginSignupConfig);
   }
 
   init = setupAuthRoutes.bind(this);
@@ -107,7 +100,7 @@ export class AuthHandler {
       logout: logoutRoute,
       magicLinks: magicLinksRoute,
       loginWithProvider,
-    } = GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
+    } = getAllAuthRoutes(this.config?.loginSignupConfig);
     const pubRoutes = [
       ...(this.config?.loginSignupConfig?.publicRoutes || []),
       login,
@@ -170,7 +163,7 @@ export class AuthHandler {
       loginWithProvider,
       emailRegistration,
       magicLinks,
-    } = GET_ALL_AUTH_ROUTES(this.config?.loginSignupConfig);
+    } = getAllAuthRoutes(this.config?.loginSignupConfig);
 
     removeExpressRoute(app, [
       login,
