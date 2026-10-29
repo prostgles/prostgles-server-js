@@ -4,6 +4,7 @@ import type { ExpressReq, LoginParams } from "./AuthTypes";
 import { getMagicLinkUrl, type BasicSession } from "./AuthTypes";
 import type { LoginResponseHandler } from "./endpoints/setLoginRequestHandler";
 import { throttledAuthCall } from "./utils/throttledReject";
+import { getAuthResponse } from "./utils/getAuthResponse";
 
 export async function login(
   this: AuthHandler,
@@ -71,16 +72,17 @@ export async function login(
   });
 
   if (!loginResponse.session) {
-    if (!loginResponse.response.success) {
-      const errorCode = loginResponse.response.code;
+    const response = getAuthResponse("login", loginResponse.response);
+    if (!response.success) {
+      const errorCode = response.code;
       const statusCode =
         errorCode === "server-error" ? HTTP_FAIL_CODES.INTERNAL_SERVER_ERROR
         : errorCode === "password-missing" ? HTTP_FAIL_CODES.UNAUTHORIZED
         : errorCode === "totp-token-missing" ? HTTP_FAIL_CODES.UNAUTHORIZED
         : HTTP_FAIL_CODES.BAD_REQUEST;
-      return res.status(statusCode).json(loginResponse.response);
+      return res.status(statusCode).json(response);
     }
-    return res.json(loginResponse.response);
+    return res.json(response);
   }
   this.setCookieAndGoToReturnURLIfSet(loginResponse.session, { req, res });
 }

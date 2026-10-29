@@ -6,6 +6,7 @@ import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
 import { testAuditSubscriptionBenchmark } from "./server/auditSubscriptionBenchmark.spec";
 import { testSocketLifecycle } from "./server/socketLifecycle.spec";
+import { testAuthContract } from "./server/authContract.spec";
 import { testSyncSchema } from "./server/syncSchema.spec";
 import { testJoins } from "./server/joins.spec";
 import { testSelectRules } from "./server/selectRules.spec";
@@ -44,6 +45,7 @@ export const serverOnlyQueries = async (
     await testSelectRules(pgDb);
     await testSelectBenchmark(pgDb);
     await testSocketLifecycle(pgDb);
+    await testAuthContract(pgDb);
     await testSyncSchema(pgDb, db);
     await testAudit(pgDb);
     await testAuditSubscriptionBenchmark(pgDb);

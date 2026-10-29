@@ -5,6 +5,7 @@ import { getBasicSessionErrorCode } from "../login";
 import { getSafeReturnUrlFromQuery } from "./getSafeReturnUrlFromQuery";
 import { getSafeReturnURL } from "./getSafeReturnURL";
 import { matchesRoute } from "./matchesRoute";
+import type { Response } from "express";
 
 export function validateSessionAndSetCookie(
   this: AuthHandler,
@@ -25,7 +26,7 @@ export function validateSessionAndSetCookie(
 export function setCookieAndGoToReturnURLIfSet(
   this: AuthHandler,
   cookie: { sid: string; expires: number },
-  requestHandler: { req: ExpressReq; res: LoginResponseHandler },
+  requestHandler: { req: ExpressReq; res: Pick<Response, "cookie" | "redirect"> },
 ) {
   if (!this.config) {
     throw new Error("AuthHandler config is not set");

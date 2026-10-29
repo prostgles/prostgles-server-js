@@ -13,6 +13,8 @@ import type { MicrosoftStrategyOptions } from "passport-microsoft";
 import type OAuth2Strategy from "passport-oauth2";
 import type {
   AnyObject,
+  AuthInput,
+  AuthOutput,
   AuthRequest,
   AuthResponse,
   ClientSchema,
@@ -81,8 +83,7 @@ export type ThirdPartyProviders = {
   };
 };
 
-type PasswordRegisterResponse =
-  AuthResponse.PasswordRegisterFailure | AuthResponse.PasswordRegisterSuccess;
+type PasswordRegisterResponse = AuthOutput<"register">;
 
 /**
  * Users have to provide an email and optionally a password.
@@ -103,7 +104,7 @@ export type SignupWithEmail = {
    * Called when the user has registered.
    */
   onRegister: (data: {
-    email: string;
+    email: AuthInput<"register">["username"];
 
     /**
      * Password after validation.
@@ -332,19 +333,23 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
 export type LoginResponse =
   | {
       session: BasicSession;
-      response?: AuthResponse.PasswordLoginSuccess;
+      response?: Extract<AuthOutput<"login">, { success: true; code?: undefined }>;
     }
   | {
       session?: undefined;
-      response: AuthResponse.MagicLinkAuthSuccess;
+      response: Extract<AuthOutput<"login">, { success: true; code: string }>;
     }
-  | AuthResponse.OAuthRegisterFailure["code"]
-  | AuthResponse.PasswordLoginFailure["code"]
-  | AuthResponse.MagicLinkAuthFailure["code"];
+  | Extract<AuthOutput<"login">, { success: false }>["code"];
 
 export type MagicLinkOrOTPData =
-  | { type: "magic-link"; id: string; returnToken: boolean }
-  | { type: "otp"; code: string; email: string; returnToken: boolean };
+  | (Extract<AuthInput<"magicLinkOrOTP">, { id: string }> & {
+      type: "magic-link";
+      returnToken: boolean;
+    })
+  | (Extract<AuthInput<"magicLinkOrOTP">, { email: string }> & {
+      type: "otp";
+      returnToken: boolean;
+    });
 
 export const getMagicLinkUrl = ({
   websiteUrl,
@@ -422,11 +427,11 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
   ) => Awaitable<
     | {
         session: BasicSession | undefined;
-        response?: AuthResponse.AuthSuccess | AuthResponse.PasswordRegisterEmailConfirmationSuccess;
+        response?: Extract<AuthOutput<"magicLinkOrOTP">, { success: true }>;
       }
     | {
         session?: undefined;
-        response: AuthResponse.MagicLinkAuthFailure | AuthResponse.CodeVerificationFailure;
+        response: Extract<AuthOutput<"magicLinkOrOTP">, { success: false }>;
       }
   >;
 
