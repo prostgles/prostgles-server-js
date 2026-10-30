@@ -17,10 +17,16 @@ import { io } from "socket.io-client";
 import type * as clientAuth from "../client/node_modules/prostgles-client/dist/getAuthHandler";
 
 export const testAuthContract = async (db: DB) => {
+  await testAuthContractWithBasePath(db, undefined);
+  await testAuthContractWithBasePath(db, "/account/auth");
+};
+
+const testAuthContractWithBasePath = async (db: DB, authRoutesBasePath: string | undefined) => {
+  const basePath = authRoutesBasePath ?? "/auth";
   const { getAuthHandler, authRequest } = createRequire(path.resolve("../client/package.json"))(
     "prostgles-client/dist/getAuthHandler",
   ) as typeof clientAuth;
-  await test("HTTP auth contract validates requests and callback results", async (context) => {
+  await test(`HTTP auth contract (${basePath})`, async (context) => {
     const app = express();
     let redirectPageResponse: unknown = { account: "signed in" };
     app.use(express.json());
@@ -29,7 +35,11 @@ export const testAuthContract = async (db: DB) => {
     app.post("/malformed", (_req, res) => res.json({ success: true, code: "unknown-code" }));
     app.post("/invalid-status", (_req, res) => res.status(401).json({ success: true }));
     app.post("/plain-error", (_req, res) => res.status(502).send("Upstream unavailable"));
-    app.post("/redirect/:operation", (req, res) => res.redirect(307, `/${req.params.operation}`));
+    app.post("/redirect/:operation", (req, res) => {
+      const { operation } = req.params;
+      const prefix = operation === "register" || operation === "magic-link" ? basePath : "";
+      res.redirect(307, `${prefix}/${operation}`);
+    });
     const http = createServer(app);
     http.listen(0, "127.0.0.1");
     await once(http, "listening");
@@ -46,11 +56,22 @@ export const testAuthContract = async (db: DB) => {
       user: undefined,
       providers: undefined,
       preferredLogin: undefined,
-      login: { mode: "email+password", loginRoute: "/login?returnURL=%2F", logoutRoute: "/logout" },
+      login: {
+        mode: "email+password",
+        loginRoute: `${basePath}/login?returnURL=%2F`,
+        logoutRoute: `${basePath}/logout`,
+      },
+      signupWithEmail: {
+        minPasswordLength: 8,
+        requirePassword: true,
+        requireInvitation: false,
+        url: `${basePath}/register`,
+        emailConfirmationRoute: `${basePath}/magic-link`,
+      },
       signupWithEmailAndPassword: {
         minPasswordLength: 8,
-        url: "/register",
-        emailConfirmationRoute: "/magic-link",
+        url: `${basePath}/register`,
+        emailConfirmationRoute: `${basePath}/magic-link`,
       },
     };
     const authOptions = {
@@ -62,20 +83,38 @@ export const testAuthContract = async (db: DB) => {
       redirect: undefined,
     };
     const auth = getAuthHandler(authOptions);
-    const { login, signupWithEmailAndPassword: register, confirmEmail } = auth;
+    const { login, signupWithEmail: register, confirmEmail } = auth;
     assert(login && register && confirmEmail);
+    assert.equal(auth.signupWithEmailAndPassword, register);
     let registrationCalls = 0;
     let loginCalls = 0;
     let verificationCalls = 0;
     let registrationResult: unknown = { success: true, code: "email-verification-code-sent" };
     let instance: InitResult | undefined;
-    const post = (path: string, data: unknown) =>
-      fetch(endpoint + path, {
+    app.get("/schema", async (req, res) => {
+      assert(instance);
+      const { clientSchema } = await instance.getClientDBHandlers({ httpReq: req, res }, undefined);
+      res.json(clientSchema.auth);
+    });
+    const post = async (path: string, data: unknown) => {
+      const response = await fetch(endpoint + path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
         redirect: "manual",
       });
+      /* Check successful, failed and redirected auth responses. */
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      return response;
+    };
+    const getServerAuth = async () => {
+      const response = await fetch(endpoint + "/schema");
+      assert.equal(response.status, 200);
+      return getAuthHandler({
+        ...authOptions,
+        authData: (await response.json()) as AuthSocketSchema,
+      });
+    };
 
     try {
       await db.none("CREATE SCHEMA auth_contract_test");
@@ -91,7 +130,18 @@ export const testAuthContract = async (db: DB) => {
           responseThrottle: 1,
           loginSignupConfig: {
             app,
-            publicRoutes: ["/"],
+            authRoutesBasePath,
+            publicRoutes: [`${basePath}-public`],
+            onGetRequestOK: (_req, res) => {
+              res.send("Public page");
+            },
+            loginWithOAuth: {
+              websiteUrl: endpoint,
+              OAuthProviders: {
+                github: { clientID: "auth-contract-client", clientSecret: "auth-contract-secret" },
+              },
+              onProviderLoginStart: () => ({ success: false, code: "provider-issue" }),
+            },
             cookieOptions: { secure: false },
             login: (data) => {
               loginCalls++;
@@ -109,13 +159,18 @@ export const testAuthContract = async (db: DB) => {
             logout: () => undefined,
             signupWithEmail: {
               requirePassword: true,
-              onRegister: ({ email, password }) => {
+              onRegister: ({ email, password, invitationToken }) => {
                 registrationCalls++;
                 if (email === "error@example.com") {
                   return Promise.reject(new Error("Private registration error"));
                 }
                 assert.equal(email, "user@example.com");
                 assert.equal(password, "password123");
+                if (invitationToken) {
+                  return invitationToken === "invitation-token" ?
+                      { success: true, code: "email-verified" }
+                    : { success: false, code: "invalid-email-confirmation-code" };
+                }
                 /* Simulate an untyped application's callback at the runtime boundary. */
                 return registrationResult as AuthOutput<"register">;
               },
@@ -132,6 +187,106 @@ export const testAuthContract = async (db: DB) => {
             },
           },
         },
+      });
+
+      await context.test("client auth URLs use the configured base path", async () => {
+        const response = await fetch(endpoint + "/schema");
+        assert.equal(response.status, 200);
+        const clientAuth: unknown = await response.json();
+        assert(isObject(clientAuth));
+        assert.deepEqual(clientAuth.login, {
+          mode: "email+password",
+          loginRoute: `${basePath}/login`,
+          logoutRoute: `${basePath}/logout`,
+        });
+        assert.deepEqual(
+          clientAuth.signupWithEmailAndPassword,
+          authData.signupWithEmailAndPassword,
+        );
+        assert.deepEqual(clientAuth.signupWithEmail, authData.signupWithEmail);
+        assert.deepEqual(clientAuth.providers, { github: { url: `${basePath}/oauth/github` } });
+      });
+
+      await context.test("signupWithEmail supports new and legacy server metadata", async () => {
+        for (const clientAuth of [
+          await getServerAuth(),
+          getAuthHandler({
+            ...authOptions,
+            authData: { ...authData, signupWithEmailAndPassword: undefined },
+          }),
+          getAuthHandler({
+            ...authOptions,
+            authData: { ...authData, signupWithEmail: undefined },
+          }),
+        ]) {
+          assert(clientAuth.signupWithEmail && clientAuth.confirmEmail);
+          assert.equal(clientAuth.signupWithEmailAndPassword, clientAuth.signupWithEmail);
+          assert.deepEqual(clientAuth.signupWithEmailOptions, authData.signupWithEmail);
+          assert.deepEqual(
+            await clientAuth.signupWithEmail({
+              username: "user@example.com",
+              password: "password123",
+            }),
+            { success: true, code: "email-verification-code-sent" },
+          );
+          assert.deepEqual(
+            await clientAuth.confirmEmail({ email: "user@example.com", code: "email-code" }),
+            { success: true, code: "email-verified" },
+          );
+        }
+      });
+
+      await context.test("auth base paths reject empty, root and malformed overrides", () => {
+        const loginSignupConfig = instance?.options.auth?.loginSignupConfig;
+        assert(loginSignupConfig);
+        for (const invalidBasePath of ["", "/", "auth", "/auth/"]) {
+          assert.throws(
+            () =>
+              getMagicLinkUrl({
+                websiteUrl: endpoint,
+                data: { type: "magic-link", id: "link-id", returnToken: false },
+                loginSignupConfig: { ...loginSignupConfig, authRoutesBasePath: invalidBasePath },
+              }),
+            /authRoutesBasePath/,
+          );
+        }
+      });
+
+      await context.test("auth cache headers respect path boundaries", async () => {
+        const publicResponse = await fetch(`${endpoint}${basePath}-public`);
+        assert.equal(publicResponse.status, 200);
+        assert.equal(publicResponse.headers.get("cache-control"), null);
+        await publicResponse.arrayBuffer();
+        const protectedResponse = await fetch(endpoint + "/protected", { redirect: "manual" });
+        assert.equal(protectedResponse.status, 302);
+        assert.equal(
+          protectedResponse.headers.get("location"),
+          `${basePath}/login?returnURL=%2Fprotected`,
+        );
+        await protectedResponse.arrayBuffer();
+        const loginResponse = await post(`${basePath.toUpperCase()}/login`, {
+          username: "user@example.com",
+          password: "password123",
+        });
+        assert.equal(loginResponse.status, 302);
+        await loginResponse.arrayBuffer();
+      });
+
+      await context.test("OAuth routes preserve the prefix and disable caching", async () => {
+        const response = await fetch(`${endpoint}${basePath}/oauth/github`, { redirect: "manual" });
+        assert.equal(response.status, 302);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        const location = response.headers.get("location");
+        assert(location);
+        assert.equal(
+          new URL(location).searchParams.get("redirect_uri"),
+          `${endpoint}${basePath}/oauth/github/callback`,
+        );
+        await response.arrayBuffer();
+        const callbackResponse = await fetch(`${endpoint}${basePath}/oauth/github/callback`);
+        assert.equal(callbackResponse.status, 400);
+        assert.equal(callbackResponse.headers.get("cache-control"), "no-store");
+        assert.deepEqual(await callbackResponse.json(), { success: false, code: "provider-issue" });
       });
 
       await context.test(
@@ -158,6 +313,20 @@ export const testAuthContract = async (db: DB) => {
         },
       );
 
+      await context.test(
+        "registration forwards invitation tokens and accepts confirmation",
+        async () => {
+          assert.deepEqual(
+            await register({
+              username: "user@example.com",
+              password: "password123",
+              invitationToken: "invitation-token",
+            }),
+            { success: true, code: "email-verified" },
+          );
+        },
+      );
+
       await context.test("redirected JSON preserves auth codes, messages and tokens", async () => {
         const registrationResponse = {
           success: true,
@@ -169,6 +338,7 @@ export const testAuthContract = async (db: DB) => {
           ...authOptions,
           authData: {
             ...authData,
+            signupWithEmail: undefined,
             signupWithEmailAndPassword: {
               minPasswordLength: 8,
               url: "/redirect/register",
@@ -184,14 +354,14 @@ export const testAuthContract = async (db: DB) => {
               username: "user@example.com",
               password: "password123",
             }),
-            { ...registrationResponse, redirect_url: endpoint + "/register" },
+            { ...registrationResponse, redirect_url: `${endpoint}${basePath}/register` },
           );
           assert.deepEqual(
             await redirectedAuth.confirmEmail({ email: "user@example.com", code: "email-code" }),
             {
               success: true,
               code: "email-verified",
-              redirect_url: endpoint + "/magic-link",
+              redirect_url: `${endpoint}${basePath}/magic-link`,
             },
           );
           const redirectRejectingAuth = getAuthHandler({
@@ -217,7 +387,7 @@ export const testAuthContract = async (db: DB) => {
             {
               success: true,
               token: session.sid,
-              redirect_url: endpoint + "/magic-link",
+              redirect_url: `${endpoint}${basePath}/magic-link`,
             },
           );
         } finally {
@@ -244,7 +414,7 @@ export const testAuthContract = async (db: DB) => {
           assert.deepEqual(
             await authRequest(
               "login",
-              endpoint + "/login?returnURL=%2Fjson",
+              `${endpoint}${basePath}/login?returnURL=%2Fjson`,
               credentials,
               "POST",
               {},
@@ -265,14 +435,25 @@ export const testAuthContract = async (db: DB) => {
       await context.test("invalid inputs are rejected before application callbacks", async () => {
         const callsBefore = { registrationCalls, loginCalls, verificationCalls };
         for (const [path, data] of [
-          ["/login", { username: 123 }],
-          ["/login", { username: "user@example.com", remember_me: "yes" }],
-          ["/login", { username: "user@example.com", unexpected: true }],
-          ["/register", { username: "user@example.com", password: 123 }],
-          ["/magic-link", { email: "user@example.com", code: 123 }],
-          ["/magic-link", { email: "user@example.com", code: "email-code", returnToken: "true" }],
-          ["/magic-link", { id: "link-id", unexpected: true }],
-          ["/magic-link", []],
+          [`${basePath}/login`, { username: 123 }],
+          [`${basePath}/login`, { username: "user@example.com", remember_me: "yes" }],
+          [`${basePath}/login`, { username: "user@example.com", unexpected: true }],
+          [`${basePath}/register`, { username: "user@example.com", password: 123 }],
+          [
+            `${basePath}/register`,
+            {
+              username: "user@example.com",
+              password: "password123",
+              invitationToken: 123,
+            },
+          ],
+          [`${basePath}/magic-link`, { email: "user@example.com", code: 123 }],
+          [
+            `${basePath}/magic-link`,
+            { email: "user@example.com", code: "email-code", returnToken: "true" },
+          ],
+          [`${basePath}/magic-link`, { id: "link-id", unexpected: true }],
+          [`${basePath}/magic-link`, []],
         ] as const) {
           const response = await post(path, data);
           assert.equal(response.status, 400);
@@ -281,7 +462,7 @@ export const testAuthContract = async (db: DB) => {
           assert.equal(responseData.success, false);
         }
         assert.deepEqual({ registrationCalls, loginCalls, verificationCalls }, callsBefore);
-        const oldClientRegistration = await post("/register", {
+        const oldClientRegistration = await post(`${basePath}/register`, {
           username: "user@example.com",
           password: "password123",
           remember_me: false,
@@ -296,7 +477,7 @@ export const testAuthContract = async (db: DB) => {
           undefined,
           null,
           false,
-          { success: true, code: "email-verified" },
+          { success: true, code: "magic-link-sent" },
         ]) {
           registrationResult = invalidResult;
           assert.deepEqual(
@@ -320,9 +501,9 @@ export const testAuthContract = async (db: DB) => {
         "callback exceptions preserve HTTP status and public error responses",
         async () => {
           for (const [route, expectedResponse] of [
-            ["/login", { success: false, code: "server-error" }],
+            [`${basePath}/login`, { success: false, code: "server-error" }],
             [
-              "/register",
+              `${basePath}/register`,
               {
                 success: false,
                 code: "server-error",
@@ -347,7 +528,7 @@ export const testAuthContract = async (db: DB) => {
           [{ username: "user@example.com" }, "password-missing"],
           [{ username: "user@example.com", password: "short" }, "weak-password"],
         ] as const) {
-          const response = await post("/register", data);
+          const response = await post(`${basePath}/register`, data);
           assert.equal(response.status, 400);
           const result: unknown = await response.json();
           assert(isObject(result));
@@ -370,10 +551,13 @@ export const testAuthContract = async (db: DB) => {
         ];
         for (const data of invalidRequests) {
           for (const response of [
-            await post("/magic-link", data),
-            await fetch(endpoint + "/magic-link?" + new URLSearchParams(data).toString()),
+            await post(`${basePath}/magic-link`, data),
+            await fetch(
+              `${endpoint}${basePath}/magic-link?` + new URLSearchParams(data).toString(),
+            ),
           ]) {
             assert.equal(response.status, 400);
+            assert.equal(response.headers.get("cache-control"), "no-store");
             const result: unknown = await response.json();
             assert(isObject(result));
             assert.equal(result.success, false);
@@ -390,7 +574,7 @@ export const testAuthContract = async (db: DB) => {
           ["invalid-result", 401, { success: false, code: "server-error" }],
           ["error-code", 400, { success: false, code: "something-went-wrong" }],
         ] as const) {
-          const response = await post("/magic-link", {
+          const response = await post(`${basePath}/magic-link`, {
             email: "user@example.com",
             code,
           });
@@ -405,6 +589,8 @@ export const testAuthContract = async (db: DB) => {
           authData: undefined,
         });
         assert.equal(unavailableAuth.login, undefined);
+        assert.equal(unavailableAuth.signupWithEmail, undefined);
+        assert.equal(unavailableAuth.signupWithEmailOptions, undefined);
         assert.equal(unavailableAuth.signupWithEmailAndPassword, undefined);
         assert.equal(unavailableAuth.confirmEmail, undefined);
         assert.equal(unavailableAuth.isLoggedin, false);
@@ -433,7 +619,7 @@ export const testAuthContract = async (db: DB) => {
           ]) {
             assert.deepEqual(await login(data), { success: true, redirect_url: endpoint + "/" });
           }
-          const response = await post("/login", {
+          const response = await post(`${basePath}/login`, {
             username: "user@example.com",
             password: "password123",
           });
@@ -452,17 +638,18 @@ export const testAuthContract = async (db: DB) => {
           const magicLinkUrl = getMagicLinkUrl({
             websiteUrl: endpoint,
             data: { type: "magic-link", id: "link-id", returnToken: false },
-            loginSignupConfig: undefined,
+            loginSignupConfig: instance?.options.auth?.loginSignupConfig,
           });
-          assert.equal(magicLinkUrl, `${endpoint}/magic-link/link-id`);
+          assert.equal(magicLinkUrl, `${endpoint}${basePath}/magic-link/link-id`);
           for (const path of [
             magicLinkUrl,
             `${magicLinkUrl}?returnToken=true`,
-            "/magic-link?id=link-id&returnURL=%2Fjson",
-            "/magic-link?email=user%40example.com&code=login-code",
+            `${basePath}/magic-link?id=link-id&returnURL=%2Fjson`,
+            `${basePath}/magic-link?email=user%40example.com&code=login-code`,
           ]) {
             const response = await fetch(new URL(path, endpoint), { redirect: "manual" });
             assert.equal(response.status, 302);
+            assert.equal(response.headers.get("cache-control"), "no-store");
             assert.match(
               response.headers.get("set-cookie") ?? "",
               /session_id=auth-contract-session/,
@@ -473,7 +660,7 @@ export const testAuthContract = async (db: DB) => {
             );
             await response.arrayBuffer();
           }
-          const response = await post("/magic-link", {
+          const response = await post(`${basePath}/magic-link`, {
             email: "user@example.com",
             code: "login-code",
             returnToken: true,
@@ -498,7 +685,11 @@ export const testAuthContract = async (db: DB) => {
               ...authOptions,
               authData: {
                 ...authData,
-                login: { mode: "email+password", loginRoute: path, logoutRoute: "/logout" },
+                login: {
+                  mode: "email+password",
+                  loginRoute: path,
+                  logoutRoute: `${basePath}/logout`,
+                },
               },
             });
             assert(malformedAuth.login);
@@ -519,6 +710,9 @@ export const testAuthContract = async (db: DB) => {
       );
 
       await context.test("logout retains its HTTP redirect result", async () => {
+        const response = await post(`${basePath}/logout`, {});
+        assert.equal(response.status, 302);
+        await response.arrayBuffer();
         const authenticated = getAuthHandler({
           ...authOptions,
           authData: { ...authData, user: { id: "user", type: "default" } },
@@ -528,6 +722,136 @@ export const testAuthContract = async (db: DB) => {
           success: true,
           redirect_url: endpoint + "/",
         });
+      });
+
+      await context.test(
+        "invitation-only signup keeps helpers and enforces invitations",
+        async () => {
+          assert(instance);
+          const authConfig = instance.options.auth;
+          const loginSignupConfig = authConfig?.loginSignupConfig;
+          const signupWithEmail = loginSignupConfig?.signupWithEmail;
+          assert(authConfig && loginSignupConfig && signupWithEmail);
+          await instance.update({
+            auth: {
+              ...authConfig,
+              loginSignupConfig: {
+                ...loginSignupConfig,
+                signupWithEmail: {
+                  ...signupWithEmail,
+                  requireInvitation: true,
+                  minPasswordLength: 10,
+                },
+              },
+            },
+          });
+          const response = await fetch(endpoint + "/schema");
+          assert.equal(response.status, 200);
+          const invitationAuthData = (await response.json()) as AuthSocketSchema;
+          assert.equal(invitationAuthData.signupWithEmailAndPassword, undefined);
+          const invitedAuth = getAuthHandler({ ...authOptions, authData: invitationAuthData });
+          assert(invitedAuth.signupWithEmail && invitedAuth.confirmEmail);
+          assert.equal(invitedAuth.signupWithEmailAndPassword, undefined);
+          assert.deepEqual(invitedAuth.signupWithEmailOptions, {
+            ...authData.signupWithEmail,
+            requireInvitation: true,
+            minPasswordLength: 10,
+          });
+          const credentials = { username: "user@example.com", password: "password123" };
+          const callsBefore = registrationCalls;
+          assert.deepEqual(await invitedAuth.signupWithEmail(credentials), {
+            success: false,
+            code: "invalid-email-confirmation-code",
+            message: "An invitation is required to register",
+          });
+          assert.equal(registrationCalls, callsBefore);
+          assert.deepEqual(
+            await invitedAuth.signupWithEmail({ ...credentials, invitationToken: "invalid-token" }),
+            { success: false, code: "invalid-email-confirmation-code" },
+          );
+          assert.deepEqual(
+            await invitedAuth.signupWithEmail({
+              ...credentials,
+              invitationToken: "invitation-token",
+            }),
+            { success: true, code: "email-verified" },
+          );
+          assert.equal(registrationCalls, callsBefore + 2);
+          assert.deepEqual(
+            await invitedAuth.confirmEmail({ email: "user@example.com", code: "email-code" }),
+            { success: true, code: "email-verified" },
+          );
+        },
+      );
+
+      await context.test(
+        "signup defaults allow an omitted password and validate supplied passwords",
+        async () => {
+          assert(instance);
+          const authConfig = instance.options.auth;
+          const loginSignupConfig = authConfig?.loginSignupConfig;
+          assert(authConfig && loginSignupConfig);
+          await instance.update({
+            auth: {
+              ...authConfig,
+              loginSignupConfig: {
+                ...loginSignupConfig,
+                signupWithEmail: {
+                  onRegister: ({ password }) => {
+                    assert.equal(password, "");
+                    return { success: true, code: "email-verification-code-sent" };
+                  },
+                },
+              },
+            },
+          });
+          const publicAuth = await getServerAuth();
+          assert(publicAuth.signupWithEmail);
+          assert.equal(publicAuth.signupWithEmailAndPassword, publicAuth.signupWithEmail);
+          assert.deepEqual(publicAuth.signupWithEmailOptions, {
+            ...authData.signupWithEmail,
+            requirePassword: false,
+          });
+          assert.deepEqual(await publicAuth.signupWithEmail({ username: "user@example.com" }), {
+            success: true,
+            code: "email-verification-code-sent",
+          });
+          assert.deepEqual(
+            await publicAuth.signupWithEmail({ username: "user@example.com", password: "short" }),
+            {
+              success: false,
+              code: "weak-password",
+              message: "Password must be at least 8 characters long",
+            },
+          );
+        },
+      );
+
+      await context.test("disabling signup removes both signup helpers", async () => {
+        assert(instance);
+        const authConfig = instance.options.auth;
+        const loginSignupConfig = authConfig?.loginSignupConfig;
+        assert(authConfig && loginSignupConfig);
+        await instance.update({
+          auth: {
+            ...authConfig,
+            loginSignupConfig: { ...loginSignupConfig, signupWithEmail: undefined },
+          },
+        });
+        const disabledAuth = await getServerAuth();
+        assert.equal(disabledAuth.signupWithEmail, undefined);
+        assert.equal(disabledAuth.signupWithEmailOptions, undefined);
+        assert.equal(disabledAuth.signupWithEmailAndPassword, undefined);
+      });
+
+      await context.test("destroy removes auth routes and their cache middleware", async () => {
+        await instance?.destroy();
+        instance = undefined;
+        app.post(`${basePath}/login`, (_req, res) => res.sendStatus(404));
+        const response = await fetch(`${endpoint}${basePath}/login`, { method: "POST" });
+        assert.equal(response.status, 404);
+        assert.equal(response.headers.get("cache-control"), null);
+        await response.arrayBuffer();
       });
     } finally {
       socket.close();

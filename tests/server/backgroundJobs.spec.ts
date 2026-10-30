@@ -455,18 +455,24 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           }),
           scheduled: defineJob({
             trigger: { type: "schedule", cron: "0 * * * *" },
+            retention: { succeeded: "forever" },
             run: ({ row }) => {
               row satisfies undefined;
               return Promise.resolve();
             },
           }),
         };
+        const { retention: _retention, ...scheduleWithoutRetention } = definitions.scheduled;
+        /* @ts-expect-error Scheduled jobs require explicit retention. */
+        defineJob(scheduleWithoutRetention);
+        /* @ts-expect-error Inline scheduled definitions also require retention. */
+        const missingRetention: JobsConfig<JobSchema> = { scheduled: scheduleWithoutRetention };
         const options: JobsOptions<JobSchema> = { definitions };
         const invalid: ParamsSchema = {
           // @ts-expect-error required parameters need a default
           required: { jsonbSchema: { type: "string" } },
         };
-        void [checkActions, checkProgress, options, invalid, invalidTrigger];
+        void [checkActions, checkProgress, options, invalid, invalidTrigger, missingRetention];
       });
       await t.test("row and job commit together; rollback and hooks remove the job", async () => {
         const before = (await records()).length;
@@ -1744,6 +1750,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const scheduled: string[] = [];
           definitions.brokenSchedule = defineJob({
             trigger: { type: "schedule", cron: "* * * * * *" },
+            retention: { succeeded: "forever" },
             runAs: "user",
             run: async () => {},
           });
@@ -1755,6 +1762,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           rejectSchedule = true;
           definitions.schedule = defineJob({
             trigger: { type: "schedule", cron: "* * * * * *" },
+            retention: { succeeded: "forever" },
             run: async ({ row, run, progress }) => {
               assert.equal(row, undefined);
               assert.deepEqual(getExecution().invocations, [

@@ -13,6 +13,7 @@ import { getSidAndUserFromRequest } from "./utils/getSidAndUserFromRequest";
 import { handleGetUserThrottled, type GetUserOrRedirected } from "./utils/handleGetUser";
 import { matchesRoute } from "./utils/matchesRoute";
 import { removeExpressRoute, removeExpressRoutesTest } from "./utils/removeExpressRoute";
+import { removeExpressRouteByName } from "./utils/upsertNamedExpressMiddleware";
 import {
   setCookieAndGoToReturnURLIfSet,
   validateSessionAndSetCookie,
@@ -36,6 +37,7 @@ export const HTTP_SUCCESS_CODES = {
 const SID_KEY_NAME = "session_id" as const;
 export const EXPRESS_CATCH_ALL_ROUTE = "*splat"; //v5 "*splat" //v4 "*"
 export const AUTH_RETURN_URL_PARAM_NAME = "returnURL";
+export const AUTH_CACHE_CONTROL_MIDDLEWARE_NAME = "prostglesAuthCacheControl";
 export const AUTH_ROUTES = {
   login: "/login",
   loginWithProvider: "/oauth",
@@ -48,8 +50,16 @@ export const getAuthRoute = (
   conf: AuthConfig["loginSignupConfig"],
   route: keyof typeof AUTH_ROUTES,
 ) => {
-  const basePath = conf?.authRoutesBasePath || "";
-  return `${basePath}${AUTH_ROUTES[route]}`;
+  return `${getAuthRoutesBasePath(conf)}${AUTH_ROUTES[route]}`;
+};
+export const getAuthRoutesBasePath = (conf: AuthConfig["loginSignupConfig"]) => {
+  const basePath = conf?.authRoutesBasePath ?? "/auth";
+  if (!basePath.startsWith("/") || basePath.endsWith("/")) {
+    throw new Error(
+      "authRoutesBasePath must be a non-empty path starting with '/' and without a trailing '/'",
+    );
+  }
+  return basePath;
 };
 export const getAllAuthRoutes = (conf: AuthConfig["loginSignupConfig"]) => {
   return fromEntries(getEntries(AUTH_ROUTES).map(([key]) => [key, getAuthRoute(conf, key)]));
@@ -156,6 +166,9 @@ export class AuthHandler {
   destroy = () => {
     this.socketSessions.destroy();
     const app = this.config?.loginSignupConfig?.app;
+    if (app) {
+      removeExpressRouteByName(app, AUTH_CACHE_CONTROL_MIDDLEWARE_NAME);
+    }
     const {
       login,
       logout,
@@ -222,7 +235,8 @@ export class AuthHandler {
     const bearerSid = authToken && Buffer.from(authToken.token, "base64").toString();
 
     return this.validateSid(
-      bearerSid ?? (getProperty(maybeClientReq.httpReq.cookies, sidKeyName) as string | undefined),
+      bearerSid ??
+        (getProperty(maybeClientReq.httpReq.cookies ?? {}, sidKeyName) as string | undefined),
     );
   }
 

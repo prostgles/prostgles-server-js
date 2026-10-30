@@ -19,6 +19,11 @@ export const jobTableConfig = {
     target_row_pkey: "JSONB NOT NULL",
     params: "JSONB NOT NULL",
     user_id: "TEXT",
+    /**
+     * Scheduled cron time, rounded to a minute (five fields) or second (six fields).
+     * Together with job_name, prevents duplicate scheduling across workers and restarts.
+     * Null for row-triggered jobs and manual reruns.
+     */
     occurrence: "TIMESTAMPTZ",
     reason: "TEXT NOT NULL DEFAULT 'trigger'",
     status: "TEXT NOT NULL DEFAULT 'pending'",
@@ -60,5 +65,9 @@ export const jobTableConfig = {
     occurrence: { unique: true, columns: "job_name, occurrence", where: "occurrence IS NOT NULL" },
     pending: { columns: "job_name, run_at", where: "status = 'pending'" },
     active: { columns: "job_name", where: "status IN ('pending', 'running')" },
+    retention: {
+      columns: "job_name, status, finished_at, id",
+      where: "target_table IS NULL AND status IN ('succeeded', 'failed', 'cancelled')",
+    },
   },
 } as const satisfies TableDefinition;

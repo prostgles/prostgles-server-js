@@ -53,6 +53,20 @@ export type RowTrigger<S, T extends JobTableName<S>> = {
 };
 /** Missed occurrences while all workers are stopped are not replayed. */
 export type ScheduleTrigger = { type: "schedule"; cron: string; timezone?: string };
+export type JobRetention =
+  | "forever"
+  | Partial<
+      Record<
+        Extract<JobStatus, "succeeded" | "failed" | "cancelled">,
+        | string
+        | {
+            /** Positive milliseconds or a PostgreSQL interval, measured from finished_at. */
+            maxAge?: number | string;
+            /** Keep the newest runs of this status. Zero removes all eligible runs. */
+            maxCount?: number;
+          }
+      >
+    >;
 export type JobContext<
   S,
   T extends JobTableName<S> | undefined,
@@ -79,19 +93,17 @@ export type JobDefinition<
   T extends JobTableName<S> | undefined = JobTableName<S> | undefined,
   P extends ParamsSchema = ParamsSchema,
   Context = undefined,
-> = {
-  trigger: T extends JobTableName<S> ? RowTrigger<S, T> : ScheduleTrigger;
-  params?: P;
-  /** Defaults to system. User jobs enforce the triggering/rerunning user's publish rules. */
-  runAs?: "system" | "user";
-  retry?: { maxAttempts: number; backoff?: "exponential" | "fixed"; delayMs?: number };
-  timeoutMs?: number;
-  /** Conflicts use the job name and row primary key, or just the name for schedules. */
-  onConflict?: "queue" | "replace" | "skip";
-  /** Maximum parallel runs across workers. Defaults to 1. Same-key runs are serialized. */
-  concurrency?: number;
-  run: (ctx: JobContext<S, T, P, Context>) => Promise<void>;
-};
+> = JobDefinitionOptions<S, T, P, Context> &
+  (T extends JobTableName<S>
+    ? { trigger: RowTrigger<S, T>; retention?: never }
+    : {
+        trigger: ScheduleTrigger;
+        /** Required for schedules. "forever" keeps all history.
+         * Per-status strings shorthand maxAge; "forever" or omitted statuses keep their history.
+         * Cleanup runs periodically and preserves the current scheduling minute for deduplication.
+         */
+        retention: JobRetention;
+      });
 
 export type JobsConfig<S = void, Context = undefined> = Record<
   string,
@@ -112,7 +124,10 @@ export const createJobDefiner = <S = void, Context = undefined>() =>
 
 type DefineJob<S, Context> = {
   <T extends JobTableName<S>, const P extends ParamsSchema = {}>(
-    definition: Omit<JobDefinition<S, T, P, Context>, "trigger"> & { trigger: RowTrigger<S, T> },
+    definition: JobDefinitionOptions<S, T, P, Context> & {
+      trigger: RowTrigger<S, T>;
+      retention?: never;
+    },
   ): JobDefinition<S, T, P, Context>;
   <const P extends ParamsSchema = {}>(
     definition: JobDefinition<S, undefined, P, Context>,
@@ -163,6 +178,23 @@ export type Jobs = {
 };
 export type JobTransaction = { t: pgPromise.ITask<{}>; dbx: DbTxTableHandlers };
 export type RuntimeJobDefinition = JobDefinition<void, string | undefined, ParamsSchema, unknown>;
+type JobDefinitionOptions<
+  S,
+  T extends JobTableName<S> | undefined,
+  P extends ParamsSchema,
+  Context,
+> = {
+  params?: P;
+  /** Defaults to system. User jobs enforce the triggering/rerunning user's publish rules. */
+  runAs?: "system" | "user";
+  retry?: { maxAttempts: number; backoff?: "exponential" | "fixed"; delayMs?: number };
+  timeoutMs?: number;
+  /** Conflicts use the job name and row primary key, or just the name for schedules. */
+  onConflict?: "queue" | "replace" | "skip";
+  /** Maximum parallel runs across workers. Defaults to 1. Same-key runs are serialized. */
+  concurrency?: number;
+  run: (ctx: JobContext<S, T, P, Context>) => Promise<void>;
+};
 type JobTableName<S> = S extends DBSchema ? keyof S & string : string;
 type JobRow<S, T extends string> =
   S extends Record<T, { columns: infer R extends AnyObject }> ? R : AnyObject;

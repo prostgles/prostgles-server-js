@@ -18,6 +18,7 @@ import { testExecutionContext } from "./server/executionContext.spec";
 import { testTableHookRecursion } from "./server/tableHookRecursion.spec";
 import { testTableConfigValidation } from "./server/tableConfig.spec";
 import { testBackgroundJobs } from "./server/backgroundJobs.spec";
+import { testJobRetention } from "./server/jobRetention.spec";
 import { testFileJobs } from "./server/fileJobs.spec";
 import { testConflictUpdates } from "./server/conflictUpdates.spec";
 import { testNestedInserts } from "./server/nestedInserts.spec";
@@ -37,6 +38,7 @@ export const serverOnlyQueries = async (
     await testNestedInserts(pgDb);
     await testSubscriptionNotifications(pgDb);
     await testBackgroundJobs(pgDb);
+    await testJobRetention(pgDb);
     await testFileJobs(pgDb);
     await testSchemaTypes(db, pgDb);
     await testClientSchemaTypes(pgDb);

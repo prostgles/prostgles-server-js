@@ -16,6 +16,7 @@ export const enqueueJob = async (
     userId?: string;
     params?: Record<string, unknown>;
     reason?: "trigger" | "rerun";
+    /** Cron slot timestamp for deduplication; omitted for row-triggered jobs and manual reruns. */
     occurrence?: Date;
   } = {},
 ) => {

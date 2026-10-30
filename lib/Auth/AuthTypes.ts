@@ -100,6 +100,9 @@ export type SignupWithEmail = {
    */
   requirePassword?: boolean;
 
+  /** Require an invitation token and hide public signup from clients. */
+  requireInvitation?: boolean;
+
   /**
    * Called when the user has registered.
    */
@@ -111,11 +114,12 @@ export type SignupWithEmail = {
      * Will be empty if requirePassword is false
      */
     password: string;
+    invitationToken: AuthInput<"register">["invitationToken"];
     clientInfo: LoginClientInfo;
 
     /**
      * Returns a URL that the user can click or enter the verification code to confirm their email address.
-     * Will point to /magic-link/:email:code by default
+     * Will point to /auth/magic-link?email=...&code=... by default
      */
     getConfirmationUrl: (data: { code: string; websiteUrl: string }) => string;
     req: ExpressReq;
@@ -311,10 +315,7 @@ export type AuthConfig<S = void, SUser extends SessionUser = SessionUser> = {
   sessionFields?: FieldFilter<SUser["user"]>;
 
   /**
-   * Will setup auth routes
-   *  /login
-   *  /logout
-   *  /magic-link/:id
+   * Will setup auth routes under authRoutesBasePath (defaults to /auth).
    */
   loginSignupConfig?: LoginSignupConfig<S, SUser>;
 
@@ -384,6 +385,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
    */
   app: Express;
 
+  /** Defaults to /auth. Must start with / and cannot be empty, / or end with /. */
   authRoutesBasePath?: string;
 
   /**
@@ -414,8 +416,9 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
 
   /**
    * If defined, will enable:
-   * - GET /magic-link/:id route.
-   * - POST /magic-link { email, code } route.
+   * - GET /auth/magic-link/:id route.
+   * - POST /auth/magic-link { email, code } route.
+   * The /auth prefix is configurable through authRoutesBasePath.
    * Successful requests that return a session will be logged in
    * and redirected to the returnUrl if set.
    * Otherwise just the response will be sent
@@ -448,7 +451,7 @@ export type LoginSignupConfig<S, SUser extends SessionUser> = {
 
   /**
    * If provided then the user will be able to login with a username and/or password
-   * through the POST /login route.
+   * through the POST /auth/login route (prefix configurable through authRoutesBasePath).
    */
   login: (
     params: LoginParams,

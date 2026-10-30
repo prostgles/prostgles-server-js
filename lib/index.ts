@@ -33,6 +33,7 @@ export type {
   JobsConfig,
   JobsOptions,
   JobDefinition,
+  JobRetention,
   JobContext,
   RowTrigger,
   ScheduleTrigger,

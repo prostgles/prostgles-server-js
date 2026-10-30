@@ -4,7 +4,7 @@ import type {
   AuthSocketSchema,
 } from "prostgles-types";
 import { CHANNELS, getObjectEntries, isEmpty, isObject } from "prostgles-types";
-import { AUTH_ROUTES, type AuthHandler } from "./AuthHandler";
+import type { AuthHandler } from "./AuthHandler";
 import type { AuthClientRequest, AuthConfig, AuthResultWithSID } from "./AuthTypes";
 import { type AuthResult } from "./AuthTypes";
 
@@ -79,19 +79,31 @@ export async function getClientAuth(
   }
 
   const loginMode = localLoginMode ?? (login ? "email+password" : undefined);
+  const authRoutes = this.authRoutes;
+  const signupWithEmailOptions = signupWithEmail && {
+    minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
+    requirePassword: signupWithEmail.requirePassword ?? false,
+    requireInvitation: signupWithEmail.requireInvitation ?? false,
+    url: authRoutes.emailRegistration,
+    emailConfirmationRoute: authRoutes.magicLinks,
+  };
   const auth: AuthSocketSchema = {
     providers: getOAuthProviders(this, loginWithOAuth),
-    signupWithEmailAndPassword: signupWithEmail && {
-      minPasswordLength: signupWithEmail.minPasswordLength ?? 8,
-      url: AUTH_ROUTES.emailRegistration,
-      emailConfirmationRoute: AUTH_ROUTES.magicLinks,
-    },
+    signupWithEmail: signupWithEmailOptions,
+    signupWithEmailAndPassword:
+      signupWithEmailOptions && !signupWithEmailOptions.requireInvitation ?
+        {
+          minPasswordLength: signupWithEmailOptions.minPasswordLength,
+          url: signupWithEmailOptions.url,
+          emailConfirmationRoute: signupWithEmailOptions.emailConfirmationRoute,
+        }
+      : undefined,
     preferredLogin: userData.preferredLogin,
     user: userData.clientUser,
     login: loginMode && {
       mode: loginMode,
-      loginRoute: AUTH_ROUTES.login,
-      logoutRoute: AUTH_ROUTES.logout,
+      loginRoute: authRoutes.login,
+      logoutRoute: authRoutes.logout,
     },
     pathGuard,
   };

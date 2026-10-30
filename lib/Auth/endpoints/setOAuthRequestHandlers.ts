@@ -71,7 +71,7 @@ export function setOAuthRequestHandlers(
           providerName,
           {
             session: false,
-            failureRedirect: "/login",
+            failureRedirect: this.authRoutes.login,
             failWithError: true,
           },
           async (error: any, _profile: any, authInfo: AuthProviderUserData) => {

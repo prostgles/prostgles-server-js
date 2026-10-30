@@ -162,9 +162,13 @@ export const runJob = async (
     : retry ? "pending"
     : "failed";
   await db.none(
-    `UPDATE ${tableSQL} 
-    SET status = CASE WHEN cancel_requested THEN 'cancelled' ELSE \${status} END,
-      error = \${error:json}, lease_token = NULL, locked_until = NULL,
+    `
+    UPDATE ${tableSQL} 
+    SET 
+      status = CASE WHEN cancel_requested THEN 'cancelled' ELSE \${status} END,
+      error = \${error:json}, 
+      lease_token = NULL, 
+      locked_until = NULL,
       run_at = clock_timestamp() + \${delayMs} * interval '1 millisecond',
       finished_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN clock_timestamp() ELSE NULL END
     WHERE ${owned}

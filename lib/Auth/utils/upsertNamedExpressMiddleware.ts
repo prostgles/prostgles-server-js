@@ -7,14 +7,15 @@ export const upsertNamedExpressMiddleware = (
   app: e.Express,
   handler: RequestHandler,
   name: string,
+  routePath = "/",
 ) => {
   const funcName = name;
   Object.defineProperty(handler, "name", { value: funcName });
   removeExpressRouteByName(app as ExpressApp, name);
-  app.use(handler);
+  app.use(routePath, handler);
 };
 
-export const removeExpressRouteByName = (app: ExpressApp, name: string) => {
+export const removeExpressRouteByName = (app: ExpressApp | e.Express, name: string) => {
   const { router, getStack } = getRouter(app);
   const newRoutes = getStack().filter((route) => {
     if (route.name === name) {

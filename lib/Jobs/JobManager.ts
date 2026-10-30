@@ -8,6 +8,8 @@ import { claimJob } from "./claimJob";
 import { enqueueSchedules } from "./enqueueSchedules";
 import { validateJobDefinitions } from "./getJobDefinition";
 import { getJobControlBinding } from "./getJobControlBinding";
+import { getJobRetention, type JobRetentionPolicy } from "./getJobRetention";
+import { pruneJobs } from "./pruneJobs";
 
 export class JobManager {
   constructor(private readonly prostgles: Prostgles) {
@@ -26,6 +28,8 @@ export class JobManager {
   private ticking?: Promise<void>;
   private readonly running = new Map<AbortController, Promise<void>>();
   private readonly schedules = new Map<string, string>();
+  private retention: JobRetentionPolicy[] = [];
+  private nextRetentionCleanup = 0;
 
   readonly api: Jobs;
 
@@ -35,6 +39,8 @@ export class JobManager {
       for (const method of Object.values(group.functions))
         getJobControlBinding(this.prostgles, method);
     }
+    this.retention = await getJobRetention(this.prostgles);
+    this.nextRetentionCleanup = 0;
   };
 
   start = () => {
@@ -52,6 +58,7 @@ export class JobManager {
     await this.ticking;
     await Promise.all(this.running.values());
     this.schedules.clear();
+    this.nextRetentionCleanup = 0;
   };
 
   private schedule = () => {
@@ -86,6 +93,10 @@ export class JobManager {
           .finally(() => this.running.delete(controller));
         this.running.set(controller, work);
       }
+    }
+    if (this.retention.length && Date.now() >= this.nextRetentionCleanup) {
+      this.nextRetentionCleanup = Date.now() + 60_000;
+      await pruneJobs(prostgles, this.retention);
     }
   };
 }

@@ -1,6 +1,10 @@
 import type { RequestHandler } from "express";
 import type { AuthHandler } from "./AuthHandler";
-import { getClientRequestIPsInfo } from "./AuthHandler";
+import {
+  AUTH_CACHE_CONTROL_MIDDLEWARE_NAME,
+  getAuthRoutesBasePath,
+  getClientRequestIPsInfo,
+} from "./AuthHandler";
 import { setCatchAllRequestHandler } from "./endpoints/setCatchAllRequestHandler";
 import { setLoginRequestHandler } from "./endpoints/setLoginRequestHandler";
 import { setLogoutRequestHandler } from "./endpoints/setLogoutRequestHandler";
@@ -32,6 +36,16 @@ export function setupAuthRoutes(this: AuthHandler, config: AuthConfig) {
     throw "Invalid or empty string provided within publicRoutes ";
   }
 
+  const authRoutesBasePath = getAuthRoutesBasePath(loginSignupConfig);
+  upsertNamedExpressMiddleware(
+    app,
+    (_req, res, next) => {
+      res.set("Cache-Control", "no-store");
+      next();
+    },
+    AUTH_CACHE_CONTROL_MIDDLEWARE_NAME,
+    authRoutesBasePath,
+  );
   setupUserContextMiddleware.bind(this)(app);
 
   if (signupWithEmail) {
