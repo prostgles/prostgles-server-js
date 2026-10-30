@@ -70,6 +70,9 @@ export async function getTablesForSchemaPostgresSQL(
             and a.attnum = ANY(ix.indkey)
             and t.relkind = 'r'
             and ix.indisunique
+            and ix.indisvalid
+            and ix.indpred IS NULL
+            and ix.indexprs IS NULL
         group by 1,2,3
         order by
             t.relname,

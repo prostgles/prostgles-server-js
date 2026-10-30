@@ -66,7 +66,7 @@ export type GetJoinQueryResult = {
   ) target_table
   ON ...condition
  */
-export const getJoinQuery = (_viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
+export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
   const paths = q2.joinPath;
 
   if (q2.joins?.length) {
@@ -109,12 +109,31 @@ export const getJoinQuery = (_viewHandler: ViewHandler, { q1, q2 }: Args): GetJo
   );
   const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields.join(", ")}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
+  const isOrJoin = firstJoinTablePath.on.length > 1;
+  /* Correlate unique-key lookups before aggregation and windowing. */
+  const useLateralJoin =
+    !isOrJoin &&
+    paths.length === 1 &&
+    q2.source.expression === q2.table.escaped &&
+    viewHandler.dboBuilder.dboMap
+      .get(firstJoinTablePath.table)
+      ?.tableOrViewInfo.uniqueColumnGroups?.some((columns) =>
+        columns.every((column) => firstJoinTableJoinFields.includes(column)),
+      );
   const { innerQuery } = getInnerJoinQuery({
     paths,
     q1,
     q2,
     rootSelectItems,
     targetTableAliasRaw,
+    parentJoinCondition:
+      useLateralJoin ?
+        getJoinOnCondition({
+          on: firstJoinTablePath.on,
+          leftAlias: q1.tableAlias?.escaped || q1.table.escaped,
+          rightAlias: targetTableAlias,
+        })
+      : undefined,
   });
 
   const requiredJoinFields = joinFields.map((field) => getJoinCol(field).alias);
@@ -126,7 +145,6 @@ export const getJoinQuery = (_viewHandler: ViewHandler, { q1, q2 }: Args): GetJo
    * If multiple join conditions exist it's an OR join
    * Must use LATERAL JOIN to prevent cartesian product
    */
-  const isOrJoin = firstJoinTablePath.on.length > 1;
   if (isOrJoin.toString() === "true") {
     const wrappingQuery = [
       `SELECT `,
@@ -177,14 +195,24 @@ export const getJoinQuery = (_viewHandler: ViewHandler, { q1, q2 }: Args): GetJo
    * This is done to prevent join cte names clashing with actual table names
    */
   const targetTableAliasTempRename = asName(`${targetTableAlias}_prostgles_join_temp_rename`);
-  const cteLines = [`${targetTableAliasTempRename} AS (`, ...indentLines(wrappingQuery), `)`];
+  const cteLines =
+    useLateralJoin ?
+      []
+    : [`${targetTableAliasTempRename} AS (`, ...indentLines(wrappingQuery), `)`];
 
-  const joinLines = [
-    `${joinType} JOIN ( SELECT * FROM ${targetTableAliasTempRename} ) as ${targetTableAlias}`,
-    isOrJoin ?
-      `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}`
-    : `ON ${joinCondition}`,
-  ];
+  const joinLines =
+    useLateralJoin ?
+      [
+        `${joinType} JOIN LATERAL (`,
+        ...indentLines(wrappingQuery),
+        `) as ${targetTableAlias} ON TRUE`,
+      ]
+    : [
+        `${joinType} JOIN ( SELECT * FROM ${targetTableAliasTempRename} ) as ${targetTableAlias}`,
+        isOrJoin ?
+          `ON ${targetTableAlias}.${ROOT_TABLE_ROW_NUM_ID} = ${rootTableIdField}`
+        : `ON ${joinCondition}`,
+      ];
 
   return {
     type: "cte",
@@ -202,12 +230,14 @@ const getInnerJoinQuery = ({
   q2,
   targetTableAliasRaw,
   rootSelectItems,
+  parentJoinCondition,
 }: {
   paths: ParsedJoinPath[];
   q1: NewQuery;
   q2: NewQueryJoin;
   targetTableAliasRaw: string;
   rootSelectItems: SelectItemNested[];
+  parentJoinCondition: string | undefined;
 }) => {
   const innerQuery = paths.flatMap((path, i) => {
     const isLast = i === paths.length - 1;
@@ -227,7 +257,12 @@ const getInnerJoinQuery = ({
 
     if (isLast) {
       if (q2.where) {
-        targetQueryExtraQueries.push(q2.where);
+        targetQueryExtraQueries.push(
+          parentJoinCondition ? `WHERE (${q2.whereOpts.condition})` : q2.where,
+        );
+      }
+      if (parentJoinCondition) {
+        targetQueryExtraQueries.push(`${q2.where ? "AND" : "WHERE"} (${parentJoinCondition})`);
       }
 
       /* If aggs exist need to set groupBy add joinFields into select */

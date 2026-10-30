@@ -14,10 +14,7 @@ import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
 import { withTableExpression } from "prostgles-server/dist/DboBuilder/QueryBuilder/getQuerySource";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
-import {
-  NOTIF_CHANNEL,
-  NOTIF_TYPE,
-} from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
+import { NOTIF_CHANNEL, NOTIF_TYPE } from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
 
 export const testJoins = async (db: DB) => {
   const clientRequest = {
@@ -28,6 +25,198 @@ export const testJoins = async (db: DB) => {
     },
     res: {},
   } as never;
+  await test("unique-key nested joins use bounded index lookups for repeated job controls", async (context) => {
+    await db.none(`
+      CREATE SCHEMA unique_join_test;
+      CREATE TABLE unique_join_test.jobs (
+        id int PRIMARY KEY, status text NOT NULL, tenant_id int, reference int,
+        UNIQUE (tenant_id, reference)
+      );
+      CREATE TABLE unique_join_test.documents (
+        id int PRIMARY KEY, kind text NOT NULL, job_id int REFERENCES unique_join_test.jobs(id)
+      );
+      CREATE TABLE unique_join_test.composite_documents (
+        id int PRIMARY KEY, tenant_id int, job_reference int,
+        FOREIGN KEY (tenant_id, job_reference) REFERENCES unique_join_test.jobs(tenant_id, reference)
+      );
+      CREATE TABLE unique_join_test.partial_documents (id int PRIMARY KEY, job_reference int);
+      CREATE UNIQUE INDEX pending_job_reference ON unique_join_test.jobs (reference)
+        WHERE status = 'pending';
+      INSERT INTO unique_join_test.jobs
+        SELECT id, 'succeeded', id % 2, id / 2 FROM generate_series(1, 25000) id;
+      INSERT INTO unique_join_test.documents VALUES
+        (1, 'decision_notice', 1234), (2, 'other', NULL), (3, 'other', 1234);
+      INSERT INTO unique_join_test.composite_documents VALUES (1, 0, 617), (2, 1, 617);
+      ANALYZE unique_join_test.jobs;
+    `);
+    const instance = await prostgles({
+      dbConnection: {
+        ...getConnectionDetails(db),
+        options: "-c search_path=unique_join_test,public",
+      } as unknown as ProstglesInitOptions["dbConnection"],
+      schemaFilter: { unique_join_test: 1 },
+      joins: [{ tables: ["partial_documents", "jobs"], on: [{ job_reference: "reference" }] }],
+      publish: {
+        documents: { select: "*" },
+        jobs: { select: { fields: "*", forcedFilter: { id: 1234 } } },
+      },
+      publishRawSQL: () => true,
+      onReady: () => {},
+    });
+    try {
+      const documents = instance.db.documents!;
+      const jobSelect = {
+        $leftJoin: "jobs",
+        select: { id: 1, status: 1 },
+        orderBy: { id: -1 },
+        limit: 1,
+      } as const;
+      const select = {
+        id: 1 as const,
+        ...Object.fromEntries(
+          Array.from({ length: 6 }, (_, index) => [
+            `job_${index}`,
+            index % 2 ?
+              { ...jobSelect, filter: { $or: [{ status: "succeeded" }, { id: 4321 }] } }
+            : { $leftJoin: "jobs", select: jobSelect.select },
+          ]),
+        ),
+      };
+      const filter = { kind: "decision_notice" };
+      const params = { select, orderBy: { "job_0.id": -1 as const }, limit: 1000 };
+      const expectedJobs = Object.fromEntries(
+        Array.from({ length: 6 }, (_, index) => [
+          `job_${index}`,
+          [{ id: 1234, status: "succeeded" }],
+        ]),
+      );
+      assert.deepEqual(await documents.find!(filter, params), [{ id: 1, ...expectedJobs }]);
+      const statement: unknown = await documents.find!(filter, {
+        ...params,
+        returnType: "statement-no-rls",
+      });
+      const jobScans = await getNestedJoinScans(instance._db, statement, "jobs");
+      assert.equal(jobScans.length, 6);
+      for (const scan of jobScans) {
+        assert.equal(scan["Index Name"], "jobs_pkey");
+        assert(scan["Index Cond"]?.includes("job_id"), JSON.stringify(scan));
+        assert.equal(scan["Actual Rows"], 1);
+        assert.equal(scan["Actual Loops"], 1);
+      }
+      assert.deepEqual(
+        await documents.find!({}, { select: { id: 1, job: jobSelect }, orderBy: "id" }),
+        [
+          { id: 1, job: [{ id: 1234, status: "succeeded" }] },
+          { id: 2, job: [] },
+          { id: 3, job: [{ id: 1234, status: "succeeded" }] },
+        ],
+      );
+      assert.deepEqual(
+        await documents.find!(
+          {},
+          {
+            select: {
+              id: 1,
+              job: { $innerJoin: "jobs", select: { count: { $countAll: [] } } },
+            },
+            orderBy: "id",
+          },
+        ),
+        [
+          { id: 1, job: [{ count: 1 }] },
+          { id: 3, job: [{ count: 1 }] },
+        ],
+      );
+      const client = await instance.getClientDBHandlers(clientRequest, undefined);
+      assert.deepEqual(await client.clientDb.documents!.find!(filter, params), [
+        { id: 1, ...expectedJobs },
+      ]);
+      assert.deepEqual(
+        await client.clientDb.documents!.find!(filter, {
+          select: { id: 1, job: { ...jobSelect, filter: { id: 4321 } } },
+        }),
+        [{ id: 1, job: [] }],
+      );
+      assert.deepEqual(
+        await instance.db.composite_documents!.find!(
+          {},
+          {
+            select: { id: 1, job: jobSelect },
+            orderBy: "id",
+          },
+        ),
+        [
+          { id: 1, job: [{ id: 1234, status: "succeeded" }] },
+          { id: 2, job: [{ id: 1235, status: "succeeded" }] },
+        ],
+      );
+      await instance.update({
+        publish: {
+          documents: { select: "*" },
+          jobs: { select: { fields: "*", forcedFilter: { id: 4321 } } },
+        },
+      });
+      const restrictedClient = await instance.getClientDBHandlers(clientRequest, undefined);
+      assert.deepEqual(
+        await restrictedClient.clientDb.documents!.find!(filter, {
+          select: { id: 1, job: jobSelect },
+        }),
+        [{ id: 1, job: [] }],
+      );
+
+      await db.none(`
+        INSERT INTO unique_join_test.documents
+          SELECT id, 'other', id FROM generate_series(4, 1003) id;
+        INSERT INTO unique_join_test.partial_documents
+          SELECT id, id FROM generate_series(4, 1003) id;
+        ANALYZE unique_join_test.documents;
+        ANALYZE unique_join_test.partial_documents;
+      `);
+      await instance.update({
+        publish: {
+          documents: { select: "*" },
+          jobs: { select: [{ fields: "*", forcedFilter: { status: "succeeded" } }] },
+        },
+      });
+      const maskedClient = await instance.getClientDBHandlers(clientRequest, undefined);
+      for (const { name, documents, getJobId } of [
+        {
+          name: "permission-wrapped joins scan the target once",
+          documents: maskedClient.clientDb.documents!,
+          getJobId: (documentId: number) => documentId,
+        },
+        {
+          name: "partial unique indexes do not cause per-parent scans",
+          documents: instance.db.partial_documents!,
+          getJobId: (documentId: number) => documentId * 2 + 1,
+        },
+      ]) {
+        await context.test(name, async () => {
+          const filter = { id: { $gte: 4 } };
+          const params = { select: { id: 1 as const, job: jobSelect }, orderBy: "id", limit: 1000 };
+          assert.deepEqual(
+            await documents.find!(filter, params),
+            Array.from({ length: 1000 }, (_, index) => ({
+              id: index + 4,
+              job: [{ id: getJobId(index + 4), status: "succeeded" }],
+            })),
+          );
+          const statement: unknown = await documents.find!(filter, {
+            ...params,
+            returnType: "statement-no-rls",
+          });
+          const jobScans = await getNestedJoinScans(instance._db, statement, "jobs");
+          assert.equal(jobScans.length, 1);
+          for (const scan of jobScans) {
+            assert.equal(scan["Actual Loops"], 1, JSON.stringify(scan));
+          }
+        });
+      }
+    } finally {
+      await instance.destroy();
+      await db.none("DROP SCHEMA unique_join_test CASCADE");
+    }
+  });
   await test("custom joins add conditions unless override is requested", async () => {
     await db.none(`
       CREATE SCHEMA join_merge_test;
@@ -1527,3 +1716,27 @@ export const testJoins = async (db: DB) => {
     }
   });
 };
+
+type NestedJoinPlan = {
+  "Relation Name": string | undefined;
+  "Index Name": string | undefined;
+  "Index Cond": string | undefined;
+  "Actual Rows": number;
+  "Actual Loops": number;
+  Plans: NestedJoinPlan[] | undefined;
+};
+
+const getNestedJoinScans = async (db: DB, statement: unknown, table: string) => {
+  assert(typeof statement === "string");
+  const explain = await db.one<{ "QUERY PLAN": { Plan: NestedJoinPlan }[] }>(
+    `EXPLAIN (ANALYZE, FORMAT JSON) ${statement}`,
+  );
+  const [queryPlan] = explain["QUERY PLAN"];
+  assert(queryPlan);
+  return flattenNestedJoinPlan(queryPlan.Plan).filter((node) => node["Relation Name"] === table);
+};
+
+const flattenNestedJoinPlan = (node: NestedJoinPlan): NestedJoinPlan[] => [
+  node,
+  ...(node.Plans ?? []).flatMap(flattenNestedJoinPlan),
+];
