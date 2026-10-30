@@ -39,7 +39,7 @@ export function getRawInfo(
       fileTableName &&
       this.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
     ),
-    fileTableName: isVersionTable ? undefined : fileTableName,
+    fileTableName,
     dynamicRules: {
       update: Boolean(tableRules?.update?.dynamicFields?.length),
     },

@@ -40,6 +40,7 @@ export const testJoins = async (db: DB) => {
         FOREIGN KEY (tenant_id, job_reference) REFERENCES unique_join_test.jobs(tenant_id, reference)
       );
       CREATE TABLE unique_join_test.partial_documents (id int PRIMARY KEY, job_reference int);
+      CREATE TABLE unique_join_test.numeric_documents (id int PRIMARY KEY, job_id numeric);
       CREATE UNIQUE INDEX pending_job_reference ON unique_join_test.jobs (reference)
         WHERE status = 'pending';
       INSERT INTO unique_join_test.jobs
@@ -55,7 +56,10 @@ export const testJoins = async (db: DB) => {
         options: "-c search_path=unique_join_test,public",
       } as unknown as ProstglesInitOptions["dbConnection"],
       schemaFilter: { unique_join_test: 1 },
-      joins: [{ tables: ["partial_documents", "jobs"], on: [{ job_reference: "reference" }] }],
+      joins: [
+        { tables: ["partial_documents", "jobs"], on: [{ job_reference: "reference" }] },
+        { tables: ["numeric_documents", "jobs"], on: [{ job_id: "id" }] },
+      ],
       publish: {
         documents: { select: "*" },
         jobs: { select: { fields: "*", forcedFilter: { id: 1234 } } },
@@ -169,8 +173,11 @@ export const testJoins = async (db: DB) => {
           SELECT id, 'other', id FROM generate_series(4, 1003) id;
         INSERT INTO unique_join_test.partial_documents
           SELECT id, id FROM generate_series(4, 1003) id;
+        INSERT INTO unique_join_test.numeric_documents
+          SELECT id, id FROM generate_series(4, 1003) id;
         ANALYZE unique_join_test.documents;
         ANALYZE unique_join_test.partial_documents;
+        ANALYZE unique_join_test.numeric_documents;
       `);
       await instance.update({
         publish: {
@@ -189,6 +196,11 @@ export const testJoins = async (db: DB) => {
           name: "partial unique indexes do not cause per-parent scans",
           documents: instance.db.partial_documents!,
           getJobId: (documentId: number) => documentId * 2 + 1,
+        },
+        {
+          name: "numeric-to-integer joins scan the target once",
+          documents: instance.db.numeric_documents!,
+          getJobId: (documentId: number) => documentId,
         },
       ]) {
         await context.test(name, async () => {

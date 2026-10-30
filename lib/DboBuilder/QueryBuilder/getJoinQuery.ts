@@ -110,16 +110,28 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields.join(", ")}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
   const isOrJoin = firstJoinTablePath.on.length > 1;
+  const targetTableHandler = viewHandler.dboBuilder.dboMap.get(firstJoinTablePath.table);
+  if (!targetTableHandler) {
+    throw new Error(`INTERNAL ERROR: Joined table handler missing for ${firstJoinTablePath.table}`);
+  }
   /* Correlate unique-key lookups before aggregation and windowing. */
   const useLateralJoin =
     !isOrJoin &&
     paths.length === 1 &&
     q2.source.expression === q2.table.escaped &&
-    viewHandler.dboBuilder.dboMap
-      .get(firstJoinTablePath.table)
-      ?.tableOrViewInfo.uniqueColumnGroups?.some((columns) =>
-        columns.every((column) => firstJoinTableJoinFields.includes(column)),
-      );
+    /* Different types from custom joins can cast the indexed column and force a scan per parent. */
+    firstJoinTablePath.on.every((condition) =>
+      Object.entries(condition).every(([sourceColumnName, targetColumnName]) => {
+        const sourceColumn = viewHandler.columns.find((column) => column.name === sourceColumnName);
+        const targetColumn = targetTableHandler.columns.find(
+          (column) => column.name === targetColumnName,
+        );
+        return sourceColumn && sourceColumn.udt_name === targetColumn?.udt_name;
+      }),
+    ) &&
+    targetTableHandler.tableOrViewInfo.uniqueColumnGroups?.some((columns) =>
+      columns.every((column) => firstJoinTableJoinFields.includes(column)),
+    );
   const { innerQuery } = getInnerJoinQuery({
     paths,
     q1,

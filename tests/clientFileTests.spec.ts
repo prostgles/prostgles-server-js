@@ -32,6 +32,20 @@ export const clientFileTests = async (db: DBHandlerClient, sql: SQLHandler) => {
       assert.deepStrictEqual(files, []);
     });
 
+    await test("File versions retain file table metadata without upload controls", async () => {
+      const fileVersionInfo = await db.files_versions!.getInfo!();
+      assert.equal(fileVersionInfo.fileTableName, "files");
+      assert.equal(fileVersionInfo.hasFiles, false);
+      assert.equal(fileVersionInfo.isFileTable, undefined);
+      const fileVersionColumns = await db.files_versions!.getColumns!();
+      const fileIdColumn = fileVersionColumns.find((column) => column.name === "file_id");
+      assert.ok(fileIdColumn);
+      assert.ok(
+        fileIdColumn.references?.some(({ ftable }) => ftable === fileVersionInfo.fileTableName),
+      );
+      assert.equal(fileIdColumn.file, undefined);
+    });
+
     const file = {
       data: Buffer.from("This is a string", "utf-8"),
       original_name: "sample_file.txt",
