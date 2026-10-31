@@ -41,6 +41,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
   const failedQueries: { query: string; error: any }[] = [];
   const queryHistory: string[] = [];
   let queries: string[] = [];
+  const foreignKeyQueries: string[] = [];
   const makeQuery = (q: string[]) =>
     q
       .filter((v) => v.trim().length)
@@ -213,7 +214,14 @@ export const initTableConfig = async function (this: TableConfigurator) {
       constraintDefs.push(constraint);
     }
     if (tableColumnDefinition?.isCreate) {
-      queries.push(...constraintDefs.map((c) => c.alterQuery));
+      /* Defer foreign keys until tables defined later in the config have been created. */
+      for (const constraint of constraintDefs) {
+        const targetQueries =
+          constraint.content.trim().toUpperCase().startsWith("FOREIGN KEY") ?
+            foreignKeyQueries
+          : queries;
+        targetQueries.push(constraint.alterQuery);
+      }
     } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
         db: this.db,
@@ -265,6 +273,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
     queries.push(...indexQueries);
   }
 
+  /* Referenced tables must exist before adding foreign keys to new tables. */
+  queries.push(...foreignKeyQueries);
   if (queries.length) {
     const q = makeQuery(queries);
 

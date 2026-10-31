@@ -5,10 +5,15 @@ import type {
   FullFilter,
   JobControlOperation,
   JobStatus,
+  JobRecord,
+  JobValue,
   JSONB,
   MaybePromise,
 } from "prostgles-types";
 export type {
+  JobRecord,
+  JobInsertRecord,
+  JobValue,
   JobStatus,
   JobControlOperation,
   JobControlFunctionMetadata,
@@ -21,11 +26,6 @@ import type {
 } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
 import type { JSONBColumnDef } from "../TableConfig/TableConfigTypes";
-import type {
-  TableInsertRowFromTableConfig,
-  TableRowFromTableConfig,
-} from "../TableConfig/TableRowFromColumnDefinitions";
-import type { jobTableConfig } from "./jobTableConfig";
 
 export type ParamsSchema = Record<
   string,
@@ -94,16 +94,15 @@ export type JobDefinition<
   P extends ParamsSchema = ParamsSchema,
   Context = undefined,
 > = JobDefinitionOptions<S, T, P, Context> &
-  (T extends JobTableName<S>
-    ? { trigger: RowTrigger<S, T>; retention?: never }
-    : {
-        trigger: ScheduleTrigger;
-        /** Required for schedules. "forever" keeps all history.
-         * Per-status strings shorthand maxAge; "forever" or omitted statuses keep their history.
-         * Cleanup runs periodically and preserves the current scheduling minute for deduplication.
-         */
-        retention: JobRetention;
-      });
+  (T extends JobTableName<S> ? { trigger: RowTrigger<S, T>; retention?: never }
+  : {
+      trigger: ScheduleTrigger;
+      /** Required for schedules. "forever" keeps all history.
+       * Per-status strings shorthand maxAge; "forever" or omitted statuses keep their history.
+       * Cleanup runs periodically and preserves the current scheduling minute for deduplication.
+       */
+      retention: JobRetention;
+    });
 
 export type JobsConfig<S = void, Context = undefined> = Record<
   string,
@@ -134,16 +133,6 @@ type DefineJob<S, Context> = {
   ): JobDefinition<S, undefined, P, Context>;
 };
 
-export type JobValue =
-  null | string | number | boolean | readonly JobValue[] | { readonly [key: string]: JobValue };
-type JobValues = {
-  target_row_pkey: Record<string, JobValue>;
-  params: Record<string, JobValue>;
-  checkpoint: JobValue | null;
-  error: JobValue;
-};
-export type JobRecord = TableRowFromTableConfig<typeof jobTableConfig, JobValues>;
-export type JobInsertRecord = TableInsertRowFromTableConfig<typeof jobTableConfig, JobValues>;
 export const jobControlStatuses: Record<JobControlOperation, readonly JobStatus[]> = {
   startOrRetry: ["failed", "cancelled"],
   rerun: ["succeeded"],

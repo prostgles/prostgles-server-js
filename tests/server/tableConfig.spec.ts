@@ -50,6 +50,10 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       concurrently: false,
     };
     const tableConfig: TableConfig = {
+      backup_sources: {
+        columns: { id: "INT PRIMARY KEY", group_id: "INT" },
+        constraints: { source_group: "FOREIGN KEY (group_id) REFERENCES backup_groups(id)" },
+      },
       synced_variants: {
         columns: { id: "SERIAL PRIMARY KEY", state: "TEXT", synced: "BIGINT NOT NULL" },
         syncConfig: { id_fields: ["id"], synced_field: "synced" },
@@ -91,6 +95,11 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       await db.none("CREATE TABLE backups (unmanaged TEXT)");
       const prgl = await start();
       await db.none("INSERT INTO backup_groups VALUES (1)");
+      /* Foreign keys to later table definitions are installed and enforced. */
+      await db.none("INSERT INTO backup_sources VALUES (1, 1)");
+      await assert.rejects(db.none("INSERT INTO backup_sources VALUES (2, 2)"), {
+        code: "23503",
+      });
       await db.none("INSERT INTO backup_jobs VALUES (1, 1, 'queued')");
       await assert.rejects(db.none("INSERT INTO backup_jobs VALUES (2, 2, 'queued')"), {
         code: "23503",

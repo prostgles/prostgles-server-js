@@ -95,6 +95,7 @@ export type {
   TableConfigMigrations,
 } from "./ProstglesTypes";
 export type * from "./TableConfig/TableConfigTypes";
+export type * from "./TableConfig/TableRowFromColumnDefinitions";
 export type * from "./Audit/AuditTypes";
 export type * from "./TableHooks/TableHooks";
 export * from "./Auth/utils/upsertNamedExpressMiddleware";

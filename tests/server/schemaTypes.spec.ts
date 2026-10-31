@@ -2,9 +2,16 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { getDBGeneratedSchema } from "prostgles-server/dist/DBSchemaBuilder/getDBGeneratedSchema";
 import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfigTypes";
-import type { DBHandlerServerInternal } from "prostgles-server";
+import type { DBHandlerServerInternal, FileTableRow } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
 import type { TableRowFromColumnDefinitions } from "prostgles-server/dist/TableConfig/TableRowFromColumnDefinitions";
+import type {
+  FileTableInsertRow as SharedFileTableInsertRow,
+  FileTableRow as SharedFileTableRow,
+  TableInsertRowFromTableConfig as SharedTableInsertRowFromTableConfig,
+  TableRowFromColumnDefinitions as SharedTableRowFromColumnDefinitions,
+  TableRowFromTableConfig as SharedTableRowFromTableConfig,
+} from "prostgles-types";
 import { testTableConfig } from "./testTableConfig";
 import { testSchemaWatch } from "./schemaWatch.spec";
 import { checkGeneratedTypes } from "./checkGeneratedTypes";
@@ -14,7 +21,9 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
 
   await test("generated file insert types exclude managed columns and allow custom columns", async () => {
     const { tsSchema } = await db.files!.dboBuilder.getTsDefinitions();
-    checkGeneratedTypes(tsSchema, `
+    checkGeneratedTypes(
+      tsSchema,
+      `
       import type { DBHandlerServer } from "prostgles-server";
       declare const db: DBHandlerServer<DBGeneratedSchema>;
       const input: DBSchemaForInsert["files"] = {
@@ -30,13 +39,17 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
         await db.files.insert({ original_name: "schema-types.txt" });
         // @ts-expect-error The original filename is required.
         await db.files.insert({ data: Buffer.from("file schema") });
-        ${["content_type", "storage_key", "local_file_path", "version", "url"].map((column) => `
+        ${["content_type", "storage_key", "local_file_path", "version", "url"]
+          .map(
+            (column) => `
         const with_${column} = { ...input, ${column}: ${column === "version" ? "1" : '"generated"'} };
         // @ts-expect-error Managed file metadata is rejected even through variables.
         await db.files.insert(with_${column});
         // @ts-expect-error The standalone insert schema also rejects managed metadata.
         const invalid_${column}: DBSchemaForInsert["files"] = with_${column};
-        `).join("\n")}
+        `,
+          )
+          .join("\n")}
         const row = await db.files.findOne({}, { select: "*" });
         if (row) {
           row.content_type satisfies string;
@@ -45,7 +58,8 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
           row.version satisfies number;
         }
       };
-    `);
+    `,
+    );
     const input = {
       original_name: "schema-types.txt",
       data: Buffer.from("file schema"),
@@ -160,6 +174,25 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
       nullable: null,
       quoted: "ok",
     };
+    /* Shared row inference accepts browser bytes while server rows retain Buffer. */
+    row satisfies SharedTableRowFromColumnDefinitions<typeof columns>;
+    row.bytes satisfies Buffer;
+    row.bytes satisfies FileTableRow["data"];
+    for (const browserBytes of [new Uint8Array([1, 2]), new ArrayBuffer(2)]) {
+      browserBytes satisfies SharedTableRowFromColumnDefinitions<typeof columns>["bytes"];
+      browserBytes satisfies SharedTableRowFromTableConfig<{
+        columns: typeof columns;
+      }>["bytes"];
+      browserBytes satisfies SharedTableInsertRowFromTableConfig<{
+        columns: typeof columns;
+      }>["bytes"];
+      browserBytes satisfies SharedFileTableRow["data"];
+      browserBytes satisfies SharedFileTableInsertRow["data"];
+      /* @ts-expect-error Server BYTEA values retain the Buffer API. */
+      browserBytes satisfies Row["bytes"];
+      /* @ts-expect-error Server file rows also retain the Buffer API. */
+      browserBytes satisfies FileTableRow["data"];
+    }
     // @ts-expect-error INT columns must reject strings.
     const invalidInt: Row["int"] = "1";
     // @ts-expect-error BOOL columns must reject strings.

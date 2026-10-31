@@ -4,7 +4,9 @@ import type {
   JSONB,
   MaybePromise,
   StrictUnion,
+  TableCheck,
 } from "prostgles-types";
+export type { TableCheck, TableCheckBranch, TableCheckValue } from "prostgles-types";
 import type { DB, DBHandlerServerInternal } from "../Prostgles";
 import type { Join } from "../ProstglesTypes";
 import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
@@ -189,13 +191,6 @@ export type ColumnConfigs<LANG_IDS = { en: 1 }> = {
 };
 
 type ConstraintType = "PRIMARY KEY" | "UNIQUE" | "CHECK" | "FOREIGN KEY";
-
-export type TableCheckValue = string | number | boolean | null;
-export type TableCheckBranch = Record<
-  string,
-  TableCheckValue | { enum: readonly TableCheckValue[] } | { $ne: null } | Record<string, never>
->;
-export type TableCheck = { $or: readonly TableCheckBranch[] };
 
 /**
  * Each column definition cannot reference to tables that appear later in the table definition.
