@@ -336,10 +336,52 @@ export const testTableConfigValidation = async (parentDb: DB) => {
                 value: { jsonbSchemaType: { enabled: { type: "boolean" } } },
               },
             },
+            default_categories: {
+              isLookupTable: { values: { "": {}, default: {} } },
+            },
+            jsonb_defaults: {
+              columns: {
+                id: "SERIAL PRIMARY KEY",
+                empty_array: { jsonbSchema: { type: "unknown[]" }, defaultValue: [] },
+                serialized_array: { jsonbSchema: { type: "unknown[]" }, defaultValue: "[]" },
+                items: {
+                  jsonbSchema: { arrayOfType: { label: "string" } },
+                  defaultValue: [{ label: "It's a default" }],
+                },
+                enabled: { jsonbSchema: { type: "boolean" }, defaultValue: false },
+                count: { jsonbSchema: { type: "number" }, defaultValue: 0 },
+                label: { jsonbSchema: { type: "string" }, defaultValue: '""' },
+                empty_category: {
+                  references: { tableName: "default_categories" },
+                  defaultValue: "",
+                },
+                category: {
+                  references: { tableName: "default_categories" },
+                  defaultValue: "default",
+                },
+              },
+            },
           },
           onReady: () => {},
         });
         instance = await prgl.init(() => {}, { type: "init" });
+        /* JSONB and reference defaults retain their values on fresh schemas and upgrades. */
+        assert.deepEqual(
+          await db.one(
+            "INSERT INTO jsonb_defaults DEFAULT VALUES RETURNING empty_array, serialized_array, items, enabled, count, label, empty_category, category",
+          ),
+          {
+            empty_array: [],
+            serialized_array: [],
+            items: [{ label: "It's a default" }],
+            enabled: false,
+            count: 0,
+            label: "",
+            empty_category: "",
+            category: "default",
+          },
+          scenario,
+        );
         const getChecks = () =>
           db.any(
             "SELECT oid, conname FROM pg_constraint WHERE conrelid = 'validated'::regclass AND contype = 'c'",

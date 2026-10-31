@@ -34,9 +34,18 @@ export const getColumnSQLDefinitionQuery = async ({
 }: Args): Promise<string | undefined> => {
   const colConf = typeof colConfRaw === "string" ? { sqlDefinition: colConfRaw } : colConfRaw;
   const colNameEsc = escapedColumnName ?? asName(column);
+  const jsonbDefaultValueSQL = asValue(
+    typeof colConf.defaultValue === "string" ?
+      colConf.defaultValue
+    : JSON.stringify(colConf.defaultValue),
+  );
   const getColTypeDef = (colConf: BaseColumnTypes, pgType: "TEXT" | "JSONB") => {
     const { nullable, defaultValue } = colConf;
-    return `${pgType} ${!nullable ? "NOT NULL" : ""} ${defaultValue ? `DEFAULT ${asValue(defaultValue)}` : ""} `;
+    const defaultValueSQL =
+      defaultValue !== undefined ?
+        `DEFAULT ${pgType === "JSONB" ? jsonbDefaultValueSQL : asValue(defaultValue)}`
+      : "";
+    return `${pgType} ${!nullable ? "NOT NULL" : ""} ${defaultValueSQL} `;
   };
 
   const getDefinition = async () => {
@@ -90,7 +99,7 @@ export const getColumnSQLDefinitionQuery = async ({
         }) + "::TEXT";
 
       /** Validate default value against jsonbSchema  */
-      const validationQuery = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${asValue(colConf.defaultValue) + "::JSONB"}, ${asValue({ table, column })}) as v`;
+      const validationQuery = `SELECT ${VALIDATE_SCHEMA_FUNCNAME}(${jsonbSchemaStr}, ${jsonbDefaultValueSQL}::JSONB, ${asValue({ table, column })}) as v`;
       if (colConf.defaultValue !== undefined) {
         try {
           const row = await db.oneOrNone<{ v?: null | boolean }>(validationQuery);
@@ -113,7 +122,7 @@ export const getColumnSQLDefinitionQuery = async ({
         onDelete,
         onUpdate,
       } = colConf.references;
-      return `${getColTypeDef(colConf, "TEXT")} ${defaultValueSQL} REFERENCES ${lookupTable} (${lookupCol}) ${onDelete ? ` ON DELETE ${onDelete}` : ""} ${onUpdate ? ` ON UPDATE ${onUpdate}` : ""}`;
+      return `${getColTypeDef(colConf, "TEXT")} REFERENCES ${lookupTable} (${lookupCol}) ${onDelete ? ` ON DELETE ${onDelete}` : ""} ${onUpdate ? ` ON UPDATE ${onUpdate}` : ""}`;
     } else if ("sqlDefinition" in colConf && colConf.sqlDefinition) {
       return `${colConf.sqlDefinition} `;
     } else if ("isText" in colConf && colConf.isText) {
