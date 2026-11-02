@@ -59,7 +59,7 @@ export const prepareSortItems = (
         ...jq,
         selectItem,
         joinAlias,
-        key: `${joinAlias.raw}.${selectItem.alias}`,
+        key: `${jq.outputAlias}.${selectItem.alias}`,
       };
     }),
   );

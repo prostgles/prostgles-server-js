@@ -127,6 +127,11 @@ export const find = async function (
       isOneOrNone ?
         dbHandler.oneOrNone<AnyObject>(query).then((data) => (data ? [data] : []))
       : dbHandler.any<AnyObject>(query);
+    const outputAliases = new Map(
+      newQuery.joins
+        ?.filter((join) => join.outputAlias !== join.joinAlias.raw)
+        .map((join) => [join.joinAlias.raw, join.outputAlias]),
+    );
 
     const parsedResult = await queryPromise
       .then((rows) => {
@@ -134,7 +139,13 @@ export const find = async function (
           return rows.map((d) => Object.values(d)[0]);
         }
 
-        return rows;
+        return outputAliases.size ?
+            rows.map((row) =>
+              Object.fromEntries(
+                Object.entries(row).map(([key, value]) => [outputAliases.get(key) ?? key, value]),
+              ),
+            )
+          : rows;
       })
       .catch((err) =>
         rejectWithPGClientError(err, {

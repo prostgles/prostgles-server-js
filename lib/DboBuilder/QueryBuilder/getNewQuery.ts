@@ -51,6 +51,10 @@ export const getNewQuery = async (
   const joinQueries: NewQueryJoin[] = [];
 
   const { select: userSelect = "*" } = selectParams;
+  const reservedAliases = new Set([
+    ...viewHandler.column_names,
+    ...(isObject(userSelect) ? Object.keys(userSelect) : []),
+  ]);
   const selectExpressionAlias =
     selectParams.joinExpressionAlias ??
     ({ raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS } satisfies PGIdentifier);
@@ -126,7 +130,15 @@ export const getNewQuery = async (
       let j_filter: Filter = {},
         j_isLeftJoin = true;
 
-      const joinExpressionAlias = { raw: joinColumnName, escaped: asName(joinColumnName) };
+      let sqlAlias = joinColumnName;
+      if (Buffer.byteLength(sqlAlias) > 63) {
+        let suffix = 0;
+        do {
+          sqlAlias = `__prostgles_join_${suffix++}`;
+        } while (reservedAliases.has(sqlAlias));
+        reservedAliases.add(sqlAlias);
+      }
+      const joinExpressionAlias = { raw: sqlAlias, escaped: asName(sqlAlias) };
       const j_path = await parseJoinPath({
         rawPath: parsedJoin.type === "simple" ? joinColumnName : parsedJoin.params.path,
         rootTable: viewHandler.name,
@@ -195,6 +207,7 @@ export const getNewQuery = async (
         ...joinQuery,
         joinPath: j_path,
         joinAlias: joinQuery.tableAlias ?? joinQuery.table,
+        outputAlias: joinColumnName,
       });
     },
   );

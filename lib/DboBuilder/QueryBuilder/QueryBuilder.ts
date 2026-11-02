@@ -71,6 +71,7 @@ export type NewQueryRoot = {
 export type NewQueryJoin = NewQuery & {
   joinPath: ParsedJoinPath[];
   joinAlias: PGIdentifier;
+  outputAlias: string;
 };
 export type NewQuery = NewQueryRoot & {
   joins?: NewQueryJoin[];

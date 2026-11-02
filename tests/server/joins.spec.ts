@@ -95,6 +95,86 @@ export const testJoins = async (db: DB) => {
         ]),
       );
       assert.deepEqual(await documents.find!(filter, params), [{ id: 1, ...expectedJobs }]);
+      await context.test(
+        "long join aliases preserve distinct output keys and nested ordering",
+        async () => {
+          const jobAlias =
+            '__job_["background_processing_jobs","document_extraction_background_job_id"]';
+          const aliases = [
+            jobAlias,
+            `${jobAlias}_other`,
+            "作業".repeat(16),
+            "__prostgles_join_0",
+          ];
+          const longAliasParams = {
+            select: {
+              id: 1 as const,
+              ...Object.fromEntries(aliases.map((alias) => [alias, jobSelect])),
+            },
+            orderBy: { [`${jobAlias}.id`]: -1 as const },
+          };
+          const expectedRow = {
+            id: 1,
+            ...Object.fromEntries(
+              aliases.map((alias) => [
+                alias,
+                [{ id: 1234, status: "succeeded" }],
+              ]),
+            ),
+          };
+          assert.deepEqual(await documents.find!(filter, longAliasParams), [
+            expectedRow,
+          ]);
+          assert.deepEqual(
+            await documents.findOne!(filter, longAliasParams),
+            expectedRow,
+          );
+          const client = await instance.getClientDBHandlers(
+            clientRequest,
+            undefined,
+          );
+          assert.deepEqual(
+            await client.clientDb.documents!.find!(filter, longAliasParams),
+            [expectedRow],
+          );
+          let onRows: (rows: AnyObject[]) => void = () => {};
+          const firstRows = new Promise<AnyObject[]>((resolve) => {
+            onRows = resolve;
+          });
+          const subscription = await documents.subscribe!(
+            filter,
+            longAliasParams,
+            (rows) => onRows(rows),
+          );
+          try {
+            assert.deepEqual(await firstRows, [expectedRow]);
+            const updatedRows = new Promise<AnyObject[]>((resolve) => {
+              onRows = resolve;
+            });
+            await instance.db.jobs!.update!(
+              { id: 1234 },
+              { status: "running" },
+            );
+            assert.deepEqual(await updatedRows, [
+              {
+                id: 1,
+                ...Object.fromEntries(
+                  aliases.map((alias) => [
+                    alias,
+                    [{ id: 1234, status: "running" }],
+                  ]),
+                ),
+              },
+            ]);
+          } finally {
+            await subscription.unsubscribe();
+            await instance.db.jobs!.update!(
+              { id: 1234 },
+              { status: "succeeded" },
+            );
+          }
+        },
+      );
       const statement: unknown = await documents.find!(filter, {
         ...params,
         returnType: "statement-no-rls",
