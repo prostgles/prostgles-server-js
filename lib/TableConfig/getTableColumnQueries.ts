@@ -101,15 +101,19 @@ export const getTableColumnQueries = async ({
       const newCol = futureCols.find((nc) => nc.column_name === c.column_name);
       if (!newCol) {
         droppedColNames.push(c.column_name);
-      } else if (newCol.nullable !== c.nullable) {
+        return;
+      }
+      if (newCol.nullable !== c.nullable) {
         alteredColQueries.push(
           `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
         );
-      } else if (newCol.udt_name !== c.udt_name) {
+      }
+      if (newCol.udt_name !== c.udt_name) {
         alteredColQueries.push(
           `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
         );
-      } else if (newCol.column_default !== c.column_default) {
+      }
+      if (newCol.column_default !== c.column_default) {
         const colConfig = columnDefinitions.find((cd) => cd.name === c.column_name);
         if (
           ["serial", "bigserial"].some((t) => colConfig?.def.toLowerCase().includes(` ${t}`)) &&

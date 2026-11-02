@@ -322,6 +322,10 @@ export const testTableConfigValidation = async (parentDb: DB) => {
       ]) {
         if (scenario === "older package version") {
           await db.none("UPDATE prostgles.versions SET version = '0.0.0'");
+          /* Restore a legacy column that needs both nullability and its default updated. */
+          await db.none(`ALTER TABLE jsonb_defaults
+            ALTER COLUMN empty_array DROP NOT NULL,
+            ALTER COLUMN empty_array DROP DEFAULT`);
         } else if (scenario === "outdated version") {
           await db.none("UPDATE prostgles.versions SET version = '0.0.0', schema_md5 = 'outdated'");
         } else if (scenario === "legacy versions") {
