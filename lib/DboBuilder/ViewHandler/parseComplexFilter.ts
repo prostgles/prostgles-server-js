@@ -1,5 +1,5 @@
 import type { AnyObject } from "prostgles-types";
-import { isObject } from "prostgles-types";
+import { isObject, includes, TextFilterKeys } from "prostgles-types";
 import { FILTER_OPERANDS, FILTER_OPERAND_TO_SQL_OPERAND } from "../../Filtering/Filtering";
 import { FUNCTIONS } from "../QueryBuilder/Functions/Functions";
 import { parseFunctionObject } from "../QueryBuilder/QueryBuilder";
@@ -113,6 +113,10 @@ export const parseComplexFilter = ({
       );
     }
 
+    if (includes(TextFilterKeys, comparator)) {
+      result = `(${leftVal})::TEXT`;
+      rightVal = `(${rightVal})::TEXT`;
+    }
     result += ` ${sqlOperand} ${rightVal}`;
   }
 

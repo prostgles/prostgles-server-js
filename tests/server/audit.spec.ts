@@ -365,6 +365,22 @@ export async function testAudit(parentDb: DB) {
           }),
           3,
         );
+        /* Text searches of diff expressions match both snapshots, excluding unchanged fields. */
+        for (const [operator, term, expectedCount] of [
+          ["$ilike", "%UNCHANGED%", 0],
+          ["$ilike", "%STATUS%", 3],
+          ["$like", "%STATUS%", 0],
+          ["$like", "%last%", 1],
+          ["$nilike", "%STATUS%", diffCases.length - 3],
+          ["$nlike", "%last%", diffCases.length - 1],
+        ] as const) {
+          assert.equal(
+            await diffTable.count!({
+              $filter: [diffExpression, operator, term],
+            }),
+            expectedCount,
+          );
+        }
         await result.sql("INSERT INTO audit_test_diff(old_row, new_row) VALUES ('null', 'null')");
         assert.equal(await diffTable.count!({ $filter: [diffExpression, "=", "{}"] }), 3);
         for (const columns of [["old_row"], ["old_row", "new_row", "id"], ["old_row", "id"]]) {
