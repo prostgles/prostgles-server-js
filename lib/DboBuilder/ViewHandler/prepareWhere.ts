@@ -18,6 +18,7 @@ export type PrepareWhereParams = {
   tableRule: ParsedTableRule | undefined;
   isHaving?: boolean;
   selectParams?: SelectParams;
+  existsDepth?: number;
 };
 
 export type WhereOptions = {
@@ -43,6 +44,7 @@ export const prepareWhere = async (
     filterFields = !tableRule ? "*" : undefined,
     isHaving,
     selectParams,
+    existsDepth = 0,
   }: PrepareWhereParams,
 ): Promise<WhereOptions> => {
   const { $and: $and_key, $or: $or_key } = viewHandler.dboBuilder.prostgles.keywords;
@@ -117,6 +119,7 @@ export const prepareWhere = async (
         tableRules: isForcedFilterBypass ? undefined : tableRule,
         isHaving,
         joinColumns: source.joinColumns,
+        existsDepth,
       });
       exists.push(...itemInfo.exists);
       return {

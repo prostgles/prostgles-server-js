@@ -100,12 +100,7 @@ export const testJoins = async (db: DB) => {
         async () => {
           const jobAlias =
             '__job_["background_processing_jobs","document_extraction_background_job_id"]';
-          const aliases = [
-            jobAlias,
-            `${jobAlias}_other`,
-            "作業".repeat(16),
-            "__prostgles_join_0",
-          ];
+          const aliases = [jobAlias, `${jobAlias}_other`, "作業".repeat(16), "__prostgles_join_0"];
           const longAliasParams = {
             select: {
               id: 1 as const,
@@ -116,62 +111,39 @@ export const testJoins = async (db: DB) => {
           const expectedRow = {
             id: 1,
             ...Object.fromEntries(
-              aliases.map((alias) => [
-                alias,
-                [{ id: 1234, status: "succeeded" }],
-              ]),
+              aliases.map((alias) => [alias, [{ id: 1234, status: "succeeded" }]]),
             ),
           };
-          assert.deepEqual(await documents.find!(filter, longAliasParams), [
+          assert.deepEqual(await documents.find!(filter, longAliasParams), [expectedRow]);
+          assert.deepEqual(await documents.findOne!(filter, longAliasParams), expectedRow);
+          const client = await instance.getClientDBHandlers(clientRequest, undefined);
+          assert.deepEqual(await client.clientDb.documents!.find!(filter, longAliasParams), [
             expectedRow,
           ]);
-          assert.deepEqual(
-            await documents.findOne!(filter, longAliasParams),
-            expectedRow,
-          );
-          const client = await instance.getClientDBHandlers(
-            clientRequest,
-            undefined,
-          );
-          assert.deepEqual(
-            await client.clientDb.documents!.find!(filter, longAliasParams),
-            [expectedRow],
-          );
           let onRows: (rows: AnyObject[]) => void = () => {};
           const firstRows = new Promise<AnyObject[]>((resolve) => {
             onRows = resolve;
           });
-          const subscription = await documents.subscribe!(
-            filter,
-            longAliasParams,
-            (rows) => onRows(rows),
+          const subscription = await documents.subscribe!(filter, longAliasParams, (rows) =>
+            onRows(rows),
           );
           try {
             assert.deepEqual(await firstRows, [expectedRow]);
             const updatedRows = new Promise<AnyObject[]>((resolve) => {
               onRows = resolve;
             });
-            await instance.db.jobs!.update!(
-              { id: 1234 },
-              { status: "running" },
-            );
+            await instance.db.jobs!.update!({ id: 1234 }, { status: "running" });
             assert.deepEqual(await updatedRows, [
               {
                 id: 1,
                 ...Object.fromEntries(
-                  aliases.map((alias) => [
-                    alias,
-                    [{ id: 1234, status: "running" }],
-                  ]),
+                  aliases.map((alias) => [alias, [{ id: 1234, status: "running" }]]),
                 ),
               },
             ]);
           } finally {
             await subscription.unsubscribe();
-            await instance.db.jobs!.update!(
-              { id: 1234 },
-              { status: "succeeded" },
-            );
+            await instance.db.jobs!.update!({ id: 1234 }, { status: "succeeded" });
           }
         },
       );
@@ -309,6 +281,129 @@ export const testJoins = async (db: DB) => {
       await db.none("DROP SCHEMA unique_join_test CASCADE");
     }
   });
+  await test("nested exists filters preserve correlations and permissions", async () => {
+    await db.none(`
+      CREATE SCHEMA nested_exists_test;
+      CREATE TABLE nested_exists_test.members (
+        id int PRIMARY KEY, manager_id int REFERENCES nested_exists_test.members(id), secret text
+      );
+      CREATE TABLE nested_exists_test.events (
+        id int PRIMARY KEY, member_id int REFERENCES nested_exists_test.members(id), kind text
+      );
+      CREATE TABLE nested_exists_test.secrets (id int PRIMARY KEY);
+      INSERT INTO nested_exists_test.members VALUES
+        (1, NULL, 'private'), (2, 1, 'private'), (3, 2, 'private'), (4, NULL, 'private');
+      INSERT INTO nested_exists_test.events VALUES
+        (10, 2, 'visible'), (11, 3, 'hidden'), (12, 4, 'visible');
+    `);
+    const instance = await prostgles({
+      dbConnection: {
+        ...getConnectionDetails(db),
+        options: "-c search_path=nested_exists_test,public",
+      } as unknown as ProstglesInitOptions["dbConnection"],
+      schemaFilter: { nested_exists_test: 1 },
+      joins: "inferred",
+      publish: {
+        members: {
+          select: {
+            fields: ["id", "manager_id"],
+            forcedFilter: { id: { $ne: 4 } },
+          },
+        },
+        events: {
+          select: {
+            fields: ["id", "member_id"],
+            forcedFilter: { kind: "visible" },
+          },
+        },
+      },
+      onReady: () => {},
+    });
+    try {
+      const client = await instance.getClientDBHandlers(clientRequest, undefined);
+      const select = { select: ["id"], orderBy: "id" };
+      const managerPath = [{ table: "members", on: [{ manager_id: "id" }] }];
+      for (const [members, isClient] of [
+        [instance.db.members!, false],
+        [client.clientDb.members!, true],
+      ] as const) {
+        for (const grouped of [false, true]) {
+          const memberFilter = { $existsJoined: { members: { id: 2 } } };
+          assert.deepEqual(
+            await members.find!(
+              {
+                $existsJoined: {
+                  events: grouped ? { $and: [{ $or: [memberFilter] }] } : memberFilter,
+                },
+              },
+              select,
+            ),
+            [{ id: 2 }],
+          );
+        }
+        /* Both self-joins must correlate with their immediate parent. */
+        assert.deepEqual(
+          await members.find!(
+            {
+              $existsJoined: {
+                path: managerPath,
+                filter: {
+                  $existsJoined: { path: managerPath, filter: { id: 1 } },
+                },
+              },
+            },
+            select,
+          ),
+          [{ id: 3 }],
+        );
+        assert.deepEqual(
+          await members.find!(
+            {
+              $existsJoined: {
+                events: { $notExistsJoined: { members: { id: 2 } } },
+              },
+            },
+            select,
+          ),
+          isClient ? [] : [{ id: 3 }, { id: 4 }],
+        );
+        /* Unjoined EXISTS still allows nested joined and negated filters. */
+        assert.deepEqual(
+          await members.find!(
+            { $exists: { events: { $notExists: { members: { id: 999 } } } } },
+            select,
+          ),
+          isClient ?
+            [{ id: 1 }, { id: 2 }, { id: 3 }]
+          : [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        );
+        assert.deepEqual(
+          await members.find!(
+            { $exists: { events: { $existsJoined: { members: { id: 4 } } } } },
+            select,
+          ),
+          isClient ? [] : [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+        );
+      }
+      /* Nested filters retain target field and table permissions. */
+      await assert.rejects(() =>
+        client.clientDb.members!.find!({
+          $existsJoined: {
+            events: { $existsJoined: { members: { secret: "private" } } },
+          },
+        }),
+      );
+      await assert.rejects(() =>
+        client.clientDb.members!.find!({
+          $existsJoined: { events: { $exists: { secrets: {} } } },
+        }),
+      );
+    } finally {
+      await instance.destroy();
+      await db.none("DROP SCHEMA nested_exists_test CASCADE");
+    }
+  });
+
   await test("custom joins add conditions unless override is requested", async () => {
     await db.none(`
       CREATE SCHEMA join_merge_test;

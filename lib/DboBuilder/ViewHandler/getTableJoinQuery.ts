@@ -11,6 +11,7 @@ type getTableJoinsArgs = {
   path: ParsedJoinPath[];
   rootJoinColumns?: Record<string, string>;
   targetJoinColumns?: Record<string, string>;
+  aliasPrefix?: string;
 };
 export const getTableJoinQuery = ({
   path,
@@ -20,13 +21,14 @@ export const getTableJoinQuery = ({
   finalTableExpression,
   rootJoinColumns,
   targetJoinColumns,
+  aliasPrefix,
 }: getTableJoinsArgs): { targetAlias: string; query: string } => {
   const [firstPath] = path;
   if (!firstPath) {
     throw `Cannot create join query for empty path`;
   }
   const getTableAlias = (table: string, pathIndex: number) =>
-    getTableJoinAlias(table, pathIndex).escaped;
+    getTableJoinAlias(table, pathIndex, aliasPrefix).escaped;
   const firstJoinColumns = path.length === 1 ? targetJoinColumns : firstPath.source!.joinColumns;
 
   const query = path
@@ -94,8 +96,11 @@ export const getTableJoinQuery = ({
   };
 };
 
-export const getTableJoinAlias = (table: string, pathIndex: number): PGIdentifier => {
-  const prefix = "jd";
+export const getTableJoinAlias = (
+  table: string,
+  pathIndex: number,
+  prefix = "jd",
+): PGIdentifier => {
   const raw = `${prefix}_${pathIndex}_${table}`;
   return { raw, escaped: asName(raw) };
 };

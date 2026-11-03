@@ -30,6 +30,7 @@ export async function getCondition(
     tableRules?: ParsedTableRule;
     isHaving?: boolean;
     joinColumns?: Record<string, string>;
+    existsDepth?: number;
   },
 ): Promise<{ exists: ExistsFilterConfig[]; condition: string; columnsUsed: string[] }> {
   const {
@@ -87,6 +88,7 @@ export async function getCondition(
               tableAlias?.escaped,
               localParams,
               params.joinColumns,
+              params.existsDepth ?? 0,
             ),
         ),
       )

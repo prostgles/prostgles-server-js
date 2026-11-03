@@ -1,5 +1,3 @@
-import type { EXISTS_KEY } from "prostgles-types";
-import { EXISTS_KEYS } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { ExistsFilterConfig, LocalParams } from "../DboBuilder";
 import { getQuerySourceSQL } from "../QueryBuilder/getQuerySource";
@@ -13,19 +11,12 @@ export async function getExistsCondition(
   rootTableAlias: string | undefined,
   localParams: LocalParams | undefined,
   rootJoinColumns: Record<string, string> | undefined,
+  existsDepth: number,
 ): Promise<string> {
   const rootTable = this.name;
   const isNotExists = ["$notExists", "$notExistsJoined"].includes(eConfig.existType);
 
   const { targetTableFilter } = eConfig;
-
-  /* Nested $exists is not allowed */
-  if (Object.keys(targetTableFilter).find((fk) => EXISTS_KEYS.includes(fk as EXISTS_KEY))) {
-    throw {
-      stack: ["prepareExistCondition()"],
-      message: "Nested exists disallowed",
-    };
-  }
 
   /* Check if allowed to view data - forcedFilters will bypass this check through isForcedFilterBypass */
   if (localParams?.isRemoteRequest && !localParams.clientReq) {
@@ -54,8 +45,13 @@ export async function getExistsCondition(
     if (!targetTableRules.select) throw "Disallowed";
   }
 
-  const targetAlias =
-    eConfig.isJoined ? getTableJoinAlias(targetTable, eConfig.parsedPath.length - 1) : undefined;
+  /* Each EXISTS scope needs distinct aliases, including repeated self-joins. */
+  const aliasPrefix = `exists_${existsDepth}`;
+  const targetAlias = getTableJoinAlias(
+    targetTable,
+    eConfig.isJoined ? eConfig.parsedPath.length - 1 : 0,
+    aliasPrefix,
+  );
   const whereOpts = await prepareWhere(tableHandler, {
     select: undefined,
     selectParams: {},
@@ -66,6 +62,7 @@ export async function getExistsCondition(
     addWhere: false,
     tableAlias: targetAlias,
     localParams,
+    existsDepth: existsDepth + 1,
   });
   const { source: targetSource, where: finalWhere } = whereOpts;
   eConfig.targetTableColumns = whereOpts.columnsUsed;
@@ -96,6 +93,7 @@ export async function getExistsCondition(
       finalTableExpression: targetSource.expression,
       rootJoinColumns,
       targetJoinColumns: targetSource.joinColumns,
+      aliasPrefix,
     });
     innerQuery = query;
   }
