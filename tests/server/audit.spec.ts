@@ -111,6 +111,13 @@ export async function testAudit(parentDb: DB) {
           }),
         },
         tableConfig: {
+          audit_test_diff: {
+            columns: {
+              id: "serial PRIMARY KEY",
+              old_row: "jsonb",
+              new_row: "jsonb",
+            },
+          },
           audit_test_source: {
             columns: {
               a: "int NOT NULL",
@@ -182,6 +189,15 @@ export async function testAudit(parentDb: DB) {
           const check = async () => {
             await db.audit_events.insert(auditInput);
             const row = await db.audit_events.findOne({}, { select: "*" });
+            const diff = await db.audit_events.findOne({}, {
+              select: { changes: { $jsonb_diff: ["old_row", "new_row"] } },
+            });
+            diff?.changes satisfies Record<string, [string | null, string | null]> | undefined;
+            /* @ts-expect-error Diff objects must not fall back to any. */
+            diff?.changes satisfies string;
+            diff?.changes.value?.[0] satisfies string | null | undefined;
+            /* @ts-expect-error Diff values must be text or null, not numbers. */
+            diff?.changes.value?.[0] satisfies number | undefined;
             if (row) row.table_name satisfies string;
             // @ts-expect-error Audit history cannot be updated.
             await db.audit_events.update({}, { table_name: "tampered" });
@@ -259,6 +275,103 @@ export async function testAudit(parentDb: DB) {
         assert.deepEqual(Object.values(AUDIT_TABLE_COLUMN_NAMES), AUDIT_TABLE_COLUMNS);
         const auditRow: AuditTableRow = (await history())[0];
         assert.equal(auditRow.operation, "INSERT");
+        /* Diff pairs preserve before/after direction and stringify changed values without unchanged keys. */
+        const diffCases = [
+          {
+            old_row: null,
+            new_row: { status: "needs_review" },
+            changes: { status: [null, "needs_review"] },
+          },
+          {
+            old_row: { status: "needs_review" },
+            new_row: null,
+            changes: { status: ["needs_review", null] },
+          },
+          {
+            old_row: { unchanged: "omit me", status: "needs_review" },
+            new_row: { unchanged: "omit me", status: "approved" },
+            changes: { status: ["needs_review", "approved"] },
+          },
+          {
+            old_row: { value: "" },
+            new_row: { value: null },
+            changes: { value: ["", null] },
+          },
+          {
+            old_row: {},
+            new_row: { value: null },
+            changes: { value: [null, null] },
+          },
+          {
+            old_row: { value: null },
+            new_row: {},
+            changes: { value: [null, null] },
+          },
+          {
+            old_row: { value: null },
+            new_row: { value: "null" },
+            changes: { value: [null, "null"] },
+          },
+          {
+            old_row: { value: 0 },
+            new_row: { value: false },
+            changes: { value: ["0", "false"] },
+          },
+          {
+            old_row: { value: { a: 1, b: 2 } },
+            new_row: { value: { b: 2, a: 1 } },
+            changes: {},
+          },
+          {
+            old_row: { value: { a: 1 } },
+            new_row: { value: { a: 2 } },
+            changes: { value: ['{"a": 1}', '{"a": 2}'] },
+          },
+          {
+            old_row: { value: [1] },
+            new_row: { value: [2] },
+            changes: { value: ["[1]", "[2]"] },
+          },
+          { old_row: null, new_row: null, changes: {} },
+          {
+            old_row: {},
+            new_row: { z: "last", a: "A&B_100%\\path\n**literal**" },
+            changes: {
+              a: [null, "A&B_100%\\path\n**literal**"],
+              z: [null, "last"],
+            },
+          },
+        ];
+        const diffTable = result.db.audit_test_diff!;
+        await diffTable.insertMany!(
+          diffCases.map(({ old_row, new_row }) => ({ old_row, new_row })),
+        );
+        const diffExpression = {
+          $jsonb_diff: ["old_row", "new_row"],
+        };
+        assert.deepEqual(
+          await diffTable.find!({}, { select: { changes: diffExpression }, orderBy: { id: 1 } }),
+          diffCases.map(({ changes }) => ({ changes })),
+        );
+        assert.equal(
+          await diffTable.count!({
+            $filter: [diffExpression, "?", "unchanged"],
+          }),
+          0,
+        );
+        assert.equal(
+          await diffTable.count!({
+            $filter: [diffExpression, "?", "status"],
+          }),
+          3,
+        );
+        await result.sql("INSERT INTO audit_test_diff(old_row, new_row) VALUES ('null', 'null')");
+        assert.equal(await diffTable.count!({ $filter: [diffExpression, "=", "{}"] }), 3);
+        for (const columns of [["old_row"], ["old_row", "new_row", "id"], ["old_row", "id"]]) {
+          await assert.rejects(() =>
+            diffTable.find!({}, { select: { changes: { $jsonb_diff: columns } } }),
+          );
+        }
         assert.equal(Object.keys(prgl.mergedTableConfig.tableConfig!)[0], audit.tableName);
         // Comments are ordinary metadata and have no role in reconciliation or publishing.
         await result.sql(`COMMENT ON TABLE "audit_events" IS 'History shown in the UI'`);
@@ -505,6 +618,28 @@ export async function testAudit(parentDb: DB) {
           table_name: maskedTable,
         };
         const serverAudit = result.db[auditName]!;
+        /* Both selecting and searching the diff must use permission-filtered snapshots. */
+        const maskedDiffFilter = {
+          ...maskedAuditTableFilter,
+          $filter: [diffExpression, "?", "secret"] satisfies [typeof diffExpression, "?", string],
+        };
+        assert.equal(await serverAudit.count!(maskedDiffFilter), 2);
+        assert.equal(await clientAudit.count!(maskedDiffFilter), 0);
+        assert.deepEqual(
+          await clientAudit.find!(maskedAuditTableFilter, {
+            select: { changes: diffExpression },
+            orderBy: { id: 1 },
+          }),
+          [{ changes: { id: [null, "1"] } }, { changes: { id: ["1", null] } }],
+        );
+        await assert.rejects(() =>
+          sourceClient.clientDb.audit_test_source!.find!(
+            {},
+            {
+              select: { changes: { $jsonb_diff: ["a", "secret"] } },
+            },
+          ),
+        );
         for (const snapshotColumn of [
           AUDIT_TABLE_COLUMN_NAMES.old_id,
           AUDIT_TABLE_COLUMN_NAMES.new_id,

@@ -990,6 +990,71 @@ export const isomorphicQueries = async (
       });
     });
 
+    await test("$term_highlight expands dates only when enabled", async () => {
+      for (const returnType of ["boolean", "object"] as const) {
+        for (const term of ["Thursday", "December", "Q4", "WK49", "1997-12-04"]) {
+          const result = await db.various.findOne(
+            { name: "abc81 here" },
+            {
+              select: {
+                defaultExpansion: {
+                  $term_highlight: [["added"], term, { returnType }],
+                },
+                enabledExpansion: {
+                  $term_highlight: [["added"], term, { returnType, expandDates: true }],
+                },
+                disabledExpansion: {
+                  $term_highlight: [["added"], term, { returnType, expandDates: false }],
+                },
+              },
+            },
+          );
+          assert(result);
+          assert.deepStrictEqual(result.defaultExpansion, result.disabledExpansion);
+          const matchesRawDate = term === "1997-12-04";
+          if (returnType === "boolean") {
+            assert.equal(result.enabledExpansion, true);
+            assert.equal(result.disabledExpansion, matchesRawDate);
+          } else {
+            assert(result.enabledExpansion);
+            assert.deepStrictEqual(
+              result.disabledExpansion,
+              matchesRawDate ? { added: ["", [term], " 00:12:00"] } : null,
+            );
+          }
+        }
+      }
+    });
+
+    await test("$term_highlight validates options", async () => {
+      for (const options of [
+        { unknown: true },
+        { expandDates: "false" },
+        { noFields: 1 },
+        { matchCase: "false" },
+        { returnType: "invalid" },
+        { edgeTruncate: 1.5 },
+        { edgeTruncate: -2 },
+        [],
+        false,
+        0,
+        "invalid",
+      ]) {
+        await assert.rejects(
+          () =>
+            db.various.find(
+              {},
+              {
+                select: {
+                  h: { $term_highlight: [["added"], "1997", options] },
+                },
+              },
+            ),
+          `Expected invalid options to be rejected: ${JSON.stringify(options)}`,
+        );
+      }
+    });
+
     await test("funcFilters: $term_highlight", async () => {
       const term = "abc81";
       const res = await db.various.count({
@@ -1478,6 +1543,64 @@ export const isomorphicQueries = async (
         $filter: [{ $upper: ["name"] }, "$in", ["A"]],
       });
       assert.deepStrictEqual(res, 2);
+    });
+    await test("Complex filters accept falsy values and compare nulls", async () => {
+      const rows = await db.items3.insertMany([{ name: "" }, { name: null }, { name: "present" }], {
+        returning: { id: 1 },
+      });
+      const rowFilter = { id: { $in: rows.map(({ id }) => id) } };
+      const textExpression = { $upper: ["name"] };
+      try {
+        assert.equal(
+          await db.items3.count({
+            ...rowFilter,
+            $filter: [{ $length: ["name"] }, "=", 0],
+          }),
+          1,
+        );
+        assert.equal(
+          await db.items3.count({
+            ...rowFilter,
+            $filter: [textExpression, "=", ""],
+          }),
+          1,
+        );
+        assert.equal(
+          await db.items3.count({
+            ...rowFilter,
+            $filter: [
+              {
+                $term_highlight: [["name"], "present", { returnType: "boolean" }],
+              },
+              "=",
+              false,
+            ],
+          }),
+          2,
+        );
+        for (const [comparator, expectedCount] of [
+          ["=", 1],
+          ["$eq", 1],
+          ["<>", 2],
+          ["$ne", 2],
+          ["$isDistinctFrom", 2],
+          ["$isNotDistinctFrom", 1],
+        ] as const) {
+          assert.equal(
+            await db.items3.count({
+              ...rowFilter,
+              $filter: [textExpression, comparator, null],
+            }),
+            expectedCount,
+            comparator,
+          );
+        }
+        await assert.rejects(() =>
+          db.items3.count({ ...rowFilter, $filter: [textExpression, "="] }),
+        );
+      } finally {
+        await db.items3.delete(rowFilter);
+      }
     });
     await test("Order by aggregation", async () => {
       const res = await db.items.find(

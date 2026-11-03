@@ -82,14 +82,16 @@ export const parseComplexFilter = ({
     if (typeof comparator !== "string" || !allowedComparators.includes(comparator as any)) {
       throw `Invalid $filter. comparator ${JSON.stringify(comparator)} is not valid. Expecting one of: ${allowedComparators}`;
     }
-    if (!rightFilterOrValue) {
+    if (rightFilterOrValue === undefined) {
       throw "Invalid $filter. Expecting a value or function after the comparator";
     }
     const maybeValidComparator = comparator as keyof typeof FILTER_OPERAND_TO_SQL_OPERAND;
-    const sqlOperand = FILTER_OPERAND_TO_SQL_OPERAND[maybeValidComparator];
+    let sqlOperand = FILTER_OPERAND_TO_SQL_OPERAND[maybeValidComparator];
     if (!sqlOperand) {
       throw `Invalid $filter. comparator ${comparator} is not valid. Expecting one of: ${allowedComparators}`;
     }
+    if (rightFilterOrValue === null && sqlOperand === "=") sqlOperand = "IS";
+    if (rightFilterOrValue === null && sqlOperand === "<>") sqlOperand = "IS NOT";
 
     let rightVal =
       isObject(rightFilterOrValue) ?

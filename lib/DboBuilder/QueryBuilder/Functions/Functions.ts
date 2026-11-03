@@ -5,6 +5,7 @@ import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
 import { ARRAY_SEARCH } from "./ARRAY_SEARCH";
+import { JSONB_DIFF } from "./JSONB_DIFF";
 import { asFunction, getAggregateQuery } from "./utils";
 import type { ExistsFilterConfig } from "../../DboBuilderTypes";
 const pgp = pgPromise();
@@ -108,6 +109,7 @@ const parseUnix = (
 };
 
 const JSON_Funcs: FunctionSpec[] = [
+  JSONB_DIFF,
   {
     name: "$jsonb_set",
     description:

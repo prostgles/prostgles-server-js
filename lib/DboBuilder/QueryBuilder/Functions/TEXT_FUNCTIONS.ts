@@ -1,4 +1,4 @@
-import { isEmpty, postgresToTsType } from "prostgles-types";
+import { getJSONBSchemaValidationError, postgresToTsType } from "prostgles-types";
 import { asValue } from "../../../PubSubManager/PubSubManagerUtils";
 import { parseFieldFilter } from "../../ViewHandler/parseFieldFilter";
 import { asFunction } from "./utils";
@@ -136,7 +136,7 @@ export const TEXT_FUNCTIONS: FunctionSpec[] = [
    * */
   asFunction({
     name: "$term_highlight" /* */,
-    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ returnIndex?: number; edgeTruncate?: number; noFields?: boolean }>] -> get case-insensitive text match highlight`,
+    description: ` :[column_names<string[] | "*">, search_term<string>, opts?<{ returnType?: "index" | "boolean" | "object"; edgeTruncate?: number; noFields?: boolean; matchCase?: boolean; expandDates?: boolean }>] -> get text match highlight. expandDates defaults to false and adds date parts for object/boolean results when enabled.`,
     type: "function",
     numArgs: 1,
     singleColArg: true,
@@ -146,26 +146,32 @@ export const TEXT_FUNCTIONS: FunctionSpec[] = [
       const cols = parseFieldFilter(args[0], false, allowedFields);
       let term = args[1];
       const rawTerm = args[1];
-      const { edgeTruncate, noFields = false, returnType, matchCase = false } = args[2] || {};
-      if (!isEmpty(args[2])) {
-        const keys = Object.keys(args[2]);
-        const validKeys = ["edgeTruncate", "noFields", "returnType", "matchCase"];
-        const bad_keys = keys.filter((k) => !validKeys.includes(k));
-        if (bad_keys.length)
-          throw (
-            "Invalid options provided for $term_highlight. Expecting one of: " +
-            validKeys.join(", ")
-          );
+      const { data: options, error } = getJSONBSchemaValidationError(
+        {
+          type: {
+            edgeTruncate: { type: "integer", optional: true },
+            noFields: { type: "boolean", optional: true },
+            returnType: { enum: ["index", "boolean", "object"], optional: true },
+            matchCase: { type: "boolean", optional: true },
+            expandDates: { type: "boolean", optional: true },
+          },
+        } as const,
+        args[2] ?? {},
+      );
+      if (!options) {
+        throw new Error(`Invalid options provided for $term_highlight: ${error}`);
       }
+      const {
+        edgeTruncate,
+        noFields = false,
+        returnType,
+        matchCase = false,
+        expandDates = false,
+      } = options;
       if (!cols.length) throw "Cols are empty/invalid";
       if (typeof term !== "string") throw "Non string term provided: " + term;
-      if (edgeTruncate !== undefined && (!Number.isInteger(edgeTruncate) || edgeTruncate < -1))
+      if (edgeTruncate !== undefined && edgeTruncate < -1)
         throw "Invalid edgeTruncate. expecting a positive integer";
-      if (typeof noFields !== "boolean") throw "Invalid noFields. expecting boolean";
-      const RETURN_TYPES = ["index", "boolean", "object"];
-      if (returnType && !RETURN_TYPES.includes(returnType)) {
-        throw `returnType can only be one of: ${RETURN_TYPES}`;
-      }
 
       const makeTextMatcherArray = (rawText: string, _term: string) => {
         let matchText = rawText,
@@ -255,7 +261,7 @@ export const TEXT_FUNCTIONS: FunctionSpec[] = [
               const colNameEscaped = asNameAlias(c.key, tableAlias);
               let colSelect = `${colNameEscaped}::TEXT`;
               const isTstamp = c.colInfo?.udt_name.startsWith("timestamp");
-              if (isTstamp || c.colInfo?.udt_name === "date") {
+              if (expandDates && (isTstamp || c.colInfo?.udt_name === "date")) {
                 colSelect = `( CASE WHEN ${colNameEscaped} IS NULL THEN '' 
               ELSE concat_ws(' ', 
                 trim(to_char(${colNameEscaped}, 'YYYY-MM-DD HH24:MI:SS')), 
