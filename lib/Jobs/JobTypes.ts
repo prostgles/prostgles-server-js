@@ -49,6 +49,9 @@ export type RowTrigger<S, T extends JobTableName<S>> = {
   columns?: (keyof JobRow<S, T> & string)[];
   /** Existing column receiving the job ID atomically, including reruns, through normal table hooks. */
   jobIdColumn?: keyof JobRow<S, T> & string;
+  /**
+   * A filter that determines when the trigger should fire. If omitted, the trigger fires for all rows.
+   */
   when?: FullFilter<JobRow<S, T>, S extends DBSchema ? S : void>;
 };
 /** Missed occurrences while all workers are stopped are not replayed. */

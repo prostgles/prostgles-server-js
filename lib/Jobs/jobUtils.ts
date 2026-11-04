@@ -1,5 +1,15 @@
 import { getSerialisableError } from "prostgles-types";
-import type { JobValue } from "./JobTypes";
+import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
+import type { JobRecord, JobValue, RowTrigger } from "./JobTypes";
+
+export const getJobPrimaryKeyNames = (table: TableHandler) =>
+  table.columns.filter((column) => column.is_pkey).map((column) => column.name);
+
+export const matchesJobTriggerCondition = async (
+  table: TableHandler,
+  targetRowPkey: JobRecord["target_row_pkey"],
+  when: RowTrigger<void, string>["when"],
+) => !when || !!(await table.findOne({ $and: [targetRowPkey, when] }));
 
 export const assertJobValue: (
   value: unknown,
@@ -20,7 +30,6 @@ export const assertJobValue: (
   ancestors.delete(value);
 };
 
-export const jobError = (error: unknown) =>
-  getSerialisableError(error) ?? String(error);
+export const jobError = (error: unknown) => getSerialisableError(error) ?? String(error);
 
 export class PermanentJobError extends Error {}

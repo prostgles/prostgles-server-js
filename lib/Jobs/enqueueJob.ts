@@ -73,7 +73,9 @@ export const enqueueJob = async (
     },
     { orderBy: { created_at: 1 } },
   );
-  if (active && definition.onConflict === "skip") return setJobId(active.id);
+  if (active && definition.onConflict === "skip") {
+    return setJobId(active.id);
+  }
   if (active && definition.onConflict === "replace") {
     await transaction.t.none(
       `

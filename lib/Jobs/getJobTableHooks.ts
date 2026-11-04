@@ -5,6 +5,7 @@ import type { AfterEachTsTrigger } from "../PublishParser/publishTypesAndUtils";
 import type { TableHooks } from "../TableHooks/TableHooks";
 import { enqueueJob } from "./enqueueJob";
 import type { JobRecord } from "./JobTypes";
+import { getJobPrimaryKeyNames, matchesJobTriggerCondition } from "./jobUtils";
 
 export const getJobTableHooks = (
   prostgles: Prostgles,
@@ -26,19 +27,27 @@ export const getJobTableHooks = (
       validate: async ({ row, dbx, localParams }) => {
         const table = dbx[trigger.table]!;
         const transaction = table.getTransaction(localParams)!;
-        const primaryKeyNames = table.columns
-          .filter((column) => column.is_pkey)
-          .map((column) => column.name);
+        const primaryKeyNames = getJobPrimaryKeyNames(table);
         const targetRowPkey = pickKeys(row, primaryKeyNames) as JobRecord["target_row_pkey"];
-        if (trigger.when && !(await table.findOne({ $and: [targetRowPkey, trigger.when] }))) return;
-        const { targetRow } = await enqueueJob(prostgles, { t: transaction.t, dbx }, name, targetRowPkey, {
-          userId: prostgles.getExecution()?.user?.id,
-        }).catch((error: unknown) => {
+        if (!(await matchesJobTriggerCondition(table, targetRowPkey, trigger.when))) {
+          return;
+        }
+        const { targetRow } = await enqueueJob(
+          prostgles,
+          { t: transaction.t, dbx },
+          name,
+          targetRowPkey,
+          {
+            userId: prostgles.getExecution()?.user?.id,
+          },
+        ).catch((error: unknown) => {
           // A caught enqueue error must not commit the originating row without its job.
           table.dboBuilder.failTransaction(transaction.t, error);
           throw error;
         });
-        if (targetRow) Object.assign(row, targetRow);
+        if (targetRow) {
+          Object.assign(row, targetRow);
+        }
       },
     } satisfies AfterEachTsTrigger<AnyObject, TableHandlers, any> & { hookKey: string };
     const hooks = mergedHooks[trigger.table];

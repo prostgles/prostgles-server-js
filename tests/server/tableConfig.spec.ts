@@ -306,6 +306,98 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     }
   });
 
+  await test("tableConfig backfills configured defaults before enforcing NOT NULL", async () => {
+    const database = `table_config_defaults_${process.pid}_${Date.now()}`;
+    await parentDb.none(`CREATE DATABASE ${asName(database)}`);
+    const pgp = pgPromise();
+    const dbConnection = { ...getConnectionDetails(parentDb), database };
+    const db = pgp(dbConnection as unknown as Parameters<typeof pgp>[0]);
+    const columns = {
+      id: "INTEGER PRIMARY KEY",
+      filter: { jsonbSchema: { type: "unknown[]" as const }, defaultValue: [] },
+      existing_default: "INTEGER NOT NULL DEFAULT 0",
+      changed_default: "INTEGER NOT NULL DEFAULT 0",
+      enabled: "BOOLEAN NOT NULL DEFAULT FALSE",
+      label: "TEXT NOT NULL DEFAULT ''",
+      converted: "INTEGER NOT NULL DEFAULT (1 + 1)",
+      optional_filter: "JSONB DEFAULT '[]'::jsonb",
+      no_default: "TEXT",
+    };
+    let instance: Awaited<ReturnType<Prostgles["init"]>> | undefined;
+    try {
+      await db.none(`
+        CREATE TABLE windows (
+          id INTEGER PRIMARY KEY, filter JSONB, existing_default INTEGER DEFAULT 0,
+          changed_default INTEGER DEFAULT 1, enabled BOOLEAN, label TEXT, converted TEXT,
+          optional_filter JSONB, no_default TEXT
+        );
+        INSERT INTO windows VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+        INSERT INTO windows VALUES (2, '[1]', 3, 4, TRUE, 'kept', '5', NULL, NULL);
+      `);
+      const defaultRow = {
+        id: 1,
+        filter: [],
+        existing_default: 0,
+        changed_default: 0,
+        enabled: false,
+        label: "",
+        converted: 2,
+        optional_filter: null,
+        no_default: null,
+      };
+      for (const restart of [false, true]) {
+        const prgl = new Prostgles({
+          dbConnection: dbConnection as ProstglesInitOptions["dbConnection"],
+          tableConfig: { windows: { columns } },
+          onReady: () => {},
+        });
+        instance = await prgl
+          .init(() => {}, { type: "init" })
+          .catch(async (error: unknown) => {
+            await prgl.dbForSchema?.$pool.end();
+            throw error;
+          });
+        assert.deepEqual(await db.one("SELECT * FROM windows WHERE id = 1"), defaultRow);
+        assert.deepEqual(await db.one("SELECT * FROM windows WHERE id = 2"), {
+          id: 2,
+          filter: [1],
+          existing_default: 3,
+          changed_default: 4,
+          enabled: true,
+          label: "kept",
+          converted: 5,
+          optional_filter: null,
+          no_default: null,
+        });
+        if (restart) {
+          assert.equal(prgl.tableConfigurator!.prevInitQueryHistory, undefined);
+          assert.deepEqual(await db.one("INSERT INTO windows (id) VALUES (3) RETURNING *"), {
+            ...defaultRow,
+            id: 3,
+            optional_filter: [],
+          });
+          await assert.rejects(db.none("INSERT INTO windows (id, filter) VALUES (4, NULL)"), {
+            code: "23502",
+          });
+          columns.no_default = "TEXT NOT NULL";
+          await assert.rejects(prgl.tableConfigurator!.init(), {
+            code: "23502",
+          });
+          assert.equal(
+            (await db.one("SELECT no_default FROM windows WHERE id = 1")).no_default,
+            null,
+          );
+        }
+        await instance.destroy();
+        instance = undefined;
+      }
+    } finally {
+      await instance?.destroy();
+      await db.$pool.end();
+      await parentDb.none(`DROP DATABASE ${asName(database)} WITH (FORCE)`);
+    }
+  });
+
   await test("tableConfig JSONB checks survive PubSub initialization and upgrades", async () => {
     const database = `table_config_validation_${process.pid}_${Date.now()}`;
     await parentDb.none(`CREATE DATABASE ${asName(database)}`);

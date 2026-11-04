@@ -103,11 +103,6 @@ export const getTableColumnQueries = async ({
         droppedColNames.push(c.column_name);
         return;
       }
-      if (newCol.nullable !== c.nullable) {
-        alteredColQueries.push(
-          `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
-        );
-      }
       if (newCol.udt_name !== c.udt_name) {
         alteredColQueries.push(
           `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} TYPE ${newCol.udt_name} USING ${asName(c.column_name)}::${newCol.udt_name};`,
@@ -125,6 +120,16 @@ export const getTableColumnQueries = async ({
             `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.column_default === null ? "DROP DEFAULT" : `SET DEFAULT ${newCol.column_default}`};`,
           );
         }
+      }
+      if (newCol.nullable !== c.nullable) {
+        if (!newCol.nullable && newCol.column_default) {
+          alteredColQueries.push(
+            `UPDATE ${asName(tableName)} SET ${asName(c.column_name)} = DEFAULT WHERE ${asName(c.column_name)} IS NULL;`,
+          );
+        }
+        alteredColQueries.push(
+          `${alterTableQuery} ALTER COLUMN ${asName(c.column_name)} ${newCol.nullable ? "DROP" : "SET"} NOT NULL;`,
+        );
       }
     });
   }

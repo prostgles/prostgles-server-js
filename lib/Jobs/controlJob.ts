@@ -9,6 +9,7 @@ import { getJobDefinition } from "./getJobDefinition";
 import { getJobTableHandler } from "./getJobTableHandler";
 import type { JobControlOptions, JobRecord, JobTransaction } from "./JobTypes";
 import { jobControlStatuses } from "./JobTypes";
+import { getJobPrimaryKeyNames, matchesJobTriggerCondition } from "./jobUtils";
 
 export const controlJob = async <S, Row extends AnyObject>(
   prostgles: Prostgles,
@@ -38,9 +39,7 @@ export const controlJob = async <S, Row extends AnyObject>(
     ) as Promise<AnyObject[]>;
 
   const rowTable = transaction.dbx[trigger.table]!;
-  const primaryKeys = rowTable.columns
-    .filter((column) => column.is_pkey)
-    .map((column) => column.name);
+  const primaryKeys = getJobPrimaryKeyNames(rowTable);
   if (!primaryKeys.length || !primaryKeys.every((key) => options.row[key] !== undefined)) {
     throw new Error("Job row primary key is unavailable");
   }
@@ -104,11 +103,7 @@ export const controlJob = async <S, Row extends AnyObject>(
         await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(job!.id);
         return { jobId: job!.id };
       }
-      if (
-        !job &&
-        trigger.when &&
-        !(await rowTable.findOne({ $and: [targetRowPkey, trigger.when] }))
-      ) {
+      if (!job && !(await matchesJobTriggerCondition(rowTable, targetRowPkey, trigger.when))) {
         throw new Error("Job row does not satisfy its trigger condition");
       }
       const { jobId, targetRow } = await enqueueJob(prostgles, transaction, name, targetRowPkey, {

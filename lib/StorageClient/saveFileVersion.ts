@@ -66,18 +66,21 @@ export const backfillFileVersions = async (dbo: TableHandlers, config: FileTable
   const files = getFileTableHandler(dbo, config);
   const fileRows = await files.find({}, { limit: null });
   if (!fileRows.length) return;
-  console.log(`Backfilling file versions for ${fileRows.length} files`);
   const fileRevisionsTableHandler = getFileRevisionsTableHandler(dbo, config);
   const fileRevisionColumns = (fileRevisionsTableHandler as TableHandler).column_names;
-  await fileRevisionsTableHandler.insertMany(
+  const backfilledFileVersions = await fileRevisionsTableHandler.insertMany(
     fileRows.map((fileRow) => getFileVersionRow(fileRow, fileRevisionColumns)),
     {
+      returning: ["id"],
       onConflict: {
         action: "DoNothing",
         conflictColumns: ["file_id", "version"],
       },
     },
   );
+  if (backfilledFileVersions.length) {
+    console.log(`Backfilled ${backfilledFileVersions.length} file versions`);
+  }
 };
 
 /** Must ensure we copy over any columns that might have been created by the user */
