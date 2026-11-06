@@ -96,7 +96,13 @@ export const getFileTableConfig = (
     }
   }
 
+  const configuredTableNames = getKeys(tableConfig ?? {});
+  const precedingTableNames = configuredTableNames.slice(
+    0,
+    Math.max(0, configuredTableNames.indexOf(fileTableName)),
+  );
   const mergedTableConfig: TableConfig = {
+    ...pickKeys(tableConfig ?? {}, precedingTableNames),
     [fileTableName]: {
       ...userFileTableConfig,
       columns: {
@@ -133,7 +139,7 @@ export const getFileTableConfig = (
         },
       },
     }),
-    ...omitKeys(tableConfig ?? {}, [fileTableName]),
+    ...omitKeys(tableConfig ?? {}, [...precedingTableNames, fileTableName]),
   };
 
   const userFileTableHooks = tableHooks?.[fileTableName];

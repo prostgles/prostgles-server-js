@@ -68,7 +68,7 @@ export const testFileJobs = async (db: DB) => {
     }
   });
 
-  await test("file jobs start after upload and commit, pin revisions and skip metadata changes", async () => {
+  await test("file jobs preserve inline references, start after upload and commit, pin revisions and skip metadata changes", async () => {
     const database = `file_jobs_${randomUUID().replaceAll("-", "")}`;
     const files = "files";
     const objects = new Map<string, Buffer>();
@@ -90,7 +90,20 @@ export const testFileJobs = async (db: DB) => {
         transactions: true,
         onReady: () => {},
         tableConfig: {
-          [files]: { columns: { notes: "TEXT", job_id: "UUID REFERENCES prostgles_jobs(id)" } },
+          file_owners: { columns: { id: "TEXT PRIMARY KEY" } },
+          [files]: {
+            columns: {
+              notes: "TEXT",
+              job_id: "UUID REFERENCES prostgles_jobs(id)",
+              owner_id: "TEXT NOT NULL DEFAULT 'owner' REFERENCES file_owners(id)",
+            },
+          },
+          file_references: {
+            columns: {
+              file_id: "UUID REFERENCES files(id)",
+              version_id: "UUID REFERENCES files_versions(id)",
+            },
+          },
         },
         fileTable: {
           tableName: files,
@@ -152,6 +165,7 @@ export const testFileJobs = async (db: DB) => {
           },
         },
       });
+      await instance._db.none("INSERT INTO file_owners (id) VALUES ($1)", ["owner"]);
       const fileTable = instance.db[files];
       const waitForJobs = async (count: number) => {
         const deadline = Date.now() + 10_000;
@@ -175,6 +189,12 @@ export const testFileJobs = async (db: DB) => {
       finishUpload();
       const file = await inserting;
       assert(file.job_id);
+      for (const tableName of [files, `${files}_versions`]) {
+        await assert.rejects(
+          instance._db.none("UPDATE $1:name SET owner_id = $2", [tableName, "missing"]),
+          { code: "23503" },
+        );
+      }
       assert.equal((await instance.jobs.get(file.job_id))?.job_name, "link");
       const rerun = await instance.jobs.rerun(file.job_id);
       assert.equal((await fileTable.findOne({ id: file.id }))!.job_id, rerun.jobId);
