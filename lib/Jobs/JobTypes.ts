@@ -185,7 +185,8 @@ type JobDefinitionOptions<
   onConflict?: "queue" | "replace" | "skip";
   /** Maximum parallel runs across workers. Defaults to 1. Same-key runs are serialized. */
   concurrency?: number;
-  run: (ctx: JobContext<S, T, P, Context>) => Promise<void>;
+  /** JSON return values are saved to output when the job succeeds. */
+  run: (ctx: JobContext<S, T, P, Context>) => Promise<JobValue | void>;
 };
 type JobTableName<S> = S extends DBSchema ? keyof S & string : string;
 type JobRow<S, T extends string> =

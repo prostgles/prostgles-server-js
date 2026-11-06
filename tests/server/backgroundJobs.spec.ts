@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import pgPromise from "pg-promise";
-import { ROW_ACTIONS_COLUMN, type AnyObject } from "prostgles-types";
+import { isObject, ROW_ACTIONS_COLUMN, type AnyObject, type JobValue } from "prostgles-types";
 import prostgles, {
   createJobDefiner,
   createJobControlFunctionDefiner,
@@ -44,6 +44,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     let rejectHook = false;
     let rejectSchedule = false;
     let jobFailure: unknown;
+    let jobOutput: unknown;
     let rowSelectCount = 0;
     let rowMutationCount = 0;
     const controlCallbacks: ExecutionContext[] = [];
@@ -114,6 +115,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           }
           if (row.mode === "permanent") fail("Permanent failure");
           if (row.mode === "error") throw jobFailure;
+          if (row.mode === "retry-output" && run.attempt > 1) return { attempt: run.attempt };
+          if (["output", "retry-output", "cancel-output"].includes(row.mode ?? "")) {
+            if (row.mode === "cancel-output") await instance!.jobs.cancel(run.id);
+            return jobOutput as JobValue | undefined;
+          }
           if (row.mode === "retry") {
             if (run.attempt === 1) {
               await checkpoint.set({ done: 1 });
@@ -148,6 +154,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           }
           await progress(0, 0);
           await progress(1, 1);
+          if (row.mode === "retry") return { attempt: run.attempt, size: params.size };
         },
       }),
     };
@@ -421,6 +428,8 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const checkProgress = (job: JobRecord) => {
           job.progress_message satisfies string | null;
           job.progress_numeric satisfies { done: number; total: number } | null;
+          job.output satisfies JobValue;
+          if (job.status !== "succeeded") job.output satisfies null;
           // @ts-expect-error numeric progress requires a total
           const missingTotal: NonNullable<JobRecord["progress_numeric"]> = { done: 1 };
           // @ts-expect-error progress values must be numbers
@@ -451,6 +460,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               void row.name;
               // @ts-expect-error unknown parameter
               void params.typo;
+              return { revision: row.revision };
             },
           }),
           scheduled: defineJob({
@@ -667,6 +677,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const completed = await status(job.id, "succeeded");
           assert.equal(completed.attempts, 2);
           assert.equal(completed.error, null);
+          assert.deepEqual(completed.output, { attempt: 2, size: 10 });
           assert.deepEqual(completed.progress_numeric, { done: 1, total: 1 });
           controlHooks.length = 0;
           const rerun = await instance!.jobs.rerun(job.id, { size: 20 });
@@ -681,7 +692,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(invocation.operation, "rerun");
           assert.deepEqual(invocation.rowParts, [{ id: row.id }]);
           assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, rerun.jobId);
-          await status(rerun.jobId, "succeeded");
+          assert.deepEqual((await status(rerun.jobId, "succeeded")).output, {
+            attempt: 2,
+            size: 20,
+          });
+          assert.deepEqual((await instance!.jobs.get(job.id))!.output, completed.output);
           const run = seen.find((entry) => entry.id === rerun.jobId)!;
           assert.equal(run.reason, "rerun");
           assert.deepEqual(run.params, { size: 20 });
@@ -703,14 +718,65 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const failed = await status(permanent.job.id, "failed");
           assert.equal(failed.attempts, 1);
           assert.deepEqual(failed.error, { message: "Permanent failure" });
+          assert.equal(failed.output, null);
         },
       );
+      await t.test(
+        "job output preserves JSON values and rejects invalid or cancelled results",
+        async () => {
+          for (const output of [
+            { processing_time: 0.1, timings: {}, literal: { $to_timestamp: [123] } },
+            ["done", { count: 2 }],
+            "done",
+            "",
+            0,
+            false,
+            null,
+            undefined,
+          ]) {
+            jobOutput = output;
+            const { job } = await insert({ mode: "output" });
+            assert.deepEqual((await status(job.id, "succeeded")).output, output ?? null);
+          }
+          const circular: Record<string, unknown> = {};
+          circular.self = circular;
+          for (const output of [Infinity, 1n, new Date(), { missing: undefined }, circular]) {
+            jobOutput = output;
+            const { job } = await insert({ mode: "output" });
+            const failed = await status(job.id, "failed");
+            assert.equal(failed.output, null);
+            assert.deepEqual(failed.error, {
+              message: "Job data and checkpoints must be finite JSON values",
+            });
+          }
+          jobOutput = { cancelled: true };
+          const { job } = await insert({ mode: "cancel-output" });
+          assert.equal((await status(job.id, "cancelled")).output, null);
+        },
+      );
+      await t.test("output storage failures retry and preserve database errors", async () => {
+        jobOutput = { text: "\u0000" };
+        const { job } = await insert({ mode: "output" });
+        const failed = await status(job.id, "failed");
+        assert.equal(failed.attempts, 3);
+        assert.equal(failed.output, null);
+        assert(isObject(failed.error) && "code" in failed.error && "message" in failed.error);
+        assert.equal(failed.error.code, "22P05");
+        assert.equal(failed.error.message, "unsupported Unicode escape sequence");
+
+        const { job: retryJob } = await insert({ mode: "retry-output" });
+        const completed = await status(retryJob.id, "succeeded");
+        assert.equal(completed.attempts, 2);
+        assert.equal(completed.error, null);
+        assert.deepEqual(completed.output, { attempt: 2 });
+      });
       await t.test(
         "message and numeric progress are independent and numeric progress is typed",
         async () => {
           const { job } = await insert({ mode: "progress" });
           const completed = await status(job.id, "succeeded");
           assert.equal(completed.progress_message, "Complete");
+          assert.equal(completed.output, null);
           assert.deepEqual(completed.progress_numeric, { done: 1, total: 2 });
           for (const progress of [
             { done: 1 },

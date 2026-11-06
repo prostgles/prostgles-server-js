@@ -2,7 +2,7 @@ import type { Prostgles } from "../Prostgles";
 import { createExecutionContext } from "../ExecutionContext";
 import { getJobDefinition } from "./getJobDefinition";
 import { getJobContext } from "./getJobContext";
-import type { JobContext, JobRecord, ParamsSchema } from "./JobTypes";
+import type { JobContext, JobRecord, JobValue, ParamsSchema } from "./JobTypes";
 import { assertJobValue, jobError, PermanentJobError } from "./jobUtils";
 
 export const runJob = async (
@@ -54,6 +54,7 @@ export const runJob = async (
   };
   renew();
   let failure: { error: unknown } | undefined;
+  let output: JobValue = null;
   try {
     controller.signal.throwIfAborted();
     const { definition } = getJobDefinition(prostgles, job.job_name);
@@ -114,7 +115,7 @@ export const runJob = async (
       },
     };
     controller.signal.throwIfAborted();
-    await prostgles.runWithExecution(
+    const result = await prostgles.runWithExecution(
       {
         ...createExecutionContext(undefined),
         user: context.user,
@@ -139,6 +140,10 @@ export const runJob = async (
       () => definition.run(jobContext),
     );
     controller.signal.throwIfAborted();
+    if (result !== undefined) {
+      assertJobValue(result);
+      output = result;
+    }
   } catch (error) {
     failure = { error };
   } finally {
@@ -151,28 +156,37 @@ export const runJob = async (
     await db.none(`UPDATE ${tableSQL} SET locked_until = clock_timestamp() WHERE ${owned}`, claim);
     return;
   }
-  const retry =
-    failure && !(failure.error instanceof PermanentJobError) && job.attempts < job.max_attempts;
   const delayMs = Math.min(
     2_147_483_647,
     job.delay_ms * (job.backoff === "exponential" ? 2 ** (job.attempts - 1) : 1),
   );
-  const status =
-    !failure ? "succeeded"
-    : retry ? "pending"
-    : "failed";
-  await db.none(
-    `
+  const finishJob = async (failure: { error: unknown } | undefined, output: JobValue) => {
+    const retry =
+      failure && !(failure.error instanceof PermanentJobError) && job.attempts < job.max_attempts;
+    const status =
+      !failure ? "succeeded"
+      : retry ? "pending"
+      : "failed";
+    await db.none(
+      `
     UPDATE ${tableSQL} 
     SET 
       status = CASE WHEN cancel_requested THEN 'cancelled' ELSE \${status} END,
       error = \${error:json}, 
+      output = CASE WHEN NOT cancel_requested AND \${status} = 'succeeded' THEN \${output:json}::jsonb END,
       lease_token = NULL, 
       locked_until = NULL,
       run_at = clock_timestamp() + \${delayMs} * interval '1 millisecond',
-      finished_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN clock_timestamp() ELSE NULL END
+      finished_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN clock_timestamp() END
     WHERE ${owned}
   `,
-    { ...claim, status, error: failure ? jobError(failure.error) : null, delayMs },
-  );
+      { ...claim, status, output, error: failure ? jobError(failure.error) : null, delayMs },
+    );
+  };
+  try {
+    await finishJob(failure, output);
+  } catch (error) {
+    if (failure) throw error;
+    await finishJob({ error }, null);
+  }
 };

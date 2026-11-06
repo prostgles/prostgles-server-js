@@ -65,10 +65,10 @@ export const testJobRetention = async (parentDb: DB) => {
             \${id}, \${jobName}, \${targetTable}, '{}', '{}', \${status}, 3, 1000, 'fixed',
             CASE WHEN \${status} IN ('pending', 'running') THEN NULL
               ELSE clock_timestamp() - \${age}::interval END,
-            CASE WHEN \${status} = 'failed' THEN '{"message":"Failed"}'::jsonb ELSE NULL END,
+            CASE WHEN \${status} = 'failed' THEN '{"message":"Failed"}'::jsonb END,
             clock_timestamp() + interval '1 day',
-            CASE WHEN \${status} = 'running' THEN \${id}::uuid ELSE NULL END,
-            CASE WHEN \${status} = 'running' THEN clock_timestamp() + interval '1 day' ELSE NULL END
+            CASE WHEN \${status} = 'running' THEN \${id}::uuid END,
+            CASE WHEN \${status} = 'running' THEN clock_timestamp() + interval '1 day' END
           )`,
           { id, jobName, targetTable, status, age },
         );

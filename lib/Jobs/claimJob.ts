@@ -14,7 +14,7 @@ export const claimJob = async (prostgles: Prostgles, name: string, concurrency: 
       `UPDATE ${tableSQL} SET
       status = CASE WHEN cancel_requested THEN 'cancelled' WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
       error = jsonb_build_object('message', 'Worker interrupted'), lease_token = NULL, locked_until = NULL,
-      finished_at = CASE WHEN cancel_requested OR attempts >= max_attempts THEN clock_timestamp() ELSE NULL END
+      finished_at = CASE WHEN cancel_requested OR attempts >= max_attempts THEN clock_timestamp() END
       WHERE job_name = \${jobName} AND status = 'running' AND locked_until < clock_timestamp()`,
       { jobName: name },
     );
