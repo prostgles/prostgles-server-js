@@ -159,7 +159,14 @@ export const getAuditTableRules = async function (
         .join(" OR ") || "FALSE";
     // One scan lets ORDER BY/LIMIT use the audit index before projecting snapshots.
     const expression = getTableExpression(auditTableHandler, columnOverrides, condition);
-    return { expression, joinColumns: AUDIT_JOIN_COLUMNS };
+    return {
+      expression,
+      joinColumns: AUDIT_JOIN_COLUMNS,
+      unmaskedColumns: [
+        ...auditTableHandler.column_names.filter((column) => !columnOverrides?.[column]),
+        ...Object.values(AUDIT_JOIN_COLUMNS),
+      ],
+    };
   };
 
   const select: SelectRule = withTableExpression(

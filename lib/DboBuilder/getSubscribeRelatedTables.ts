@@ -11,6 +11,7 @@ import { getViewRelatedTables } from "./ViewRelatedTables/getViewRelatedTables";
 import type { AddTriggerParams } from "../PubSubManager/addTrigger";
 import { prepareWhere } from "./ViewHandler/prepareWhere";
 import { getAllViewRelatedTables } from "./ViewRelatedTables/getAllViewRelatedTables";
+import type { ParsedComputedJoin } from "./joins/computedJoins";
 
 type Args = {
   selectParams: Omit<SubscribeParams, "throttle">;
@@ -32,6 +33,7 @@ export async function getSubscribeRelatedTables(
   let hasComputedJoin = false as boolean;
   const rootJoinColumns = new Set<string>();
   const expandedViews = new Set<string>();
+  const computedJoinNeedsUnfilteredTrigger = new Map<ParsedComputedJoin, boolean>();
   const getRowPermissionTables = (query: NewQuery): string[] => [
     ...(query.source.rowPermissionTables ?? []),
     ...query.select.flatMap(
@@ -91,7 +93,12 @@ export async function getSubscribeRelatedTables(
       : {};
     // Views can hide changed rows; self joins also need rows outside the trigger's transition tables.
     const needsUnfilteredTrigger =
-      hasRowPermissions ||
+      (hasRowPermissions && !isEmpty(targetTableFilter)) ||
+      joinPath.some(
+        ({ computedJoin }) =>
+          computedJoin &&
+          (computedJoinNeedsUnfilteredTrigger.get(computedJoin) ?? hasRowPermissions),
+      ) ||
       this.isView ||
       joinPath.some((path) => this.dboBuilder.dboMap.get(path.table)?.isView) ||
       (joinPath.length > 0 &&
@@ -160,6 +167,22 @@ export async function getSubscribeRelatedTables(
 
   const subscribeQuery = async (query: NewQuery, parentPath: ParsedJoinPath[]) => {
     for (const join of query.joins ?? []) {
+      for (const [index, part] of join.joinPath.entries()) {
+        if (!part.computedJoin) continue;
+        const joinSources = [
+          index ? join.joinPath[index - 1]?.source : query.source,
+          index === join.joinPath.length - 1 ? join.source : part.source,
+        ];
+        computedJoinNeedsUnfilteredTrigger.set(
+          part.computedJoin,
+          !part.computedJoin.columnsUsed.every((columns, side) => {
+            const source = joinSources[side];
+            return [...columns].every((column) =>
+              source?.unmaskedColumns?.includes(source.joinColumns?.[column] ?? column),
+            );
+          }),
+        );
+      }
       const joinPath = [...parentPath, ...join.joinPath];
       const sortAliases = query.orderByItems.flatMap((item) =>
         item.nested?.joinAlias.raw === join.joinAlias.raw ? [item.nested.selectItemAlias] : [],

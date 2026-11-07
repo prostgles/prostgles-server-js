@@ -23,6 +23,8 @@ export type QuerySource = {
   alias?: PGIdentifier;
   /** Private source columns used only by registered relationships. */
   joinColumns?: Record<string, string>;
+  /** Columns whose values are unchanged by the source expression. */
+  unmaskedColumns?: string[];
   /** Tables whose changes can affect row-dependent field permissions. */
   rowPermissionTables?: string[];
   /** Refine a permission boundary only after the complete query has been validated. */
@@ -54,6 +56,7 @@ export const getQuerySource = async (
     : undefined);
 
   return {
+    unmaskedColumns: tableExpression ? undefined : viewHandler.column_names,
     ...(typeof tableExpression === "object" ? tableExpression : (
       {
         expression: tableExpression ?? viewHandler.escapedName,

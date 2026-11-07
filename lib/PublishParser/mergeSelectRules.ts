@@ -59,6 +59,19 @@ export const mergeSelectRules = (
         })),
       })),
     );
+    if (
+      grants.some(
+        (grant) =>
+          !grant.condition && table.column_names.every((column) => grant.fields.includes(column)),
+      )
+    ) {
+      return;
+    }
+    const unmaskedColumns = table.column_names.filter(
+      (column) =>
+        grants.every((grant) => grant.fields.includes(column)) ||
+        grants.some((grant) => !grant.condition && grant.fields.includes(column)),
+    );
     const columns = table.column_names.map(
       (column) =>
         `CASE WHEN ${orConditions(grants.filter((grant) => grant.fields.includes(column)))} THEN ${asName(column)} END AS ${asName(column)}`,
@@ -76,6 +89,7 @@ export const mergeSelectRules = (
     return {
       // Keep masking and the boundary even when adding proven-safe predicates inside it.
       expression: getExpression(),
+      unmaskedColumns,
       rowPermissionTables,
       getOptimizedExpression: (query) => {
         const { condition, suffix } = getSelectRulePushdown(table, query, params, (field) => ({

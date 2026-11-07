@@ -147,6 +147,69 @@ export const testJoins = async (db: DB) => {
           }
         },
       );
+      await context.test(
+        "masked document subscriptions ignore unrelated job changes",
+        { timeout: 10_000 },
+        async () => {
+          const documentHandler = documents as unknown as TableHandler;
+          const originalPublish = documentHandler.dboBuilder.prostgles.opts.publish;
+          await instance.update({
+            publish: {
+              documents: {
+                select: [
+                  { fields: "*", forcedFilter: { kind: "decision_notice" } },
+                  { fields: ["id"], forcedFilter: { kind: "other" } },
+                ],
+              },
+              jobs: { select: "*" },
+            },
+          });
+          const rules = await documentHandler.dboBuilder.publishParser!.getValidatedRequestRuleWusr(
+            {
+              tableName: "documents",
+              command: "subscribe",
+              clientReq: clientRequest,
+            },
+            undefined,
+          );
+          let pushCount = 0;
+          let onRows: () => void = () => {};
+          const firstRows = new Promise<void>((resolve) => {
+            onRows = resolve;
+          });
+          const subscription = await documentHandler.subscribe(
+            filter,
+            { select: { id: 1, job: jobSelect }, limit: 0, throttle: 0 },
+            () => {
+              pushCount++;
+              onRows();
+            },
+            rules,
+            { clientReq: clientRequest },
+          );
+          assert("unsubscribe" in subscription && typeof subscription.unsubscribe === "function");
+          const { unsubscribe } = subscription;
+          try {
+            await firstRows;
+            const initialPushCount = pushCount;
+            await instance.db.jobs!.insert!({ id: 25001, status: "pending" });
+            await instance.db.jobs!.update!({ id: 25001 }, { status: "succeeded" });
+            await instance.db.jobs!.delete!({ id: 25001 });
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            assert.equal(pushCount, initialPushCount);
+            const linkedJobUpdate = new Promise<void>((resolve) => {
+              onRows = resolve;
+            });
+            await instance.db.jobs!.update!({ id: 1234 }, { status: "running" });
+            await linkedJobUpdate;
+            assert.equal(pushCount, initialPushCount + 1);
+          } finally {
+            await unsubscribe();
+            await instance.db.jobs!.update!({ id: 1234 }, { status: "succeeded" });
+            await instance.update({ publish: originalPublish });
+          }
+        },
+      );
       const statement: unknown = await documents.find!(filter, {
         ...params,
         returnType: "statement-no-rls",
@@ -281,7 +344,7 @@ export const testJoins = async (db: DB) => {
       await db.none("DROP SCHEMA unique_join_test CASCADE");
     }
   });
-  await test("nested exists filters preserve correlations and permissions", async () => {
+  await test("nested exists filters preserve correlations and permissions", async (context) => {
     await db.none(`
       CREATE SCHEMA nested_exists_test;
       CREATE TABLE nested_exists_test.members (
@@ -397,6 +460,66 @@ export const testJoins = async (db: DB) => {
         client.clientDb.members!.find!({
           $existsJoined: { events: { $exists: { secrets: {} } } },
         }),
+      );
+      await context.test(
+        "subscriptions refresh when nested exists filters use masked fields",
+        { timeout: 10_000 },
+        async () => {
+          await instance.update({
+            publish: {
+              members: {
+                select: [
+                  { fields: ["id", "manager_id"] },
+                  { fields: ["secret"], forcedFilter: { id: 999 } },
+                ],
+              },
+              events: { select: "*" },
+            },
+          });
+          const members = instance.db.members as unknown as TableHandler;
+          const rules = await members.dboBuilder.publishParser!.getValidatedRequestRuleWusr(
+            { tableName: "members", command: "subscribe", clientReq: clientRequest },
+            undefined,
+          );
+          let observedRows: AnyObject[] | undefined;
+          let subscriptionError: unknown;
+          const subscription = await members.subscribe(
+            {
+              id: 1,
+              $existsJoined: { events: { $exists: { members: { secret: null } } } },
+            },
+            { select: ["id"], throttle: 0 },
+            (rows, error) => {
+              observedRows = rows;
+              subscriptionError = error;
+            },
+            rules,
+            { clientReq: clientRequest },
+          );
+          assert("unsubscribe" in subscription && typeof subscription.unsubscribe === "function");
+          const { unsubscribe } = subscription;
+          const waitForRows = async (expectedRows: AnyObject[]) => {
+            const deadline = Date.now() + 3000;
+            while (!isDeepStrictEqual(observedRows, expectedRows)) {
+              if (subscriptionError) throw subscriptionError;
+              if (Date.now() >= deadline) assert.deepEqual(observedRows, expectedRows);
+              await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+          };
+          try {
+            await waitForRows([]);
+            await instance.db.events!.insert!({ id: 13, member_id: 1, kind: "visible" });
+            await waitForRows([{ id: 1 }]);
+            await instance.db.events!.update!({ id: 13 }, { member_id: 2 });
+            await waitForRows([]);
+            await instance.db.events!.update!({ id: 13 }, { member_id: 1 });
+            await waitForRows([{ id: 1 }]);
+            await instance.db.events!.delete!({ id: 13 });
+            await waitForRows([]);
+          } finally {
+            await unsubscribe();
+          }
+        },
       );
     } finally {
       await instance.destroy();
@@ -679,6 +802,11 @@ export const testJoins = async (db: DB) => {
                 params.tableName satisfies string;
                 return `${left("table_name")} = ${asValue(params.tableName ?? "members")} AND ${left("owner")} ->> 'id' = ${right("id")}::text AND ${left("id")} <= ${right(params.useId ? "id" : "max_event")} + ${asValue(params.distance)}`;
               },
+            }),
+            defineComputedJoin({
+              $joinName: "masked_bound",
+              $sql: ({ left, right }) =>
+                `${left("table_name")} = 'members' AND ${left("owner")} ->> 'id' = ${right("id")}::text AND COALESCE(${right("max_event")}, 0) = 0`,
             }),
           ],
         },
@@ -1568,6 +1696,164 @@ export const testJoins = async (db: DB) => {
         await Promise.all(subscriptions.map((subscription) => subscription.unsubscribe()));
       }
 
+      await context.test(
+        "computed subscriptions filter unmasked join columns and retain masked matches",
+        { timeout: 15_000 },
+        async () => {
+          const handler = members as unknown as TableHandler;
+          const originalPublish = handler.dboBuilder.prostgles.opts.publish;
+          const initialSubscriptionCount = subscriptions.length;
+          try {
+            await instance.update({
+              publish: {
+                members: {
+                  select: [{ fields: ["id"] }, { fields: ["max_event"], forcedFilter: { id: 2 } }],
+                },
+                member_links: { select: "*" },
+                events: { select: "*" },
+              },
+            });
+            const direct = await watch(
+              members,
+              { id: 1 },
+              {
+                select: {
+                  max_event: 1,
+                  history: { $leftJoin: historyPath, select: ["id"], orderBy: "id" },
+                },
+                throttle: 0,
+              },
+              true,
+            );
+            const intermediate = await watch(
+              linkedMembers,
+              { id: 1 },
+              {
+                select: {
+                  history: {
+                    $leftJoin: [{ table: "members" }, ...historyPath],
+                    select: ["id"],
+                    orderBy: "id",
+                  },
+                },
+                throttle: 0,
+              },
+              true,
+            );
+            const masked = await watch(
+              members,
+              { id: 1 },
+              {
+                select: {
+                  history: {
+                    $leftJoin: [{ table: "events", on: "masked_bound" }],
+                    select: ["id"],
+                    orderBy: "id",
+                  },
+                },
+                throttle: 0,
+              },
+              true,
+            );
+            const waitForHistory = async (ids: number[]) => {
+              const history = ids.map((id) => ({ id }));
+              await direct([{ max_event: null, history }]);
+              await intermediate([{ history }]);
+              await masked([{ history }]);
+            };
+            await waitForHistory([1, 2, 3]);
+            const initialPushCounts = [direct.getPushCount(), intermediate.getPushCount()];
+            await instance.db.events!.insert!({ id: 20, table_name: "other", owner: { id: 1 } });
+            await instance.db.events!.update!({ id: 20 }, { label: "unrelated" });
+            await instance.db.events!.delete!({ id: 20 });
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            assert.deepEqual(
+              [direct.getPushCount(), intermediate.getPushCount()],
+              initialPushCounts,
+            );
+            await instance.db.events!.insert!({ id: 20, table_name: "members", owner: { id: 1 } });
+            await waitForHistory([1, 2, 3, 20]);
+            await instance.db.events!.update!({ id: 20 }, { owner: { id: 2 } });
+            await waitForHistory([1, 2, 3]);
+            await instance.db.events!.update!({ id: 20 }, { owner: { id: 1 } });
+            await waitForHistory([1, 2, 3, 20]);
+            await instance.db.events!.delete!({ id: 20 });
+            await waitForHistory([1, 2, 3]);
+          } finally {
+            await Promise.all(
+              subscriptions
+                .splice(initialSubscriptionCount)
+                .map((subscription) => subscription.unsubscribe()),
+            );
+            await instance.db.events!.delete!({ id: 20 });
+            await instance.update({ publish: originalPublish });
+          }
+        },
+      );
+      await context.test(
+        "unrestricted select arrays avoid unconditional permission triggers",
+        { timeout: 15_000 },
+        async () => {
+          const handler = members as unknown as TableHandler;
+          const originalPublish = handler.dboBuilder.prostgles.opts.publish;
+          const initialSubscriptionCount = subscriptions.length;
+          try {
+            await instance.update({
+              publish: {
+                members: { select: [{ fields: "*" }] },
+                events: {
+                  select: [
+                    { fields: "*" },
+                    { fields: ["id"], forcedFilter: { $exists: { members: { max_event: 999 } } } },
+                  ],
+                },
+              },
+            });
+            const rows = await watch(
+              members,
+              { id: 1 },
+              {
+                select: {
+                  max_event: 1,
+                  history: { $leftJoin: historyPath, select: ["id"], orderBy: "id" },
+                },
+                throttle: 0,
+              },
+              true,
+              { members: ["id", "max_event"], events: ["id", "owner", "table_name"] },
+            );
+            await rows([{ max_event: 3, history: [{ id: 1 }, { id: 2 }, { id: 3 }] }]);
+            const initialPushCount = rows.getPushCount();
+            await instance.db.events!.insert!({ id: 20, table_name: "members", owner: { id: 2 } });
+            await instance.db.events!.update!({ id: 20 }, { label: "unrelated" });
+            await instance.db.events!.delete!({ id: 20 });
+            await members.insert!({ id: 20, max_event: 0 });
+            await members.update!({ id: 20 }, { max_event: 5 });
+            await members.delete!({ id: 20 });
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            assert.equal(rows.getPushCount(), initialPushCount);
+            await members.update!({ id: 1 }, { max_event: 4 });
+            await rows([{ max_event: 4, history: [{ id: 1 }, { id: 2 }, { id: 3 }] }]);
+            await members.update!({ id: 1 }, { max_event: 3 });
+            await rows([{ max_event: 3, history: [{ id: 1 }, { id: 2 }, { id: 3 }] }]);
+            await instance.db.events!.insert!({ id: 20, table_name: "members", owner: { id: 1 } });
+            await rows([{ max_event: 3, history: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 20 }] }]);
+            await instance.db.events!.delete!({ id: 20 });
+            await rows([{ max_event: 3, history: [{ id: 1 }, { id: 2 }, { id: 3 }] }]);
+          } finally {
+            await Promise.all(
+              subscriptions
+                .splice(initialSubscriptionCount)
+                .map((subscription) => subscription.unsubscribe()),
+            );
+            await instance.db.events!.delete!({ id: 20 });
+            await members.delete!({ id: 20 });
+            await members.update!({ id: 1 }, { max_event: 3 });
+            await instance.update({ publish: originalPublish });
+          }
+        },
+      );
+
       // Multi-hop client joins must enforce target row filters and column permissions.
       const client = await instance.getClientDBHandlers(clientRequest, undefined);
       const clientMembers = client.clientDb.members!;
@@ -1610,6 +1896,7 @@ export const testJoins = async (db: DB) => {
       assert.deepEqual(client.clientSchema.joins.map((join) => join.on).sort(), [
         "before",
         "default",
+        "masked_bound",
         "next_member",
         "within",
       ]);
