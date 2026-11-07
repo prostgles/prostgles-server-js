@@ -153,7 +153,9 @@ export const testSocketLifecycle = async (db: DB) => {
           assert(serverSocket);
           instance.invalidateAuth(["another-session"]);
           assert(serverSocket.connected, "Unrelated sessions stay connected");
-          const revoked = new Promise<string>((resolve) => replacement.socket.once("disconnect", resolve));
+          const revoked = new Promise<string>((resolve) =>
+            replacement.socket.once("disconnect", resolve),
+          );
           instance.invalidateAuth(["lifecycle-session"]);
           assert.equal(await revoked, "transport close");
         } finally {
@@ -243,18 +245,18 @@ const testSocketSessionCaching = async (db: DB) => {
         ]);
         assert.equal(lookups, initialLookups, "Socket requests reuse cached auth");
         await callHttpMethod(url);
-      const afterFirstHttp = lookups;
-      assert(afterFirstHttp > initialLookups);
+        const afterFirstHttp = lookups;
+        assert(afterFirstHttp > initialLookups);
         await callHttpMethod(url);
-      assert(lookups > afterFirstHttp, "HTTP requests always authenticate");
+        assert(lookups > afterFirstHttp, "HTTP requests always authenticate");
 
-      const beforeSecondSocket = lookups;
+        const beforeSecondSocket = lookups;
         const secondClient = connect(url);
         clients.push(secondClient.socket);
         await secondClient.schema;
         assert.equal(
           lookups,
-        beforeSecondSocket + 1,
+          beforeSecondSocket + 1,
           "Another socket with the same SID authenticates separately",
         );
         secondClient.socket.close();
@@ -394,7 +396,7 @@ const testSocketSessionCaching = async (db: DB) => {
         clients.push(pendingClient.socket);
         void pendingClient.schema.catch(() => {});
         await invalidationPaused;
-      if (!pendingClient.socket.connected) await onceSocket(pendingClient.socket, "connect");
+        if (!pendingClient.socket.connected) await onceSocket(pendingClient.socket, "connect");
         const pendingSocket = io.sockets.sockets.get(pendingClient.socket.id!);
         assert(pendingSocket);
         const invalidatedLookup = assert.rejects(
@@ -419,37 +421,38 @@ const testSocketSessionCaching = async (db: DB) => {
           auth: { ...getAuth(), cacheSession: false },
           publishRawSQL: () => true,
         });
-        const connectClient = createRequire(
-          path.resolve("../client/package.json"),
-        )("prostgles-client").default as typeof prostglesClient;
-        const requestSocket = createClient(url, {
-          path: "/ws-api/restart",
-          transports: ["websocket"],
-          reconnection: false,
-          query: { token: "lifecycle-session" },
-        });
-        clients.push(requestSocket);
+        const connectClient = createRequire(path.resolve("../client/package.json"))(
+          "prostgles-client",
+        ).default as typeof prostglesClient;
         const requestClient = await connectClient({
-          socket: requestSocket,
-          onReady: () => {},
+          endpoint: url,
+          socketOptions: {
+            path: "/ws-api/restart",
+            transports: ["websocket"],
+            query: { token: "lifecycle-session" },
+          },
         });
-        const disconnectListeners =
-          requestSocket.listeners("disconnect").length;
+        const requestSocket = requestClient.socket;
+        requestSocket.io.reconnection(false);
+        clients.push(requestSocket);
+        const disconnectListeners = requestSocket.listeners("disconnect").length;
+        assert.deepEqual(await requestClient.db["socket_cache_test.records"]!.find!(), [{ id: 1 }]);
         assert.deepEqual(
-          await requestClient.db["socket_cache_test.records"]!.find!(),
-          [{ id: 1 }],
+          await requestClient.sql!("SELECT 1 AS value", {}, { returnType: "rows" }),
+          [{ value: 1 }],
         );
-        assert.deepEqual(await requestClient.sql!("SELECT 1 AS value", {}, { returnType: "rows" }), [
-          { value: 1 },
-        ]);
+        /* Results with more than ten binary values must not disconnect the socket. */
+        assert.deepEqual(
+          await requestClient.sql!(
+            "SELECT convert_to(value::text, 'UTF8') AS value FROM generate_series(1, 16) value",
+            {},
+            { returnType: "rows" },
+          ),
+          Array.from({ length: 16 }, (_, index) => ({ value: Buffer.from(String(index + 1)) })),
+        );
         assert.equal(await requestClient.methods!.version!(), 1);
-        await assert.rejects(() =>
-          requestClient.sql!("SELECT * FROM missing_lifecycle_table"),
-        );
-        assert.equal(
-          requestSocket.listeners("disconnect").length,
-          disconnectListeners,
-        );
+        await assert.rejects(() => requestClient.sql!("SELECT * FROM missing_lifecycle_table"));
+        assert.equal(requestSocket.listeners("disconnect").length, disconnectListeners);
 
         // Simulate a suspended tab whose heartbeat expired before its timer ran.
         requestSocket.io.engine["_pingTimeoutTime"] = Date.now() - 1;
@@ -499,18 +502,11 @@ const testSocketSessionCaching = async (db: DB) => {
           await requestsPaused;
           instance.invalidateAuth(["lifecycle-session"]);
           await Promise.all(pendingRequests);
-          assert.equal(
-            requestSocket.listeners("disconnect").length,
-            disconnectListeners,
-          );
+          assert.equal(requestSocket.listeners("disconnect").length, disconnectListeners);
           await Promise.all(
             requests.map((request) => assert.rejects(request, /Socket disconnected/)),
           );
-          assert.equal(
-            requestSocket.sendBuffer.length,
-            0,
-            "Disconnected calls are not queued",
-          );
+          assert.equal(requestSocket.sendBuffer.length, 0, "Disconnected calls are not queued");
         } finally {
           beforeGetUser = undefined;
           resumeRequests();
