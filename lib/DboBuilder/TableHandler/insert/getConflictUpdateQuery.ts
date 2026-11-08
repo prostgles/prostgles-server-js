@@ -60,9 +60,10 @@ export const getConflictUpdateQuery = async ({
     rows: [Object.assign({}, ...prepared.map(({ data }) => data))],
     allowedCols: columns,
   });
-  const assignments = getAssignments(({ escapedCol, escapedVal }) =>
+  const [assignments] = getAssignments(({ escapedCol, escapedVal }) =>
     forcedColumns.has(escapedCol) ? escapedVal : `EXCLUDED.${escapedCol}`,
-  )[0]!;
+  );
+  if (!assignments) throw new Error("Conflict update assignments are missing");
   const { where } = await prepareWhere(table, {
     select: undefined,
     filter: {},

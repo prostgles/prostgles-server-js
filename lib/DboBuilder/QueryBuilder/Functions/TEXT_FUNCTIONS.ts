@@ -246,7 +246,7 @@ export const TEXT_FUNCTIONS: FunctionSpec[] = [
         const _cols = validCols.filter(
           (c) =>
             /** Exclude numeric columns when the search tern contains a character */
-            !hasChars || postgresToTsType(c.colInfo!.udt_name) !== "number",
+            !hasChars || (c.colInfo && postgresToTsType(c.colInfo.udt_name) !== "number"),
         );
 
         /** This will break GROUP BY (non-integer constant in GROUP BY) */

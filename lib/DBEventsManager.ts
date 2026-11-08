@@ -39,7 +39,8 @@ export class DBEventsManager {
     getKeys(this.notifies)
       .filter((ch) => ch === channel)
       .map((ch) => {
-        const sub = this.notifies[ch]!;
+        const sub = this.notifies[ch];
+        if (!sub) return;
 
         sub.sockets.map((s) => {
           s.emit(sub.socketChannel, payload);
@@ -66,7 +67,7 @@ export class DBEventsManager {
   async addNotify(
     query: string,
     socket?: ClientSocketWithCachedData,
-    func?: any
+    func?: any,
   ): Promise<{
     socketChannel: string;
     socketUnsubChannel: string;
@@ -113,7 +114,8 @@ export class DBEventsManager {
     const socketChannel = CHANNELS.LISTEN_EV + notifChannel,
       socketUnsubChannel = socketChannel + "unsubscribe";
 
-    if (!this.notifies[notifChannel]) {
+    const existingNotification = this.notifies[notifChannel];
+    if (!existingNotification) {
       this.notifies[notifChannel] = {
         socketChannel,
         sockets: socket ? [socket] : [],
@@ -121,10 +123,10 @@ export class DBEventsManager {
         notifMgr: await PostgresNotifListenManager.create(this.db_pg, this.onNotif, channel),
       };
     } else {
-      if (socket && !this.notifies[notifChannel]!.sockets.find((s) => s.id === socket.id)) {
-        this.notifies[notifChannel]!.sockets.push(socket);
+      if (socket && !existingNotification.sockets.find((s) => s.id === socket.id)) {
+        existingNotification.sockets.push(socket);
       } else if (func) {
-        this.notifies[notifChannel]!.localFuncs.push(func);
+        existingNotification.localFuncs.push(func);
       }
     }
 
@@ -155,10 +157,8 @@ export class DBEventsManager {
     }
 
     if (socket) {
-      getKeys(this.notifies).forEach((channel) => {
-        this.notifies[channel]!.sockets = this.notifies[channel]!.sockets.filter(
-          (s) => s.id !== socket.id
-        );
+      Object.values(this.notifies).forEach((notification) => {
+        notification.sockets = notification.sockets.filter((s) => s.id !== socket.id);
       });
     }
   }

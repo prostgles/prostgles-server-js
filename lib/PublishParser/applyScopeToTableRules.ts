@@ -3,7 +3,7 @@ import type { TableHandler } from "../DboBuilder/TableHandler/TableHandler";
 import { type ParsedTableRule, type PermissionScope } from "./PublishParser";
 export const applyScopeToTableRules = (
   tableName: string,
-  tableHandler: Partial<TableHandler>,
+  tableHandler: TableHandler,
   tableRules: ParsedTableRule | undefined,
   scope: PermissionScope | undefined,
 ): ParsedTableRule | undefined => {
@@ -12,10 +12,7 @@ export const applyScopeToTableRules = (
   const tableScope = scope.tables?.[tableName];
   if (!tableScope) return;
 
-  const validatedTableRules = tableHandler.getValidatedRules?.(tableRules);
-  if (!validatedTableRules) {
-    throw "INTERNAL ERROR: getValidatedRules is missing for " + tableName;
-  }
+  const validatedTableRules = tableHandler.getValidatedRules(tableRules);
 
   /** Make sure the scope does not allow things outside the validatedTableRules */
   const result = fromEntries(
@@ -31,7 +28,7 @@ export const applyScopeToTableRules = (
           return [ruleName, rule] as const;
         }
         const scopeFields = "fields" in ruleScope ? ruleScope.fields : undefined;
-        const scopeFieldList = scopeFields && tableHandler.parseFieldFilter!(scopeFields);
+        const scopeFieldList = scopeFields ? tableHandler.parseFieldFilter(scopeFields) : undefined;
         const scopeForcedFilter = "forcedFilter" in ruleScope ? ruleScope.forcedFilter : undefined;
 
         if (scopeFieldList) {

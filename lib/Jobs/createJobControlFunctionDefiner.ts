@@ -21,8 +21,8 @@ export const createJobControlFunctionDefiner =
     ) => MaybePromise<void>;
   }) => {
     const { jobName, operation, description, run } = definition;
-    const trigger = jobs[jobName]!.trigger;
-    if (trigger.type !== "row" || !trigger.jobIdColumn)
+    const trigger = jobs[jobName]?.trigger;
+    if (trigger?.type !== "row" || !trigger.jobIdColumn)
       throw new Error(`Job control requires a row job with jobIdColumn: ${jobName}`);
     const functionDefinition = {
       input: { row: { type: "RowLookup" as const, table: trigger.table } },
@@ -33,8 +33,9 @@ export const createJobControlFunctionDefiner =
         context.jobs.control<S, JobRow<Definitions, Name>>(jobName, {
           row: input.row,
           operation,
-          run: run && ((row, dbx) =>
-            run({ ...context, row, dbx, jobs: context.jobs.withTransaction(dbx) })),
+          run:
+            run &&
+            ((row, dbx) => run({ ...context, row, dbx, jobs: context.jobs.withTransaction(dbx) })),
         }),
     };
     return functionDefinition as typeof functionDefinition &

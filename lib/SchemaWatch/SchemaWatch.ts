@@ -5,7 +5,7 @@ import type { OnReadyCallbackBasic } from "../initProstgles";
 import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID, log } from "../PubSubManager/PubSubManagerUtils";
 import type { ValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
 import { getValidatedWatchSchemaType } from "./getValidatedWatchSchemaType";
-const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.map((tag) => tag.split(" ")[0]!).filter(
+const COMMAND_FIRST_KEYWORDS = EVENT_TRIGGER_TAGS.flatMap((tag) => tag.split(" ", 1)).filter(
   (tag) => tag !== "SELECT",
 ); /** SELECT INTO is not easily detectable with pg-node (command = "SELECT")  */
 
@@ -103,7 +103,9 @@ export class SchemaWatch {
           while (this.pendingSchemaChange) {
             const pendingEvent = this.pendingSchemaChange;
             this.pendingSchemaChange = undefined;
-            await this.schemaRefreshStorage.run(this.schemaChangePromise!, () =>
+            const schemaChangePromise = this.schemaChangePromise;
+            if (!schemaChangePromise) throw new Error("Schema change promise is missing");
+            await this.schemaRefreshStorage.run(schemaChangePromise, () =>
               this.refreshSchema(pendingEvent),
             );
           }

@@ -8,7 +8,9 @@ export const getAuditJoins = (prostgles: Prostgles, tables: TableSchema[]): Join
   const audit = parseAuditConfig(prostgles, tables);
   if (!audit) return [];
   return Object.entries(audit.tables).map(([tableName, { idColumns }]) => {
-    const { schema, name } = tables.find((table) => table.name === tableName)!.qualifiedNameParts;
+    const table = tables.find((table) => table.name === tableName);
+    if (!table) throw new Error(`Audit source table not found: ${tableName}`);
+    const { schema, name } = table.qualifiedNameParts;
     return {
       tables: [audit.tableName, tableName],
       on: [

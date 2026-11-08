@@ -47,7 +47,8 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
     });
   }
 
-  if (!dboBuilder.tablesOrViews) {
+  const tablesOrViews = dboBuilder.tablesOrViews;
+  if (!tablesOrViews) {
     throw new Error("Could not create join config. this.tablesOrViews missing");
   }
 
@@ -56,7 +57,7 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
   // The initial DBO is needed by tableConfig before its tables/columns exist.
   // Defer only joins that cannot be resolved yet; the final rebuild validates all.
   if (Array.isArray(joinConfig) && dboBuilder.prostgles.preparingTableConfig) {
-    const tables = dboBuilder.tablesOrViews;
+    const tables = tablesOrViews;
     joinConfig = joinConfig.filter((join) =>
       join.tables.every((name, index) => {
         const table = tables.find((candidate) => candidate.name === name);
@@ -72,7 +73,7 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
     );
   }
 
-  const inferredJoins = getInferredJoins(dboBuilder.tablesOrViews);
+  const inferredJoins = getInferredJoins(tablesOrViews);
   if (joinConfig === "inferred") {
     joinConfig = inferredJoins;
   } else if (Array.isArray(joinConfig)) {
@@ -98,7 +99,7 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
 
   // Validate joins
   try {
-    const tovNames = dboBuilder.tablesOrViews.map((t) => t.name);
+    const tovNames = tablesOrViews.map((t) => t.name);
 
     // 2 find incorrect tables
     const missing = joins.flatMap((j) => j.tables).find((t) => !tovNames.includes(t));
@@ -120,7 +121,7 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
           const t = <string>v[0],
             f = <string[]>v[1];
 
-          const tov = dboBuilder.tablesOrViews!.find((_t) => _t.name === t);
+          const tov = tablesOrViews.find((_t) => _t.name === t);
           if (!tov) throw "Table not found: " + t;
           const m1 = f.filter((k) => !tov.columns.map((c) => c.name).includes(k));
           if (m1.length) {
@@ -137,18 +138,14 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
 
   // Make joins graph
   const joinGraph: Graph = {};
-  joins.forEach(({ tables }) => {
-    const _t = tables.slice().sort(),
-      t1 = _t[0]!,
-      t2 = _t[1]!;
+  joins.forEach(({ tables: [firstTable, secondTable] }) => {
+    if (firstTable === secondTable) return;
 
-    if (t1 === t2) return;
+    joinGraph[firstTable] ??= {};
+    joinGraph[firstTable][secondTable] = 1;
 
-    joinGraph[t1] ??= {};
-    joinGraph[t1][t2] = 1;
-
-    joinGraph[t2] ??= {};
-    joinGraph[t2][t1] = 1;
+    joinGraph[secondTable] ??= {};
+    joinGraph[secondTable][firstTable] = 1;
   });
   const tables = Array.from(new Set(joins.flatMap((t) => t.tables)));
   const shortestJoinPaths: JoinPaths = joins

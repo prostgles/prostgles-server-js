@@ -4,9 +4,10 @@ import { getCanExecute } from "../DboBuilder/dboBuilderUtils";
 import type { DboBuilder } from "../DboBuilder/DboBuilder";
 
 export const getCreatePubSubManagerError = async (
-  dboBuilder: DboBuilder
+  dboBuilder: DboBuilder,
 ): Promise<string | undefined> => {
-  const db = dboBuilder.prostgles.dbForSchema!;
+  const db = dboBuilder.prostgles.dbForSchema;
+  if (!db) throw new Error("Schema database connection is not initialized");
 
   const canExecute = await getCanExecute(db);
   if (!canExecute) return "Cannot run EXECUTE statements on this connection";
@@ -58,7 +59,7 @@ export const getCreatePubSubManagerError = async (
     if (!canCheckVersion.data?.ok) {
       console.error(
         "prostgles schema exists but cannot check version. Check logs",
-        canCheckVersion.error
+        canCheckVersion.error,
       );
       return "prostgles schema exists but cannot check version. Check logs";
     }

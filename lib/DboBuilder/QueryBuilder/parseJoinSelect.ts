@@ -1,6 +1,5 @@
 import type {
   DetailedJoinSelect,
-  JoinPath,
   JoinSelect,
   RawJoinPath,
   SimpleJoinSelect,
@@ -41,16 +40,19 @@ export const parseJoinSelect = (joinParams: JoinSelect): ParsedJoin | string => 
     if (invalidParams.length) {
       throw "Invalid join params: " + invalidParams.join(", ");
     }
-    const path = joinParams[joinKey] as string | JoinPath[];
+    const path = joinParams[joinKey] as RawJoinPath;
     if (Array.isArray(path) && !path.length) {
       throw `Cannot have an empty join path/tableName ${joinKey}`;
     }
+    const lastPath = typeof path === "string" ? path : path.at(-1);
+    const table = typeof lastPath === "string" ? lastPath : lastPath?.table;
+    if (!table) throw new Error(`Join target table is missing: ${joinKey}`);
     return {
       type: "detailed",
       params: {
         ...(joinParams as DetailedJoinSelect),
         path,
-        table: typeof path === "string" ? path : path.at(-1)!.table,
+        table,
       },
     };
   }

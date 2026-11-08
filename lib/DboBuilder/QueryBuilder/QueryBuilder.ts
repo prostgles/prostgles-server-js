@@ -82,8 +82,8 @@ export const parseFunctionObject = (funcData: unknown): { funcName: string; args
     `Function not specified correctly. Expecting { $funcName: ["columnName" | <value>, ...args] } object but got: ${JSON.stringify(funcData)} \n ${msg}`;
   if (!isObject(funcData)) throw makeErr("");
   const keys = getKeys(funcData);
-  if (keys.length !== 1) throw makeErr("");
-  const funcName = keys[0]!;
+  const [funcName] = keys;
+  if (keys.length !== 1 || funcName === undefined) throw makeErr("");
   const args = funcData[funcName] as unknown;
   if (!args || !Array.isArray(args)) {
     throw makeErr("Arguments missing or invalid");
@@ -439,7 +439,7 @@ export class SelectItemBuilder {
               (typeof userSelectValue === "string" && userSelectValue !== "*") ||
               (isObject(userSelectValue) &&
                 functionEntries.length === 1 &&
-                Array.isArray(functionEntries[0]![1]))
+                Array.isArray(functionEntries[0]?.[1]))
             ) {
               let funcName: string | undefined,
                 args: any[] | undefined,

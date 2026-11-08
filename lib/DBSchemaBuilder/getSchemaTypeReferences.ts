@@ -29,7 +29,8 @@ export const getSchemaTypeReferences = (
     addReference(type, reference);
 
     const nonNullable = checker.getNonNullableType(type);
-    const nestedReference = references.get(nonNullable)!;
+    const nestedReference = references.get(nonNullable);
+    if (!nestedReference) return;
     if (checker.isArrayType(nonNullable) || checker.isTupleType(nonNullable)) {
       const elementType = nonNullable.getNumberIndexType();
       if (elementType) addNestedReferences(elementType, `${nestedReference}[number]`);

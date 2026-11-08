@@ -7,14 +7,14 @@ import { JSON_AGG_FIELD_NAME, type GetJoinQueryResult } from "./getJoinQuery";
 
 export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): GetJoinQueryResult => {
   const alias = child.tableAlias ?? child.table;
-  const nestedSorts = parent.orderByItems.filter(
-    (item) => item.nested?.joinAlias.raw === child.joinAlias.raw,
+  const nestedSorts = parent.orderByItems.flatMap((item) =>
+    item.nested?.joinAlias.raw === child.joinAlias.raw ? [item.nested] : [],
   );
   const fields = child.select.filter(
     (field) =>
       field.selected ||
       child.orderByItems.some((item) => item.key === field.alias) ||
-      nestedSorts.some((item) => item.nested?.selectItemAlias === field.alias),
+      nestedSorts.some((item) => item.selectItemAlias === field.alias),
   );
   const selectedFields = fields.filter((field) => field.selected);
   const sortColumns = child.orderByItems
@@ -22,27 +22,31 @@ export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): Get
     .filter((column) => !fields.some((field) => field.alias === column));
   const pathTables = child.joinPath.map((path, index, paths) => {
     const isLast = index === paths.length - 1;
+    const source = isLast ? child.source : path.source;
+    if (!source) throw new Error(`Join source is missing for ${path.table}`);
     return {
       ...path,
       alias: isLast ? alias : getTableJoinAlias(path.table, index),
-      source: isLast ? child.source : path.source!,
+      source,
     };
   });
-  const conditions = pathTables.map((path, index) =>
-    getJoinOnCondition({
+  const conditions = pathTables.map((path, index) => {
+    const previousPath = pathTables[index - 1];
+    if (index && !previousPath) throw new Error("Previous join path is missing");
+    return getJoinOnCondition({
       ...path,
       leftAlias:
-        index ?
-          pathTables[index - 1]!.alias.escaped
+        previousPath ?
+          previousPath.alias.escaped
         : (parent.tableAlias?.escaped ?? parent.table.escaped),
       rightAlias: path.alias.escaped,
       getLeftColName: (column) =>
         asName(
-          (index ? pathTables[index - 1]!.source : parent.source).joinColumns?.[column] ?? column,
+          (previousPath ? previousPath.source : parent.source).joinColumns?.[column] ?? column,
         ),
       getRightColName: (column) => asName(path.source.joinColumns?.[column] ?? column),
-    }),
-  );
+    });
+  });
   const hasAggregates = fields.some((field) => field.type === "aggregation");
   const groupBy =
     hasAggregates ?
@@ -84,7 +88,7 @@ export const getComputedJoinQuery = (parent: NewQuery, child: NewQueryJoin): Get
   const projection = selectedFields.map((field) => asNameAlias(field.alias, alias.raw)).join(", ");
   const aggregate = `json_agg((SELECT row_to_json(projected.*) FROM (SELECT ${projection}) projected) ${orderBy}) AS ${JSON_AGG_FIELD_NAME}`;
   const query = [
-    `SELECT ${[aggregate, ...nestedSorts.map((item) => item.nested!.wrapperQuerySortItem)].join(", ")}`,
+    `SELECT ${[aggregate, ...nestedSorts.map((item) => item.wrapperQuerySortItem)].join(", ")}`,
     `FROM (${rows}) ${alias.escaped}`,
     child.isLeftJoin ? "" : "HAVING count(*) > 0",
   ]

@@ -55,7 +55,7 @@ export const getPublishedObjectFromResult = (
           ...(table.is_view ? pickKeys(allTableRules, ["select"]) : allTableRules),
         };
         // Apply restrictions before wildcard rules become explicit table rules.
-        const restrictions = tableHandlers[table.name]?.config?.publish;
+        const restrictions = tableHandlers[table.name]?.config?.publishRestrictions;
         for (const [command] of getObjectEntries(rules)) {
           if (restrictions?.[command] === false) delete rules[command];
         }

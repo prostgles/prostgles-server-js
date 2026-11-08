@@ -6,6 +6,7 @@ import type { PublishParser, TableRequest } from "./PublishParser";
 import type { ParsedPublishTable } from "./publishTypesAndUtils";
 import { TABLE_RULE_NO_LIMITS } from "./publishTypesAndUtils";
 import { mergeSelectRules } from "./mergeSelectRules";
+import { applyTableConfigPublishRestrictions } from "./applyTableConfigPublishRestrictions";
 
 export async function getParsedPublishTable(
   this: PublishParser,
@@ -52,12 +53,12 @@ export async function getParsedPublishTable(
     };
   }
 
-  const restrictions = tableHandler.config?.publish;
+  const restrictions = tableHandler.config?.publishRestrictions;
   if (!isInferred && isObject(rawTableRule)) {
     for (const [command, allowed] of getObjectEntries(restrictions ?? {})) {
       if (allowed === false && rawTableRule[command]) {
         throw new Error(
-          `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publish`,
+          `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publishRestrictions`,
         );
       }
     }
@@ -140,5 +141,5 @@ export async function getParsedPublishTable(
     }
   });
 
-  return parsedTableRule;
+  return applyTableConfigPublishRestrictions(tableHandler, parsedTableRule, !isInferred);
 }

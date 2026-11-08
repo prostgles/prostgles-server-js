@@ -232,10 +232,11 @@ const FTS_Funcs: FunctionSpec[] =
       /* { to_tsquery: 'search term' } */
       if (isObject(qVal)) {
         const keys = Object.keys(qVal);
-        if (!keys.length) throw "Bad arg";
-        if (keys.length !== 1 || !searchTypes.includes(keys[0] as any))
+        const [searchType] = keys;
+        if (searchType === undefined) throw "Bad arg";
+        if (keys.length !== 1 || !searchTypes.includes(searchType as any))
           throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
-        qType = keys[0]!;
+        qType = searchType;
         qVal = asValue(qVal[qType]);
 
         /* 'search term' */

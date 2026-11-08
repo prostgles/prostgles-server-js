@@ -30,7 +30,8 @@ export const getExistsFilters = (
       const isDetailed =
         dataKeys.length === 2 && dataKeys.every((key) => ["path", "filter"].includes(key));
 
-      const firstKey = dataKeys[0]!;
+      const [firstKey] = dataKeys;
+      if (firstKey === undefined) throw new Error("Exists filter cannot be empty");
 
       /**
        * Non joined exists are never detailed

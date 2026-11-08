@@ -30,10 +30,11 @@ export const getInferredJoins = (schema: TableSchema[]): Join[] => {
     tov.columns.map((col) => {
       if (col.references) {
         col.references.forEach((r) => {
-          const joinCols = r.cols.map((c, i) => ({
-            col1: c,
-            col2: r.fcols[i]!,
-          }));
+          const joinCols = r.cols.map((c, i) => {
+            const foreignColumn = r.fcols[i];
+            if (!foreignColumn) throw new Error(`Foreign key column missing for ${tov.name}.${c}`);
+            return { col1: c, col2: foreignColumn };
+          });
           upsertJoin(tov.name, r.ftable, joinCols);
         });
       }

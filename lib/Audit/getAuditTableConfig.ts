@@ -27,7 +27,7 @@ export const getAuditTableConfig = (
     [tableName]: {
       getJoins: (tables) => getAuditJoins(prgl, tables),
       allowMultiHopJoins: false,
-      publish: { insert: false, update: false, delete: false },
+      publishRestrictions: { insert: false, update: false, delete: false },
       columns: AUDIT_TABLE_COLUMN_DEFINITIONS,
       indexes: {
         [`prostgles_audit_source_${md5(tableName)}`]: { columns: "schema_name, table_name, id" },

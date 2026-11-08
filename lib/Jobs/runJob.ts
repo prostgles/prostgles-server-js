@@ -11,7 +11,8 @@ export const runJob = async (
   controller: AbortController,
   stopping: () => boolean,
 ) => {
-  const db = prostgles.db!;
+  const db = prostgles.db;
+  if (!db) throw new Error("Database is not initialized");
   const tableSQL = prostgles.jobs.tableSQL;
   const claim = { jobId: job.id, leaseToken: job.lease_token };
   const owned =

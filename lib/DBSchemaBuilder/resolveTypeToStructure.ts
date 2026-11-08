@@ -81,7 +81,8 @@ export const resolveTypeToStructure = (
     const unique = [...new Set(parts)];
     if (unique.includes("unknown")) return "unknown";
     if (unique.includes("any")) return "any";
-    return unique.length === 1 ? unique[0]! : `(${unique.join(" | ")})`;
+    const [firstPart] = unique;
+    return unique.length === 1 && firstPart ? firstPart : `(${unique.join(" | ")})`;
   }
 
   // Handle intersection types
@@ -130,15 +131,14 @@ export const resolveTypeToStructure = (
   }
 
   // Handle function types
-  const callSignatures = type.getCallSignatures();
-  if (callSignatures.length > 0) {
+  const [sig] = type.getCallSignatures();
+  if (sig) {
     console.error(
       "Function types are not supported in return types. Failing function: " + functionName,
       getParentNames().join(" -> "),
     );
-    const sig = callSignatures[0]!;
     const params = sig.getParameters().map((param) => {
-      const paramType = checker.getTypeOfSymbolAtLocation(param, param.valueDeclaration!);
+      const paramType = checker.getTypeOfSymbol(param);
       const paramTypeStr = resolveChild(paramType, true);
       const isOptional = param.flags & ts.SymbolFlags.Optional;
       return `${param.getName()}${isOptional ? "?" : ""}: ${paramTypeStr}`;

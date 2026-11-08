@@ -29,9 +29,11 @@ export async function updateBatch(
         .length || this.hooks?.beforeEach?.some(({ commands }) => commands.update);
     if (hasHooks && !isReturningQuery(params?.returnType, localParams)) {
       if (!this.getTransaction(localParams)) {
-        return this.dboBuilder.getTX((dbx) =>
-          dbx[this.name]!.updateBatch(updates, params, undefined, tableRules, localParams),
-        );
+        return this.dboBuilder.getTX((dbx) => {
+          const table = dbx[this.name];
+          if (!table) throw new Error(`Transaction table not found: ${this.name}`);
+          return table.updateBatch(updates, params, undefined, tableRules, localParams);
+        });
       }
       // Run the full update pipeline so hooks share the batch transaction.
       for (const [filter, data] of updates) {

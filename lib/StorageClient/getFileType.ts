@@ -41,7 +41,7 @@ export const getFileTypeFromFilename = (
 
   if (nameParts.length < 2) return undefined;
 
-  const nameExt = nameParts.at(-1)!.toLowerCase(),
+  const nameExt = nameParts.at(-1)?.toLowerCase() ?? "",
     mime = getKeys(CONTENT_TYPE_TO_EXT).find((k) =>
       (CONTENT_TYPE_TO_EXT[k] as readonly string[]).includes(nameExt),
     );

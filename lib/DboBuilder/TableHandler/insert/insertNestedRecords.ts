@@ -65,10 +65,9 @@ export async function insertNestedRecords(
   });
   const hasNestedInserts = insertedRowsWithNestedData.some((d) => d.hasNestedData);
 
-  const rowOrRows =
-    isMultiInsert ?
-      insertedRowsWithNestedData.map((d) => d.row)
-    : insertedRowsWithNestedData[0]!.row;
+  const [firstRow] = insertedRowsWithNestedData;
+  const rowOrRows = isMultiInsert ? insertedRowsWithNestedData.map((d) => d.row) : firstRow?.row;
+  if (!rowOrRows) throw new Error("Missing row for nested insert");
   /**
    * Make sure nested insert uses a transaction
    */

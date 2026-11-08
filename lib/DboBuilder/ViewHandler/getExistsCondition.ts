@@ -24,7 +24,8 @@ export async function getExistsCondition(
   }
 
   let targetTableRules = (targetTableFilter as FilterWithTableRules)[EXISTS_TABLE_RULES];
-  const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)!.table : eConfig.targetTable;
+  const targetTable = eConfig.isJoined ? eConfig.parsedPath.at(-1)?.table : eConfig.targetTable;
+  if (!targetTable) throw new Error("Exists filter requires a target table");
   const tableHandler = this.dboBuilder.dboMap.get(targetTable);
   if (!tableHandler) {
     throw `Table handler for ${targetTable} not found`;

@@ -133,7 +133,11 @@ export async function insert(
 
     const preparedRows = await Promise.allSettled(
       rows.map(async (input, index) => {
-        if (preparedNestedRows) return { ...preparedNestedRows[index]!, row: input };
+        if (preparedNestedRows) {
+          const preparedRow = preparedNestedRows[index];
+          if (!preparedRow) throw new Error("Prepared nested insert row is missing");
+          return { ...preparedRow, row: input };
+        }
         const { preValidate } = rule ?? {};
         const { tableConfigurator } = this.dboBuilder.prostgles;
         if (!tableConfigurator) {
@@ -172,7 +176,9 @@ export async function insert(
       if (result.status === "rejected") throw result.reason;
       return result.value;
     });
-    const preValidatedRowOrRows = isMultiInsert ? preValidatedRows : preValidatedRows[0]!;
+    const [firstPreparedRow] = preValidatedRows;
+    const preValidatedRowOrRows = isMultiInsert ? preValidatedRows : firstPreparedRow;
+    if (!preValidatedRowOrRows) throw new Error("Prepared insert row is missing");
 
     /**
      * If media it will: upload file and continue insert

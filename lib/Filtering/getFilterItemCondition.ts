@@ -181,7 +181,7 @@ export const getFilterItemCondition = ({
         includes(TextFilter_FullTextSearchFilterKeys, funcName)
       ) {
         let lq = `to_tsvector(${leftQ}::text)`;
-        if (selItem.columnPGDataType === "tsvector") lq = leftQ!;
+        if (selItem.columnPGDataType === "tsvector") lq = leftQ;
 
         const res = `${lq} ${operand} ` + `${funcName}${parseRightVal(funcArgs, "csv")}`;
 

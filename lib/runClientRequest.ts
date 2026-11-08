@@ -285,7 +285,8 @@ export const runClientMethod = async function (
   }
 
   if (inputSchema) {
-    const publishParams = await this.publishParser!.getPublishParams(clientReq, undefined);
+    if (!this.publishParser) throw new Error("Publish parser is not initialized");
+    const publishParams = await this.publishParser.getPublishParams(clientReq, undefined);
     const { clientDb } = await this.getClientDBHandlers(clientReq, undefined);
     const expectedArgsError = await getJSONBSchemaValidationErrorAsync(
       { type: replaceContextPlaceholders(inputSchema, publishParams, "runtime") },

@@ -341,7 +341,9 @@ export const getSyncUtilFunctions = ({
         if (c_fr && s_fr) {
           result = Math.min(c_fr[synced_field], s_fr[synced_field]);
         } else {
-          result = (c_fr ?? s_fr)![synced_field];
+          const firstRow = c_fr ?? s_fr;
+          if (!firstRow) throw new Error("First sync row is missing");
+          result = firstRow[synced_field];
         }
 
         /* Sync from last matching synced value */
@@ -349,7 +351,7 @@ export const getSyncUtilFunctions = ({
         if (s_lr && c_lr) {
           result = Math.min(...getNumbers([c_lr[synced_field], s_lr[synced_field]]));
         } else {
-          result = Math.min(...getNumbers([c_fr![synced_field], s_fr?.[synced_field]]));
+          result = Math.min(...getNumbers([c_fr?.[synced_field], s_fr?.[synced_field]]));
         }
 
         const min_count = Math.min(...getNumbers([c_count, s_count]));

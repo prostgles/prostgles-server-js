@@ -40,7 +40,8 @@ export const getAuditTableRules = async function (
     ([tableName]) => canSelect(resolvedPublishObject?.[tableName]) || this.dbo[tableName]?.is_media,
   );
 
-  const auditTableHandler = this.dbo[audit.tableName]!;
+  const auditTableHandler = this.dbo[audit.tableName];
+  if (!auditTableHandler) throw new Error(`Audit table not found: ${audit.tableName}`);
 
   const auditedTableRules = (
     await Promise.all(
@@ -76,11 +77,13 @@ export const getAuditTableRules = async function (
             ),
           })),
         );
+        const [firstSelectRule] = selectRules;
+        if (!firstSelectRule) return;
         const tableColumnOverrides =
           selectRules.length === 1 ?
-            selectRules[0]!.overrides
+            firstSelectRule.overrides
           : fromEntries(
-              getKeys(selectRules[0]!.overrides).map((column) => [
+              getKeys(firstSelectRule.overrides).map((column) => [
                 column,
                 selectRules
                   .map(

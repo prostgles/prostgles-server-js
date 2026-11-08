@@ -76,7 +76,8 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   const targetTableAliasRaw = q2.tableAlias?.raw || q2.table.raw;
   const targetTableAlias = asName(targetTableAliasRaw);
 
-  const firstJoinTablePath = paths[0]!;
+  const [firstJoinTablePath] = paths;
+  if (!firstJoinTablePath) throw new Error("Join path is empty");
   const firstJoinTableJoinFields = firstJoinTablePath.on.flatMap((condObj) =>
     Object.entries(condObj).map(([_source, target]) => target),
   );
@@ -104,8 +105,8 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
   const selectedFields = rootSelectItems
     .filter((s) => s.selected)
     .map((s) => asNameAlias(s.alias, targetTableAliasRaw));
-  const rootNestedSort = q1.orderByItems.filter(
-    (d) => d.nested?.joinAlias.raw === q2.joinAlias.raw,
+  const rootNestedSort = q1.orderByItems.flatMap((item) =>
+    item.nested?.joinAlias.raw === q2.joinAlias.raw ? [item.nested] : [],
   );
   const jsonAgg = `json_agg((SELECT x FROM (SELECT ${selectedFields.join(", ")}) as x )${jsonAggSort}) ${jsonAggLimit} as ${JSON_AGG_FIELD_NAME}`;
 
@@ -161,7 +162,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     const wrappingQuery = [
       `SELECT `,
       ...indentLines(
-        [rootTableIdField, jsonAgg, ...rootNestedSort.map((d) => d.nested!.wrapperQuerySortItem)],
+        [rootTableIdField, jsonAgg, ...rootNestedSort.map((sort) => sort.wrapperQuerySortItem)],
         { appendCommas: true },
       ),
       `FROM (`,
@@ -190,7 +191,7 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
       [
         ...(isOrJoin ? [rootTableIdField] : requiredJoinFields),
         jsonAgg,
-        ...rootNestedSort.map((d) => d.nested!.wrapperQuerySortItem),
+        ...rootNestedSort.map((sort) => sort.wrapperQuerySortItem),
       ],
       { appendCommas: true },
     ),
@@ -253,14 +254,14 @@ const getInnerJoinQuery = ({
 }) => {
   const innerQuery = paths.flatMap((path, i) => {
     const isLast = i === paths.length - 1;
+    const source = isLast ? q2.source : path.source;
+    if (!source) throw new Error(`Join source is missing for ${path.table}`);
+    const previousPath = paths[i - 1];
+    if (i && !previousPath) throw new Error("Previous join path is missing");
     const targetQueryExtraQueries: string[] = [];
 
     const prevTable = getJoinTable(
-      !i ?
-        q1.tableAlias ?
-          q1.tableAlias.escaped
-        : q1.table.escaped
-      : paths[i - 1]!.table,
+      previousPath ? previousPath.table : (q1.tableAlias?.escaped ?? q1.table.escaped),
       i - 1,
       undefined,
     );
@@ -296,7 +297,7 @@ const getInnerJoinQuery = ({
 
     const isFirst = !i;
     if (isFirst) {
-      const tableExpression = isLast ? q2.source.expression : path.source!.expression;
+      const tableExpression = source.expression;
       return [
         `SELECT `,
         `  /* Join fields + select */`,
@@ -310,7 +311,7 @@ const getInnerJoinQuery = ({
     }
 
     return [
-      `INNER JOIN ${isLast ? q2.source.expression : path.source!.expression} ${table.alias}`,
+      `INNER JOIN ${source.expression} ${table.alias}`,
       `ON ${getJoinOnCondition({
         on: path.on,
         leftAlias: prevTable.alias,

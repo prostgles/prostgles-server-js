@@ -283,8 +283,8 @@ export const getNewQuery = async (
 };
 
 const prepareOffsetQuery = (offset?: number) => {
-  if (Number.isInteger(offset)) {
-    return offset!;
+  if (offset !== undefined && Number.isInteger(offset)) {
+    return offset;
   }
 
   return 0;
@@ -305,10 +305,15 @@ const prepareLimitQuery = (
   let _limit = limit;
   /* If no limit then set as the lesser of (100, maxLimit) */
   if (_limit !== null && !Number.isInteger(_limit) && p.select.maxLimit !== null) {
-    _limit = [100, p.select.maxLimit].filter(Number.isInteger).sort((a, b) => a - b)[0]!;
+    _limit = Number.isInteger(p.select.maxLimit) ? Math.min(100, p.select.maxLimit) : 100;
   } else {
     /* If a limit higher than maxLimit specified throw error */
-    if (Number.isInteger(p.select.maxLimit) && _limit !== null && _limit > p.select.maxLimit!) {
+    if (
+      p.select.maxLimit !== null &&
+      Number.isInteger(p.select.maxLimit) &&
+      _limit !== null &&
+      _limit > p.select.maxLimit
+    ) {
       throw (
         `Unexpected LIMIT ${_limit}. Must be less than the published maxLimit: ` + p.select.maxLimit
       );

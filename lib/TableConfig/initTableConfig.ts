@@ -120,7 +120,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
         ...otherColumns,
       }));
       const lookupTableHandler = this.dbo[tableNameRaw];
-      const columnNames = Object.keys(rows[0]!).filter((k) => k !== "id");
+      const [firstRow] = rows;
+      if (!firstRow) throw new Error(`Lookup table values are empty: ${tableName}`);
+      const columnNames = Object.keys(firstRow).filter((k) => k !== "id");
       if (isDropped || !lookupTableHandler) {
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -141,8 +143,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
           .map((row) => {
             const allColumns = ["id", ...columnNames];
             const values = allColumns.map((key) => (row as any)[key]);
+            if (!this.prostgles.pgp) throw new Error("Database connection is not initialized");
             queries.push(
-              this.prostgles.pgp!.as.format(
+              this.prostgles.pgp.as.format(
                 `INSERT INTO ${tableName}  (${allColumns.map((t) => asName(t)).join(", ")})  ` +
                   " VALUES (${values:csv}) ON CONFLICT DO NOTHING;",
                 { values },

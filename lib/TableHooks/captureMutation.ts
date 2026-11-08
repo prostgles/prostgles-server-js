@@ -65,8 +65,8 @@ export const captureMutation = async <Row extends AnyObject>(
     } = entry;
     return { command, changedFields, rowKey, row };
   });
-  const result = results.at(-2)!;
-  if (result.length !== mutations.length) {
+  const result = results.at(-2);
+  if (!result || result.length !== mutations.length) {
     throw new Error(`Missing captured mutations for ${table.name}`);
   }
   return { result, mutations };

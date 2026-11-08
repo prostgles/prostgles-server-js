@@ -63,11 +63,13 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
       }),
     rerun: (id, params = {}, options) =>
       runInTransaction(async (transaction) => {
-        const clientReq = getClientRequest(prostgles, options?.userId);
-        const userId =
-          clientReq ?
-            (await prostgles.publishParser!.getPublishParams(clientReq, undefined)).user?.id
-          : undefined;
+        const userId = await (async () => {
+          const clientReq = getClientRequest(prostgles, options?.userId);
+          if (!clientReq) return;
+          const publishParser = prostgles.publishParser;
+          if (!publishParser) throw new Error("Publish parser is not initialized");
+          return (await publishParser.getPublishParams(clientReq, undefined)).user?.id;
+        })();
         const job = await getJobTableHandler(prostgles, transaction).findOne({ id });
         if (!job) throw new Error("Job not found");
         const enqueue = () =>
@@ -76,9 +78,13 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
             reason: "rerun",
             userId,
           });
-        const { jobId } = await (job.target_table ?
+        const targetTable = job.target_table ? transaction.dbx[job.target_table] : undefined;
+        if (job.target_table && !targetTable) {
+          throw new Error(`Job source table not found: ${job.target_table}`);
+        }
+        const { jobId } = await (targetTable ?
           runJobControl(
-            transaction.dbx[job.target_table]!,
+            targetTable,
             job.target_row_pkey,
             { jobName: job.job_name, operation: "rerun" },
             enqueue,

@@ -274,8 +274,10 @@ export class DboBuilder {
       this.checkingCanSubscribe = false;
     }
     const start = Date.now();
+    const schemaDb = this.prostgles.dbForSchema;
+    if (!schemaDb) throw new Error("Schema database connection is not initialized");
     const tablesOrViewsReq = await getTablesForSchemaPostgresSQL(
-      { db: this.prostgles.dbForSchema! },
+      { db: schemaDb },
       {
         schemaFilter: this.prostgles.opts.schemaFilter,
       },
@@ -289,10 +291,7 @@ export class DboBuilder {
     const tablesOrViews = tablesOrViewsReq.result;
     this.tablesOrViews = tablesOrViews;
 
-    this.constraints = await getConstraints(
-      this.prostgles.dbForSchema!,
-      this.prostgles.opts.schemaFilter,
-    );
+    this.constraints = await getConstraints(schemaDb, this.prostgles.opts.schemaFilter);
     this.prepareShortestJoinPaths();
 
     const { tableConfig, tableHooks } = this.prostgles.mergedTableConfig;

@@ -28,11 +28,11 @@ export const getConstraintDefinitionQueries = ({
         alterQuery: `ALTER TABLE ${asName(tableName)} ADD ${c}`,
       }));
     } else {
-      const constraintNames = Object.keys(constraints);
-      return constraintNames.map((constraintName) => {
-        const _cnstr = constraints[constraintName]!;
+      return Object.entries(constraints).map(([constraintName, constraintDefinition]) => {
         const constraintDef =
-          typeof _cnstr === "string" ? _cnstr : `${_cnstr.type} (${_cnstr.content})`;
+          typeof constraintDefinition === "string" ? constraintDefinition : (
+            `${constraintDefinition.type} (${constraintDefinition.content})`
+          );
 
         /** Drop constraints with the same name */
         // const existingConstraint = constraints.some(c => c.conname === constraintName);

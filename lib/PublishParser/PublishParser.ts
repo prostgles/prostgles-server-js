@@ -7,6 +7,7 @@ import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
 import type { DB, DBHandlerServerInternal, Prostgles } from "../Prostgles";
 import { getClientHandlers } from "../WebsocketAPI/getClientHandlers";
 import { applyScopeToTableRules } from "./applyScopeToTableRules";
+import { applyTableConfigPublishRestrictions } from "./applyTableConfigPublishRestrictions";
 import type {
   RestrictedFunctionContext,
   ServerFunctionDefinition,
@@ -379,14 +380,10 @@ export class PublishParser {
       tableRules = fileTableRules;
     }
 
-    const parsedTableRules = parsePublishTableRule(tableRules);
-    const restrictions = tableHandler.config?.publish;
-    if (parsedTableRules && restrictions) {
-      for (const [command, allowed] of getObjectEntries(restrictions)) {
-        if (allowed === false) delete parsedTableRules[command];
-      }
-      if (!Object.values(parsedTableRules).some(Boolean)) return;
-    }
+    const parsedTableRules = applyTableConfigPublishRestrictions(
+      tableHandler,
+      parsePublishTableRule(tableRules),
+    );
 
     return applyScopeToTableRules(tableName, tableHandler, parsedTableRules, scope);
   }

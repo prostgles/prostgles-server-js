@@ -72,9 +72,9 @@ export const getServerFunctionReturnTypes = (
             finalRunReturnType.symbol?.valueDeclaration &&
             ts.isFunctionLike(finalRunReturnType.symbol.valueDeclaration)
           ) {
-            finalRunReturnType = unwrapMaybePromise(
-              checker.getReturnTypeOfSignature(finalRunReturnType.getCallSignatures()[0]!),
-            );
+            const [signature] = finalRunReturnType.getCallSignatures();
+            if (!signature) break;
+            finalRunReturnType = unwrapMaybePromise(checker.getReturnTypeOfSignature(signature));
           }
 
           if (finalRunReturnType) {
@@ -123,10 +123,7 @@ export const getServerFunctionReturnTypes = (
     const runSymbol = checker.getPropertyOfType(fnDefType, "run");
     if (!runSymbol) return;
 
-    let runType = checker.getTypeOfSymbolAtLocation(
-      runSymbol,
-      runSymbol.valueDeclaration ?? runSymbol.declarations![0]!,
-    );
+    let runType = getSymbolType(runSymbol);
 
     // run is usually `undefined | ((...) => MaybePromise<T>)`
     runType = checker.getNonNullableType(runType);

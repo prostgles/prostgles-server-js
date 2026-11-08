@@ -14,6 +14,7 @@ import type { CloudStorageClient } from "prostgles-server/dist/StorageClient/Sto
 import { setupFileServeHandler } from "prostgles-server/dist/StorageClient/setupFileServeHandler";
 import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileStorageKey";
 import { deleteUnreferencedFile } from "prostgles-server/dist/StorageClient/deleteUnreferencedFile";
+import type { PublishObject } from "prostgles-server/dist/PublishParser/PublishParser";
 
 export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
   await test("Managed storage permission and transaction safety", async (t) => {
@@ -72,6 +73,101 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
     ];
     let original = await files.insert(fileData("original"), { returning: "*" });
     try {
+      const getFileRules = async (publish: PublishObject) => {
+        const rules = await files.dboBuilder.publishParser!.getTableRules({
+          tableName: files.name,
+          clientReq: undefined,
+          clientInfo: undefined,
+          scope: undefined,
+          resolvedPublishObject: publish,
+        });
+        assert(rules);
+        return rules;
+      };
+      await t.test("published and inferred file columns expose only supported writes", async () => {
+        const writableColumns = [
+          "data",
+          "original_name",
+          "original_last_modified",
+          "description",
+          "metadata",
+        ];
+        for (const publishedTableName of [files.name, "users_public_info"]) {
+          const rules = await getFileRules({ [publishedTableName]: "*" });
+          for (const column of await files.getColumns(undefined, undefined, undefined, rules)) {
+            assert.equal(column.select, true, `${column.name}.select`);
+            assert.equal(
+              column.insert,
+              column.name === "id" || writableColumns.includes(column.name),
+              `${column.name}.insert`,
+            );
+            assert.equal(
+              column.update,
+              writableColumns.includes(column.name),
+              `${column.name}.update`,
+            );
+          }
+        }
+      });
+
+      await t.test(
+        "file columns respect publish fields, forced data and dynamic rules",
+        async () => {
+          const rules = await getFileRules({
+            files: {
+              select: { fields: "*", filterFields: "*", orderByFields: "*" },
+              insert: {
+                fields: ["data", "original_name", "description", "metadata"],
+                forcedData: { description: "Forced description" },
+                returningFields: "*",
+              },
+              update: {
+                fields: { data: 0, metadata: 0 },
+                forcedData: { description: "Forced description" },
+                filterFields: "*",
+                returningFields: "*",
+                dynamicFields: [
+                  { filter: { id: original.id }, fields: ["metadata", "description"] },
+                ],
+              },
+            },
+          });
+          const staticColumns = await files.getColumns(undefined, undefined, undefined, rules);
+          for (const column of staticColumns) {
+            assert.equal(
+              column.insert,
+              ["data", "original_name", "metadata"].includes(column.name),
+              `${column.name}.insert`,
+            );
+            assert.equal(
+              column.update,
+              ["original_name", "original_last_modified"].includes(column.name),
+              `${column.name}.update`,
+            );
+          }
+          const dynamicColumns = await files.getColumns(
+            undefined,
+            { rule: "update", filter: { id: original.id } },
+            undefined,
+            rules,
+          );
+          for (const column of dynamicColumns) {
+            assert.equal(column.update, column.name === "metadata", `${column.name}.update`);
+          }
+          const selectOnlyColumns = await files.getColumns(
+            undefined,
+            undefined,
+            undefined,
+            await getFileRules({ files: { select: rules.select } }),
+          );
+          for (const column of selectOnlyColumns) {
+            assert.equal(column.select, true, `${column.name}.select`);
+            assert.equal(column.insert, false, `${column.name}.insert`);
+            assert.equal(column.update, false, `${column.name}.update`);
+          }
+        },
+      );
+
       await t.test("select arrays protect referenced files and version fields", async () => {
         const ownFile = await files.insert(
           { ...fileData("own-array"), description: "own-private" },

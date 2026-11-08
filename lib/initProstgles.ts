@@ -225,20 +225,23 @@ export const initProstgles = async function (
   this.checkDb();
 
   const db = this.db;
-  const pgp = this.pgp!;
+  const pgp = this.pgp;
+  if (!pgp) throw new Error("Database connection is not initialized");
 
   try {
     await this.cleanupContext();
 
     await this.tableConfigurator?.destroy();
     await this.initTableConfig(reason);
-    await this.tableConfigurator?.setTableOnMounts();
+    const tableConfigurator = this.tableConfigurator;
+    if (!tableConfigurator) throw new Error("Table configurator is not initialized");
+    await tableConfigurator.setTableOnMounts();
     // onMount may create additional targets; validate joins against the completed schema.
-    await this.tableConfigurator!.refresh();
+    await tableConfigurator.refresh();
     await this.jobs.validate();
     await this.createContext(reason);
     // Context setup may resolve publish rules that require mutation triggers.
-    await this.tableConfigurator!.sync();
+    await tableConfigurator.sync();
     this.initRestApi();
 
     // Preserve schema events queued during reinitialization.
@@ -266,10 +269,11 @@ export const initProstgles = async function (
     /* 5. Finish init and provide DBO object */
     try {
       if (!this.destroyed) {
+        if (!this.dbo) throw new Error("Database handlers are not initialized");
         void onReady(
           {
             sql: this.dboBuilder.sql,
-            dbo: this.dbo!,
+            dbo: this.dbo,
             db,
             tables: this.dboBuilder.tables,
             reason,

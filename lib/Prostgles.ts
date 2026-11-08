@@ -326,12 +326,14 @@ export class Prostgles {
   refreshDBO = async () => {
     this.loaded = false;
     await this.cleanupContext();
-    await this.tableConfigurator!.refresh();
+    if (!this.tableConfigurator) throw new Error("Table configurator is not initialized");
+    await this.tableConfigurator.refresh();
     await this.jobs.validate();
     await this.createContext({ type: "dbo.refresh" });
     this.loaded = true;
     this.jobs.start();
-    return this.dbo!;
+    if (!this.dbo) throw new Error("Database handlers are not initialized");
+    return this.dbo;
   };
 
   initRestApi = () => {

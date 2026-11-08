@@ -22,11 +22,8 @@ export async function refreshTriggers(this: PubSubManager) {
   const newTriggers: PubSubManagerTriggers = new Map();
 
   triggers.forEach((t) => {
-    newTriggers.set(
-      t.table_name,
-      newTriggers.get(t.table_name) ?? new Map<number, TableTriggerInfo>(),
-    );
-    const tableTriggers = newTriggers.get(t.table_name)!;
+    const tableTriggers = newTriggers.get(t.table_name) ?? new Map<number, TableTriggerInfo>();
+    newTriggers.set(t.table_name, tableTriggers);
     const table_condition_id = Number(t.table_condition_id);
     tableTriggers.set(table_condition_id, {
       condition: t.condition,

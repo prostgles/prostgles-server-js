@@ -43,8 +43,9 @@ export const setupFileServeHandler = (
       if (
         versionParam !== undefined &&
         (typeof versionParam !== "string" ||
+          version === undefined ||
           !Number.isInteger(version) ||
-          version! < 1 ||
+          version < 1 ||
           String(version) !== versionParam)
       ) {
         throw "Invalid file version";

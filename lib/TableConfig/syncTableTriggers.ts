@@ -35,12 +35,14 @@ export const syncTableTriggers = async (configurator: TableConfigurator) => {
         (table.privileges.insert &&
           table.privileges.update &&
           publishNeedsCapture(prostgles.opts.publish, table.name)));
+    const tableHandler = prostgles.dboBuilder.dboMap.get(table.name);
+    if (needsCapture && !tableHandler) throw new Error(`Table handler not found: ${table.name}`);
     return {
       tableIdent: table.escaped_identifier,
       triggers: {
         ...config[table.name]?.triggers,
         ...auditTriggers?.[table.name]?.triggers,
-        ...(needsCapture && getMutationTriggerConfig(prostgles.dboBuilder.dboMap.get(table.name)!)),
+        ...(needsCapture && tableHandler && getMutationTriggerConfig(tableHandler)),
       },
     };
   });

@@ -102,7 +102,9 @@ const getTableQueries = async (
       }),
     );
 
-    const allColumns = Object.keys(rows[0]!);
+    const [firstRow] = rows;
+    if (!firstRow) throw new Error(`Lookup table values are empty: ${tableName}`);
+    const allColumns = Object.keys(firstRow);
     const nonIdColumns = allColumns.filter((k) => k !== "id");
     const colDefs: Record<string, string> = {
       id: "TEXT PRIMARY KEY",
@@ -234,7 +236,9 @@ const getTriggerQueries = (
       const newTableName = action !== "delete" ? "NEW TABLE AS new_table" : "";
       const oldTableName = action !== "insert" ? "OLD TABLE AS old_table" : "";
       const transitionTables =
-        trigger.forEach === "row" || trigger.type !== "after" || action === "truncate" ? "" : `REFERENCING ${newTableName} ${oldTableName}`;
+        trigger.forEach === "row" || trigger.type !== "after" || action === "truncate" ?
+          ""
+        : `REFERENCING ${newTableName} ${oldTableName}`;
       queries.push(`
           CREATE TRIGGER ${triggerActionNameParsed}
           ${trigger.type} ${action} ON ${tableName}

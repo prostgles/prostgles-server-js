@@ -13,7 +13,10 @@ export const getJobContext = async (
   const params =
     request ? await prostgles.publishParser?.getPublishParams(request, undefined) : undefined;
   const base = { user: params?.user, context: prostgles.context };
-  if (definition.runAs !== "user") return { ...base, dbo: prostgles.dbo! as DBHandlerServer };
+  if (definition.runAs !== "user") {
+    if (!prostgles.dbo) throw new Error("Database handlers are not initialized");
+    return { ...base, dbo: prostgles.dbo as DBHandlerServer };
+  }
   if (!request || !params?.user) throw new Error("Job user no longer exists");
   const handlers = await getClientHandlers(prostgles, request, undefined);
   return {

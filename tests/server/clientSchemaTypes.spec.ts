@@ -16,6 +16,7 @@ import prostgles, {
   type PublishContextValue,
   type PublishedResult,
 } from "prostgles-server";
+import type { PublishTableRule } from "prostgles-server/dist/PublishParser/PublishParser";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import type { ViewHandler } from "prostgles-server/dist/DboBuilder/ViewHandler/ViewHandler";
 import type { DB } from "prostgles-server/dist/Prostgles";
@@ -1288,17 +1289,17 @@ export const testClientSchemaTypes = async (db: DB) => {
         sockets.forEach((socket) => socket.disconnect());
         io.disconnectSockets(true);
         await instance.update({ publish: originalPublish });
-        await t.test("tableConfig publish only restricts client access", async () => {
+        await t.test("tableConfig publishRestrictions only restricts client access", async () => {
           assert(instance);
           const originalTableConfig = instance.options.tableConfig;
           const tableConfig = {
             ...originalTableConfig,
             [tableName]: {
               ...originalTableConfig?.[tableName],
-              publish: { insert: false, update: false, delete: false },
+              publishRestrictions: { insert: false, update: false, delete: false },
             },
             [privateTableName]: {
-              publish: { select: false, insert: false, update: false, delete: false },
+              publishRestrictions: { select: false, insert: false, update: false, delete: false },
             },
           } satisfies NonNullable<ProstglesInitOptions["tableConfig"]>;
           const savedInsert = handlers.clientDb[tableName]!.insert!;
@@ -1387,7 +1388,7 @@ export const testClientSchemaTypes = async (db: DB) => {
                       ...tableConfig,
                       [tableName]: {
                         ...originalTableConfig?.[tableName],
-                        publish: { [command]: false },
+                        publishRestrictions: { [command]: false },
                       },
                     },
                     publish: [
@@ -1400,7 +1401,7 @@ export const testClientSchemaTypes = async (db: DB) => {
                   }),
                   (error: unknown) =>
                     String(error).endsWith(
-                      `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publish`,
+                      `publish.${tableName}.${command} is disabled by tableConfig.${tableName}.publishRestrictions`,
                     ),
                 );
               }
@@ -1410,13 +1411,16 @@ export const testClientSchemaTypes = async (db: DB) => {
               publish: () => ({ [tableName]: { insert: "*" } }),
             });
             await assert.rejects(savedInsert({ body: "forbidden" }), {
-              message: `publish.${tableName}.insert is disabled by tableConfig.${tableName}.publish`,
+              message: `publish.${tableName}.insert is disabled by tableConfig.${tableName}.publishRestrictions`,
             });
             await assert.rejects(
               instance.update({
                 tableConfig: {
                   ...tableConfig,
-                  [tableName]: { ...originalTableConfig?.[tableName], publish: { select: false } },
+                  [tableName]: {
+                    ...originalTableConfig?.[tableName],
+                    publishRestrictions: { select: false },
+                  },
                 },
                 publish: [
                   {
@@ -1433,7 +1437,7 @@ export const testClientSchemaTypes = async (db: DB) => {
               }),
               (error: unknown) =>
                 String(error).endsWith(
-                  `publish.${tableName}.select is disabled by tableConfig.${tableName}.publish`,
+                  `publish.${tableName}.select is disabled by tableConfig.${tableName}.publishRestrictions`,
                 ),
             );
             await instance.update({
@@ -1472,6 +1476,174 @@ export const testClientSchemaTypes = async (db: DB) => {
             await instance.update({ tableConfig: originalTableConfig, publish: originalPublish });
           }
         });
+        await t.test(
+          "tableConfig excluded fields restrict client writes and dynamic rules",
+          async () => {
+            assert(instance);
+            const originalTableConfig = instance.options.tableConfig;
+            const originalTableHooks = instance.options.tableHooks;
+            const tableConfig = {
+              ...originalTableConfig,
+              [tableName]: {
+                ...originalTableConfig?.[tableName],
+                publishRestrictions: {
+                  insert: { excludeFields: ["id", "created_by", "note", "internal"] },
+                  update: { excludeFields: ["internal", "created_by"] },
+                },
+              },
+              [fileTableName]: {
+                ...originalTableConfig?.[fileTableName],
+                publishRestrictions: {
+                  insert: { excludeFields: ["description"] },
+                  update: {
+                    excludeFields: ["data", "original_name", "original_last_modified", "error"],
+                  },
+                },
+              },
+            } satisfies NonNullable<ProstglesInitOptions["tableConfig"]>;
+            try {
+              for (const publish of [
+                "*",
+                ["*", { select: true, insert: true, update: true }],
+                { [tableName]: true, [fileTableName]: "*" },
+                {
+                  [tableName]: {
+                    select: "*",
+                    insert: { fields: "*", forcedData: { created_by: "forced" } },
+                    update: {
+                      fields: { note: 0 },
+                      dynamicFields: [{ filter: { body: "restricted-fields" }, fields: "*" }],
+                      forcedData: { created_by: "forced" },
+                    },
+                  },
+                  [fileTableName]: "*",
+                },
+              ] satisfies PublishedResult[]) {
+                await instance.update({
+                  tableConfig,
+                  tableHooks: {
+                    ...originalTableHooks,
+                    [tableName]: {
+                      beforeEach: [
+                        {
+                          commands: { insert: 1 },
+                          validate: ({ data }) => ({
+                            row: { ...data, internal: "hook value" },
+                          }),
+                        },
+                      ],
+                    },
+                  },
+                  publish: [{ name: "FieldRestrictedSchema", userTypes: ["admin"], publish }],
+                });
+                const restricted: Awaited<ReturnType<typeof instance.getClientDBHandlers>> =
+                  await instance.getClientDBHandlers({ userId: "user-admin" }, undefined);
+                assert.equal(restricted.clientSchema.err, undefined);
+                const table = restricted.clientDb[tableName]!;
+                const columns = await table.getColumns!();
+                assert.deepEqual(
+                  columns.filter((column) => column.insert).map((column) => column.name),
+                  ["body", "synced"],
+                );
+                assert.equal(columns.find((column) => column.name === "internal")?.update, false);
+                const row = await instance.db[tableName]!.insert!(
+                  { body: "restricted-fields", created_by: "server" },
+                  { returning: "*" },
+                );
+                try {
+                  await table.update!({ id: row.id }, { note: "allowed" });
+                  await assert.rejects(table.insert!({ body: "forbidden", note: "forbidden" }));
+                  await assert.rejects(table.update!({ id: row.id }, { internal: "forbidden" }));
+                  await instance.db[tableName]!.update!(
+                    { id: row.id },
+                    { internal: "trusted write" },
+                  );
+                  if (
+                    typeof publish === "object" &&
+                    !Array.isArray(publish) &&
+                    typeof publish[tableName] === "object"
+                  ) {
+                    const inserted = await table.insert!(
+                      { body: "hook-and-forced" },
+                      { returning: "*" },
+                    );
+                    assert.equal(inserted.internal, "hook value");
+                    assert.equal(inserted.created_by, "forced");
+                    await instance.db[tableName]!.delete!({ id: inserted.id });
+                  }
+                  const files = restricted.clientDb[fileTableName]!;
+                  const fileColumns = await files.getColumns!();
+                  assert.equal(
+                    fileColumns.find((column) => column.name === "storage_key")?.update,
+                    false,
+                  );
+                  assert.equal(
+                    fileColumns.find((column) => column.name === "description")?.insert,
+                    false,
+                  );
+                  const file = await files.insert!(
+                    {
+                      original_name: "field-caps.txt",
+                      data: Buffer.from("field caps"),
+                    },
+                    { returning: "*" },
+                  );
+                  try {
+                    await files.update!({ id: file.id }, { description: "allowed" });
+                    await assert.rejects(files.update!({ id: file.id }, { error: "forbidden" }));
+                  } finally {
+                    await instance.db[fileTableName]!.delete!({ id: file.id });
+                  }
+                } finally {
+                  await instance.db[tableName]!.delete!({ id: row.id });
+                }
+              }
+              checkGeneratedTypes(
+                (await instance.getTSSchema()).tsSchema,
+                `
+                      import type { TableHandler } from "prostgles-types";
+                      declare const table: TableHandler<FieldRestrictedSchema, "${tableName}">;
+                      table.insert({ body: "allowed" });
+                      /* @ts-expect-error tableConfig excludes note from client inserts */
+                      table.insert({ body: "forbidden", note: "forbidden" });
+                      /* @ts-expect-error tableConfig excludes internal from client updates */
+                      table.update({}, { internal: "forbidden" });
+                    `,
+              );
+              for (const rule of [
+                { insert: { fields: ["note"] } },
+                { update: { fields: { internal: 1 } } },
+                {
+                  update: {
+                    fields: "*",
+                    dynamicFields: [
+                      { filter: { body: "restricted-fields" }, fields: ["internal"] },
+                    ],
+                  },
+                },
+              ] satisfies PublishTableRule[]) {
+                await assert.rejects(
+                  instance.update({
+                    publish: [
+                      {
+                        name: "ConflictingFieldsSchema",
+                        userTypes: ["admin"],
+                        publish: { [tableName]: rule },
+                      },
+                    ],
+                  }),
+                  /excluded by tableConfig\.correspondence\.publishRestrictions\.(insert|update)\.excludeFields/,
+                );
+              }
+            } finally {
+              await instance.update({
+                tableConfig: originalTableConfig,
+                tableHooks: originalTableHooks,
+                publish: originalPublish,
+              });
+            }
+          },
+        );
         await instance.update({
           publish: [{ name: "EmptyDBSchema", userTypes: ["empty"], publish: null }],
         });

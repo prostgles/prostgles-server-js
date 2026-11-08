@@ -449,7 +449,9 @@ export class PubSubManager {
     this.deletingOrphanedTriggers ??= {
       tableNames: latestTableNames,
       timeout: setTimeout(() => {
-        const tableNames = this.deletingOrphanedTriggers!.tableNames;
+        const pendingDeletion = this.deletingOrphanedTriggers;
+        if (!pendingDeletion) return;
+        const tableNames = pendingDeletion.tableNames;
         this.deletingOrphanedTriggers = undefined;
         // Finish existing registrations before cleanup; new ones wait for this cleanup.
         this.triggerCleanup = Promise.allSettled([

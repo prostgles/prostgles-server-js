@@ -16,10 +16,7 @@ export const getGlobalBuiltinTypes = (
     if (!sourceFile) throw new Error("No source files found in program");
 
     const globals = checker
-      .getSymbolsInScope(
-        program.getSourceFiles()[0]!,
-        ts.SymbolFlags.Type | ts.SymbolFlags.Namespace,
-      )
+      .getSymbolsInScope(sourceFile, ts.SymbolFlags.Type | ts.SymbolFlags.Namespace)
       // .filter((sym) => sym.declarations?.some((d) => d.getSourceFile().hasNoDefaultLib))
       .filter((sym) =>
         sym.declarations?.some((d) => isGlobalDeclarationFile(d.getSourceFile(), program)),

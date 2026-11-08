@@ -124,7 +124,9 @@ export class QueryStreamer {
         | { reachedEnd: true; rows: any[]; info: Info }
         | { reachedEnd: false; rows: any[]; info: Omit<Info, "command"> }) => {
         if (!(info as any).fields) throw "No fields";
-        const fields = getDetailedFieldInfo(this.dboBuilder.dbTypesCache!, info.fields);
+        const dbTypesCache = this.dboBuilder.dbTypesCache;
+        if (!dbTypesCache) throw new Error("Database types are not initialized");
+        const fields = getDetailedFieldInfo(dbTypesCache, info.fields);
         const packet: SocketSQLStreamPacket = {
           type: "data",
           rows,
@@ -251,7 +253,9 @@ export class QueryStreamer {
       }
       try {
         const stopFunction = opts?.terminate ? "pg_terminate_backend" : "pg_cancel_backend";
-        const rows = await this.dboBuilder.prostgles.adminClient!.query(
+        const adminClient = this.dboBuilder.prostgles.adminClient;
+        if (!adminClient) throw new Error("Admin client is not initialized");
+        const rows = await adminClient.query(
           `SELECT ${stopFunction}(pid), pid, state, query FROM pg_stat_activity WHERE pid = $1`,
           [processID],
         );
@@ -281,12 +285,13 @@ export class QueryStreamer {
         try {
           /* Persisted connection query */
           if (runCount) {
+            if (!_data) throw new Error("Persisted query data is missing");
             const persistedClient = this.socketQueries.get(socketId)?.get(id);
             if (!persistedClient) throw "Persisted query client not found";
 
             await startStream(persistedClient.client, {
               ...query,
-              query: _data!.query,
+              query: _data.query,
             });
           } else {
             await startStream(undefined, query);

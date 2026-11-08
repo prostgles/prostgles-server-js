@@ -49,6 +49,7 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
         }
       }
       if (forcedData) {
+        const forcedRow = forcedData;
         const keys = Object.keys(forcedData);
         if (keys.length) {
           const dataCols = keys.filter((k) => this.column_names.includes(k));
@@ -68,12 +69,11 @@ export async function insertTest(this: TableHandler, { localParams, tableRules }
             const values =
                 "(" +
                 dataCols
-                  .map(
-                    (k) =>
-                      asValue(forcedData![k]) +
-                      "::" +
-                      this.columns.find((c) => c.name === k)!.udt_name,
-                  )
+                  .map((k) => {
+                    const column = this.columns.find((c) => c.name === k);
+                    if (!column) throw new Error(`Forced data column not found: ${k}`);
+                    return asValue(forcedRow[k]) + "::" + column.udt_name;
+                  })
                   .join(", ") +
                 ")",
               colNames = dataCols.map((k) => asName(k)).join(",");

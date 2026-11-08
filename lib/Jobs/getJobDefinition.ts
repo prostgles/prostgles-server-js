@@ -59,9 +59,9 @@ export const validateJobDefinitions = async (prostgles: Prostgles, tables: Table
         );
       }
       if (trigger.when) {
-        await prostgles.dboBuilder.dboMap
-          .get(table.name)!
-          .find(trigger.when, { select: "", limit: 0 });
+        const tableHandler = prostgles.dboBuilder.dboMap.get(table.name);
+        if (!tableHandler) throw new Error(`Job source table not found: ${table.name}`);
+        await tableHandler.find(trigger.when, { select: "", limit: 0 });
       }
       // Validate untyped JavaScript configurations too.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

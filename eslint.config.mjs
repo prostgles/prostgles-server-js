@@ -37,7 +37,7 @@ export default defineConfig(
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-namespace": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/ban-types": "off",
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/no-unused-expressions": "off",
@@ -77,6 +77,12 @@ export default defineConfig(
         projectService: false,
         project: ["./tests/server/tsconfig.json", "./tests/client/tsconfig.json"],
       },
+    },
+  },
+  {
+    files: ["tests/**/*.ts", "**/*.spec.ts", "**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
 );

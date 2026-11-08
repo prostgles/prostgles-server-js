@@ -108,14 +108,17 @@ export const parseJoinPath = async ({
   }
 
   for (const part of result.slice(0, -1)) {
-    const table = viewHandler.dboBuilder.dboMap.get(part.table)!;
-    const tableRules =
-      localParams?.clientReq ?
-        await viewHandler.dboBuilder.publishParser!.getValidatedRequestRuleWusr(
-          { tableName: part.table, command: "find", clientReq: localParams.clientReq },
-          localParams.scope,
-        )
-      : undefined;
+    const table = viewHandler.dboBuilder.dboMap.get(part.table);
+    if (!table) throw new Error(`Join table not found: ${part.table}`);
+    const tableRules = await (async () => {
+      if (!localParams?.clientReq) return;
+      const publishParser = viewHandler.dboBuilder.publishParser;
+      if (!publishParser) throw new Error("Publish parser is not initialized");
+      return publishParser.getValidatedRequestRuleWusr(
+        { tableName: part.table, command: "find", clientReq: localParams.clientReq },
+        localParams.scope,
+      );
+    })();
     const { source, where, exists } = await prepareWhere(table, {
       filter: {},
       forcedFilter: tableRules?.select?.forcedFilter,
@@ -190,8 +193,9 @@ const getJoins = (
       path
     : undefined;
 
-  if (getShortestJoin && actualPath?.length && lastItem.on?.length) {
-    actualPath[actualPath.length - 1]!.on = lastItem.on;
+  const lastPath = actualPath?.at(-1);
+  if (getShortestJoin && lastPath && lastItem.on?.length) {
+    lastPath.on = lastItem.on;
   }
 
   if (!actualPath) {
@@ -201,8 +205,9 @@ const getJoins = (
   /* Make the join chain info */
   const paths: JoinInfo["paths"] = [];
   actualPath.forEach((tablePath, i, arr) => {
-    const prevTable = arr[i - 1]!;
-    const t1 = i === 0 ? source : prevTable.table;
+    const prevTable = arr[i - 1];
+    if (i && !prevTable) throw new Error("Previous join table is missing");
+    const t1 = prevTable ? prevTable.table : source;
 
     /* Get join options */
     const join = viewHandler.joins.find(({ tables: [left, right] }) => {

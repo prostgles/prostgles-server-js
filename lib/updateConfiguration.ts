@@ -75,7 +75,8 @@ export const updateConfiguration = async (
    */
   if (onlyUpdatesHooks || onlyUpdatesClients) {
     if (includes(optionsThatChanged, "tableHooks") || includes(optionsThatChanged, "publish")) {
-      await prgl.tableConfigurator!.sync();
+      if (!prgl.tableConfigurator) throw new Error("Table configurator is not initialized");
+      await prgl.tableConfigurator.sync();
     }
     if (onlyUpdatesClients) prgl.setupSocketIO();
     return;

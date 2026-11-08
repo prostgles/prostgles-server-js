@@ -21,9 +21,13 @@ export type ColExtraInfo = {
 export type LangToTranslation = Record<string, string>;
 
 export type BaseTableDefinition = {
-  /** Relationships generated from the completed schema on each rebuild. */
+  /**
+   * Relationships generated from the completed schema on each rebuild.
+   * */
   getJoins?: (tables: TableSchema[]) => Join[];
-  /** Set false to reject multi-hop paths containing this table, including either endpoint. Direct joins remain allowed. */
+  /**
+   * Set false to reject multi-hop paths containing this table, including either endpoint. Direct joins remain allowed.
+   * */
   allowMultiHopJoins?: boolean;
   info?: {
     label?: string | LangToTranslation;
@@ -31,10 +35,18 @@ export type BaseTableDefinition = {
   dropIfExistsCascade?: boolean;
   dropIfExists?: boolean;
   syncConfig?: SyncConfig;
-  /** Reject explicit publish conflicts and restrict wildcard/inferred permissions.
+  /**
+   * Limits client publishing without granting access. false disables an operation.
+   * Reject explicit publish conflicts and restrict wildcard/inferred permissions.
+   * Excluded fields also apply to update.dynamicFields; forcedData and table hooks remain trusted.
    * Does not affect trusted server writes.
    */
-  publish?: Partial<Record<"select" | "insert" | "update" | "delete", false>>;
+  publishRestrictions?: {
+    select?: false;
+    insert?: false | { excludeFields: string[] };
+    update?: false | { excludeFields: string[] };
+    delete?: false;
+  };
 
   triggers?: {
     [triggerName: string]: {

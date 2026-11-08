@@ -36,7 +36,8 @@ export const getPublishSchemas = async (
             scope: undefined,
           });
           if (!rules || !Object.values(rules).some(Boolean)) continue;
-          const table = publishParser.dbo[tableName]!;
+          const table = publishParser.dbo[tableName];
+          if (!table) throw new Error(`Published table not found: ${tableName}`);
           tableSchema.push({
             ...getRawInfo.call(table, undefined, rules),
             name: tableName,

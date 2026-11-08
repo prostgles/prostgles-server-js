@@ -7,7 +7,8 @@ export const pruneJobs = async (prostgles: Prostgles, policies: JobRetentionPoli
   const tableSQL = prostgles.jobs.tableSQL;
   for (const policy of policies) {
     try {
-      await prostgles.db!.tx(async (transaction) => {
+      if (!prostgles.db) throw new Error("Database is not initialized");
+      await prostgles.db.tx(async (transaction) => {
         /* Skip cleanup while a scheduler may still enqueue an occurrence selected before this minute. */
         const { locked } = await transaction.one<{ locked: boolean }>(
           "SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS locked",

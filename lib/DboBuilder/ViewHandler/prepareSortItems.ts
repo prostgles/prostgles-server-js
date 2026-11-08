@@ -38,7 +38,11 @@ export const prepareSortItems = (
       /* [string] */
       orderBy = _orderBy.map((key) => ({ key, asc: true }));
     } else if (_orderBy.find((v) => isObject(v) && !isEmpty(v))) {
-      orderBy = _orderBy.map((v) => parseOrderObj(v, true)[0]!);
+      orderBy = _orderBy.map((v) => {
+        const [sortItem] = parseOrderObj(v, true);
+        if (!sortItem) return throwErr(v);
+        return sortItem;
+      });
     } else return throwErr(rawOrderBy);
   } else return throwErr(rawOrderBy);
 

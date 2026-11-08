@@ -14,8 +14,8 @@ export const parseCronSchedule = ({ cron, timezone = "UTC" }: ScheduleTrigger) =
     [1, 12],
     [0, 7],
   ] as const;
-  const allowed = fields.map((field, index) =>
-    parseField(field, ranges[index]![0], ranges[index]![1], index),
+  const allowed = ranges.map(([min, max], index) =>
+    parseField(fields[index] ?? "", min, max, index),
   );
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
@@ -31,19 +31,19 @@ export const parseCronSchedule = ({ cron, timezone = "UTC" }: ScheduleTrigger) =
     const parts = Object.fromEntries(
       formatter.formatToParts(date).map(({ type, value }) => [type, value]),
     );
-    const weekday = weekdays.indexOf(parts.weekday!.toUpperCase());
+    const weekday = weekdays.indexOf(parts.weekday?.toUpperCase() ?? "");
     const values = [
-      +parts.second!,
-      +parts.minute!,
-      +parts.hour!,
-      +parts.day!,
-      +parts.month!,
+      Number(parts.second),
+      Number(parts.minute),
+      Number(parts.hour),
+      Number(parts.day),
+      Number(parts.month),
       weekday,
     ];
-    const matches = values.map((value, index) => allowed[index]!.has(value));
+    const matches = values.map((value, index) => allowed[index]?.has(value));
     // Traditional cron uses OR when both day-of-month and day-of-week are restricted.
     const dayMatches =
-      fields[3]!.startsWith("*") || fields[5]!.startsWith("*") ?
+      fields[3]?.startsWith("*") || fields[5]?.startsWith("*") ?
         matches[3] && matches[5]
       : matches[3] || matches[5];
     if ((!hasSeconds || matches[0]) && matches[1] && matches[2] && dayMatches && matches[4]) {
@@ -80,10 +80,11 @@ const parseField = (field: string, min: number, max: number, index: number) => {
       throw new Error(`Invalid cron step: ${part}`);
     const bounds = range.split("-");
     if (bounds.length > 2) throw new Error(`Invalid cron range: ${part}`);
-    const first = range === "*" ? min : numeric(bounds[0]!);
+    const [firstBound = "", lastBound] = bounds;
+    const first = range === "*" ? min : numeric(firstBound);
     const last =
       range === "*" || (stepText !== undefined && bounds.length === 1) ? max
-      : bounds.length === 2 ? numeric(bounds[1]!)
+      : lastBound !== undefined ? numeric(lastBound)
       : first;
     if (last < first) throw new Error(`Invalid cron range: ${part}`);
     for (let value = first; value <= last; value += step)

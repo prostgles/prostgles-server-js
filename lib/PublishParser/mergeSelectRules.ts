@@ -15,16 +15,17 @@ export const mergeSelectRules = (
   rules: SelectRule[],
 ): SelectRule | undefined => {
   if (!rules.length) return;
-  const parsedRules = rules.map((rule) => ({
-    ...rule,
-    ...table.getValidatedRules({
+  const parsedRules = rules.map((rule) => {
+    const { select } = table.getValidatedRules({
       select: {
         ...rule,
         filterFields: rule.filterFields ?? rule.fields,
         orderByFields: rule.orderByFields ?? rule.fields,
       },
-    }).select!,
-  }));
+    });
+    if (!select) throw new Error(`Validated select rule is missing for ${table.name}`);
+    return { ...rule, ...select };
+  });
   const unionFields = (key: "fields" | "filterFields" | "orderByFields") => [
     ...new Set(parsedRules.flatMap((rule) => rule[key])),
   ];

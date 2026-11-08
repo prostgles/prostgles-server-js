@@ -266,8 +266,8 @@ const parseCookieStr = (cookie_str: string | undefined): Record<string, string> 
     .replace(/\s/g, "")
     .split(";")
     .reduce<AnyObject>((prev, current) => {
-      const [name, value] = current.split("=");
-      prev[name!] = value;
+      const [name = "", value] = current.split("=");
+      prev[name] = value;
       return prev;
     }, {});
 };

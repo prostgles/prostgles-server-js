@@ -174,7 +174,8 @@ export async function getTablesForSchemaPostgresSQL(
       });
       return { columns };
     });
-    if (getTVColumns.error) {
+    const columnData = getTVColumns.data;
+    if (!columnData) {
       throw getTVColumns.error ?? "No columns";
     }
 
@@ -229,7 +230,7 @@ export async function getTablesForSchemaPostgresSQL(
       const tablesAndViews = (
         await t.any<Omit<TableSchema, "columns" | "parent_tables">>(query, { schemaNames })
       ).map((table) => {
-        const columns = clone(getTVColumns.data!.columns)
+        const columns = clone(columnData.columns)
           .filter((c) => c.table_oid === table.oid)
           .map((c) => omitKeys(c, ["table_oid"]));
 
@@ -244,7 +245,7 @@ export async function getTablesForSchemaPostgresSQL(
       });
       return { tablesAndViews };
     });
-    if (getTablesAndViews.error) {
+    if (!getTablesAndViews.data) {
       throw getTablesAndViews.error ?? "No tablesAndViews";
     }
 
@@ -252,7 +253,7 @@ export async function getTablesForSchemaPostgresSQL(
       const materialViews = await getMaterialViews(t, schemaFilter);
       return { materialViews };
     });
-    if (getMaterialViewsReq.error) {
+    if (!getMaterialViewsReq.data) {
       throw getMaterialViewsReq.error ?? "No materialViews";
     }
 
@@ -264,8 +265,8 @@ export async function getTablesForSchemaPostgresSQL(
       console.error(getHyperTablesReq.error);
     }
 
-    let tableSchemaList = getTablesAndViews.data!.tablesAndViews.concat(
-      getMaterialViewsReq.data!.materialViews,
+    let tableSchemaList = getTablesAndViews.data.tablesAndViews.concat(
+      getMaterialViewsReq.data.materialViews,
     );
     tableSchemaList = await Promise.all(
       tableSchemaList.map(async (table) => {
@@ -314,7 +315,7 @@ export async function getTablesForSchemaPostgresSQL(
 
           return col;
         });
-        table.isHyperTable = getHyperTablesReq.data!.hyperTables?.includes(table.name);
+        table.isHyperTable = getHyperTablesReq.data?.hyperTables?.includes(table.name);
 
         table.uniqueColumnGroups = uniqueColsReq.data
           ?.filter((r) => r.table_name === table.name && r.table_schema === table.schema)

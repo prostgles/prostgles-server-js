@@ -24,19 +24,23 @@ export const getTableJoinQuery = ({
   aliasPrefix,
 }: getTableJoinsArgs): { targetAlias: string; query: string } => {
   const [firstPath] = path;
-  if (!firstPath) {
+  const lastPath = path.at(-1);
+  if (!firstPath || !lastPath) {
     throw `Cannot create join query for empty path`;
   }
   const getTableAlias = (table: string, pathIndex: number) =>
     getTableJoinAlias(table, pathIndex, aliasPrefix).escaped;
-  const firstJoinColumns = path.length === 1 ? targetJoinColumns : firstPath.source!.joinColumns;
+  const firstJoinColumns = path.length === 1 ? targetJoinColumns : firstPath.source?.joinColumns;
 
   const query = path
     .map(({ table, on, computedJoin, source }, i) => {
       const tableAlias = getTableAlias(table, i);
-      const prevTableAlias = i === 0 ? rootTableAlias : getTableAlias(path[i - 1]!.table, i - 1);
-      const leftJoinColumns = i ? path[i - 1]!.source!.joinColumns : rootJoinColumns;
-      const rightJoinColumns = i === path.length - 1 ? targetJoinColumns : source!.joinColumns;
+      const previousPath = path[i - 1];
+      if (i && !previousPath) throw new Error("Previous join path is missing");
+      const prevTableAlias =
+        previousPath ? getTableAlias(previousPath.table, i - 1) : rootTableAlias;
+      const leftJoinColumns = previousPath ? previousPath.source?.joinColumns : rootJoinColumns;
+      const rightJoinColumns = i === path.length - 1 ? targetJoinColumns : source?.joinColumns;
 
       const onCondition = getJoinOnCondition({
         on,
@@ -77,7 +81,8 @@ export const getTableJoinQuery = ({
             .join(") AND (")})`
         : "";
 
-      const tableSelect = isLast ? finalTableExpression : source!.expression;
+      const tableSelect = isLast ? finalTableExpression : source?.expression;
+      if (!tableSelect) throw new Error(`Join source is missing for ${table}`);
       if (isExists && isFirst) {
         return [`SELECT 1`, `FROM ${tableSelect} ${tableAlias}`, whereJoinCondition]
           .filter((v) => v)
@@ -92,7 +97,7 @@ export const getTableJoinQuery = ({
 
   return {
     query,
-    targetAlias: getTableAlias(path.at(-1)!.table, path.length - 1),
+    targetAlias: getTableAlias(lastPath.table, path.length - 1),
   };
 };
 

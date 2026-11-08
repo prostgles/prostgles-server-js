@@ -811,7 +811,10 @@ export async function testAudit(parentDb: DB) {
         await result.update({
           tableConfig: {
             ...originalTableConfig,
-            [fileTable]: { ...originalTableConfig[fileTable], publish: { select: false } },
+            [fileTable]: {
+              ...originalTableConfig[fileTable],
+              publishRestrictions: { select: false },
+            },
           },
         });
         const restrictedFileClient = await result.getClientDBHandlers(clientRequest, undefined);

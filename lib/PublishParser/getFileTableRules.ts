@@ -124,10 +124,12 @@ export async function getFileTableRules(
   };
   if (forcedSelectFilters.length || fileTablePublishRules?.select) {
     const select = fileTablePublishRules?.select;
+    const fileTable = this.dbo[fileTableName];
+    if (!fileTable) throw new Error(`File table not found: ${fileTableName}`);
     fileTableRule.select =
       hasSelectRules(select) ?
-        mergeSelectRules(this.dbo[fileTableName]!, [
-          ...getSelectRules(select, this.dbo[fileTableName]!),
+        mergeSelectRules(fileTable, [
+          ...getSelectRules(select, fileTable),
           ...(forcedSelectFilters.length ?
             [
               {

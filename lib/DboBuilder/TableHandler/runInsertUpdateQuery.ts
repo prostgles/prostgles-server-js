@@ -233,15 +233,21 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       .filter((column) => column.is_pkey)
       .map((column) => column.name);
     for (const [index, row] of tableRows.entries()) {
-      const previousRow = rowsBeforeHooks[index]!;
+      const previousRow = rowsBeforeHooks[index];
+      if (!previousRow) throw new Error("Row before hooks is missing");
       if (!Object.keys(previousRow).some((column) => row[column] !== previousRow[column])) continue;
-      const returningRow = returningRows[index]!;
+      const returningRow = returningRows[index];
+      if (!returningRow) throw new Error("Returning row is missing");
       for (const item of returningSelectItems) {
-        if (item.type === "column") returningRow[item.alias] = row[item.columnName!];
+        if (item.type === "column") {
+          if (!item.columnName) throw new Error("Returning column name is missing");
+          returningRow[item.alias] = row[item.columnName];
+        }
       }
       if (!returningExpressions.length || !primaryKeyNames.length) continue;
       const where = primaryKeyNames.map((key, i) => `${asName(key)} = $${i + 1}`).join(" AND ");
-      const expressionValues = await tx!.one<AnyObject>(
+      if (!tx) throw new Error("Returning expressions after hooks require a transaction");
+      const expressionValues = await tx.one<AnyObject>(
         `SELECT ${getSelectItemQuery(returningExpressions)} 
         FROM ${tableHandler.escapedName} WHERE ${where}`,
         primaryKeyNames.map((column) => row[column]),

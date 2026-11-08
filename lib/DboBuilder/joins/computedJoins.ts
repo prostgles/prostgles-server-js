@@ -133,8 +133,8 @@ export const getComputedJoinSQL = (
   const aliases = reversed ? [targetAlias, sourceAlias] : [sourceAlias, targetAlias];
   const columnNames =
     reversed ?
-      [getTargetColumnName, getSourceColumnName]
-    : [getSourceColumnName, getTargetColumnName];
+      ([getTargetColumnName, getSourceColumnName] as const)
+    : ([getSourceColumnName, getTargetColumnName] as const);
   const column = (side: 0 | 1) => (name: string) => {
     if (!definition.columns[side].includes(name)) {
       throw new Error(`Invalid computed join column: ${definition.tables[side]}.${name}`);
@@ -146,7 +146,7 @@ export const getComputedJoinSQL = (
         : 0
       : side
     ].add(name);
-    return `${aliases[side]}.${columnNames[side]!(name)}`;
+    return `${aliases[side]}.${columnNames[side](name)}`;
   };
   const sql = definition.$sql({ left: column(0), right: column(1), params, asValue });
   if (typeof sql !== "string" || !sql.trim()) {

@@ -2,7 +2,11 @@ import { asName, getKeys, isEmpty, omitKeys, pickKeys } from "prostgles-types";
 import { md5 } from "prostgles-types/dist/md5";
 import { onDeleteFromFileTable } from "../DboBuilder/TableHandler/onDeleteFromFileTable";
 import { updateFile } from "../DboBuilder/TableHandler/updateFile";
-import { assertFileObjectValid, uploadFile } from "../DboBuilder/TableHandler/uploadFile";
+import {
+  assertFileObjectValid,
+  FILE_SCHEMA_KEYS,
+  uploadFile,
+} from "../DboBuilder/TableHandler/uploadFile";
 import { getFileBuffer } from "../DboBuilder/TableHandler/getFileBuffer";
 import type { Prostgles } from "../Prostgles";
 import type {
@@ -97,6 +101,9 @@ export const getFileTableConfig = (
   }
 
   const configuredTableNames = getKeys(tableConfig ?? {});
+  const managedFileColumns = getKeys(fileColumnDefinitions).filter(
+    (column) => !FILE_SCHEMA_KEYS.some((inputColumn) => inputColumn === column),
+  );
   const precedingTableNames = configuredTableNames.slice(
     0,
     Math.max(0, configuredTableNames.indexOf(fileTableName)),
@@ -105,6 +112,17 @@ export const getFileTableConfig = (
     ...pickKeys(tableConfig ?? {}, precedingTableNames),
     [fileTableName]: {
       ...userFileTableConfig,
+      publishRestrictions: {
+        ...userFileTableConfig?.publishRestrictions,
+        insert: getFilePublishRestriction(
+          userFileTableConfig?.publishRestrictions?.insert,
+          managedFileColumns,
+        ),
+        update: getFilePublishRestriction(userFileTableConfig?.publishRestrictions?.update, [
+          ...managedFileColumns,
+          "id",
+        ]),
+      },
       columns: {
         ...fileColumnDefinitions,
         ...userFileTableConfig?.columns,
@@ -247,5 +265,15 @@ export const getFileTableConfig = (
   return {
     tableConfig: mergedTableConfig,
     tableHooks: mergedTableHooks,
+  };
+};
+
+const getFilePublishRestriction = (
+  restriction: false | { excludeFields: string[] } | undefined,
+  excludedColumns: string[],
+): false | { excludeFields: string[] } => {
+  if (restriction === false) return false;
+  return {
+    excludeFields: [...new Set([...excludedColumns, ...(restriction?.excludeFields ?? [])])],
   };
 };

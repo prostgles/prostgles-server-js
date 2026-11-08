@@ -25,8 +25,10 @@ export const getJobTableHooks = (
       changedFields: trigger.columns,
       preventRecursion: true,
       validate: async ({ row, dbx, localParams }) => {
-        const table = dbx[trigger.table]!;
-        const transaction = table.getTransaction(localParams)!;
+        const table = dbx[trigger.table];
+        if (!table) throw new Error(`Job source table not found: ${trigger.table}`);
+        const transaction = table.getTransaction(localParams);
+        if (!transaction) throw new Error("Job hooks require a transaction");
         const primaryKeyNames = getJobPrimaryKeyNames(table);
         const targetRowPkey = pickKeys(row, primaryKeyNames) as JobRecord["target_row_pkey"];
         if (!(await matchesJobTriggerCondition(table, targetRowPkey, trigger.when))) {

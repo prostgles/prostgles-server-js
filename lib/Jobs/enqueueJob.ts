@@ -30,8 +30,7 @@ export const enqueueJob = async (
   const tableSQL = prostgles.jobs.tableSQL;
   const jobIdColumn =
     definition.trigger.type === "row" ? definition.trigger.jobIdColumn : undefined;
-  const rowTable =
-    jobIdColumn !== undefined && table !== null ? transaction.dbx[table]! : undefined;
+  const rowTable = jobIdColumn !== undefined && table !== null ? transaction.dbx[table] : undefined;
   const targetRowFilter =
     table !== null && prostgles.isMedia(table) ?
       { id: targetRowPkey.id }

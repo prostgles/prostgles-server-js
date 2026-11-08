@@ -33,17 +33,14 @@ export const getSchemaDiffQueries = ({
 
   const tableAndColQueries = newSchema
     .flatMap(({ table_ident, table_name, columns }) => {
+      const tableDefinitions = newSchemaTableDefinitions[table_name];
+      if (!tableDefinitions) throw new Error(`Table definitions not found: ${table_name}`);
       const oldTable = oldSchema.find((ot) => ot.table_ident === table_ident);
       if (!oldTable) {
         const newTableQuery = [
           `CREATE TABLE ${table_ident} (`,
           (columns ?? [])
-            .map(
-              (c) =>
-                c.column_name_escaped +
-                " " +
-                newSchemaTableDefinitions[table_name]![c.column_name_escaped],
-            )
+            .map((c) => c.column_name_escaped + " " + tableDefinitions[c.column_name_escaped])
             .join(",\n"),
           `);`,
         ].join("\n");
@@ -65,7 +62,7 @@ export const getSchemaDiffQueries = ({
           const oldCol = oldTable.columns?.find((oc) => oc.column_name === c.column_name);
           if (!oldCol) {
             return [
-              `ALTER TABLE ${table_ident} ADD COLUMN ${newSchemaTableDefinitions[table_name]![c.column_name_escaped]};`,
+              `ALTER TABLE ${table_ident} ADD COLUMN ${tableDefinitions[c.column_name_escaped]};`,
             ];
           }
           if (isEqual(oldCol, c)) return [];

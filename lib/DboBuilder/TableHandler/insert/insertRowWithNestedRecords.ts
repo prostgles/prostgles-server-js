@@ -115,7 +115,8 @@ export async function insertRowWithNestedRecords(
   let returnData: AnyObject | undefined;
   const returning = insertParams?.returning;
   if (returning) {
-    returnData = {};
+    const returnedRow: AnyObject = {};
+    returnData = returnedRow;
     const returningItems = await this.prepareReturning(
       returning,
       this.parseFieldFilter(tableRules?.insert?.returningFields),
@@ -128,7 +129,7 @@ export async function insertRowWithNestedRecords(
         );
         const inserted =
           colInsertResult?.singleInsert ? colInsertResult.inserted?.[0] : colInsertResult?.inserted;
-        returnData![rs.alias] = inserted ?? fullRootResult[rs.alias];
+        returnedRow[rs.alias] = inserted ?? fullRootResult[rs.alias];
       });
   }
 
@@ -151,6 +152,7 @@ export async function insertRowWithNestedRecords(
 
     const { path } = joinPath;
     const [rootTableName, referencingTableName, indirectTargetTableName] = path;
+    if (!referencingTableName) throw new Error("Nested insert referencing table is missing");
     targetTableRules = await getInsertTableRules(
       this,
       targetTable,
@@ -158,9 +160,8 @@ export async function insertRowWithNestedRecords(
       localParams?.scope,
     );
 
-    const referencingTableColumns =
-      this.dboBuilder.dboMap.get(referencingTableName!)?.columns || [];
-    if (!this.dboBuilder.dboMap.get(referencingTableName!))
+    const referencingTableColumns = this.dboBuilder.dboMap.get(referencingTableName)?.columns || [];
+    if (!this.dboBuilder.dboMap.get(referencingTableName))
       throw "Invalid/disallowed table: " + referencingTableName;
     const columnsReferencingRoot = referencingTableColumns.filter((column) =>
       column.references?.some(
@@ -199,8 +200,8 @@ export async function insertRowWithNestedRecords(
         childDataItems.map((childData) => {
           const childRow = { ...childData };
           columnsReferencingRoot.map((column) => {
-            childRow[column.references![0]!.cols[0]!] =
-              fullRootResult[column.references![0]!.fcols[0]!];
+            const { columnName, referencedColumnName } = getReferenceColumnNames(column);
+            childRow[columnName] = fullRootResult[referencedColumnName];
           });
           return childRow;
         }),
@@ -244,13 +245,15 @@ export async function insertRowWithNestedRecords(
         const linkingRow: AnyObject = {};
 
         columnsReferencingTarget.map((column) => {
-          linkingRow[column.name] = insertedFile[column.references![0]!.fcols[0]!];
+          const { referencedColumnName } = getReferenceColumnNames(column);
+          linkingRow[column.name] = insertedFile[referencedColumnName];
         });
         columnsReferencingRoot.map((column) => {
-          linkingRow[column.name] = fullRootResult[column.references![0]!.fcols[0]!];
+          const { referencedColumnName } = getReferenceColumnNames(column);
+          linkingRow[column.name] = fullRootResult[referencedColumnName];
         });
 
-        await childInsert(linkingRow, referencingTableName!);
+        await childInsert(linkingRow, referencingTableName);
       }
     } else {
       console.error(JSON.stringify({ path, thisTable: this.name, targetTable }, null, 2));
@@ -258,7 +261,7 @@ export async function insertRowWithNestedRecords(
     }
 
     /* Return also the nested inserted data */
-    if (insertedChildren.length && returning) {
+    if (insertedChildren.length && returnData) {
       const targetTableHandler = dbTX[targetTable] as TableHandler;
       const targetReturning = await targetTableHandler.prepareReturning(
         "*",
@@ -273,13 +276,23 @@ export async function insertRowWithNestedRecords(
         return returnedChild;
       });
 
-      returnData![targetTable] =
+      returnData[targetTable] =
         clientTargetInserts.length === 1 ? clientTargetInserts[0] : clientTargetInserts;
     }
   }
 
   return returnData;
 }
+
+const getReferenceColumnNames = (column: TableHandler["columns"][number]) => {
+  const reference = column.references?.[0];
+  const columnName = reference?.cols[0];
+  const referencedColumnName = reference?.fcols[0];
+  if (!columnName || !referencedColumnName) {
+    throw new Error(`Missing foreign key columns for ${column.name}`);
+  }
+  return { columnName, referencedColumnName };
+};
 
 const getJoinPath = (
   tableHandler: TableHandler,

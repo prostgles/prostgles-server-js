@@ -38,17 +38,19 @@ export const controlJob = async <S, Row extends AnyObject>(
       transaction.dbx,
     ) as Promise<AnyObject[]>;
 
-  const rowTable = transaction.dbx[trigger.table]!;
+  const rowTable = transaction.dbx[trigger.table];
+  if (!rowTable) throw new Error(`Job source table not found: ${trigger.table}`);
   const primaryKeys = getJobPrimaryKeyNames(rowTable);
   if (!primaryKeys.length || !primaryKeys.every((key) => options.row[key] !== undefined)) {
     throw new Error("Job row primary key is unavailable");
   }
   const filter = Object.fromEntries(primaryKeys.map((key) => [key, { $eq: options.row[key] }]));
   const rows = await findReadableRows(filter);
-  if (rows.length !== 1) {
+  const [readableRow] = rows;
+  if (rows.length !== 1 || !readableRow) {
     throw new Error("Job lookup must reference one readable row");
   }
-  const targetRowPkey = pickKeys(rows[0]!, primaryKeys) as JobRecord["target_row_pkey"];
+  const targetRowPkey = pickKeys(readableRow, primaryKeys) as JobRecord["target_row_pkey"];
   if (!primaryKeys.every((key) => key in targetRowPkey)) {
     throw new Error("Job row primary key is unavailable");
   }
@@ -100,8 +102,9 @@ export const controlJob = async <S, Row extends AnyObject>(
         throw new Error("Job control must preserve the target row and job link");
       }
       if (options.operation === "cancel") {
-        await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(job!.id);
-        return { jobId: job!.id };
+        if (!job) throw new Error("Job has not started");
+        await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(job.id);
+        return { jobId: job.id };
       }
       if (!job && !(await matchesJobTriggerCondition(rowTable, targetRowPkey, trigger.when))) {
         throw new Error("Job row does not satisfy its trigger condition");

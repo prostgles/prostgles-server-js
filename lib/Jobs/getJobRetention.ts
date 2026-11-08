@@ -12,7 +12,10 @@ export const getJobRetention = async (prostgles: Prostgles) => {
       }
       continue;
     }
-    if (definition.trigger.type !== "schedule" || (retention !== "forever" && !isObject(retention))) {
+    if (
+      definition.trigger.type !== "schedule" ||
+      (retention !== "forever" && !isObject(retention))
+    ) {
       throw new Error(
         `Invalid job retention for ${jobName}: expected a scheduled job's status policies or "forever"`,
       );
@@ -51,7 +54,8 @@ export const getJobRetention = async (prostgles: Prostgles) => {
             throw new Error("Expected milliseconds or a PostgreSQL interval");
           }
           interval = typeof maxAge === "number" ? `${maxAge} milliseconds` : maxAge;
-          const { valid } = await prostgles.db!.one<{ valid: boolean }>(
+          if (!prostgles.db) throw new Error("Database is not initialized");
+          const { valid } = await prostgles.db.one<{ valid: boolean }>(
             `SELECT isfinite(age) AND age > interval '0' AS valid
              FROM (SELECT \${interval}::interval AS age) parsed`,
             { interval },
