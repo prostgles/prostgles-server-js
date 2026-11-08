@@ -11,8 +11,47 @@ import {
   getTableCheckBranches,
   getTableCheckConstraint,
 } from "prostgles-server/dist/TableConfig/getTableCheck";
+import { getTableConfigSchemaQueries } from "prostgles-server/dist/TableConfig/getTableConfigSchemaQueries";
+import { getSchemaDiffQueries } from "prostgles-server/dist/TableConfig/getSchemaDiffQueries";
+import type { SchemaInfo } from "prostgles-server/dist/TableConfig/getSchemaForTableConfig";
 
 export const testTableConfigValidation = async (parentDb: DB) => {
+  await test("tableConfig schema diffs accept unchanged quoted table names", async () => {
+    const tableNames = ["schema_diff_plain", "SchemaDiffMixedCase", 'schema_diff"quoted'];
+    const { tableQueries, tableDefs } = await getTableConfigSchemaQueries(
+      {
+        tableConfig: Object.fromEntries(tableNames.map((name) => [name, { columns: {} }])),
+        tableConfigMigrations: undefined,
+        fileTable: undefined,
+        sqlFilePath: undefined,
+        onLog: undefined,
+      },
+      { db: parentDb, asName },
+    );
+    await parentDb.tx(async (transaction) => {
+      await transaction.none("CREATE SCHEMA table_config_schema_diff");
+      await transaction.none("SET LOCAL search_path = table_config_schema_diff");
+      await transaction.none(tableQueries.join("\n"));
+      const schema = await transaction.any<SchemaInfo[number]>(`
+        SELECT table_name, table_schema,
+          format('%I.%I', table_schema, table_name) AS table_ident,
+          NULL AS columns, NULL AS triggers, NULL AS constraints, NULL AS indexes
+        FROM information_schema.tables
+        WHERE table_schema = current_schema()
+        ORDER BY table_name
+      `);
+      assert.deepEqual(schema.map((table) => table.table_name).sort(), tableNames.slice().sort());
+      assert.deepEqual(
+        getSchemaDiffQueries({
+          oldSchema: schema,
+          newSchema: schema,
+          newSchemaTableDefinitions: tableDefs,
+        }),
+        [],
+      );
+      await transaction.none("DROP SCHEMA table_config_schema_diff CASCADE");
+    });
+  });
   await test("tableConfig checks enforce and infer row variants", async () => {
     const database = `table_check_${process.pid}_${Date.now()}`;
     await parentDb.none(`CREATE DATABASE ${asName(database)}`);

@@ -59,7 +59,7 @@ export const getTableConfigSchemaQueries = async (
     );
     if (_tableQueries) {
       tableQueries = [...tableQueries, ..._tableQueries.queries];
-      tableDefs[tableName] = _tableQueries.colDefs;
+      tableDefs[tableNameRaw] = _tableQueries.colDefs;
     }
   }
 
