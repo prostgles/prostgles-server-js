@@ -11,11 +11,30 @@ export const claimJob = async (prostgles: Prostgles, name: string, concurrency: 
       advisoryLockKey: JSON.stringify([tableSQL, name]),
     });
     await t.none(
-      `UPDATE ${tableSQL} SET
-      status = CASE WHEN cancel_requested THEN 'cancelled' WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END,
-      error = jsonb_build_object('message', 'Worker interrupted'), lease_token = NULL, locked_until = NULL,
-      finished_at = CASE WHEN cancel_requested OR attempts >= max_attempts THEN clock_timestamp() END
-      WHERE job_name = \${jobName} AND status = 'running' AND locked_until < clock_timestamp()`,
+      `UPDATE ${tableSQL}
+      SET
+        status = CASE
+          WHEN cancel_requested THEN 'cancelled'
+          WHEN stalled_count >= max_stalled_count THEN 'failed'
+          ELSE 'pending'
+        END,
+        stalled_count = stalled_count + 1,
+        error = jsonb_build_object('code', 'WORKER_INTERRUPTED', 'message', 'Worker interrupted'),
+        lease_token = NULL,
+        locked_until = NULL,
+        run_at = CASE
+          WHEN cancel_requested OR stalled_count >= max_stalled_count THEN run_at
+          ELSE clock_timestamp() + LEAST(2147483647, delay_ms::numeric *
+            CASE WHEN backoff = 'exponential' THEN power(2::numeric, LEAST(stalled_count, 1024)) ELSE 1 END
+          ) * interval '1 millisecond'
+        END,
+        finished_at = CASE
+          WHEN cancel_requested OR stalled_count >= max_stalled_count THEN clock_timestamp()
+        END
+      WHERE
+        job_name = \${jobName}
+        AND status = 'running'
+        AND locked_until < clock_timestamp()`,
       { jobName: name },
     );
     const count = await jobs.count({ job_name: name, status: "running" });
@@ -26,7 +45,8 @@ export const claimJob = async (prostgles: Prostgles, name: string, concurrency: 
         SELECT j.id FROM ${tableSQL} j
         WHERE j.job_name = \${jobName} AND j.status = 'pending' AND j.run_at <= clock_timestamp()
           AND NOT EXISTS (
-            SELECT 1 FROM ${tableSQL} earlier WHERE earlier.job_name = j.job_name
+            SELECT 1 FROM ${tableSQL} earlier
+            WHERE earlier.job_name = j.job_name
               AND earlier.target_table IS NOT DISTINCT FROM j.target_table AND earlier.target_row_pkey = j.target_row_pkey
               AND (earlier.status = 'running' OR (earlier.status = 'pending'
                 AND (earlier.created_at, earlier.id) < (j.created_at, j.id)))

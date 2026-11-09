@@ -1,3 +1,4 @@
+import type { AnyObject } from "prostgles-types";
 import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
 import { runJobControl } from "../ExecutionContext";
 import type { Prostgles } from "../Prostgles";
@@ -5,7 +6,14 @@ import { runClientRequest } from "../runClientRequest";
 import { controlJob } from "./controlJob";
 import { enqueueJob } from "./enqueueJob";
 import { getJobTableHandler } from "./getJobTableHandler";
-import type { JobRecord, Jobs, JobTransaction } from "./JobTypes";
+import type {
+  JobControlOptions,
+  JobRecord,
+  Jobs,
+  JobTransaction,
+  ManualJobControlOptions,
+} from "./JobTypes";
+import { startJob } from "./startJob";
 
 export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jobs => {
   const runInTransaction = async <T>(callback: (transaction: JobTransaction) => Promise<T>) => {
@@ -19,6 +27,14 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
       builder.failTransaction(t, error);
       throw error;
     }
+  };
+
+  const getUserId = async (userId: string | undefined) => {
+    const clientReq = getClientRequest(prostgles, userId);
+    if (!clientReq) return;
+    const publishParser = prostgles.publishParser;
+    if (!publishParser) throw new Error("Publish parser is not initialized");
+    return (await publishParser.getPublishParams(clientReq, undefined)).user?.id;
   };
 
   return {
@@ -46,6 +62,14 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
       };
       return dbx ? runInTransaction(read) : read(undefined);
     },
+    start: (name, params = {}, options) =>
+      runInTransaction(async (transaction) =>
+        startJob(prostgles, transaction, name, {
+          params,
+          row: options?.row,
+          userId: await getUserId(options?.userId),
+        }),
+      ),
     cancel: (id) =>
       runInTransaction(async (transaction) => {
         const job = await getJobTableHandler(prostgles, transaction).findOne({ id });
@@ -63,13 +87,7 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
       }),
     rerun: (id, params = {}, options) =>
       runInTransaction(async (transaction) => {
-        const userId = await (async () => {
-          const clientReq = getClientRequest(prostgles, options?.userId);
-          if (!clientReq) return;
-          const publishParser = prostgles.publishParser;
-          if (!publishParser) throw new Error("Publish parser is not initialized");
-          return (await publishParser.getPublishParams(clientReq, undefined)).user?.id;
-        })();
+        const userId = await getUserId(options?.userId);
         const job = await getJobTableHandler(prostgles, transaction).findOne({ id });
         if (!job) throw new Error("Job not found");
         const enqueue = () =>
@@ -92,7 +110,10 @@ export const createJobsAPI = (prostgles: Prostgles, dbx: object | undefined): Jo
         : enqueue());
         return { jobId };
       }),
-    control: (name, options) =>
+    control: <S, Row extends AnyObject>(
+      name: string,
+      options: JobControlOptions<S, Row> | ManualJobControlOptions<S>,
+    ) =>
       runInTransaction((transaction) => {
         const clientReq = getClientRequest(prostgles, undefined);
         if (!clientReq) throw new Error("Job control requires a user");

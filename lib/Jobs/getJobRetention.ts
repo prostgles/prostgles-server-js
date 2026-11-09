@@ -7,17 +7,15 @@ export const getJobRetention = async (prostgles: Prostgles) => {
   for (const [jobName, definition] of Object.entries(prostgles.opts.jobs?.definitions ?? {})) {
     const retention: unknown = definition.retention;
     if (retention === undefined) {
-      if (definition.trigger.type === "schedule") {
-        throw new Error(`Invalid job retention for ${jobName}: required for scheduled jobs`);
+      if (definition.trigger.type !== "row") {
+        const jobType = definition.trigger.type === "schedule" ? "scheduled" : "manual";
+        throw new Error(`Invalid job retention for ${jobName}: required for ${jobType} jobs`);
       }
       continue;
     }
-    if (
-      definition.trigger.type !== "schedule" ||
-      (retention !== "forever" && !isObject(retention))
-    ) {
+    if (definition.trigger.type === "row" || (retention !== "forever" && !isObject(retention))) {
       throw new Error(
-        `Invalid job retention for ${jobName}: expected a scheduled job's status policies or "forever"`,
+        `Invalid job retention for ${jobName}: expected status policies or "forever" for a job without a row`,
       );
     }
     if (retention === "forever") continue;

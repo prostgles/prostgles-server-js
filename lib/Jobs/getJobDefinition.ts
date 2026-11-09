@@ -30,6 +30,10 @@ export const validateJobDefinitions = async (prostgles: Prostgles, tables: Table
       (retry &&
         (!Number.isSafeInteger(retry.maxAttempts) ||
           retry.maxAttempts < 1 ||
+          (retry.maxStalledCount !== undefined &&
+            (!Number.isSafeInteger(retry.maxStalledCount) ||
+              retry.maxStalledCount < 0 ||
+              retry.maxStalledCount > 2_147_483_647)) ||
           !Number.isFinite(retry.delayMs ?? 1000) ||
           (retry.delayMs ?? 1000) < 0 ||
           (retry.backoff !== undefined && !["fixed", "exponential"].includes(retry.backoff))))
@@ -42,7 +46,6 @@ export const validateJobDefinitions = async (prostgles: Prostgles, tables: Table
         !table ||
         table.is_view ||
         !table.columns.some((c) => c.is_pkey) ||
-        !trigger.on.length ||
         trigger.on.some((command) => !["insert", "update"].includes(command)) ||
         trigger.columns?.some((column) => !table.columns.some((c) => c.name === column))
       ) {
@@ -63,12 +66,12 @@ export const validateJobDefinitions = async (prostgles: Prostgles, tables: Table
         if (!tableHandler) throw new Error(`Job source table not found: ${table.name}`);
         await tableHandler.find(trigger.when, { select: "", limit: 0 });
       }
-      // Validate untyped JavaScript configurations too.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     } else if (trigger.type === "schedule") {
       if (job.runAs === "user") throw new Error(`Scheduled job ${name} cannot runAs user`);
       parseCronSchedule(trigger);
-    } else {
+      /* Validate untyped JavaScript configurations too. */
+      /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
+    } else if (trigger.type !== "manual") {
       throw new Error(`Invalid job trigger: ${name}`);
     }
     await getJobParams(prostgles, job.params, {});

@@ -18,7 +18,7 @@ export const getJobTableHooks = (
     ([firstName], [secondName]) => secondName.localeCompare(firstName),
   );
   for (const [name, { trigger }] of definitions) {
-    if (trigger.type !== "row") continue;
+    if (trigger.type !== "row" || !trigger.on.length) continue;
     const hook = {
       hookKey: `job:${name}`,
       commands: Object.fromEntries(trigger.on.map((command) => [command, 1 as const])),

@@ -58,7 +58,7 @@
     "pg": "^8.23.1",
     "pg-cursor": "^2.22.1",
     "pg-promise": "^12.7.1",
-    "prostgles-types": "^4.0.316"
+    "prostgles-types": "^4.0.318"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

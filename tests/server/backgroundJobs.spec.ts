@@ -2,7 +2,13 @@ import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import pgPromise from "pg-promise";
-import { isObject, ROW_ACTIONS_COLUMN, type AnyObject, type JobValue } from "prostgles-types";
+import {
+  isObject,
+  ROW_ACTIONS_COLUMN,
+  type AnyObject,
+  type JobValue,
+  type JSONBObjectTypeIfDefined,
+} from "prostgles-types";
 import prostgles, {
   createJobDefiner,
   createJobControlFunctionDefiner,
@@ -29,7 +35,7 @@ import type { AuthClientRequest } from "prostgles-server/dist/Auth/AuthTypes";
 import { runClientRequest } from "prostgles-server/dist/runClientRequest";
 
 export const testBackgroundJobs = async (parentDb: DB) => {
-  await test("configured jobs", { timeout: 60_000 }, async (t) => {
+  await test("configured jobs", { timeout: 90_000 }, async (t) => {
     const database = `jobs_${randomUUID().replaceAll("-", "")}`;
     await parentDb.none(`CREATE DATABASE ${database}`);
     const pgp = pgPromise();
@@ -258,7 +264,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               user?.type === "admin" ?
                 {}
               : {
-                  job_name: user?.id === "alice" ? "process" : "forbidden",
+                  $or:
+                    user?.id === "alice" ?
+                      [{ job_name: "process" }, { job_name: "manual", user_id: "alice" }]
+                    : [{ job_name: "forbidden" }],
                 },
           },
         };
@@ -379,6 +388,13 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(contextsCreated, 1);
           await prgl.refreshDBO();
           assert.equal(contextsCreated, 2);
+          const definition = prgl.opts.jobs!.definitions.process!;
+          for (const maxStalledCount of [-1, 1.5, NaN, Infinity, 2_147_483_648]) {
+            definition.retry = { maxAttempts: 1, maxStalledCount };
+            await assert.rejects(prgl.refreshDBO(), /Invalid job definition: process/);
+          }
+          delete definition.retry;
+          assert.equal(contextsCreated, 2);
           const control = prgl.opts.functions!.members!.functions.control!.jobControl!;
           control.jobName = "missing";
           await assert.rejects(prgl.refreshDBO(), /Unknown job: missing/);
@@ -412,7 +428,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       await db.none(`ALTER TABLE ${table} ADD FOREIGN KEY (job_id) REFERENCES ${queue}(id)`);
       assert.equal(instance.getSchema().find(({ name }) => name === queueName)?.schema, "public");
       assert((await instance.getTSSchema()).tsSchema.includes(queueName));
-      await t.test("types enforce params, rows and schedule context", () => {
+      await t.test("types enforce params, rows and standalone job context", () => {
         type JobSchema = {
           records: { columns: { id: number; revision: number } };
           other: { columns: { name: string } };
@@ -471,7 +487,65 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               return Promise.resolve();
             },
           }),
+          manual: defineJob({
+            trigger: { type: "manual" },
+            retention: "forever",
+            params: { size: { jsonbSchema: { type: "number" }, default: 10 } },
+            run: ({ row, params }) => {
+              row satisfies undefined;
+              params.size satisfies number;
+              /* @ts-expect-error Manual jobs have no source row. */
+              void row.id;
+              /* @ts-expect-error Unknown manual job parameter. */
+              void params.missing;
+              return Promise.resolve();
+            },
+          }),
         };
+        definitions.scheduled.trigger.cron satisfies string;
+        const defineControl = createJobControlFunctionDefiner<JobSchema>()(definitions);
+        const manualControl = defineControl({
+          jobName: "manual",
+          operation: "startOrRetry",
+          run: ({ row, params, job, dbx }) => {
+            row satisfies undefined;
+            params.size satisfies number;
+            job satisfies JobRecord | undefined;
+            dbx.records satisfies DBOFullyTyped<JobSchema>["records"];
+            /* @ts-expect-error Unknown manual control parameter. */
+            void params.missing;
+          },
+        });
+        const manualInput: JSONBObjectTypeIfDefined<typeof manualControl.input> = {};
+        const providedParams: JSONBObjectTypeIfDefined<typeof manualControl.input> = {
+          params: { size: 2 },
+        };
+        const invalidParams: JSONBObjectTypeIfDefined<typeof manualControl.input> = {
+          /* @ts-expect-error Manual controls preserve parameter input types. */
+          params: { size: "bad" },
+        };
+        const rerunControl = defineControl({ jobName: "manual", operation: "rerun" });
+        /* @ts-expect-error Rerunning a manual job requires its ID. */
+        const missingJobId: JSONBObjectTypeIfDefined<typeof rerunControl.input> = {};
+        const checkManualControl = (jobs: Jobs) =>
+          jobs.control<JobSchema>("manual", {
+            operation: "startOrRetry",
+            run: ({ job, dbx }) => {
+              job satisfies JobRecord | undefined;
+              dbx.records satisfies DBOFullyTyped<JobSchema>["records"];
+            },
+          });
+        void [manualInput, providedParams, invalidParams, missingJobId, checkManualControl];
+        const invalidControl = () =>
+          defineControl({
+            /* @ts-expect-error Scheduled jobs cannot use the control definer. */
+            jobName: "scheduled",
+            operation: "startOrRetry",
+          });
+        void invalidControl;
+        const { retention: _manualRetention, ...manualWithoutRetention } = definitions.manual;
+        /* @ts-expect-error Manual jobs require explicit retention. */
+        defineJob(manualWithoutRetention);
         const { retention: _retention, ...scheduleWithoutRetention } = definitions.scheduled;
         /* @ts-expect-error Scheduled jobs require explicit retention. */
         defineJob(scheduleWithoutRetention);
@@ -1097,7 +1171,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(firstRun.reason, "trigger");
           assert.deepEqual(firstRun.params, { size: 10 });
           assert.equal((await instance!.db.records.findOne({ id: row.id }))!.revision, 2);
-          await assert.rejects(control(row.id), /not allowed/);
+          await assert.rejects(control(row.id), {
+            message:
+              `Job "process" (${started.jobId}): "startOrRetry" is not allowed while status is "running". ` +
+              "Allowed statuses: failed, cancelled.",
+          });
           await assert.rejects(
             asAlice(() =>
               instance!.db.tx(async (dbx) => {
@@ -1483,46 +1561,231 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         delete definitions.process!.onConflict;
         await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
       });
+      await t.test("claims enforce concurrency across instances", async () => {
+        other = await prostgles<JobTestSchema>(options);
+        const entries = await Promise.all([
+          insert({ mode: "block" }),
+          insert({ mode: "block" }),
+          insert({ mode: "block" }),
+        ]);
+        await eventually(() => entries.filter(({ job }) => blocked.has(job.id)).length === 2);
+        assert.equal((await records("status = 'running'")).length, 2);
+        for (const { job } of entries) released.add(job.id);
+        for (const { job } of entries) await status(job.id, "succeeded");
+        await other.destroy();
+        other = undefined;
+      });
       await t.test(
-        "claims enforce concurrency across instances and recover expired leases",
+        "stall limits persist per job and unblock successors after repeated crashes",
         async () => {
-          other = await prostgles<JobTestSchema>(options);
-          const entries = await Promise.all([
-            insert({ mode: "block" }),
-            insert({ mode: "block" }),
-            insert({ mode: "block" }),
-          ]);
-          await eventually(() => entries.filter(({ job }) => blocked.has(job.id)).length === 2);
-          assert.equal((await records("status = 'running'")).length, 2);
-          for (const { job } of entries) released.add(job.id);
-          for (const { job } of entries) await status(job.id, "succeeded");
-          await other.destroy();
-          other = undefined;
-          // Simulate a process that died while holding a lease.
-          const recovered = await insert({ enabled: false });
+          const previousRetry = definitions.process!.retry;
+          try {
+            for (const maxStalledCount of [0, 1, undefined]) {
+              definitions.process!.retry = {
+                maxAttempts: 1,
+                ...(maxStalledCount === undefined ? {} : { maxStalledCount }),
+                delayMs: 1000,
+                backoff: "exponential",
+              };
+              await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+              other = await prostgles<JobTestSchema>(options);
+              const { job } = await insert({ mode: "block" });
+              const stallLimit = maxStalledCount ?? 3;
+              assert.equal(job.max_stalled_count, stallLimit);
+              const { jobId: successorId } = await instance!.jobs.rerun(job.id);
+              released.add(successorId);
+              /* A later definition change must not change the queued job's recovery budget. */
+              definitions.process!.retry.maxStalledCount = 0;
+              for (let stallCount = 1; stallCount <= stallLimit + 1; stallCount++) {
+                await eventually(() =>
+                  seen.some(({ id, attempt }) => id === job.id && attempt === stallCount),
+                );
+                const expiredAt = Date.now();
+                await db.none(
+                  `UPDATE ${queue} SET locked_until = clock_timestamp() - interval '1 second'
+                    WHERE id = \${jobId} AND status = 'running'`,
+                  { jobId: job.id },
+                );
+                const willRecover = stallCount <= stallLimit;
+                const recovered = await status(job.id, willRecover ? "pending" : "failed");
+                assert.equal(recovered.attempts, stallCount);
+                assert.equal(recovered.stalled_count, stallCount);
+                assert.deepEqual(recovered.error, {
+                  code: "WORKER_INTERRUPTED",
+                  message: "Worker interrupted",
+                });
+                assert.equal(recovered.lease_token, null);
+                assert.equal(recovered.locked_until, null);
+                if (willRecover) {
+                  assert.equal(recovered.finished_at, null);
+                  const recoveryDelay = 1000 * 2 ** (stallCount - 1);
+                  assert(new Date(recovered.run_at!).getTime() >= expiredAt + recoveryDelay);
+                  assert(new Date(recovered.run_at!).getTime() <= Date.now() + recoveryDelay);
+                  assert.equal((await instance!.jobs.get(successorId))!.attempts, 0);
+                  await db.none(
+                    `UPDATE ${queue} SET run_at = clock_timestamp() WHERE id = \${jobId}`,
+                    { jobId: job.id },
+                  );
+                } else {
+                  assert(recovered.finished_at);
+                }
+              }
+              await status(successorId, "succeeded");
+              assert.equal(seen.filter(({ id }) => id === job.id).length, stallLimit + 1);
+              await other.destroy();
+              other = undefined;
+            }
+          } finally {
+            definitions.process!.retry = previousRetry;
+            await other?.destroy();
+            other = undefined;
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+          }
+        },
+      );
+      await t.test(
+        "expired leases preserve failure retries, checkpoints and cancellation",
+        async () => {
+          jobFailure = new Error("Extraction failed after recovery");
+          for (const { mode, maxAttempts, cancelRequested } of [
+            { mode: "block", maxAttempts: 1, cancelRequested: false },
+            { mode: "error", maxAttempts: 1, cancelRequested: false },
+            { mode: "error", maxAttempts: 3, cancelRequested: false },
+            { mode: "permanent", maxAttempts: 3, cancelRequested: false },
+            { mode: "block", maxAttempts: 1, cancelRequested: true },
+          ]) {
+            const { row } = await insert({ enabled: false, mode });
+            const jobId = randomUUID();
+            const leaseToken = randomUUID();
+            /* Simulate three stalled executions followed by a fourth expired lease. */
+            await db.none(
+              `INSERT INTO ${queue} (id, job_name, target_table, target_row_pkey, params, status, attempts,
+              stalled_count, max_attempts, max_stalled_count, delay_ms, backoff, lease_token, locked_until,
+              checkpoint, has_checkpoint, cancel_requested)
+            VALUES (\${jobId}, 'process', \${targetTable}, \${targetRowPkey:json}, '{"size":10}', 'running',
+              4, 3, \${maxAttempts}, \${maxStalledCount}, 1000, 'exponential', \${leaseToken},
+              clock_timestamp() - interval '1 second', '{"done":1}', TRUE, \${cancelRequested})`,
+              {
+                jobId,
+                targetTable: table,
+                targetRowPkey: { id: row.id },
+                leaseToken,
+                maxAttempts,
+                maxStalledCount: cancelRequested ? 3 : 4,
+                cancelRequested,
+              },
+            );
+            if (!cancelRequested) {
+              const recovered = await status(jobId, "pending");
+              assert.equal(recovered.stalled_count, 4);
+              await db.none(`UPDATE ${queue} SET run_at = clock_timestamp() WHERE id = \${jobId}`, {
+                jobId,
+              });
+            }
+            if (mode === "block" && !cancelRequested) {
+              await eventually(() => blocked.has(jobId));
+              const recovered = (await instance!.jobs.get(jobId))!;
+              assert.deepEqual(recovered.error, {
+                code: "WORKER_INTERRUPTED",
+                message: "Worker interrupted",
+              });
+              assert.deepEqual(recovered.checkpoint, { done: 1 });
+              assert.equal(recovered.has_checkpoint, true);
+              assert.equal(recovered.finished_at, null);
+              assert.notEqual(recovered.lease_token, leaseToken);
+              released.add(jobId);
+            }
+            if (mode === "error" && maxAttempts > 1) {
+              await eventually(async () => {
+                const retry = (await instance!.jobs.get(jobId))!;
+                return retry.status === "pending" && retry.attempts === 5;
+              });
+              const retry = await status(jobId, "pending");
+              assert.equal(retry.attempts, 5);
+              assert(new Date(retry.run_at!).getTime() <= Date.now() + 1100);
+            }
+            const completed = await status(
+              jobId,
+              cancelRequested ? "cancelled"
+              : mode === "block" ? "succeeded"
+              : "failed",
+            );
+            assert.equal(completed.stalled_count, 4);
+            assert.equal(
+              completed.attempts,
+              cancelRequested ? 4 : 4 + (mode === "error" ? maxAttempts : 1),
+            );
+            assert.equal(completed.lease_token, null);
+            assert.equal(completed.locked_until, null);
+            if (mode === "error") {
+              assert.deepEqual(completed.error, {
+                message: "Extraction failed after recovery",
+              });
+            } else if (mode === "permanent") {
+              assert.deepEqual(completed.error, {
+                message: "Permanent failure",
+              });
+            } else if (cancelRequested) {
+              assert.equal(
+                seen.some(({ id }) => id === jobId),
+                false,
+              );
+            }
+          }
+        },
+      );
+      await t.test(
+        "graceful shutdown preserves checkpoints and both budgets across restarts and schema upgrades",
+        async () => {
+          definitions.process!.retry = { maxAttempts: 1, maxStalledCount: 0 };
+          await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+          const { job } = await insert({ mode: "block" });
+          await eventually(() => blocked.has(job.id));
+          assert.equal((await instance!.jobs.get(job.id))!.max_attempts, 1);
           await db.none(
-            `INSERT INTO ${queue} (id, job_name, target_table, target_row_pkey, params, status, attempts,
-          max_attempts, delay_ms, backoff, lease_token, locked_until, checkpoint)
-          VALUES (\${jobId}, 'process', \${targetTable}, \${targetRowPkey:json}, '{"size":10}', 'running', 1, 3, 0, 'fixed', \${leaseToken},
-            clock_timestamp() - interval '1 second', '{"done":1}')`,
-            {
-              jobId: randomUUID(),
-              targetTable: table,
-              targetRowPkey: { id: recovered.row.id },
-              leaseToken: randomUUID(),
-            },
+            `UPDATE ${queue} SET checkpoint = '{"done":1}', has_checkpoint = TRUE
+              WHERE id = \${jobId}`,
+            { jobId: job.id },
           );
-          const lost = (await records("status = 'running'"))[0]!;
-          await status(lost.id, "succeeded");
-          assert.equal((await instance!.jobs.get(lost.id))!.attempts, 2);
-          await db.none(
-            `UPDATE ${queue} SET status = 'running', max_attempts = attempts, lease_token = \${leaseToken},
-              locked_until = clock_timestamp() - interval '1 second', finished_at = NULL WHERE id = \${jobId}`,
-            { jobId: lost.id, leaseToken: randomUUID() },
-          );
-          assert.deepEqual((await status(lost.id, "failed")).error, {
-            message: "Worker interrupted",
-          });
+          const { job: cancelledJob } = await insert({ mode: "block" });
+          await eventually(() => blocked.has(cancelledJob.id));
+          await instance!.jobs.cancel(cancelledJob.id);
+          for (const restart of [1, 2]) {
+            await instance!.destroy();
+            instance = undefined;
+            const [stopped] = await records("id = ${jobId}", { jobId: job.id });
+            assert.equal(stopped!.status, "pending");
+            assert.equal(stopped!.attempts, 0);
+            assert.equal(stopped!.stalled_count, 0);
+            assert.equal(stopped!.lease_token, null);
+            assert.equal(stopped!.locked_until, null);
+            const [cancelled] = await records("id = ${jobId}", { jobId: cancelledJob.id });
+            assert.equal(cancelled!.status, "cancelled");
+            assert.equal(cancelled!.attempts, 1);
+            assert.equal(cancelled!.stalled_count, 0);
+            if (restart === 1) {
+              /* Recreate the queue schema from before stall tracking was added. */
+              await db.none(
+                `ALTER TABLE ${queue} DROP COLUMN stalled_count, DROP COLUMN max_stalled_count`,
+              );
+            }
+            instance = await prostgles<JobTestSchema>(options);
+            await eventually(() => seen.filter(({ id }) => id === job.id).length === restart + 1);
+            const recovered = (await instance.jobs.get(job.id))!;
+            assert.equal(recovered.status, "running");
+            assert.equal(recovered.attempts, 1);
+            assert.equal(recovered.stalled_count, 0);
+            assert.equal(recovered.max_stalled_count, restart === 1 ? 3 : 0);
+            assert.deepEqual(recovered.checkpoint, { done: 1 });
+            assert.equal(recovered.has_checkpoint, true);
+            await db.none(`UPDATE ${queue} SET max_stalled_count = 0 WHERE id = \${jobId}`, {
+              jobId: job.id,
+            });
+          }
+          released.add(job.id);
+          assert.equal((await status(job.id, "succeeded")).attempts, 1);
+          definitions.process!.retry = { maxAttempts: 1 };
+          await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
         },
       );
       await t.test("hooks and returning include database changes from job ID updates", async () => {
@@ -1723,6 +1986,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             await assert.rejects(boundJobs.cancel(job.id), /active transaction/);
             await assert.rejects(boundJobs.rerun(job.id), /active transaction/);
             await assert.rejects(
+              boundJobs.start("process", {}, { row: { id: row.id } }),
+              /active transaction/,
+            );
+            await assert.rejects(
               boundJobs.control("process", {
                 row: { id: row.id },
                 operation: "rerun",
@@ -1808,6 +2075,372 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const { jobId } = await detachedRerun;
           await status(jobId, "succeeded");
           assert.equal((await instance!.db[table].findOne({ id: row.id }))!.job_id, jobId);
+        },
+      );
+      await t.test(
+        "manual jobs validate parameters, retry and inherit the starting user",
+        async () => {
+          const manual = defineJob({
+            trigger: { type: "manual" },
+            retention: "forever",
+            params: { size: { jsonbSchema: { type: "number" }, default: 10 } },
+            retry: { maxAttempts: 2, delayMs: 10 },
+            run: async ({ row, params, user, dbo, run, checkpoint, progress, signal }) => {
+              assert.equal(row, undefined);
+              if (params.size === -2) throw new Error("Manual job failed");
+              while (params.size === 99) {
+                signal.throwIfAborted();
+                await delay(10);
+              }
+              if (run.attempt === 1) {
+                await checkpoint.set(params.size);
+                throw new Error("Retry manual job");
+              }
+              assert.equal(run.reason, "retry");
+              assert.equal(await checkpoint.get(), params.size);
+              await progress(1, 1);
+              return {
+                size: params.size,
+                userId: user?.id ?? null,
+                hasOtherOwners: (await dbo.records.count({ owner: { $ne: "alice" } })) > 0,
+              };
+            },
+          });
+          definitions.manual = manual;
+          const defineManualControl = createJobControlFunctionDefiner<JobTestSchema>()({ manual });
+          const functions = options.functions!.members!.functions;
+          let manualControlJobs: Jobs | undefined;
+          functions.startManualJob = defineManualControl({
+            jobName: "manual",
+            operation: "startOrRetry",
+            run: async ({ row, params, job, dbx, jobs }) => {
+              assert.equal(row, undefined);
+              assert.equal(job?.job_name ?? "manual", "manual");
+              manualControlJobs = jobs;
+              if (params.size === -1) {
+                await dbx.records.insert({
+                  enabled: false,
+                  note: "rejected manual control",
+                });
+                throw new Error("Manual preparation rejected");
+              }
+            },
+          });
+          functions.rerunManualJob = defineManualControl({
+            jobName: "manual",
+            operation: "rerun",
+          });
+          functions.cancelManualJob = defineManualControl({
+            jobName: "manual",
+            operation: "cancel",
+          });
+          try {
+            await instance!.update(
+              {
+                jobs: { tableName: queueName, definitions },
+                functions: options.functions,
+              },
+              true,
+            );
+            /* Wait for a worker tick to prove manual jobs are not enqueued automatically. */
+            await delay(500);
+            assert.equal((await records("job_name = 'manual'")).length, 0);
+            await assert.rejects(instance!.jobs.start("missing"), /Unknown job: missing/);
+            await assert.rejects(
+              instance!.jobs.start("manual", { unknown: 1 }),
+              /Unknown job parameter/,
+            );
+            await assert.rejects(
+              instance!.jobs.start("manual", { size: "bad" }),
+              /Invalid job parameter/,
+            );
+            await assert.rejects(
+              instance!.jobs.start("manual", {}, { row: { id: 1 } }),
+              /does not accept a row/,
+            );
+            const { jobId } = await instance!.jobs.start("manual");
+            const completed = await status(jobId, "succeeded");
+            assert.equal(completed.attempts, 2);
+            assert.equal(completed.target_table, null);
+            assert.deepEqual(completed.target_row_pkey, {});
+            assert.equal(completed.occurrence, null);
+            assert.deepEqual(completed.output, {
+              size: 10,
+              userId: null,
+              hasOtherOwners:
+                (await instance!.db.records.count({
+                  owner: { $ne: "alice" },
+                })) > 0,
+            });
+            const rerun = await instance!.jobs.rerun(jobId, { size: 20 });
+            assert.deepEqual((await status(rerun.jobId, "succeeded")).params, {
+              size: 20,
+            });
+
+            manual.runAs = "user";
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+            await assert.rejects(instance!.jobs.start("manual"), /requires a user/);
+            const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+            const bob = await instance!.getClientDBHandlers({ userId: "bob" }, undefined);
+            assert.equal(bob.clientMethods.startManualJob, undefined);
+            const startManual = (input: { jobId?: string; params?: { size: number } } = {}) =>
+              alice.clientMethods.startManualJob!.run(input) as Promise<{
+                jobId: string;
+              }>;
+            const rerunManual = (input: { jobId: string; params?: { size: number } }) =>
+              alice.clientMethods.rerunManualJob!.run(input) as Promise<{
+                jobId: string;
+              }>;
+            await assert.rejects(
+              alice.clientMethods.startManualJob!.run({
+                params: { size: "bad" },
+              }),
+            );
+            await assert.rejects(
+              alice.clientMethods.startManualJob!.run({
+                params: { unknown: 1 },
+              }),
+            );
+            await assert.rejects(alice.clientMethods.cancelManualJob!.run({}));
+            await assert.rejects(alice.clientMethods.rerunManualJob!.run({}));
+            const countBeforeRejectedControl = (await records()).length;
+            await assert.rejects(
+              startManual({ params: { size: -1 } }),
+              /Manual preparation rejected/,
+            );
+            assert.equal(
+              await instance!.db.records.count({
+                note: "rejected manual control",
+              }),
+              0,
+            );
+            assert.equal((await records()).length, countBeforeRejectedControl);
+            const defaultStart = await startManual();
+            assert.equal((await status(defaultStart.jobId, "succeeded")).params!.size, 10);
+            assert(manualControlJobs);
+            await assert.rejects(manualControlJobs.get(defaultStart.jobId), /active transaction/);
+            const explicit = await instance!.jobs.start(
+              "manual",
+              { size: 30 },
+              { userId: "alice" },
+            );
+            const inherited = await startManual({ params: { size: 40 } });
+            for (const [started, size] of [
+              [explicit, 30],
+              [inherited, 40],
+            ] as const) {
+              const result = await status(started.jobId, "succeeded");
+              assert.equal(result.user_id, "alice");
+              assert.deepEqual(result.output, {
+                size,
+                userId: "alice",
+                hasOtherOwners: false,
+              });
+            }
+            await assert.rejects(startManual({ jobId: inherited.jobId }), /not allowed/);
+            await assert.rejects(
+              alice.clientMethods.cancelManualJob!.run({
+                jobId: inherited.jobId,
+              }),
+              /not allowed/,
+            );
+            await assert.rejects(rerunManual({ jobId }), /not readable/);
+            const { job: rowJob } = await insert();
+            await status(rowJob.id, "succeeded");
+            await assert.rejects(rerunManual({ jobId: rowJob.id }), /does not match/);
+            const rerunControl = await rerunManual({
+              jobId: inherited.jobId,
+              params: { size: 50 },
+            });
+            assert.equal((await status(rerunControl.jobId, "succeeded")).params!.size, 50);
+            const failed = await startManual({ params: { size: -2 } });
+            await status(failed.jobId, "failed");
+            await assert.rejects(rerunManual({ jobId: failed.jobId }), {
+              message:
+                `Job "manual" (${failed.jobId}): "rerun" is not allowed while status is "failed". ` +
+                "Allowed statuses: succeeded.",
+            });
+            const retried = await startManual({
+              jobId: failed.jobId,
+              params: { size: 60 },
+            });
+            await status(retried.jobId, "succeeded");
+            const inheritedParams = await rerunManual({ jobId: retried.jobId });
+            assert.equal((await status(inheritedParams.jobId, "succeeded")).params!.size, 60);
+            const running = await startManual({ params: { size: 99 } });
+            await status(running.jobId, "running");
+            await alice.clientMethods.cancelManualJob!.run({
+              jobId: running.jobId,
+            });
+            await status(running.jobId, "cancelled");
+            const resumed = await startManual({
+              jobId: running.jobId,
+              params: { size: 70 },
+            });
+            await status(resumed.jobId, "succeeded");
+            delete manual.runAs;
+            for (const rollback of [false, true]) {
+              let startedId = "";
+              const transaction = instance!.db.tx(async (dbx) => {
+                const jobs = instance!.jobs.withTransaction(dbx);
+                startedId = (await jobs.start("manual")).jobId;
+                assert.equal((await jobs.get(startedId))!.status, "pending");
+                assert.equal(await instance!.jobs.get(startedId), undefined);
+                await jobs.cancel(startedId);
+                if (rollback) {
+                  await assert.rejects(
+                    jobs.start("manual", { size: "bad" }),
+                    /Invalid job parameter/,
+                  );
+                }
+              });
+              if (rollback) await assert.rejects(transaction, /Invalid job parameter/);
+              else await transaction;
+              assert.equal(
+                (await instance!.jobs.get(startedId))?.status,
+                rollback ? undefined : "cancelled",
+              );
+            }
+          } finally {
+            delete definitions.manual;
+            delete functions.startManualJob;
+            delete functions.rerunManualJob;
+            delete functions.cancelManualJob;
+            await instance!.update(
+              {
+                jobs: { tableName: queueName, definitions },
+                functions: options.functions,
+              },
+              true,
+            );
+          }
+        },
+      );
+      await t.test(
+        "manual row starts validate and link rows atomically without automatic triggers",
+        async () => {
+          const trigger = definitions.process!.trigger;
+          assert(trigger.type === "row");
+          const originalOn = trigger.on;
+          const originalColumns = trigger.columns;
+          trigger.on = [];
+          try {
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+            const { row } = await insert();
+            await instance!.db.records.update({ id: row.id }, { revision: 2 });
+            assert.equal(
+              (
+                await records("target_row_pkey = ${row:json}", {
+                  row: { id: row.id },
+                })
+              ).length,
+              0,
+            );
+            await assert.rejects(instance!.jobs.start("process"), /primary key is unavailable/);
+            await assert.rejects(
+              instance!.jobs.start("process", {}, { row: {} }),
+              /primary key is unavailable/,
+            );
+            await assert.rejects(
+              instance!.jobs.start("process", {}, { row: { id: -1 } }),
+              /Job row is unavailable/,
+            );
+            const disabled = await insert({ enabled: false });
+            await assert.rejects(
+              instance!.jobs.start("process", {}, { row: { id: disabled.row.id } }),
+              /does not satisfy its trigger condition/,
+            );
+            const { jobId } = await instance!.jobs.start(
+              "process",
+              { size: 25 },
+              { row: { id: row.id } },
+            );
+            assert.equal((await instance!.db.records.findOne({ id: row.id }))!.job_id, jobId);
+            assert.deepEqual((await status(jobId, "succeeded")).params, {
+              size: 25,
+            });
+            assert.equal(seen.find(({ id }) => id === jobId)!.revision, 2);
+            assert.equal(seen.find(({ id }) => id === jobId)!.reason, "trigger");
+
+            const beforeRollback = (await records()).length;
+            await assert.rejects(
+              instance!.db.tx(async (dbx) => {
+                await instance!.jobs
+                  .withTransaction(dbx)
+                  .start("process", {}, { row: { id: row.id } });
+                throw new Error("Rollback manual start");
+              }),
+              /Rollback manual start/,
+            );
+            rejectHook = true;
+            await assert.rejects(instance!.jobs.start("process", {}, { row: { id: row.id } }), {
+              message: "Reject row",
+            });
+            rejectHook = false;
+            assert.equal((await records()).length, beforeRollback);
+            assert.equal((await instance!.db.records.findOne({ id: row.id }))!.job_id, jobId);
+
+            definitions.unlinked = defineJob({
+              trigger: { type: "row", table, on: [] },
+              run: ({ row }) => Promise.resolve({ revision: row.revision }),
+            });
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+            const unlinked = await instance!.jobs.start("unlinked", {}, { row: { id: row.id } });
+            assert.deepEqual((await status(unlinked.jobId, "succeeded")).output, {
+              revision: 2,
+            });
+            assert.equal((await instance!.db.records.findOne({ id: row.id }))!.job_id, jobId);
+
+            /* Published controls also work when all automatic row triggers are disabled. */
+            const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
+            const { row: controlledRow } = await insert({
+              mode: "block",
+              owner: "alice",
+            });
+            const controlInput = { row: { id: controlledRow.id } };
+            const controlled = (await alice.clientMethods.controlRecord!.run(controlInput)) as {
+              jobId: string;
+            };
+            await status(controlled.jobId, "running");
+            await alice.clientMethods.cancelRecord!.run(controlInput);
+            await status(controlled.jobId, "cancelled");
+            const retried = (await alice.clientMethods.controlRecord!.run(controlInput)) as {
+              jobId: string;
+            };
+            released.add(retried.jobId);
+            await status(retried.jobId, "succeeded");
+            const rerunControl = (await alice.clientMethods.rerunRecord!.run(controlInput)) as {
+              jobId: string;
+            };
+            released.add(rerunControl.jobId);
+            await status(rerunControl.jobId, "succeeded");
+            assert.equal(
+              (await instance!.db.records.findOne({ id: controlledRow.id }))!.job_id,
+              rerunControl.jobId,
+            );
+            assert.equal(
+              (
+                await records("target_row_pkey = ${row:json}", {
+                  row: { id: controlledRow.id },
+                })
+              ).length,
+              3,
+            );
+
+            trigger.on = originalOn;
+            delete trigger.columns;
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+            const beforeAutomatic = (await records()).length;
+            const started = await instance!.jobs.start("process", {}, { row: { id: row.id } });
+            await status(started.jobId, "succeeded");
+            assert.equal((await records()).length, beforeAutomatic + 1);
+          } finally {
+            rejectHook = false;
+            delete definitions.unlinked;
+            trigger.on = originalOn;
+            trigger.columns = originalColumns;
+            await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
+          }
         },
       );
       await t.test(

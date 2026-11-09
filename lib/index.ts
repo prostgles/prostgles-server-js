@@ -37,6 +37,7 @@ export type {
   JobContext,
   RowTrigger,
   ScheduleTrigger,
+  ManualTrigger,
   ParamsSchema,
   ParamsOutput,
   Jobs,
@@ -44,6 +45,7 @@ export type {
   JobStatus,
   JobControlOperation,
   JobControlOptions,
+  ManualJobControlOptions,
   JobControlFunctionMetadata,
   JobControlBinding,
 } from "./Jobs/JobTypes";

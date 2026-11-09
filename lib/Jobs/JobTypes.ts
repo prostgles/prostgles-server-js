@@ -44,6 +44,7 @@ export type ParamsOutput<P extends ParamsSchema> = {
 export type RowTrigger<S, T extends JobTableName<S>> = {
   type: "row";
   table: T;
+  /** Use an empty array for rows whose jobs are started only through the jobs API. */
   on: ("insert" | "update")[];
   /** On updates, at least one of these columns must actually change. */
   columns?: (keyof JobRow<S, T> & string)[];
@@ -56,6 +57,7 @@ export type RowTrigger<S, T extends JobTableName<S>> = {
 };
 /** Missed occurrences while all workers are stopped are not replayed. */
 export type ScheduleTrigger = { type: "schedule"; cron: string; timezone?: string };
+export type ManualTrigger = { type: "manual" };
 export type JobRetention =
   | "forever"
   | Partial<
@@ -76,12 +78,13 @@ export type JobContext<
   P extends ParamsSchema,
   Context = undefined,
 > = {
-  /** Re-fetched at the start of each attempt. Undefined for schedules. */
+  /** Re-fetched at the start of each attempt. Undefined for jobs without a row. */
   row: T extends string ? Required<JobRow<S, T>> : undefined;
   params: ParamsOutput<P>;
   dbo: DBHandlerServer<S>;
   user: SessionUser["user"] | undefined;
   context: Context;
+  /** An attempt released during graceful shutdown keeps its number when resumed. */
   run: { id: string; attempt: number; reason: "trigger" | "rerun" | "retry" };
   /** Cancellation and timeouts are cooperative: handlers must observe this signal. */
   signal: AbortSignal;
@@ -99,8 +102,8 @@ export type JobDefinition<
 > = JobDefinitionOptions<S, T, P, Context> &
   (T extends JobTableName<S> ? { trigger: RowTrigger<S, T>; retention?: never }
   : {
-      trigger: ScheduleTrigger;
-      /** Required for schedules. "forever" keeps all history.
+      trigger: ScheduleTrigger | ManualTrigger;
+      /** Required for jobs without a row. "forever" keeps all history.
        * Per-status strings shorthand maxAge; "forever" or omitted statuses keep their history.
        * Cleanup runs periodically and preserves the current scheduling minute for deduplication.
        */
@@ -131,9 +134,12 @@ type DefineJob<S, Context> = {
       retention?: never;
     },
   ): JobDefinition<S, T, P, Context>;
-  <const P extends ParamsSchema = {}>(
-    definition: JobDefinition<S, undefined, P, Context>,
-  ): JobDefinition<S, undefined, P, Context>;
+  <
+    const P extends ParamsSchema = {},
+    Trigger extends ScheduleTrigger | ManualTrigger = ScheduleTrigger | ManualTrigger,
+  >(
+    definition: JobDefinition<S, undefined, P, Context> & { trigger: Trigger },
+  ): JobDefinition<S, undefined, P, Context> & { trigger: Trigger };
 };
 
 export const jobControlStatuses: Record<JobControlOperation, readonly JobStatus[]> = {
@@ -146,6 +152,17 @@ export type JobControlOptions<S = void, Row extends AnyObject = AnyObject> = {
   operation: JobControlOperation;
   run?: (row: Row, dbx: DBTableHandlersFromSchema<S>) => MaybePromise<void>;
 };
+export type ManualJobControlOptions<S = void> = {
+  /** Omit only when starting a new manual job with startOrRetry. */
+  jobId?: string;
+  params?: Record<string, JobValue>;
+  operation: JobControlOperation;
+  run?: (context: {
+    job: JobRecord | undefined;
+    params: Record<string, JobValue>;
+    dbx: DBTableHandlersFromSchema<S>;
+  }) => MaybePromise<void>;
+};
 /** Uses the execution request/user, or an explicit userId. Calls without either are trusted server operations.
  * Mutations create their own transaction unless explicitly bound with withTransaction.
  */
@@ -154,6 +171,14 @@ export type Jobs = {
   withTransaction: (dbx: object) => Jobs;
   /** User reads obey the jobs table's publish.select fields and filters. */
   get: (id: string, options?: { userId: string }) => Promise<Partial<JobRecord> | undefined>;
+  /** Server operation. Row jobs require a primary key and must satisfy trigger.when.
+   * Expose through a published function to authorize client calls, as with rerun.
+   */
+  start: (
+    name: string,
+    params?: Record<string, JobValue>,
+    options?: { row?: JobRecord["target_row_pkey"]; userId?: string },
+  ) => Promise<{ jobId: string }>;
   /** Server operation. Expose through a published function to authorize client calls. */
   cancel: (id: string) => Promise<void>;
   /** Server operation. The user context determines who the new run executes as. */
@@ -163,10 +188,13 @@ export type Jobs = {
     options?: { userId: string },
   ) => Promise<{ jobId: string }>;
   /** Requires an execution user. Uses the bound transaction, or creates its own. */
-  control: <S = void, Row extends AnyObject = AnyObject>(
-    name: string,
-    options: JobControlOptions<S, Row>,
-  ) => Promise<{ jobId: string }>;
+  control: {
+    <S = void, Row extends AnyObject = AnyObject>(
+      name: string,
+      options: JobControlOptions<S, Row>,
+    ): Promise<{ jobId: string }>;
+    <S = void>(name: string, options: ManualJobControlOptions<S>): Promise<{ jobId: string }>;
+  };
 };
 export type JobTransaction = { t: pgPromise.ITask<{}>; dbx: DbTxTableHandlers };
 export type RuntimeJobDefinition = JobDefinition<void, string | undefined, ParamsSchema, unknown>;
@@ -179,9 +207,19 @@ type JobDefinitionOptions<
   params?: P;
   /** Defaults to system. User jobs enforce the triggering/rerunning user's publish rules. */
   runAs?: "system" | "user";
-  retry?: { maxAttempts: number; backoff?: "exponential" | "fixed"; delayMs?: number };
+  /**
+   * Failures and stalled executions have separate retry budgets and backoff counts.
+   * Graceful shutdowns consume neither.
+   */
+  retry?: {
+    maxAttempts: number;
+    /** Maximum stalled executions to recover from. Defaults to 3; 0 disables recovery. */
+    maxStalledCount?: number;
+    backoff?: "exponential" | "fixed";
+    delayMs?: number;
+  };
   timeoutMs?: number;
-  /** Conflicts use the job name and row primary key, or just the name for schedules. */
+  /** Conflicts use the job name and row primary key, or just the name for jobs without a row. */
   onConflict?: "queue" | "replace" | "skip";
   /** Maximum parallel runs across workers. Defaults to 1. Same-key runs are serialized. */
   concurrency?: number;

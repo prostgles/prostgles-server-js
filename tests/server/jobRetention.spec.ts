@@ -236,6 +236,32 @@ export const testJobRetention = async (parentDb: DB) => {
         assert.equal(await result.jobs.get(jobId), undefined);
       });
 
+      await context.test("manual jobs require retention and prune completed starts", async () => {
+        const manual = defineJob({
+          trigger: { type: "manual" },
+          retention: "forever",
+          run: async () => {},
+        });
+        prostgles.opts.jobs!.definitions.manual = manual;
+        try {
+          /* @ts-expect-error Exercise an untyped manual job without retention. */
+          delete manual.retention;
+          await assert.rejects(prostgles.jobs.validate(), /required for manual jobs/);
+          manual.retention = "forever";
+          await prostgles.jobs.validate();
+          const { jobId } = await result.jobs.start("manual");
+          prostgles.jobs.start();
+          await eventually(async () => (await result.jobs.get(jobId))?.status === "succeeded");
+          await prostgles.jobs.stop();
+          manual.retention = { succeeded: { maxCount: 0 } };
+          await pruneJobs(prostgles, await getJobRetention(prostgles));
+          assert.equal(await result.jobs.get(jobId), undefined);
+        } finally {
+          await prostgles.jobs.stop();
+          delete prostgles.opts.jobs!.definitions.manual;
+        }
+      });
+
       await context.test(
         "cleanup uses bounded batches across workers and skips locked rows",
         async () => {
@@ -310,16 +336,10 @@ export const testJobRetention = async (parentDb: DB) => {
           other.retention = "forever";
           const { occurrence: occurrenceTimestamp } = await db.one<{
             occurrence: string;
-          }>(
-            "SELECT date_trunc('minute', clock_timestamp()) - interval '2 minutes' AS occurrence",
-          );
+          }>("SELECT date_trunc('minute', clock_timestamp()) - interval '2 minutes' AS occurrence");
           const occurrence = new Date(occurrenceTimestamp);
           /* Simulate the database clock advancing after each occurrence was selected. */
-          testContext.mock.method(
-            cronSchedule,
-            "parseCronSchedule",
-            () => () => occurrence,
-          );
+          testContext.mock.method(cronSchedule, "parseCronSchedule", () => () => occurrence);
           const schedules = new Map<string, string>();
           await enqueueSchedules(prostgles, schedules);
           assert.equal((await remainingIds()).length, 2);
@@ -345,13 +365,8 @@ export const testJobRetention = async (parentDb: DB) => {
           );
           const occurrence = new Date(occurrenceTimestamp);
           const parseCronSchedule = cronSchedule.parseCronSchedule;
-          testContext.mock.method(
-            cronSchedule,
-            "parseCronSchedule",
-            (trigger: ScheduleTrigger) =>
-              trigger === retained.trigger
-                ? () => occurrence
-                : parseCronSchedule(trigger),
+          testContext.mock.method(cronSchedule, "parseCronSchedule", (trigger: ScheduleTrigger) =>
+            trigger === retained.trigger ? () => occurrence : parseCronSchedule(trigger),
           );
           const policies = await getJobRetention(prostgles);
           const getJobParams = jobParams.getJobParams;

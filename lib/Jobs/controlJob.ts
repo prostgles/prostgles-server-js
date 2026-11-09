@@ -7,22 +7,36 @@ import { runClientRequest } from "../runClientRequest";
 import { enqueueJob } from "./enqueueJob";
 import { getJobDefinition } from "./getJobDefinition";
 import { getJobTableHandler } from "./getJobTableHandler";
-import type { JobControlOptions, JobRecord, JobTransaction } from "./JobTypes";
-import { jobControlStatuses } from "./JobTypes";
-import { getJobPrimaryKeyNames, matchesJobTriggerCondition } from "./jobUtils";
+import type {
+  JobControlOptions,
+  JobRecord,
+  JobTransaction,
+  ManualJobControlOptions,
+} from "./JobTypes";
+import {
+  assertJobControlStatus,
+  getJobPrimaryKeyNames,
+  matchesJobTriggerCondition,
+} from "./jobUtils";
+import { controlManualJob } from "./controlManualJob";
 
 export const controlJob = async <S, Row extends AnyObject>(
   prostgles: Prostgles,
   transaction: JobTransaction,
   clientReq: AuthClientRequest,
   name: string,
-  options: JobControlOptions<S, Row>,
+  options: JobControlOptions<S, Row> | ManualJobControlOptions<S>,
 ) => {
   const { definition } = getJobDefinition(prostgles, name);
   const { trigger } = definition;
+  if (trigger.type === "manual") {
+    if ("row" in options) throw new Error(`Manual job ${name} does not accept a row`);
+    return controlManualJob(prostgles, transaction, name, options);
+  }
   if (trigger.type !== "row" || !trigger.jobIdColumn) {
     throw new Error(`Job control requires a row job with jobIdColumn: ${name}`);
   }
+  if (!("row" in options)) throw new Error(`Job control requires a row: ${name}`);
   const findReadableRows = (filter: AnyObject) =>
     runClientRequest.call(
       prostgles,
@@ -91,9 +105,7 @@ export const controlJob = async <S, Row extends AnyObject>(
       ) {
         throw new Error("Linked job does not match the target row");
       }
-      if (job && !jobControlStatuses[options.operation].includes(job.status)) {
-        throw new Error(`Job control is not allowed while the job is ${job.status}`);
-      }
+      if (job) assertJobControlStatus(job, options.operation);
       if (!job && options.operation !== "startOrRetry") {
         throw new Error("Job has not started");
       }

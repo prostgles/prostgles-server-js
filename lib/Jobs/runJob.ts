@@ -154,16 +154,30 @@ export const runJob = async (
     await heartbeatWork;
   }
   if (stopping()) {
-    await db.none(`UPDATE ${tableSQL} SET locked_until = clock_timestamp() WHERE ${owned}`, claim);
+    await db.none(
+      `UPDATE ${tableSQL} 
+      SET
+        status = CASE WHEN cancel_requested THEN 'cancelled' ELSE 'pending' END,
+        attempts = attempts - CASE WHEN cancel_requested THEN 0 ELSE 1 END,
+        lease_token = NULL,
+        locked_until = NULL,
+        run_at = clock_timestamp(),
+        finished_at = CASE WHEN cancel_requested THEN clock_timestamp() END
+      WHERE ${owned}`,
+      claim,
+    );
     return;
   }
+  const failureAttempts = job.attempts - job.stalled_count;
   const delayMs = Math.min(
     2_147_483_647,
-    job.delay_ms * (job.backoff === "exponential" ? 2 ** (job.attempts - 1) : 1),
+    job.delay_ms * (job.backoff === "exponential" ? 2 ** (failureAttempts - 1) : 1),
   );
   const finishJob = async (failure: { error: unknown } | undefined, output: JobValue) => {
     const retry =
-      failure && !(failure.error instanceof PermanentJobError) && job.attempts < job.max_attempts;
+      failure &&
+      !(failure.error instanceof PermanentJobError) &&
+      failureAttempts < job.max_attempts;
     const status =
       !failure ? "succeeded"
       : retry ? "pending"

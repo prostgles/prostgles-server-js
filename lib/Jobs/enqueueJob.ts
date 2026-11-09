@@ -6,7 +6,7 @@ import type { JobRecord, JobTransaction } from "./JobTypes";
 import { getJobTableHandler } from "./getJobTableHandler";
 import { getJobParams } from "./getJobParams";
 
-/** Called only by configured triggers and reruns, inside their originating transaction. */
+/** Enqueue configured jobs inside the trigger, start or rerun transaction. */
 export const enqueueJob = async (
   prostgles: Prostgles,
   transaction: JobTransaction,
@@ -102,6 +102,7 @@ export const enqueueJob = async (
     occurrence: options.occurrence?.toISOString() ?? null,
     reason: options.reason ?? "trigger",
     max_attempts: definition.retry?.maxAttempts ?? 1,
+    max_stalled_count: definition.retry?.maxStalledCount ?? 3,
     delay_ms: definition.retry?.delayMs ?? 1000,
     backoff: definition.retry?.backoff ?? "fixed",
   });

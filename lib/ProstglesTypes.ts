@@ -233,7 +233,7 @@ export type ProstglesInitOptions<
    */
   functions?: ServerFunctionDefinitions<S, SUser, Context>;
 
-  /** Durable jobs triggered by row changes or schedules. */
+  /** Durable jobs triggered manually, by row changes or by schedules. */
   jobs?: JobsOptions<S, Context>;
 
   /**
