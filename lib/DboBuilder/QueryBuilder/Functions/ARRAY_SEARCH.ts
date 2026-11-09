@@ -1,36 +1,37 @@
 import pgPromise from "pg-promise";
 import { asNameAlias } from "../../../utils/asNameAlias";
-import type { FunctionSpec } from "./Functions";
-import { isObject } from "prostgles-types";
+import { createFunc } from "./createFunc";
 
 const pgp = pgPromise();
 
-export const ARRAY_SEARCH: FunctionSpec = {
+export const ARRAY_SEARCH = createFunc({
   name: "$array_search",
   type: "function",
-  description: `:[column_name, search_term, opts?: { matchCase?: boolean, contextChars?: number, limit?: number }] -> Search a text array for non-overlapping literal matches. Returns [{ index, offset, match, snippet }] in page/offset order. Index is the PostgreSQL array index (normally 1-based); offset is a 0-based character offset within that page, not a UTF-16 offset. Defaults: matchCase=false, contextChars=80 on each side, limit=20 per row. No matches or a null array returns [].`,
-  numArgs: 3,
+  description: `Search a text array for non-overlapping literal matches. Returns [{ index, offset, match, snippet }] in page/offset order. Index is the PostgreSQL array index (normally 1-based); offset is a 0-based character offset within that page, not a UTF-16 offset. Defaults: matchCase=false, contextChars=80 on each side, limit=20 per row. No matches or a null array returns [].`,
+  argsSchema: {
+    columnName: "string",
+    searchTerm: "string",
+    options: {
+      optional: true,
+      type: {
+        matchCase: { type: "boolean", optional: true },
+        contextChars: { type: "integer", optional: true },
+        limit: { type: "integer", optional: true },
+      },
+    },
+  },
   singleColArg: false,
   returnType: "jsonb",
-  getFields: ([columnName]) => [columnName],
-  getQuery: ({ args: [columnName, searchTerm, options = {}], tableAliasRaw, allColumns }) => {
-    if (typeof searchTerm !== "string" || !searchTerm.length) {
+  getFields: ({ columnName }) => [columnName],
+  getQuery: ({ args: { columnName, searchTerm, options = {} }, tableAliasRaw, allColumns }) => {
+    if (!searchTerm.length) {
       throw new Error("$array_search search_term must be a non-empty string");
     }
-    if (!options || !isObject(options)) {
-      throw new Error("$array_search options must be an object");
-    }
-    if (Object.keys(options).some((key) => !["matchCase", "contextChars", "limit"].includes(key))) {
-      throw new Error("$array_search options must be matchCase, contextChars or limit");
-    }
     const { matchCase = false, contextChars = 80, limit = 20 } = options;
-    if (typeof matchCase !== "boolean") {
-      throw new Error("$array_search matchCase must be a boolean");
-    }
-    if (!Number.isInteger(contextChars) || contextChars < 0 || contextChars > 10000) {
+    if (contextChars < 0 || contextChars > 10000) {
       throw new Error("$array_search contextChars must be an integer between 0 and 10000");
     }
-    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    if (limit < 1 || limit > 1000) {
       throw new Error("$array_search limit must be an integer between 1 and 1000");
     }
 
@@ -70,4 +71,4 @@ export const ARRAY_SEARCH: FunctionSpec = {
       ) AS matches
     )`;
   },
-};
+});

@@ -13,7 +13,7 @@ import { isomorphicQueries } from "../isomorphicQueries.spec";
 //@ts-ignore
 import { isomorphicQueriesTyped } from "../isomorphicQueriesTyped.spec";
 import { clientHooks } from "./hooks.spec";
-import { newly_created_table, useProstglesTest } from "./useProstgles.spec";
+import { useProstglesTest } from "./useProstgles.spec";
 export { DBHandlerClient } from "prostgles-client";
 export { AuthHandler } from "prostgles-client/dist/getAuthHandler";
 export type { ClientFunctionHandler } from "prostgles-client/dist/getMethods";
@@ -63,7 +63,6 @@ const tests: Record<string, ClientTestSpecV2> = {
     await testSyncTriggerCleanup(db, sql!);
   },
   main: async ({ db, sql, methods, tableSchema, auth, reconnectSocket }) => {
-    await sql!(`DROP TABLE IF EXISTS ${newly_created_table}`);
     await isomorphicQueries(db as any, sql, log, TEST_NAME);
     await isomorphicQueriesTyped(
       //@ts-ignore

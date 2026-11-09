@@ -1,5 +1,5 @@
 import { strict as assert } from "assert";
-import { describe, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { useProstglesClient, type UseProstglesClientProps } from "prostgles-client";
 import type { DBHandlerClient } from "./index";
 import { renderReactHook, renderReactHookManual } from "./renderReactHook";
@@ -15,6 +15,9 @@ export const useProstglesTest = async (
   /** Wait for schema changes to propagate */
   await sql(`select pg_sleep(3);`);
   await describe("useProstgles hook", async (t) => {
+    after(async () => {
+      await sql(`DROP TABLE IF EXISTS ${newly_created_table};`);
+    });
     const clientOptions = getSocketOptions();
     await test("useProstglesClient", async (t) => {
       const {

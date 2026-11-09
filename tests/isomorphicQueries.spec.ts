@@ -9,6 +9,7 @@ import {
   ABORTABLE_METHODS,
   type SubscriptionHandler,
   innerJoin,
+  isObject,
   leftJoin,
   pickKeys,
   type AnyObject,
@@ -820,10 +821,106 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(result, { second: "a2" });
     });
 
+    await test("JSON path extraction omits payloads and preserves rows with missing or null values", async () => {
+      const filter = { json: { "@>": { arrStr: ["json-path-test"] } } };
+      await db.tjson.insert({
+        colOneOf: "a",
+        json: {
+          a: false,
+          arr: "1",
+          arr1: 1,
+          arr2: [],
+          arrStr: ["json-path-test"],
+        },
+        table_config: {
+          referencedTables: [{ name: "large payload".repeat(4096), minFiles: 0 }],
+          recType: { a: { bools: [false, true] } },
+        },
+      });
+      const select = {
+        minFiles: {
+          $jsonb_extract_path_text: ["table_config", "referencedTables", "0", "minFiles"],
+        },
+        missing: { $jsonb_extract_path_text: ["table_config", "missing'key"] },
+        bool: {
+          $jsonb_extract_path_text: ["table_config", "recType", "a", "bools", "0"],
+        },
+        hasReferencedTables: {
+          $case: [[{ table_config: { "?": "referencedTables" } }, true]],
+          $else: false,
+        },
+      } as const;
+      try {
+        await assert.rejects(
+          () =>
+            db.tjson.findOne(filter, {
+              /* @ts-expect-error An unknown function should suggest the generated signature. */
+              select: { json: { jsonb_extract_path_text: ["json", "key"] } },
+            }),
+          (error: unknown) => {
+            assert(isObject(error) && typeof error.message === "string");
+            assert(error.message.includes(":[columnName: string, ...path: string[]] -> Extract"));
+            return true;
+          },
+        );
+        assert.deepStrictEqual(await db.tjson.findOne(filter, { select }), {
+          hasReferencedTables: true,
+          minFiles: "0",
+          missing: null,
+          bool: "false",
+        });
+        assert.equal(
+          await db.tjson.count({
+            $and: [
+              filter,
+              {
+                $filter: [
+                  { $jsonb_extract_path_text: [...select.minFiles.$jsonb_extract_path_text] },
+                  "=",
+                  "0",
+                ],
+              },
+            ],
+          }),
+          1,
+        );
+        await db.tjson.update(filter, {
+          table_config: { referencedTables: [], recType: null },
+        });
+        assert.deepStrictEqual(await db.tjson.findOne(filter, { select }), {
+          hasReferencedTables: true,
+          minFiles: null,
+          missing: null,
+          bool: null,
+        });
+        await db.tjson.update(filter, { table_config: null });
+        assert.deepStrictEqual(await db.tjson.findOne(filter, { select }), {
+          hasReferencedTables: false,
+          minFiles: null,
+          missing: null,
+          bool: null,
+        });
+        for (const path of [[], [null], [0], [{}]]) {
+          await assert.rejects(() =>
+            db.tjson.findOne(filter, {
+              select: { json: { $jsonb_extract_path_text: ["json", ...path] } },
+            }),
+          );
+        }
+        await assert.rejects(() =>
+          db.tjson.findOne(filter, {
+            select: { json: { $jsonb_extract_path_text: ["colOneOf", "key"] } },
+          }),
+        );
+      } finally {
+        await db.tjson.delete(filter);
+      }
+    });
+
     await test("PostgreSQL text array search", async () => {
       const id = -101;
       await db.items.insert({ id, name: "array search", h: ["xxCat cat!", "", "🐈 café CAT"] });
-      const search = (searchTerm: string, options = {}) =>
+      const search = (searchTerm: string, options: unknown = {}) =>
         db.items.findOne(
           { id },
           { select: { matches: { $array_search: ["h", searchTerm, options] } } },
@@ -840,6 +937,10 @@ export const isomorphicQueries = async (
             { index: 3, offset: 7, match: "CAT", snippet: "é CAT" },
           ],
         });
+        assert.deepStrictEqual(
+          await db.items.findOne({ id }, { select: { matches: { $array_search: ["h", "cat"] } } }),
+          await search("cat"),
+        );
         assert.deepStrictEqual(await search("cat", { matchCase: true, contextChars: 0 }), {
           matches: [{ index: 1, offset: 6, match: "cat", snippet: "cat" }],
         });
@@ -882,8 +983,16 @@ export const isomorphicQueries = async (
           { limit: 1001 },
           { matchCase: "true" },
           { unknownOption: true },
+          null,
+          [],
         ]) {
           await assert.rejects(() => search("cat", options));
+        }
+        /* Required argument types and surplus positional arguments are checked before querying. */
+        for (const args of [[], ["h"], [null, "cat"], ["h", 42], ["h", "cat", {}, "extra"]]) {
+          await assert.rejects(() =>
+            db.items.findOne({ id }, { select: { matches: { $array_search: args } } }),
+          );
         }
         await assert.rejects(() =>
           db.items.findOne(

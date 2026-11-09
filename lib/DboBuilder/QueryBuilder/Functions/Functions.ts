@@ -6,6 +6,7 @@ import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
 import { ARRAY_SEARCH } from "./ARRAY_SEARCH";
 import { JSONB_DIFF } from "./JSONB_DIFF";
+import { createFunc } from "./createFunc";
 import { asFunction, getAggregateQuery } from "./utils";
 import type { ExistsFilterConfig } from "../../DboBuilderTypes";
 const pgp = pgPromise();
@@ -110,6 +111,24 @@ const parseUnix = (
 
 const JSON_Funcs: FunctionSpec[] = [
   JSONB_DIFF,
+  createFunc({
+    name: "$jsonb_extract_path_text",
+    description: "Extract a JSON value as text; missing paths return null.",
+    argsSchema: {
+      columnName: "string",
+      path: { type: "string", rest: true },
+    },
+    type: "function",
+    singleColArg: false,
+    getFields: ({ columnName }) => [columnName],
+    getQuery: ({ args: { columnName, path }, tableAliasRaw, allColumns }) => {
+      const column = allColumns.find(({ name }) => name === columnName);
+      if (!column || !["json", "jsonb"].includes(column.udt_name) || !path.length) {
+        throw new Error("$jsonb_extract_path_text expects a JSON column and string path keys");
+      }
+      return `jsonb_extract_path_text(${asNameAlias(columnName, tableAliasRaw)}::jsonb, ${path.map((key) => asValue(key)).join(", ")})`;
+    },
+  }),
   {
     name: "$jsonb_set",
     description:

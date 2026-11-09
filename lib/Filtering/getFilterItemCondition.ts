@@ -152,6 +152,11 @@ export const getFilterItemCondition = ({
     } else if (filterOperand === "$isDistinctFrom" || filterOperand === "$isNotDistinctFrom") {
       const operator = FILTER_OPERAND_TO_SQL_OPERAND[filterOperand];
       return leftQ + ` ${operator} ` + asValue(filterValue);
+    } else if (filterOperand === "?") {
+      if (selItem.column_udt_type !== "jsonb" || typeof filterValue !== "string") {
+        throw new Error("JSON key-existence filters expect a JSONB column and a string key");
+      }
+      return leftQ + " ? " + asValue(filterValue);
 
       /* MAYBE TEXT OR MAYBE ARRAY */
     } else if (
