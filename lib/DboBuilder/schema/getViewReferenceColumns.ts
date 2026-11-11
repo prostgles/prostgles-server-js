@@ -6,7 +6,7 @@ import type { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
 export const getViewReferenceColumns = async (
   table: TableSchema,
   tableSchemaList: TableSchema[],
-  db: DB
+  db: DB,
 ) => {
   const viewReferenceColumns: Pick<TableSchemaColumn, "name" | "references">[] = [];
   if (!table.is_view || !table.view_definition) {
@@ -17,12 +17,10 @@ export const getViewReferenceColumns = async (
       table.view_definition.endsWith(";") ?
         table.view_definition.slice(0, -1)
       : table.view_definition;
-    const { fields } = await db.result(
-      `SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`,
-    );
+    const { fields } = await db.result(`SELECT * FROM \n ( ${view_definition} \n) t LIMIT 0`);
     const viewFieldsWithInfo = getDetailedFieldInfo(await getDbTypes(db), fields);
     const viewTables = tableSchemaList.filter((r) =>
-      viewFieldsWithInfo.some((f) => f.tableID === r.oid)
+      viewFieldsWithInfo.some((f) => f.tableID === r.oid),
     );
     viewTables.forEach((viewTable) => {
       const viewTableColumnsUsed = viewFieldsWithInfo
@@ -36,10 +34,14 @@ export const getViewReferenceColumns = async (
         .filter(isDefined);
       const viewTablePKeys = viewTable.columns.filter((c) => c.is_pkey);
       const viewTableColumnsUsedPKeys = viewTableColumnsUsed.filter((ff) =>
-        viewTablePKeys.some((p) => p.name === ff.columnName)
+        viewTablePKeys.some((p) => p.name === ff.columnName),
       );
 
       const addReferences = (referenceCols: typeof viewTableColumnsUsedPKeys) => {
+        /* Repeated source columns may come from different aliases of a self-join.
+         * PostgreSQL field metadata cannot identify which alias each column belongs to. */
+        const sourceColumnNames = referenceCols.map(({ columnName }) => columnName);
+        if (new Set(sourceColumnNames).size !== sourceColumnNames.length) return;
         const reference: { ftable: string; fcols: string[]; cols: string[] } = {
           ftable: viewTable.name,
           cols: [],
@@ -62,7 +64,7 @@ export const getViewReferenceColumns = async (
         addReferences(viewTableColumnsUsedPKeys);
       } else {
         const comparableColumns = viewTableColumnsUsed.filter(
-          (ff) => !["json", "jsonb", "xml"].includes(ff.udt_name)
+          (ff) => !["json", "jsonb", "xml"].includes(ff.udt_name),
         );
         addReferences(comparableColumns);
       }

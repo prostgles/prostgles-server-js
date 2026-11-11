@@ -719,6 +719,74 @@ export const testJoins = async (db: DB) => {
     }
   });
 
+  await test("view references ignore duplicates outside the inferred join columns", async (context) => {
+    await db.none(`
+        CREATE SCHEMA view_reference_test;
+        CREATE TABLE view_reference_test.stations (id int PRIMARY KEY, name text, metadata jsonb);
+        INSERT INTO view_reference_test.stations VALUES (1, 'Origin', '{}'), (2, 'Destination', '{}');
+        CREATE VIEW view_reference_test.station_labels AS
+          SELECT id, name, name AS label FROM view_reference_test.stations;
+        CREATE VIEW view_reference_test.station_metadata AS
+          SELECT name, metadata, metadata AS metadata_copy FROM view_reference_test.stations;
+        CREATE VIEW view_reference_test.station_routes AS
+          SELECT origin.name AS origin, destination.name AS destination
+          FROM view_reference_test.stations origin
+          CROSS JOIN view_reference_test.stations destination;
+        CREATE VIEW view_reference_test.station_route_ids AS
+          SELECT origin.id AS origin_id, destination.id AS destination_id
+          FROM view_reference_test.stations origin
+          CROSS JOIN view_reference_test.stations destination;
+      `);
+    const instance = await prostgles({
+      dbConnection: {
+        ...getConnectionDetails(db),
+        options: "-c search_path=view_reference_test,public",
+      } as unknown as ProstglesInitOptions["dbConnection"],
+      schemaFilter: { view_reference_test: 1 },
+      joins: "inferred",
+      onReady: () => {},
+    });
+    try {
+      for (const { viewName, referenceColumn } of [
+        { viewName: "station_labels", referenceColumn: "id" },
+        { viewName: "station_metadata", referenceColumn: "name" },
+      ]) {
+        await context.test(`${viewName} retains its inferred station join`, async () => {
+          const view = instance.db[viewName]!;
+          const columns = await view.getColumns!();
+          assert.deepEqual(columns.find(({ name }) => name === referenceColumn)?.references, [
+            {
+              ftable: "stations",
+              cols: [referenceColumn],
+              fcols: [referenceColumn],
+            },
+          ]);
+          assert.deepEqual(
+            await view.find!(
+              { name: "Origin" },
+              {
+                select: {
+                  name: 1,
+                  station: { $leftJoin: "stations", select: { id: 1 } },
+                },
+              },
+            ),
+            [{ name: "Origin", station: [{ id: 1 }] }],
+          );
+        });
+      }
+      for (const viewName of ["station_routes", "station_route_ids"]) {
+        await context.test(`${viewName} does not combine separate station aliases`, async () => {
+          const columns = await instance.db[viewName]!.getColumns!();
+          assert(columns.every(({ references }) => !references?.length));
+        });
+      }
+    } finally {
+      await instance.destroy();
+      await db.none("DROP SCHEMA view_reference_test CASCADE");
+    }
+  });
+
   await test("computed joins support params, subscriptions, pagination and publish rules", async (context) => {
     // Cover plain views, quoted schema names and views built on other views.
     const viewPairs = [
