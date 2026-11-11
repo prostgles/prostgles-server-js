@@ -51,11 +51,48 @@ export const testTableHookRecursion = async (db: DB) => {
         });
         const dbo = instance.db as DBHandlerServerInternal;
 
+        await t.test(
+          "captured mutation errors identify the original SQL before internal setup",
+          async () => {
+            await setHooks({
+              [table]: {
+                afterEach: [{ commands: { insert: 1 }, validate: () => {} }],
+              },
+            });
+            await assert.rejects(
+              dbo[table]!.insert({ id: 999, amount: "invalid bigint" }),
+              (error: unknown) => {
+                const mutationError = error as {
+                  code: string;
+                  mutationQuery: string;
+                  query: string;
+                };
+                assert.equal(mutationError.code, "22P02");
+                assert.match(mutationError.mutationQuery, /INSERT INTO/);
+                assert(
+                  mutationError.mutationQuery.includes((dbo[table] as TableHandler).escapedName),
+                );
+                assert(!mutationError.mutationQuery.includes("prostgles_mutation_outbox"));
+                assert(mutationError.query.includes("prostgles_mutation_outbox"));
+                assert(
+                  Object.keys(mutationError).indexOf("mutationQuery") <
+                    Object.keys(mutationError).indexOf("query"),
+                );
+                return true;
+              },
+            );
+            assert.equal(await dbo[table]!.count({ id: 999 }), 0);
+            await setHooks({});
+          },
+        );
+
         await t.test("hook mutations do not notify schema watchers", async () => {
           const schemaChanges: (string | undefined)[] = [];
           let schemaChanged = () => {};
           schemaWatcher = await prostgles({
-            dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
+            dbConnection: getConnectionDetails(
+              db,
+            ) as unknown as ProstglesInitOptions["dbConnection"],
             schemaFilter: { [schema]: 1 },
             transactions: true,
             tableHooks: {

@@ -5,6 +5,7 @@ import type { LocalParams } from "../DboBuilder/DboBuilder";
 import { needsChangedFields } from "./getMutationTriggerConfig";
 import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "../PubSubManager/PubSubManagerUtils";
 import { MUTATION_METADATA } from "./mutationMetadata";
+import { getErrorAsObject } from "../DboBuilder/dboBuilderUtils";
 
 export type CapturedMutation = {
   command: "insert" | "update" | "delete";
@@ -32,7 +33,9 @@ export const captureMutation = async <Row extends AnyObject>(
   const operationId = randomUUID();
   // Send the scope, mutation and reset in one database call: concurrent JS branches
   // sharing this transaction must not overwrite each other's capture scope.
-  const results = await t.multi<Row>(`
+  const results = await t
+    .multi<Row>(
+      `
     /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
     CREATE TEMP TABLE IF NOT EXISTS prostgles_mutation_outbox (
       sequence bigint GENERATED ALWAYS AS IDENTITY,
@@ -44,7 +47,12 @@ export const captureMutation = async <Row extends AnyObject>(
       set_config('prostgles.mutation_changed_fields', ${asValue(String(needsChangedFields(table)))}, true);
     ${query};
     SELECT set_config('prostgles.mutation_id', '', true);
-  `);
+  `,
+    )
+    .catch((error: unknown) => {
+      const { query: captureQuery, ...postgresError } = getErrorAsObject(error);
+      throw { ...postgresError, mutationQuery: query, query: captureQuery };
+    });
   // Composite text preserves native types (including extension types). Decode
   // in PostgreSQL so the driver sees typed columns, not JSON-parsed numbers.
   const captured = await t.any(
