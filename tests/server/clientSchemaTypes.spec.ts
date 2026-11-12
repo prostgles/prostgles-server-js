@@ -1466,10 +1466,10 @@ export const testClientSchemaTypes = async (db: DB) => {
             assert.deepEqual(
               await writer.clientDb[tableName]!.update!(
                 { body: "writer-row" },
-                { note: "allowed" },
-                { returning: "*" },
+                { note: "allowed", body: "disallowed" },
+                { returning: "*", multi: false, removeDisallowedFields: true },
               ),
-              [{ body: "writer-row" }],
+              { body: "writer-row" },
             );
             await instance.db[tableName]!.delete!({ id: writerRow.id });
           } finally {

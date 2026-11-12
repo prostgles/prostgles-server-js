@@ -87,6 +87,8 @@ export const runClientRequest = async function (
           returning: { type: "any", optional: true },
           returnQuery: { type: "boolean", optional: true },
           returnType: { type: "string", optional: true },
+          multi: { type: "boolean", optional: true },
+          removeDisallowedFields: { type: "boolean", optional: true },
         },
         optional: true,
       },
