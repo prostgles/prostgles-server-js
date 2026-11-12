@@ -256,9 +256,12 @@ export const isomorphicQueries = async (
         .find({}, { abortSignal: AbortSignal.timeout(100) })
         .catch((err) => err);
       assert.deepStrictEqual(
-        { message: abortError.message },
+        { message: abortError.message, code: abortError.code },
         {
-          message: "canceling statement due to user request",
+          message: isServer
+            ? "Query cancelled by abortSignal: The operation was aborted due to timeout"
+            : "Query cancelled by client abort request",
+          code: "57014",
         },
         "abortSignal error message is not as expected",
       );
@@ -277,7 +280,11 @@ export const isomorphicQueries = async (
       );
 
       const start2 = Date.now();
-      await assert.rejects(tableHandler.find());
+      await assert.rejects(tableHandler.find(), {
+        message:
+          "Query cancelled because the default client query timeout of 7000ms was exceeded",
+        code: "57014",
+      });
       assert(
         Date.now() - start2 < 9_000,
         "very_slow_items.find should abort before the slow query completed",

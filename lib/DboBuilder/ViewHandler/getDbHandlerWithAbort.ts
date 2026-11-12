@@ -4,6 +4,7 @@ import type { ViewHandler } from "./ViewHandler";
 import type pgPromise from "pg-promise";
 import { getServerSideUserId } from "../../Auth/utils/serverSideRequest";
 import type { Prostgles } from "../../Prostgles";
+import { isObject } from "prostgles-types";
 
 type Params = { abortSignal: AbortSignal | undefined; abortSignalId: string | undefined };
 
@@ -25,7 +26,8 @@ export const getDbHandlerWithAbort = (
   }
 
   const { clientReq } = localParams ?? {};
-  const abortSignal = params.abortSignal ?? AbortSignal.timeout(clientReq ? 7_000 : 120_000);
+  const defaultTimeoutMs = clientReq ? 7_000 : 120_000;
+  const abortSignal = params.abortSignal ?? AbortSignal.timeout(defaultTimeoutMs);
   const { prostgles } = viewHandler.dboBuilder;
   const handler = viewHandler.getTransaction(localParams)?.t ?? viewHandler.db;
   const { adminClient } = prostgles;
@@ -56,14 +58,25 @@ export const getDbHandlerWithAbort = (
         );
       }
 
+      let abortErrorMessage: string | undefined;
       const abort = () => {
+        const abortReason: unknown = abortSignal.reason;
+        const reasonMessage =
+          abortReason instanceof Error ? abortReason.message
+          : typeof abortReason === "string" ? abortReason
+          : "";
+        abortErrorMessage ??=
+          !abortSignal.aborted ? "Query cancelled by client abort request"
+          : params.abortSignal ?
+            `Query cancelled by abortSignal${reasonMessage ? `: ${reasonMessage}` : ""}`
+          : `Query cancelled because the default ${clientReq ? "client" : "server"} query timeout of ${defaultTimeoutMs}ms was exceeded`;
         void viewHandler._log({
           data: { query, abortSignalId: signalKeys.abortSignalId },
           command: "abort",
           localParams,
           duration:
             Date.now() - (viewHandler.activeQueries.get(abortSignalKey)?.start ?? Date.now()),
-          error: new Error("Query aborted"),
+          error: new Error(abortErrorMessage),
         });
         /** Only terminate if there is exactly one matching query with a query id prefix */
 
@@ -96,11 +109,18 @@ export const getDbHandlerWithAbort = (
         socketId: localParams?.clientReq?.socket?.id,
       });
       abortSignal.addEventListener("abort", abort);
-      return func(query, ...args).finally(() => {
-        abortSignal.removeEventListener("abort", abort);
-        viewHandler.activeQueries.delete(abortSignalKey);
-        viewHandler.abortRequests.delete(abortSignalKey);
-      });
+      return func(query, ...args)
+        .catch((error: unknown) => {
+          if (abortErrorMessage && isObject(error) && error.code === "57014") {
+            error.message = abortErrorMessage;
+          }
+          throw error;
+        })
+        .finally(() => {
+          abortSignal.removeEventListener("abort", abort);
+          viewHandler.activeQueries.delete(abortSignalKey);
+          viewHandler.abortRequests.delete(abortSignalKey);
+        });
     };
   };
 
