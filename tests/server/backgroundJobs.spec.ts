@@ -1561,7 +1561,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         delete definitions.process!.onConflict;
         await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
       });
-      await t.test("claims enforce concurrency across instances", async () => {
+      await t.test("claims enforce concurrency and record attempt timestamps", async () => {
         other = await prostgles<JobTestSchema>(options);
         const entries = await Promise.all([
           insert({ mode: "block" }),
@@ -1570,8 +1570,26 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         ]);
         await eventually(() => entries.filter(({ job }) => blocked.has(job.id)).length === 2);
         assert.equal((await records("status = 'running'")).length, 2);
+        const [queued] = await records("status = 'pending'");
+        assert(queued);
+        assert.equal(queued.started_at, null);
+        await db.none(
+          `UPDATE ${queue} SET created_at = clock_timestamp() - interval '48 minutes' WHERE id = \${jobId}`,
+          { jobId: queued.id },
+        );
         for (const { job } of entries) released.add(job.id);
-        for (const { job } of entries) await status(job.id, "succeeded");
+        for (const { job } of entries) {
+          const completed = await status(job.id, "succeeded");
+          assert(completed.started_at && completed.finished_at);
+          assert(new Date(completed.started_at) <= new Date(completed.finished_at));
+          if (job.id === queued.id) {
+            assert(completed.created_at);
+            assert(
+              new Date(completed.started_at).getTime() - new Date(completed.created_at).getTime() >=
+                48 * 60_000,
+            );
+          }
+        }
         await other.destroy();
         other = undefined;
       });
@@ -1617,6 +1635,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 assert.equal(recovered.lease_token, null);
                 assert.equal(recovered.locked_until, null);
                 if (willRecover) {
+                  assert.equal(recovered.started_at, null);
                   assert.equal(recovered.finished_at, null);
                   const recoveryDelay = 1000 * 2 ** (stallCount - 1);
                   assert(new Date(recovered.run_at!).getTime() >= expiredAt + recoveryDelay);
@@ -1702,6 +1721,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               });
               const retry = await status(jobId, "pending");
               assert.equal(retry.attempts, 5);
+              assert.equal(retry.started_at, null);
               assert(new Date(retry.run_at!).getTime() <= Date.now() + 1100);
             }
             const completed = await status(
@@ -1717,6 +1737,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             );
             assert.equal(completed.lease_token, null);
             assert.equal(completed.locked_until, null);
+            if (!cancelRequested) assert(completed.started_at);
             if (mode === "error") {
               assert.deepEqual(completed.error, {
                 message: "Extraction failed after recovery",
@@ -1759,20 +1780,22 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             assert.equal(stopped!.stalled_count, 0);
             assert.equal(stopped!.lease_token, null);
             assert.equal(stopped!.locked_until, null);
+            assert.equal(stopped!.started_at, null);
             const [cancelled] = await records("id = ${jobId}", { jobId: cancelledJob.id });
             assert.equal(cancelled!.status, "cancelled");
             assert.equal(cancelled!.attempts, 1);
             assert.equal(cancelled!.stalled_count, 0);
             if (restart === 1) {
-              /* Recreate the queue schema from before stall tracking was added. */
+              /* Recreate the queue schema from before stall and attempt time tracking. */
               await db.none(
-                `ALTER TABLE ${queue} DROP COLUMN stalled_count, DROP COLUMN max_stalled_count`,
+                `ALTER TABLE ${queue} DROP COLUMN stalled_count, DROP COLUMN max_stalled_count, DROP COLUMN started_at`,
               );
             }
             instance = await prostgles<JobTestSchema>(options);
             await eventually(() => seen.filter(({ id }) => id === job.id).length === restart + 1);
             const recovered = (await instance.jobs.get(job.id))!;
             assert.equal(recovered.status, "running");
+            assert(recovered.started_at);
             assert.equal(recovered.attempts, 1);
             assert.equal(recovered.stalled_count, 0);
             assert.equal(recovered.max_stalled_count, restart === 1 ? 3 : 0);

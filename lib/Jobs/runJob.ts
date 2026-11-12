@@ -162,6 +162,7 @@ export const runJob = async (
         lease_token = NULL,
         locked_until = NULL,
         run_at = clock_timestamp(),
+        started_at = CASE WHEN cancel_requested THEN started_at END,
         finished_at = CASE WHEN cancel_requested THEN clock_timestamp() END
       WHERE ${owned}`,
       claim,
@@ -192,6 +193,7 @@ export const runJob = async (
       lease_token = NULL, 
       locked_until = NULL,
       run_at = clock_timestamp() + \${delayMs} * interval '1 millisecond',
+      started_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN started_at END,
       finished_at = CASE WHEN cancel_requested OR \${status} <> 'pending' THEN clock_timestamp() END
     WHERE ${owned}
   `,

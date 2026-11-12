@@ -22,6 +22,9 @@ export const claimJob = async (prostgles: Prostgles, name: string, concurrency: 
         error = jsonb_build_object('code', 'WORKER_INTERRUPTED', 'message', 'Worker interrupted'),
         lease_token = NULL,
         locked_until = NULL,
+        started_at = CASE
+          WHEN cancel_requested OR stalled_count >= max_stalled_count THEN started_at
+        END,
         run_at = CASE
           WHEN cancel_requested OR stalled_count >= max_stalled_count THEN run_at
           ELSE clock_timestamp() + LEAST(2147483647, delay_ms::numeric *
@@ -54,6 +57,7 @@ export const claimJob = async (prostgles: Prostgles, name: string, concurrency: 
         ORDER BY j.created_at, j.id FOR UPDATE SKIP LOCKED LIMIT 1
       )
       UPDATE ${tableSQL} j SET status = 'running', attempts = attempts + 1,
+        started_at = clock_timestamp(),
         lease_token = \${leaseToken}, locked_until = clock_timestamp() + interval '30 seconds'
       FROM next_job WHERE j.id = next_job.id RETURNING j.*
     `,
