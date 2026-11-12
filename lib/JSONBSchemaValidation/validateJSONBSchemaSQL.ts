@@ -110,10 +110,10 @@ BEGIN
 
   nullable = COALESCE((schema->>'nullable')::BOOLEAN, FALSE);
   IF data IS NULL OR jsonb_typeof(data) = 'null' THEN
-    IF NOT nullable THEN
-      ${raiseException(`'Is not nullable. %', path`)}  
-    ELSE
+    IF nullable THEN
       RETURN true;
+    ELSIF COALESCE(schema->>'type', '') NOT IN ('unknown', 'any') THEN
+      ${raiseException(`'Is not nullable. %', path`)}
     END IF;
   END IF;
   
@@ -227,8 +227,7 @@ BEGIN
           typeStr = 'number' AND jsonb_typeof(data) != typeStr OR
           (typeStr = 'integer' AND (jsonb_typeof(data) != 'number' OR ceil(data::NUMERIC) != floor(data::NUMERIC))) OR
           typeStr = 'boolean' AND jsonb_typeof(data) != typeStr OR
-          typeStr = 'string' AND jsonb_typeof(data) != typeStr OR
-          typeStr = 'any' AND jsonb_typeof(data) = 'null'
+          typeStr = 'string' AND jsonb_typeof(data) != typeStr
         ) THEN
           ${raiseException(`'Data type not matching. Expected: %, Actual: %, %', typeStr, jsonb_typeof(data), path`)}  
         END IF;
