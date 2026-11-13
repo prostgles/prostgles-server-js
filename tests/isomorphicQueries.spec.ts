@@ -14,6 +14,7 @@ import {
   pickKeys,
   type AnyObject,
   type CaseSelect,
+  type ComplexFilter,
   type SQLHandler,
 } from "prostgles-types";
 import type { DBHandlerServer } from "./server/serverTypes";
@@ -258,8 +259,9 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(
         { message: abortError.message, code: abortError.code },
         {
-          message: isServer
-            ? "Query cancelled by abortSignal: The operation was aborted due to timeout"
+          message:
+            isServer ?
+              "Query cancelled by abortSignal: The operation was aborted due to timeout"
             : "Query cancelled by client abort request",
           code: "57014",
         },
@@ -281,8 +283,7 @@ export const isomorphicQueries = async (
 
       const start2 = Date.now();
       await assert.rejects(tableHandler.find(), {
-        message:
-          "Query cancelled because the default client query timeout of 7000ms was exceeded",
+        message: "Query cancelled because the default client query timeout of 7000ms was exceeded",
         code: "57014",
       });
       assert(
@@ -1078,6 +1079,18 @@ export const isomorphicQueries = async (
               $term_highlight: [["name"], term, { returnType: "object" }],
             },
             hObjAll: { $term_highlight: ["*", term, { returnType: "object" }] },
+            numericMatch: {
+              $term_highlight: [["id"], term, { returnType: "boolean" }],
+            },
+            numericHighlight: {
+              $term_highlight: [["id"], term, { returnType: "object" }],
+            },
+            mixedMatch: {
+              $term_highlight: [["id", "name"], term, { returnType: "boolean" }],
+            },
+            numericTermMatch: {
+              $term_highlight: [["id"], "3", { returnType: "boolean" }],
+            },
           },
           orderBy: { hIdx: -1 },
         },
@@ -1103,6 +1116,10 @@ export const isomorphicQueries = async (
         hObjAll: {
           name: ["", ["abc81"], " here"],
         },
+        numericMatch: false,
+        numericHighlight: null,
+        mixedMatch: true,
+        numericTermMatch: true,
       });
     });
 
@@ -1178,6 +1195,13 @@ export const isomorphicQueries = async (
         $term_highlight: [["*"], term, { returnType: "boolean" }],
       });
       assert.equal(+res, 1);
+      const columnSearches = ["id", "name"].map(
+        (columnName) =>
+          ({
+            $filter: [{ $term_highlight: [[columnName], term, { returnType: "boolean" }] }],
+          }) satisfies ComplexFilter,
+      );
+      assert.equal(await db.various.count({ $or: columnSearches }), 1);
     });
 
     const testToEnsureTriggersAreDisabled = async (

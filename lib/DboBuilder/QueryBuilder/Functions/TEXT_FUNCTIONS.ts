@@ -251,8 +251,6 @@ export const TEXT_FUNCTIONS: FunctionSpec[] = [
 
         /** This will break GROUP BY (non-integer constant in GROUP BY) */
         if (!_cols.length) {
-          if (validCols.length && hasChars)
-            throw `You're searching the impossible: characters in numeric fields. Use this to prevent making such a request in future: /[a-z]/i.test(your_term) `;
           return returnType === "boolean" ? "FALSE" : "NULL";
         }
         res = `CASE 
