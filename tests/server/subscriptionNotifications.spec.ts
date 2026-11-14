@@ -317,9 +317,37 @@ export const testSubscriptionNotifications = async (db: DB) => {
             query: { token: "reconnect-test" },
           },
         });
-        await client.db[tableName]!.subscribe!({}, {}, ([row]) => {
-          received.subscription = Number(row?.last_updated);
-        });
+        /* Short subscription params stay readable; long params use a bounded channel name. */
+        const manager = await server.dboBuilder.getPubSubManager();
+        const channelPrefix = `${manager.socketChannelPrefix}.${tableName}.`;
+        const shortSubscription = await client.db[tableName]!.subscribe!(
+          {},
+          {},
+          () => {},
+        );
+        assert.equal(
+          manager.subs.at(-1)?.channel_name,
+          `${channelPrefix}{}.{}.m.sub`,
+        );
+        await shortSubscription.unsubscribe();
+        await client.db[tableName]!.subscribe!(
+          {},
+          {
+            select: ["id", "last_updated"],
+            orderBy: { last_updated: 1 },
+            limit: 1,
+          },
+          ([row]) => {
+            received.subscription = Number(row?.last_updated);
+          },
+        );
+        const hashedChannelName = manager.subs.at(-1)?.channel_name;
+        assert(hashedChannelName);
+        assert(hashedChannelName.startsWith(channelPrefix));
+        assert.match(
+          hashedChannelName.slice(channelPrefix.length),
+          /^[a-f0-9]{64}\.m\.sub$/,
+        );
         await client.db[tableName]!.sync!({}, {}, (rows) => {
           received.sync = Number(rows[0]?.last_updated);
         });
@@ -327,7 +355,6 @@ export const testSubscriptionNotifications = async (db: DB) => {
           () => received.subscription === 1 && received.sync === 1,
           "Initial subscription and sync data missing",
         );
-        const manager = await server.dboBuilder.getPubSubManager();
         const listener = manager.postgresNotifListenManager;
         assert(listener);
         await waitFor(
