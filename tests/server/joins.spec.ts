@@ -25,6 +25,86 @@ export const testJoins = async (db: DB) => {
     },
     res: {},
   } as never;
+  await test("inferred join paths preserve reverse routes, ties and disconnected tables", async () => {
+    await db.none(`
+      CREATE SCHEMA shortest_join_test;
+      CREATE TABLE shortest_join_test.roots (id int PRIMARY KEY, parent_id int REFERENCES shortest_join_test.roots(id));
+      CREATE TABLE shortest_join_test.alternate (id int PRIMARY KEY, root_id int REFERENCES shortest_join_test.roots(id));
+      CREATE TABLE shortest_join_test.branches (id int PRIMARY KEY, root_id int REFERENCES shortest_join_test.roots(id));
+      CREATE TABLE shortest_join_test.leaves (
+        id int PRIMARY KEY, branch_id int REFERENCES shortest_join_test.branches(id),
+        alternate_id int REFERENCES shortest_join_test.alternate(id)
+      );
+      CREATE TABLE shortest_join_test.islands (id int PRIMARY KEY);
+      CREATE TABLE shortest_join_test.island_links (id int PRIMARY KEY, island_id int REFERENCES shortest_join_test.islands(id));
+      INSERT INTO shortest_join_test.roots VALUES (1, NULL);
+      INSERT INTO shortest_join_test.alternate VALUES (1, 1);
+      INSERT INTO shortest_join_test.branches VALUES (1, 1);
+      INSERT INTO shortest_join_test.leaves VALUES (1, 1, 1);
+    `);
+    const instance = await prostgles({
+      dbConnection: {
+        ...getConnectionDetails(db),
+        options: "-c search_path=shortest_join_test,public",
+      } as unknown as ProstglesInitOptions["dbConnection"],
+      schemaFilter: { shortest_join_test: 1 },
+      joins: "inferred",
+      onReady: () => {},
+    });
+    try {
+      const roots = instance.db.roots as unknown as TableHandler;
+      const paths = roots.dboBuilder.getAllJoinPaths();
+      assert.deepEqual(
+        paths.find(({ t1, t2 }) => t1 === "roots" && t2 === "leaves"),
+        {
+          t1: "roots",
+          t2: "leaves",
+          path: ["roots", "alternate", "leaves"],
+        },
+      );
+      assert.deepEqual(
+        paths.find(({ t1, t2 }) => t1 === "leaves" && t2 === "roots"),
+        {
+          t1: "leaves",
+          t2: "roots",
+          path: ["leaves", "alternate", "roots"],
+        },
+      );
+      assert.deepEqual(
+        paths.find(({ t1, t2 }) => t1 === "roots" && t2 === "roots"),
+        {
+          t1: "roots",
+          t2: "roots",
+          path: ["roots", "roots"],
+        },
+      );
+      assert.equal(
+        paths.some(({ t1, t2 }) => t1 === "roots" && t2 === "islands"),
+        false,
+      );
+      assert.equal(new Set(paths.map(({ t1, t2 }) => `${t1}:${t2}`)).size, paths.length);
+      for (const [sourceTable, targetTable] of [
+        ["roots", "leaves"],
+        ["leaves", "roots"],
+      ] as const) {
+        assert.deepEqual(
+          await instance.db[sourceTable]!.find!(
+            {},
+            {
+              select: {
+                id: 1,
+                related: { $leftJoin: targetTable, select: { id: 1 } },
+              },
+            },
+          ),
+          [{ id: 1, related: [{ id: 1 }] }],
+        );
+      }
+    } finally {
+      await instance.destroy();
+      await db.none("DROP SCHEMA shortest_join_test CASCADE");
+    }
+  });
   await test("unique-key nested joins use bounded index lookups for repeated job controls", async (context) => {
     await db.none(`
       CREATE SCHEMA unique_join_test;

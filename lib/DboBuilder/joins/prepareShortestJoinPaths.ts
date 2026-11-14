@@ -155,41 +155,21 @@ export const prepareShortestJoinPaths = (dboBuilder: DboBuilder): Result => {
       t2: table,
       path: [table, table],
     }));
-  tables.forEach((t1) => {
-    tables.forEach((t2) => {
-      /** Prevent recursion */
-      if (
-        t1 === t2 ||
-        shortestJoinPaths.some((jp) => {
-          if (sortedArraysMatch([jp.t1, jp.t2], [t1, t2])) {
-            const shortestPath = findShortestPath(joinGraph, t1, t2);
-            if (sortedArraysMatch(shortestPath.path, jp.path)) {
-              return true;
-            }
-          }
-        })
-      ) {
-        return;
-      }
+  for (const [firstTableIndex, firstTable] of tables.entries()) {
+    for (const secondTable of tables.slice(firstTableIndex + 1)) {
+      const calculatedPath = findShortestPath(joinGraph, firstTable, secondTable);
+      if (!Number.isFinite(calculatedPath.distance)) continue;
 
-      const calculatedPath = findShortestPath(joinGraph, t1, t2);
-      if (!(calculatedPath.distance < Infinity)) return;
-
-      const existing1 = shortestJoinPaths.find((j) => j.t1 === t1 && j.t2 === t2);
-      if (!existing1) {
-        shortestJoinPaths.push({ t1, t2, path: calculatedPath.path.slice() });
-      }
-
-      const existing2 = shortestJoinPaths.find((j) => j.t2 === t1 && j.t1 === t2);
-      if (!existing2) {
-        shortestJoinPaths.push({
-          t1: t2,
-          t2: t1,
+      shortestJoinPaths.push(
+        { t1: firstTable, t2: secondTable, path: calculatedPath.path.slice() },
+        {
+          t1: secondTable,
+          t2: firstTable,
           path: calculatedPath.path.slice().reverse(),
-        });
-      }
-    });
-  });
+        },
+      );
+    }
+  }
   return {
     joins,
     shortestJoinPaths,
