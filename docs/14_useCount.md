@@ -93,9 +93,7 @@ Returns the total number of rows matching the filter
     - **skip** <span style="color: grey">optional</span> <span style="color: green;">boolean</span>
 
       Used to prevent the hook from fetching data
-    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any[]</span>
-
-      Used to trigger re-fetching
+    - **deps** <span style="color: grey">optional</span> <span style="color: green;">any</span>
 #### Return type
 #### <span style="color: green;">AsyncResult</span>
 

@@ -115,14 +115,39 @@ export const initTableConfig = async function (this: TableConfigurator) {
         queries.push(`DROP TABLE IF EXISTS ${tableName};`);
       }
 
-      const rows = Object.entries(tableConf.isLookupTable.values).map(([id, otherColumns]) => ({
+      type LookupTableRowId = { id: string };
+      const rows: (LookupTableRowId & { [column: string]: string })[] = Object.entries(
+        tableConf.isLookupTable.values,
+      ).map(([id, otherColumns]) => ({
         id,
         ...otherColumns,
       }));
       const lookupTableHandler = this.dbo[tableNameRaw];
       const [firstRow] = rows;
-      if (!firstRow) throw new Error(`Lookup table values are empty: ${tableName}`);
-      const columnNames = Object.keys(firstRow).filter((k) => k !== "id");
+      if (!firstRow) {
+        throw new Error(`Lookup table values are empty: ${tableName}`);
+      }
+      const columnNames = Object.keys(firstRow).filter(
+        (k) => k !== ("id" satisfies keyof LookupTableRowId),
+      );
+      const addedColumns =
+        !isDropped && lookupTableHandler ?
+          columnNames.filter(
+            (name) => !lookupTableHandler.columns.some((column) => column.name === name),
+          )
+        : [];
+      if (addedColumns.length) {
+        queries.push(
+          `ALTER TABLE ${tableName} ${addedColumns.map((name) => `ADD COLUMN ${asName(name)} TEXT`).join(", ")};`,
+        );
+        for (const row of rows) {
+          queries.push(
+            `UPDATE ${tableName} 
+            SET ${addedColumns.map((name) => `${asName(name)} = ${asValue(row[name])}`).join(", ")} 
+            WHERE id = ${asValue(row.id)};`,
+          );
+        }
+      }
       if (isDropped || !lookupTableHandler) {
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (

@@ -459,6 +459,9 @@ export const testTableConfigValidation = async (parentDb: DB) => {
             ALTER COLUMN empty_array DROP DEFAULT`);
         } else if (scenario === "outdated version") {
           await db.none("UPDATE prostgles.versions SET version = '0.0.0', schema_md5 = 'outdated'");
+          await db.none(
+            `UPDATE evolving_categories SET "display name" = 'Edited' WHERE id = 'existing'`,
+          );
         } else if (scenario === "legacy versions") {
           await db.none("ALTER TABLE prostgles.versions DROP COLUMN schema_md5");
         }
@@ -473,6 +476,17 @@ export const testTableConfigValidation = async (parentDb: DB) => {
             },
             default_categories: {
               isLookupTable: { values: { "": {}, default: {} } },
+            },
+            evolving_categories: {
+              isLookupTable: {
+                values:
+                  scenario === "missing versions" ?
+                    { existing: {} }
+                  : {
+                      existing: { "display name": "Existing", description: "Existing category" },
+                      added: { "display name": "Added", description: "Added category" },
+                    },
+              },
             },
             jsonb_defaults: {
               columns: {
@@ -494,12 +508,31 @@ export const testTableConfigValidation = async (parentDb: DB) => {
                   references: { tableName: "default_categories" },
                   defaultValue: "default",
                 },
+                evolving_category: {
+                  references: { tableName: "evolving_categories" },
+                  defaultValue: "existing",
+                },
               },
             },
           },
           onReady: () => {},
         });
         instance = await prgl.init(() => {}, { type: "init" });
+        /* Lookup enrichment backfills existing rows and preserves references and later edits. */
+        if (scenario !== "missing versions") {
+          assert.deepEqual(await db.any("SELECT * FROM evolving_categories ORDER BY id"), [
+            { id: "added", "display name": "Added", description: "Added category" },
+            {
+              id: "existing",
+              "display name": scenario === "older package version" ? "Existing" : "Edited",
+              description: "Existing category",
+            },
+          ]);
+          const referencedCategory = await db.one(
+            "SELECT evolving_category FROM jsonb_defaults LIMIT 1",
+          );
+          assert.equal(referencedCategory.evolving_category, "existing");
+        }
         /* JSONB and reference defaults retain their values on fresh schemas and upgrades. */
         assert.deepEqual(
           await db.one(
