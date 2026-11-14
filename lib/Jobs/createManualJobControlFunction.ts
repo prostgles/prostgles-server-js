@@ -13,33 +13,50 @@ import type {
   ParamsOutput,
   ParamsSchema,
 } from "./JobTypes";
+import {
+  getJobControlOperation,
+  getJobControlOperationInput,
+  type JobControlOperations,
+  type SelectedJobControlOperation,
+} from "./jobControlFunctionUtils";
 
 export const createManualJobControlFunction = <
   S,
   SUser extends SessionUser,
   Context,
   Schema extends ParamsSchema,
-  Operation extends JobControlOperation,
+  Selection extends JobControlOperations,
 >({
   jobName,
-  operation,
+  selection,
   description,
   params,
   run,
 }: {
   jobName: string;
-  operation: Operation;
+  selection: Selection;
   description: string | undefined;
   params: Schema | undefined;
   run:
     | ((
-        context: ManualJobControlFunctionContext<S, SUser, Context, ParamsOutput<Schema>>,
+        context: ManualJobControlFunctionContext<S, SUser, Context, ParamsOutput<Schema>> & {
+          operation: SelectedJobControlOperation<Selection>;
+        },
       ) => MaybePromise<void>)
     | undefined;
 }) => {
-  const input = {
-    jobId: { type: "string", optional: operation === "startOrRetry" },
-    ...(operation !== "cancel" && {
+  const input: Record<string, JSONB.FieldType> = {
+    ...getJobControlOperationInput<Selection>(selection),
+    jobId: {
+      type: "string",
+      optional:
+        typeof selection === "string" ?
+          selection === "startOrRetry"
+        : selection.includes("startOrRetry"),
+    },
+    ...((typeof selection === "string" ?
+      selection !== "cancel"
+    : selection.some((operation) => operation !== "cancel")) && {
       params: {
         type: Object.fromEntries(
           Object.entries(params ?? {}).map(([key, field]) => [
@@ -53,21 +70,30 @@ export const createManualJobControlFunction = <
         optional: true,
       },
     }),
-  } as ManualControlInput<Schema, Operation>;
+  };
   const functionDefinition = {
-    input,
+    input: input as SelectedManualControlInput<Schema, Selection>,
     description,
     unrestrictedDbAccess: true as const,
     run: (
-      input: { jobId?: string; params?: Record<string, JobValue> },
+      input: {
+        jobId?: string;
+        params?: Record<string, JobValue>;
+        operation?: JobControlOperation;
+      },
       context: UnrestrictedFunctionContext<S, SUser, Context>,
     ) => {
+      const operation = getJobControlOperation(selection, input);
+      if (operation === "cancel" && "params" in input) {
+        throw new Error("Cancelling a job does not accept params");
+      }
       const prepare: ManualJobControlOptions<S>["run"] =
         run &&
         (({ job, params, dbx }) =>
           run({
             ...context,
             row: undefined,
+            operation: operation as SelectedJobControlOperation<Selection>,
             job,
             params: params as unknown as ParamsOutput<Schema>,
             dbx,
@@ -109,3 +135,15 @@ type ManualControlInput<Schema extends ParamsSchema, Operation extends JobContro
       };
     };
   });
+
+type SelectedManualControlInput<
+  Schema extends ParamsSchema,
+  Selection extends JobControlOperations,
+> =
+  Selection extends readonly JobControlOperation[] ?
+    {
+      [Operation in Selection[number]]: ManualControlInput<Schema, Operation> & {
+        operation: { enum: readonly [Operation] };
+      };
+    }[Selection[number]]
+  : ManualControlInput<Schema, Extract<Selection, JobControlOperation>>;
