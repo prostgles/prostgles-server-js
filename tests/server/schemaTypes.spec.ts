@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import prostgles, { type InitResult } from "prostgles-server";
 import { getDBGeneratedSchema } from "prostgles-server/dist/DBSchemaBuilder/getDBGeneratedSchema";
+import * as serverFunctionReturnTypes from "prostgles-server/dist/DBSchemaBuilder/getServerFunctionReturnTypes";
 import type { TableConfig } from "prostgles-server/dist/TableConfig/TableConfigTypes";
 import type { DBHandlerServerInternal, FileTableRow } from "prostgles-server";
 import type { DB } from "prostgles-server/dist/Prostgles";
@@ -99,6 +104,115 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
     for (const [name, returnType] of Object.entries(expectedTypes)) {
       const definition = tsSchema.split("\n").find((line) => line.includes(`"${name}":`));
       assert.ok(definition?.endsWith(`=> Promise<${returnType}>;`), definition ?? name);
+    }
+  });
+
+  await test("server function types are generated lazily and refreshed after reloads and updates", async (testContext) => {
+    const directory = mkdtempSync(path.join(tmpdir(), "prostgles-function-types-"));
+    const instancePath = path.join(directory, "instance.ts");
+    const alternatePath = path.join(directory, "alternate.ts");
+    const writeFunctionSource = (filename: string, returnType: string) => {
+      writeFileSync(
+        filename,
+        `export {};
+        declare const prostgles: (options: unknown) => void;
+        prostgles({ functions: { public: { functions: {
+          cachedResult: { run: (): ${returnType} => { throw new Error(); } }
+        } } } });`,
+      );
+    };
+    writeFileSync(
+      path.join(directory, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["*.ts"] }),
+    );
+    writeFunctionSource(instancePath, "number");
+    writeFunctionSource(alternatePath, "boolean");
+    const analysis = testContext.mock.method(
+      serverFunctionReturnTypes,
+      "getServerFunctionReturnTypes",
+    );
+    let instance: InitResult | undefined;
+    try {
+      const functions = {
+        public: { userFilter: {}, functions: { cachedResult: { run: () => 1 } } },
+      };
+      instance = await prostgles({
+        dbConnection: db.items!.dboBuilder.prostgles.opts.dbConnection,
+        schemaFilter: { public: 1 },
+        disableRealtime: true,
+        tsGeneratedTypesFunctionsPath: instancePath,
+        functions,
+        onReady: () => {},
+      });
+      assert.equal(analysis.mock.callCount(), 0, "initialization must not analyze unused types");
+      const excluded = await instance.getTSSchema({ excludeFunctions: true });
+      assert(!excluded.tsSchema.includes("GeneratedFunctionSchema"));
+      assert.equal(analysis.mock.callCount(), 0);
+
+      const initial = await instance.getTSSchema();
+      assert(initial.tsSchema.includes('"cachedResult": () => Promise<number>;'));
+      assert.equal((await instance.getTSSchema()).tsSchema, initial.tsSchema);
+      await Promise.all([instance.getTSSchema(), instance.getTSSchema()]);
+      assert.equal(analysis.mock.callCount(), 1, "repeated requests must reuse analysis");
+
+      writeFunctionSource(instancePath, "string");
+      instance = await instance.restart();
+      await instance.getTSSchema({ excludeFunctions: true });
+      assert.equal(analysis.mock.callCount(), 1, "reload must defer analysis until requested");
+      const reloaded = await instance.getTSSchema();
+      assert(reloaded.tsSchema.includes('"cachedResult": () => Promise<string>;'));
+      assert.equal(analysis.mock.callCount(), 2);
+
+      const updatedFunctions = {
+        public: {
+          userFilter: {},
+          functions: {
+            cachedResult: { input: { value: "number" as const }, run: () => 1 },
+          },
+        },
+      };
+      await instance.update({ functions: updatedFunctions });
+      assert.equal(analysis.mock.callCount(), 2);
+      const updated = await instance.getTSSchema();
+      assert(
+        updated.tsSchema
+          .replace(/\s+/g, " ")
+          .includes('"cachedResult": (args: { value: number; }) => Promise<string>;'),
+      );
+      assert.equal(analysis.mock.callCount(), 3);
+
+      writeFunctionSource(instancePath, "Date");
+      await instance.update({ functions: updatedFunctions }, true);
+      assert((await instance.getTSSchema()).tsSchema.includes("=> Promise<Date>;"));
+      assert.equal(analysis.mock.callCount(), 4, "forced function updates must invalidate types");
+
+      await instance.update({ tsGeneratedTypesFunctionsPath: alternatePath });
+      assert((await instance.getTSSchema()).tsSchema.includes("=> Promise<boolean>;"));
+      assert.equal(analysis.mock.callCount(), 5);
+
+      await instance.update({ tsGeneratedTypesDir: directory });
+      assert.equal(
+        analysis.mock.callCount(),
+        6,
+        "changing the schema directory must invalidate types",
+      );
+      await instance.getTSSchema();
+      assert.equal(analysis.mock.callCount(), 6);
+
+      await instance.update({ functions: {} });
+      assert(
+        (await instance.getTSSchema()).tsSchema.includes(
+          "export type GeneratedFunctionSchema = Record<string, never>;",
+        ),
+      );
+      await instance.update({ functions: { public: { userFilter: {}, functions: {} } } });
+      await instance.getTSSchema();
+      await instance.update({ functions: undefined });
+      await instance.getTSSchema();
+      assert.equal(analysis.mock.callCount(), 6, "empty functions must never invoke analysis");
+    } finally {
+      await instance?.destroy();
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 

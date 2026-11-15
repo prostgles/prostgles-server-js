@@ -18,9 +18,9 @@ export const getFunctionsTypescriptSchema = (
   >,
 ) => {
   const functionReturnTypes =
-    !tsGeneratedTypesFunctionsPath ? undefined : (
-      getServerFunctionReturnTypes(tsGeneratedTypesFunctionsPath, tsGeneratedTypesDir)
-    );
+    !resolvedFunctions.size || !tsGeneratedTypesFunctionsPath ?
+      undefined
+    : getServerFunctionReturnTypes(tsGeneratedTypesFunctionsPath, tsGeneratedTypesDir);
   const methodDefinitions = Array.from(resolvedFunctions.entries()).map(
     ([name, functionDefinition]) => {
       const input = functionDefinition.input;

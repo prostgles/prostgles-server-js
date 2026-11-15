@@ -29,6 +29,10 @@ export const updateConfiguration = async (
     return;
   }
 
+  if (includes(optionsThatChanged, "functions")) {
+    prgl.dboBuilder.functionTsDefinitions = undefined;
+  }
+
   // Clear old sockets before either update path initializes the replacement IO.
   if (includes(optionsThatChanged, "io")) {
     prgl.connectedSockets.forEach((socket) => {
