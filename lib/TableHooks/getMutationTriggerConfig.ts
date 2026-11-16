@@ -6,7 +6,9 @@ import { MUTATION_TRIGGER_PREFIX } from "../TableConfig/managedTriggerNames";
 import type { BaseTableDefinition } from "../TableConfig/TableConfigTypes";
 
 /** Stable definitions let instances with different hooks share the same triggers. */
-export const getMutationTriggerConfig = (table: TableHandler): BaseTableDefinition["triggers"] => {
+export const getMutationTriggerConfig = (
+  table: Pick<TableHandler, "tableOrViewInfo" | "column_names">,
+): BaseTableDefinition["triggers"] => {
   const { schema: functionSchema, name: tableName } = table.tableOrViewInfo.qualifiedNameParts;
   const functionName = MUTATION_TRIGGER_PREFIX + md5(JSON.stringify([functionSchema, tableName]));
   const scope = `COALESCE(operation_id, '') = '' OR pg_trigger_depth() <> 1

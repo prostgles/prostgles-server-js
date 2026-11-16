@@ -1,6 +1,6 @@
 import { asName } from "prostgles-types";
 import { md5 } from "prostgles-types/dist/md5";
-import type { DB } from "../../initProstgles";
+import type { DBorTx } from "../../Prostgles";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
 import { executeSqlWithRollback } from "../getFutureTableSchema";
 import { getPGIndexes } from "../getPGIndexes";
@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
  * This ensures we don't drop and recreate indexes unnecessarily (which might also bring foreign key constraints issues)
  */
 export const getIndexesQueries = async (
-  db: DB,
+  db: DBorTx,
   tableName: string,
   tableConf: TableConfig[string],
 ) => {
@@ -30,8 +30,9 @@ export const getIndexesQueries = async (
         [
           "CREATE",
           unique && "UNIQUE",
+          "INDEX",
           concurrent && "CONCURRENTLY",
-          `INDEX ${asName(indexName)} ON ${asName(targetTable)}`,
+          `${asName(indexName)} ON ${asName(targetTable)}`,
           using && "USING " + using,
           `(${columns})`,
           where && `WHERE ${where}`,
@@ -55,7 +56,8 @@ export const getIndexesQueries = async (
         });
         indexExistsWithDifferentDefinition = !futureIndexes.some(
           (idx) =>
-            idx.indexname === indexName && matchingIndex.indexdef === idx.indexdef &&
+            idx.indexname === indexName &&
+            matchingIndex.indexdef === idx.indexdef &&
             matchingIndex.unique === idx.unique,
         );
       }
@@ -72,6 +74,11 @@ export const getIndexesQueries = async (
         indexShouldBeReplaced ||
         !currIndexes.some((idx) => idx.indexname === indexName)
       ) {
+        if (concurrently && "ctx" in db && db.ctx.isTX) {
+          throw new Error(
+            `Index ${indexName} requires CREATE INDEX CONCURRENTLY, which cannot run inside a migration transaction. Create it separately before starting the application.`,
+          );
+        }
         queries.push(indexDefinition);
         queries.push(`COMMENT ON INDEX ${asName(indexName)} IS ${asValue(indexDefinitionHash)};`);
       } else if (!matchingIndex?.description) {

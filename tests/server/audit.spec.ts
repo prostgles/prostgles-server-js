@@ -847,11 +847,34 @@ export async function testAudit(parentDb: DB) {
           ),
           null,
         );
-        // A fresh instance derives deselected trigger names from config, without saved state.
+        /* An instance without schema configuration must preserve existing managed triggers. */
+        const managedTriggers = () =>
+          db.any(
+            "SELECT oid FROM pg_trigger WHERE starts_with(tgname, $1) OR starts_with(tgname, $2) ORDER BY oid",
+            [AUDIT_TRIGGER_PREFIX, TABLE_CONFIG_TRIGGER_PREFIX],
+          );
+        const beforeReaderTriggers = await managedTriggers();
+        const reader = new Prostgles({
+          dbConnection: prgl.opts.dbConnection,
+          schemaFilter: prgl.opts.schemaFilter,
+          disableRealtime: true,
+          onReady: () => {},
+        });
+        const readerResult = await reader.init(() => {}, { type: "init" });
+        try {
+          assert.deepEqual(await managedTriggers(), beforeReaderTriggers);
+          await readerResult.update({ publish: () => "*" });
+          assert.deepEqual(await managedTriggers(), beforeReaderTriggers);
+          await readerResult.restart();
+          assert.deepEqual(await managedTriggers(), beforeReaderTriggers);
+        } finally {
+          await readerResult.destroy();
+        }
+        /* Explicit empty tableConfig removes obsolete application triggers on a fresh instance. */
         const fresh = new Prostgles({
           ...prgl.opts,
           fileTable: undefined,
-          tableConfig: undefined,
+          tableConfig: {},
           audit: {
             ...audit,
             tables: {

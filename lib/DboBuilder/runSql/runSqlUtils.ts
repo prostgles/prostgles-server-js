@@ -1,8 +1,8 @@
 import type pg from "pg-promise/typescript/pg-subset";
 import { postgresToTsType, type PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
-import type { DB } from "../../Prostgles";
+import type { DBorTx } from "../../Prostgles";
 
-export const getDbTypes = async (db: DB) => {
+export const getDbTypes = async (db: DBorTx) => {
   const dataTypes = await db.any<{
     oid: number;
     typname: PG_COLUMN_UDT_DATA_TYPE;

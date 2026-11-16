@@ -371,8 +371,11 @@ export class Prostgles {
           duration: Date.now() - now,
         });
       } catch (e) {
-        if (!this.opts.audit && this.opts.tableConfigMigrations?.silentFail === false) {
+        if (!this.opts.audit && this.opts.tableConfigMigrations?.silentFail === true) {
           console.error("TableConfigurator silentFail: ", e);
+          await this.runSchemaQueries(async () => {
+            await this.rebuildDBO();
+          });
         } else {
           throw e;
         }

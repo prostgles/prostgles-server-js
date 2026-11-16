@@ -1,7 +1,7 @@
 import type pgPromise from "pg-promise";
 import { asName } from "prostgles-types";
 import type { DB } from "../initProstgles";
-import type { ProstglesInitOptions, TableConfigMigrations } from "../ProstglesTypes";
+import type { LegacyTableConfigMigrations, ProstglesInitOptions } from "../ProstglesTypes";
 import { fetchTableConstraints } from "./fetchTableConstraints";
 import type { TableConfig } from "./TableConfigTypes";
 import { getTableConfigVersion } from "./getTableConfigVersion";
@@ -19,6 +19,11 @@ export const tableConfigWithMigrations = async (
   file_table_schema: string,
 ) => {
   if (!tableConfigMigrations) return { config: tableConfig };
+  if (tableConfigMigrations.migrations) {
+    throw new Error(
+      "Numbered migrations require prostgles initialization, not the experimental schema diff runner",
+    );
+  }
   const { versionTableName = "schema_version" } = tableConfigMigrations;
 
   if (tableConfig?.[versionTableName]) {
@@ -60,12 +65,15 @@ const getMigration = async (
   db: DB,
   versionTableName: string,
   tableConfig: TableConfig,
-  { version, onMigrate }: Pick<TableConfigMigrations, "version" | "onMigrate">,
+  { version, onMigrate }: LegacyTableConfigMigrations,
   file_table_queries: string,
 ) => {
   const latestVersion = getTableConfigVersion(
-    (await db.oneOrNone<{ v: string | null }>(`SELECT MAX(id) as v FROM ${asName(versionTableName)}`))
-      ?.v,
+    (
+      await db.oneOrNone<{ v: string | null }>(
+        `SELECT MAX(id) as v FROM ${asName(versionTableName)}`,
+      )
+    )?.v,
   );
 
   if (latestVersion === version) {

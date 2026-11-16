@@ -95,7 +95,10 @@ export type {
   FileTableConfig,
   ProstglesInitOptions,
   TableConfigMigrations,
+  TableConfigMigration,
+  OnMigrate,
 } from "./ProstglesTypes";
+export { loadTableConfigMigrations } from "./TableConfig/loadTableConfigMigrations";
 export type * from "./TableConfig/TableConfigTypes";
 export type * from "./TableConfig/TableRowFromColumnDefinitions";
 export type * from "./Audit/AuditTypes";

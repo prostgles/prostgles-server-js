@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import {
+  asName,
   reverseParsedPath,
   type AnyObject,
   type ClientJoin,
@@ -800,9 +801,15 @@ export const testJoins = async (db: DB) => {
   });
 
   await test("view references ignore duplicates outside the inferred join columns", async (context) => {
+    const readerRole = `view_reference_reader_${process.pid}`;
     await db.none(`
+        CREATE ROLE ${asName(readerRole)};
         CREATE SCHEMA view_reference_test;
         CREATE TABLE view_reference_test.stations (id int PRIMARY KEY, name text, metadata jsonb);
+        CREATE TABLE view_reference_test.hidden (id int PRIMARY KEY);
+        INSERT INTO view_reference_test.hidden VALUES (3);
+        CREATE VIEW view_reference_test.a_restricted_view AS
+          SELECT * FROM view_reference_test.hidden;
         INSERT INTO view_reference_test.stations VALUES (1, 'Origin', '{}'), (2, 'Destination', '{}');
         CREATE VIEW view_reference_test.station_labels AS
           SELECT id, name, name AS label FROM view_reference_test.stations;
@@ -816,17 +823,24 @@ export const testJoins = async (db: DB) => {
           SELECT origin.id AS origin_id, destination.id AS destination_id
           FROM view_reference_test.stations origin
           CROSS JOIN view_reference_test.stations destination;
+        GRANT USAGE ON SCHEMA view_reference_test TO ${asName(readerRole)};
+        GRANT SELECT ON ALL TABLES IN SCHEMA view_reference_test TO ${asName(readerRole)};
+        GRANT REFERENCES ON view_reference_test.stations TO ${asName(readerRole)};
+        REVOKE SELECT ON view_reference_test.hidden FROM ${asName(readerRole)};
       `);
     const instance = await prostgles({
       dbConnection: {
         ...getConnectionDetails(db),
-        options: "-c search_path=view_reference_test,public",
+        options: `-c search_path=view_reference_test,public -c role=${readerRole}`,
       } as unknown as ProstglesInitOptions["dbConnection"],
       schemaFilter: { view_reference_test: 1 },
+      disableRealtime: true,
       joins: "inferred",
       onReady: () => {},
     });
     try {
+      /* Selecting the view works even though probing its underlying table is forbidden. */
+      assert.deepEqual(await instance.db.a_restricted_view!.find!(), [{ id: 3 }]);
       for (const { viewName, referenceColumn } of [
         { viewName: "station_labels", referenceColumn: "id" },
         { viewName: "station_metadata", referenceColumn: "name" },
@@ -864,6 +878,7 @@ export const testJoins = async (db: DB) => {
     } finally {
       await instance.destroy();
       await db.none("DROP SCHEMA view_reference_test CASCADE");
+      await db.none(`DROP ROLE ${asName(readerRole)}`);
     }
   });
 

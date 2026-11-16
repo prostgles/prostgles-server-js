@@ -50,9 +50,16 @@ export const getCreatePubSubManagerError = async (
     return undefined;
   } else {
     const canCheckVersion = await tryCatchV2(async () => {
-      await db.any(`
-        SELECT * FROM prostgles.versions
-      `);
+      const { versionTableExists, canCreate } = await db.one<{
+        versionTableExists: boolean;
+        canCreate: boolean;
+      }>(`SELECT to_regclass('prostgles.versions') IS NOT NULL AS "versionTableExists",
+          has_schema_privilege('prostgles', 'CREATE') AS "canCreate"`);
+      if (versionTableExists) {
+        await db.any("SELECT * FROM prostgles.versions");
+      } else if (!canCreate) {
+        throw new Error("Cannot create the missing prostgles.versions table");
+      }
       return { ok: true };
     });
 

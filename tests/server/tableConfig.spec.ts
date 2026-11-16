@@ -14,8 +14,10 @@ import {
 import { getTableConfigSchemaQueries } from "prostgles-server/dist/TableConfig/getTableConfigSchemaQueries";
 import { getSchemaDiffQueries } from "prostgles-server/dist/TableConfig/getSchemaDiffQueries";
 import type { SchemaInfo } from "prostgles-server/dist/TableConfig/getSchemaForTableConfig";
+import { testTableConfigMigrations } from "./tableConfigMigrations.spec";
 
 export const testTableConfigValidation = async (parentDb: DB) => {
+  await testTableConfigMigrations(parentDb);
   await test("tableConfig schema diffs accept unchanged quoted table names", async () => {
     const tableNames = ["schema_diff_plain", "SchemaDiffMixedCase", 'schema_diff"quoted'];
     const { tableQueries, tableDefs } = await getTableConfigSchemaQueries(
@@ -475,6 +477,10 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         }
         const prgl = new Prostgles({
           dbConnection: dbConnection as ProstglesInitOptions["dbConnection"],
+          tableConfigMigrations: {
+            version: 1,
+            onMigrate: () => assert.fail("Fresh or unchanged versions must skip migrations"),
+          },
           tableConfig: {
             validated: {
               columns: {

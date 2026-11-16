@@ -8,7 +8,7 @@ import {
   type JSONB,
 } from "prostgles-types";
 import { VALIDATE_SCHEMA_FUNCNAME } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import type { DB } from "../Prostgles";
+import type { DB, DBorTx } from "../Prostgles";
 import { asValue } from "../PubSubManager/PubSubManagerUtils";
 import type { BaseColumnTypes, ColumnConfig } from "./TableConfigTypes";
 
@@ -16,7 +16,7 @@ type Args = {
   column: string;
   escapedColumnName?: string;
   colConf: ColumnConfig;
-  db: DB;
+  db: DBorTx;
   table: string;
   excludeName?: boolean;
 };

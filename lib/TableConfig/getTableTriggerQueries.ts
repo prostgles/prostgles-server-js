@@ -2,17 +2,14 @@ import { as } from "pg-promise";
 import { asName } from "prostgles-types";
 import type { DB } from "../initProstgles";
 import type { BaseTableDefinition } from "./TableConfigTypes";
-import {
-  getManagedTriggerName,
-  isManagedTriggerName,
-  MUTATION_TRIGGER_PREFIX,
-} from "./managedTriggerNames";
+import { getManagedTriggerName, MUTATION_TRIGGER_PREFIX } from "./managedTriggerNames";
 
 /** Compare actual definitions so unchanged triggers do not cause schema refreshes. */
 export const getTableTriggerQueries = async (
   db: Pick<DB, "any">,
   tableIdent: string,
   triggers: BaseTableDefinition["triggers"],
+  managedTriggerPrefixes: readonly string[],
 ): Promise<string[]> => {
   const existing = await db.any<{
     name: string;
@@ -105,7 +102,7 @@ export const getTableTriggerQueries = async (
   }
   const hasCaptureConfig = [...desired].some((name) => name.startsWith(MUTATION_TRIGGER_PREFIX));
   for (const trigger of existing) {
-    const managed = isManagedTriggerName(trigger.name);
+    const managed = managedTriggerPrefixes.some((prefix) => trigger.name.startsWith(prefix));
     // Capture definitions are shared and inert outside a scoped mutation. Another
     // instance can still need them after this instance removes its hooks/publish.
     if (trigger.name.startsWith(MUTATION_TRIGGER_PREFIX) && !hasCaptureConfig) continue;

@@ -1,7 +1,6 @@
 import { asName } from "prostgles-types";
 import { randomUUID } from "crypto";
-import { pgp } from "../DboBuilder/DboBuilder";
-import type { DB } from "../Prostgles";
+import type { DBorTx } from "../Prostgles";
 import type { ColumnMinimalInfo } from "./getColumnSQLDefinitionQuery";
 import { getTableColumns } from "./getColumnSQLDefinitionQuery";
 import type { ConstraintDef } from "./getConstraintDefinitionQueries";
@@ -9,7 +8,7 @@ import { type PGConstraint, fetchTableConstraints } from "./fetchTableConstraint
 import type pgPromise from "pg-promise";
 
 type Args = {
-  db: DB;
+  db: DBorTx;
   columnDefs: string[];
   tableName: string;
   constraintDefs?: ConstraintDef[];
@@ -67,17 +66,14 @@ export const getFutureTableSchema = async ({
 };
 
 export const executeSqlWithRollback = async <R>(
-  db: DB,
+  db: DBorTx,
   txHandler: (t: pgPromise.ITask<{}>) => Promise<R>,
 ): Promise<R> => {
-  const { TransactionMode, isolationLevel } = pgp.txMode;
-
-  const txMode = new TransactionMode({
-    tiLevel: isolationLevel.serializable,
-  });
-  const res = await db.tx({ mode: txMode }, async (t) => {
+  const res = await db.tx(async (t) => {
+    await t.none("SAVEPOINT prostgles_schema_inspection");
     const result = await txHandler(t);
-    await t.any("ROLLBACK");
+    await t.none("ROLLBACK TO SAVEPOINT prostgles_schema_inspection");
+    await t.none("RELEASE SAVEPOINT prostgles_schema_inspection");
     return result;
   });
   return res;

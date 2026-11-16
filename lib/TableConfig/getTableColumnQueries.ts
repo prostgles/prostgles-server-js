@@ -1,26 +1,26 @@
 import { asName, getKeys, getObjectEntries, isObject } from "prostgles-types";
 import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../JSONBSchemaValidation/validateJSONBSchemaSQL";
-import type { DB, DBHandlerServerInternal } from "../Prostgles";
+import type { DBorTx } from "../Prostgles";
 import { getColumnSQLDefinitionQuery, getTableColumns } from "./getColumnSQLDefinitionQuery";
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import type { TableConfig } from "./TableConfigTypes";
 
 type Args = {
-  db: DB;
+  db: DBorTx;
   tableConf: TableConfig[string];
   tableName: string;
-  tableHandler: DBHandlerServerInternal[string] | undefined;
+  tableExists: boolean;
 };
 
 /**
- * Given a tableHandler, table name, column definitions and constraint definitions,
+ * Given a table name, column definitions and constraint definitions,
  * returns the queries to align any existing table with the given column definitions
  */
 export const getTableColumnQueries = async ({
   db,
   tableConf,
   tableName,
-  tableHandler,
+  tableExists,
 }: Args): Promise<
   | undefined
   | {
@@ -80,7 +80,7 @@ export const getTableColumnQueries = async ({
   }
 
   const alterTableQuery = `ALTER TABLE ${asName(tableName)}`;
-  if (!tableHandler) {
+  if (!tableExists) {
     columnDefinitions.map((c) => newColumnDefinitions.push(c.def));
   } else {
     const currCols = await getTableColumns({ db, table: tableName });
@@ -134,7 +134,7 @@ export const getTableColumnQueries = async ({
     });
   }
 
-  if (!tableHandler || tableConf.dropIfExists || tableConf.dropIfExistsCascade) {
+  if (!tableExists || tableConf.dropIfExists || tableConf.dropIfExistsCascade) {
     isCreate = true;
     const dropTableQuery = `DROP TABLE IF EXISTS ${asName(tableName)}`;
     fullQuery = [

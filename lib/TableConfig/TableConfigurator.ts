@@ -8,6 +8,8 @@ import {
 import { initTableConfig } from "./initTableConfig";
 import { runSQLFile } from "./runSQLFile";
 import { syncTableTriggers } from "./syncTableTriggers";
+import { runMigrations } from "./runMigrations";
+import { getTablesForSchemaPostgresSQL } from "../DboBuilder/schema/getTablesForSchemaPostgresSQL";
 import type { ColExtraInfo, ColumnConfig, LangToTranslation } from "./TableConfigTypes";
 
 /**
@@ -28,9 +30,11 @@ export class TableConfigurator {
     return this.prostgles.dbForSchema;
   }
   prostgles: Prostgles;
+  managedTriggerPrefixes: string[];
 
   constructor(prostgles: Prostgles) {
     this.prostgles = prostgles;
+    this.managedTriggerPrefixes = prostgles.tableConfigurator?.managedTriggerPrefixes ?? [];
   }
 
   destroy = async () => {
@@ -138,13 +142,38 @@ export class TableConfigurator {
       await runSQLFile(this.prostgles);
       this.prostgles.preparingTableConfig = true;
       try {
-        await this.prostgles.rebuildDBO();
-        await initTableConfig.call(this);
+        if (this.prostgles.opts.tableConfigMigrations) {
+          const queryHistory = await this.db.tx(async (transaction) => {
+            await transaction.any(
+              "SELECT pg_advisory_xact_lock(hashtextextended('prostgles.tableConfig.migrations', 0))",
+            );
+            const finishMigration = await runMigrations(transaction, {
+              ...this.prostgles.opts,
+              tableConfig: this.config,
+            });
+            const queries = await initTableConfig.call(this, transaction);
+            const { result: tables } = await getTablesForSchemaPostgresSQL(
+              { db: transaction },
+              { schemaFilter: this.prostgles.opts.schemaFilter },
+            );
+            await syncTableTriggers(this, transaction, tables);
+            await finishMigration?.();
+            return queries;
+          });
+          if (queryHistory.length) this.prevInitQueryHistory = queryHistory;
+        } else {
+          await this.prostgles.rebuildDBO();
+          await initTableConfig.call(this);
+        }
       } finally {
         this.prostgles.preparingTableConfig = false;
         this.initialising = false;
       }
-      await this.syncTriggers();
+      if (this.prostgles.opts.tableConfigMigrations) {
+        await this.prostgles.rebuildDBO();
+      } else {
+        await this.syncTriggers();
+      }
     });
 
   refresh = () =>

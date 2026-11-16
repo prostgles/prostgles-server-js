@@ -3,7 +3,7 @@ import { omitKeys } from "prostgles-types/dist/util";
 import type { DBorTx } from "../../Prostgles";
 import type { ProstglesInitOptions } from "../../ProstglesTypes";
 import { clone } from "../../utils/utils";
-import type { DboBuilder } from "../DboBuilder";
+import { executeSqlWithRollback } from "../../TableConfig/getFutureTableSchema";
 import type { TableSchema, TableSchemaColumn } from "../DboBuilderTypes";
 import { getFkeys } from "../getFkeys";
 import { getMaterialViews } from "./getMaterialViews";
@@ -25,7 +25,7 @@ export const getSchemaFilter = (schema: ProstglesInitOptions["schemaFilter"] = {
 // TODO: Add a onSocketConnect timeout for this query.
 //  Reason: this query gets blocked by prostgles.app_triggers from PubSubManager.addTrigger in some cases (pg_dump locks that table)
 export async function getTablesForSchemaPostgresSQL(
-  { db }: Pick<DboBuilder, "db">,
+  { db }: { db: DBorTx },
   {
     schemaFilter,
     ddlWithRollback,
@@ -33,7 +33,7 @@ export async function getTablesForSchemaPostgresSQL(
 ) {
   const { sql, schemaNames } = getSchemaFilter(schemaFilter);
 
-  return db.tx(async (t) => {
+  return executeSqlWithRollback(db, async (t) => {
     if (ddlWithRollback) {
       await t.any(ddlWithRollback);
     }
@@ -265,65 +265,61 @@ export async function getTablesForSchemaPostgresSQL(
       console.error(getHyperTablesReq.error);
     }
 
-    let tableSchemaList = getTablesAndViews.data.tablesAndViews.concat(
-      getMaterialViewsReq.data.materialViews,
-    );
-    tableSchemaList = await Promise.all(
-      tableSchemaList.map(async (table) => {
-        table.name = table.escaped_identifier;
-        /** This is used to prevent bug of table schema not sent */
-        const allowAllIfNoColumns = !table.columns.length ? true : undefined;
-        table.privileges.select =
-          allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.SELECT);
-        table.privileges.insert =
-          allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.INSERT);
-        table.privileges.update =
-          allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.UPDATE);
-        table.columns = table.columns.map((c) => {
-          const refs = fkeys.filter((fc) => fc.oid === table.oid && fc.cols.includes(c.name));
-          if (refs.length)
-            c.references = refs.map((_ref) => {
-              const ref = { ..._ref };
-              //@ts-ignore
-              delete ref.oid;
-              return ref;
-            });
-          return c;
-        });
+    const tableSchemaList = getTablesAndViews.data.tablesAndViews
+      .concat(getMaterialViewsReq.data.materialViews)
+      .map((table) => ({ ...table, name: table.escaped_identifier }));
+    /* Each view probe must finish its savepoint before the next one begins. */
+    for (const table of tableSchemaList) {
+      /** This is used to prevent bug of table schema not sent */
+      const allowAllIfNoColumns = !table.columns.length ? true : undefined;
+      table.privileges.select =
+        allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.SELECT);
+      table.privileges.insert =
+        allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.INSERT);
+      table.privileges.update =
+        allowAllIfNoColumns ?? table.columns.some((c) => c.privileges.UPDATE);
+      table.columns = table.columns.map((c) => {
+        const refs = fkeys.filter((fc) => fc.oid === table.oid && fc.cols.includes(c.name));
+        if (refs.length)
+          c.references = refs.map((_ref) => {
+            const ref = { ..._ref };
+            /* @ts-ignore */
+            delete ref.oid;
+            return ref;
+          });
+        return c;
+      });
 
-        /** Get view reference cols (based on parent table) */
-        const viewReferenceColumns = await getViewReferenceColumns(table, tableSchemaList, db);
+      /** Get view reference cols (based on parent table) */
+      const viewReferenceColumns = await getViewReferenceColumns(table, tableSchemaList, t);
 
-        table.columns = table.columns.map((col) => {
-          if (col.has_default) {
-            /** Hide pkey default value */
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            col.column_default =
-              (
-                col.udt_name !== "uuid" &&
-                !col.is_pkey &&
-                !`${col.column_default}`.startsWith("nextval(")
-              ) ?
-                col.column_default
-              : null;
-          }
+      table.columns = table.columns.map((col) => {
+        if (col.has_default) {
+          /** Hide pkey default value */
+          /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
+          col.column_default =
+            (
+              col.udt_name !== "uuid" &&
+              !col.is_pkey &&
+              !`${col.column_default}`.startsWith("nextval(")
+            ) ?
+              col.column_default
+            : null;
+        }
 
-          const viewFCol = viewReferenceColumns?.find((fc) => fc.name === col.name);
-          if (viewFCol) {
-            col.references = viewFCol.references;
-          }
+        const viewFCol = viewReferenceColumns?.find((fc) => fc.name === col.name);
+        if (viewFCol) {
+          col.references = viewFCol.references;
+        }
 
-          return col;
-        });
-        table.isHyperTable = getHyperTablesReq.data?.hyperTables?.includes(table.name);
+        return col;
+      });
+      table.isHyperTable = getHyperTablesReq.data?.hyperTables?.includes(table.name);
 
-        table.uniqueColumnGroups = uniqueColsReq.data
-          ?.filter((r) => r.table_name === table.name && r.table_schema === table.schema)
-          .map((r) => r.column_names);
-
-        return table;
-      }),
-    );
+      table.uniqueColumnGroups = uniqueColsReq.data
+        ?.filter((r) => r.table_name === table.name && r.table_schema === table.schema)
+        .map((r) => r.column_names);
+    }
 
     const res = {
       result: tableSchemaList,
@@ -337,7 +333,6 @@ export async function getTablesForSchemaPostgresSQL(
       },
     };
 
-    await t.any("ROLLBACK");
     return res;
   });
 }

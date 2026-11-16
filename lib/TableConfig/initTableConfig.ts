@@ -10,32 +10,13 @@ import { getConstraintDefinitionQueries } from "./getConstraintDefinitionQueries
 import { getFutureTableSchema } from "./getFutureTableSchema";
 import { getTableColumnQueries } from "./getTableColumnQueries";
 import { getIndexesQueries } from "./indexes/getIndexesQueries";
-import { runMigrations } from "./runMigrations";
+import type { DBorTx } from "../Prostgles";
+import { getTableColumns } from "./getColumnSQLDefinitionQuery";
 import type { TableConfigurator } from "./TableConfigurator";
 import { getTableCheckBranches, getTableCheckConstraint } from "./getTableCheck";
 
-export const initTableConfig = async function (this: TableConfigurator) {
+export const initTableConfig = async function (this: TableConfigurator, db: DBorTx = this.db) {
   this.initialising = true;
-
-  // WIP - applyTableConfig
-  // const res = await tryCatchV2(async () => {
-  //   await applyTableConfig(this.prostgles);
-  // });
-  // await this.prostgles.opts.onLog?.({
-  //   type: "debug",
-  //   command: "applyTableConfig",
-  //   duration: res.duration,
-  //   error: res.error,
-  // });
-  // if (res.error) throw res.error;
-  // await this.prostgles.refreshDBO();
-  // if (!this.prostgles.dbo?.api_table) {
-  //   console.error(res);
-  //   throw "why?";
-  // }
-  // await this.setTableOnMounts();
-  // this.initialising = false;
-  // if (Math.random() < 2) return;
 
   let changedSchema = false;
   const failedQueries: { query: string; error: any }[] = [];
@@ -62,7 +43,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     });
     const now = Date.now();
     console.warn("Running queries: ", q);
-    await this.db.multi(q).catch((err) => {
+    await db.multi(q).catch((err) => {
       log({ err, q });
       failedQueries.push({ query: q, error: err });
       return Promise.reject(err);
@@ -84,7 +65,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
   }
 
   const MAX_IDENTIFIER_LENGTH = +(
-    await this.db.one<{ max_identifier_length: number }>("SHOW max_identifier_length;")
+    await db.one<{ max_identifier_length: number }>("SHOW max_identifier_length;")
   ).max_identifier_length;
   if (!Number.isFinite(MAX_IDENTIFIER_LENGTH)) {
     throw `Could not obtain a valid max_identifier_length`;
@@ -96,10 +77,6 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
     return _asName(v);
   };
-
-  const migrations = await this.db.tx(async (t) => {
-    return runMigrations(t, this.prostgles.opts, { asName });
-  });
 
   /* Create lookup tables */
   for (const [tableNameRaw, tableConf] of Object.entries(this.config)) {
@@ -122,7 +99,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
         id,
         ...otherColumns,
       }));
-      const lookupTableHandler = this.dbo[tableNameRaw];
+      const lookupTableExists = await getTableExists(db, tableNameRaw);
+      const lookupColumns =
+        lookupTableExists ? await getTableColumns({ db, table: tableNameRaw }) : [];
       const [firstRow] = rows;
       if (!firstRow) {
         throw new Error(`Lookup table values are empty: ${tableName}`);
@@ -131,10 +110,8 @@ export const initTableConfig = async function (this: TableConfigurator) {
         (k) => k !== ("id" satisfies keyof LookupTableRowId),
       );
       const addedColumns =
-        !isDropped && lookupTableHandler ?
-          columnNames.filter(
-            (name) => !lookupTableHandler.columns.some((column) => column.name === name),
-          )
+        !isDropped && lookupTableExists ?
+          columnNames.filter((name) => !lookupColumns.some((column) => column.column_name === name))
         : [];
       if (addedColumns.length) {
         queries.push(
@@ -148,7 +125,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
           );
         }
       }
-      if (isDropped || !lookupTableHandler) {
+      if (isDropped || !lookupTableExists) {
         queries.push(
           `CREATE TABLE IF NOT EXISTS ${tableName} (
             id  TEXT PRIMARY KEY
@@ -158,9 +135,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
       }
       if (rows.length) {
         const existingValues: { id: any }[] =
-          !lookupTableHandler ?
+          !lookupTableExists ?
             []
-          : await this.db.any(
+          : await db.any(
               `SELECT id FROM ${tableName} WHERE id IN (${rows.map((r) => asValue(r.id)).join(", ")});`,
             );
         rows
@@ -183,15 +160,14 @@ export const initTableConfig = async function (this: TableConfigurator) {
 
   if (queries.length) {
     await runQueries(queries);
-    await this.prostgles.rebuildDBO();
   }
 
   /* Create/Alter columns */
   for (const [tableName, tableConf] of Object.entries(this.config)) {
-    const tableHandler = this.dbo[tableName];
+    const tableExists = await getTableExists(db, tableName);
     const ALTER_TABLE_Q = `ALTER TABLE ${asName(tableName)}`;
 
-    if (tableHandler || ("check" in tableConf && tableConf.check !== undefined)) {
+    if (tableExists || ("check" in tableConf && tableConf.check !== undefined)) {
       // Table introspection may reference tables queued earlier in this config.
       await runQueries();
     }
@@ -200,9 +176,9 @@ export const initTableConfig = async function (this: TableConfigurator) {
     const tableColumnDefinition =
       "isLookupTable" in tableConf ? undefined : (
         await getTableColumnQueries({
-          db: this.db,
+          db,
           tableConf,
-          tableHandler,
+          tableExists,
           tableName,
         })
       );
@@ -222,7 +198,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
         throw new Error(`tableConfig.check requires columns for ${tableName}`);
       // Let PostgreSQL determine types and nullability from the SQL column definitions.
       const { cols } = await getFutureTableSchema({
-        db: this.db,
+        db,
         tableName,
         columnDefs: tableColumnDefinition.columnDefs,
         constraintDefs,
@@ -252,7 +228,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       }
     } else if (tableColumnDefinition) {
       const fullSchema = await getFutureTableSchema({
-        db: this.db,
+        db,
         tableName,
         columnDefs: tableColumnDefinition.columnDefs,
         constraintDefs,
@@ -265,7 +241,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
       /** Run this first to ensure any dropped cols drop their constraints as well */
       await runQueries(queries);
       const currCons = await fetchTableConstraints({
-        db: this.db,
+        db,
         table: tableName,
       });
 
@@ -297,7 +273,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
         });
     }
 
-    const indexQueries = await getIndexesQueries(this.db, tableName, tableConf);
+    const indexQueries = await getIndexesQueries(db, tableName, tableConf);
     queries.push(...indexQueries);
   }
 
@@ -326,11 +302,7 @@ export const initTableConfig = async function (this: TableConfigurator) {
     }
   }
 
-  if (migrations) {
-    await this.db.any(
-      `INSERT INTO ${migrations.table}(id, table_config) VALUES (${asValue(migrations.version)}, ${asValue(this.config)}) ON CONFLICT DO NOTHING;`,
-    );
-  }
+  if (db !== this.db) return queryHistory;
   this.initialising = false;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (changedSchema && !failedQueries.length && !this.prostgles.opts.audit) {
@@ -349,4 +321,12 @@ export const initTableConfig = async function (this: TableConfigurator) {
   }
 
   await this.prostgles.rebuildDBO();
+  return queryHistory;
 };
+
+const getTableExists = async (db: DBorTx, tableName: string) =>
+  (
+    await db.one<{ exists: boolean }>("SELECT to_regclass(quote_ident($1)) IS NOT NULL AS exists", [
+      tableName,
+    ])
+  ).exists;

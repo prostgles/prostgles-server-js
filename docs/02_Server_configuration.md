@@ -158,23 +158,30 @@
 - **tableConfigMigrations** <span style="color: grey">optional</span> <span style="color: green;">TableConfigMigrations</span>
 
   Migration logic used when the new tableConfig version is higher than the one in the database.
+  Use `migrations` for numbered files, or both `version` and `onMigrate` for callbacks.
   By default server will fail to start if the tableConfig schema changes cannot be applied without errors
   - **silentFail** <span style="color: grey">optional</span> <span style="color: green;">boolean | undefined</span>
 
     If false then prostgles won't start on any tableConfig error
-    true by default
+    false by default
   - **versionTableName** <span style="color: grey">optional</span> <span style="color: green;">string</span>
 
     Table that will contain the schema version number and the tableConfig
     Defaults to schema_version
-  - **version** <span style="color: red">required</span> <span style="color: green;">number</span>
+  - **version** <span style="color: grey">optional</span> <span style="color: green;">number</span>
 
     Current schema version number.
     Must increase on each schema change.
-  - **onMigrate** <span style="color: red">required</span> <span style="color: green;">OnMigrate</span>
+  - **onMigrate** <span style="color: grey">optional</span> <span style="color: green;">OnMigrate</span>
 
     Script executed before tableConfig is loaded and IF an older schema_version is present.
     Any data conflicting with the new schema changes should be resolved here.
+  - **migrations** <span style="color: grey">optional</span> <span style="color: green;">readonly TableConfigMigration[]</span>
+
+    Numbered upgrade files, normally loaded with loadTableConfigMigrations.
+  - **baseline** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+
+    Explicitly adopt an existing database through this version without running those files.
 - **tableHooks** <span style="color: grey">optional</span> <span style="color: green;">TableHooks</span>
 
   Allows defining hooks for table events such as insert, update, delete and select.

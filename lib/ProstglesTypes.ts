@@ -362,6 +362,7 @@ export type ProstglesInitOptions<
 
   /**
    * Migration logic used when the new tableConfig version is higher than the one in the database.
+   * Use `migrations` for numbered files, or both `version` and `onMigrate` for callbacks.
    * By default server will fail to start if the tableConfig schema changes cannot be applied without errors
    */
   tableConfigMigrations?: TableConfigMigrations;
@@ -388,7 +389,7 @@ export type ProstglesInitOptions<
 export type TableConfigMigrations = {
   /**
    * If false then prostgles won't start on any tableConfig error
-   * true by default
+   * false by default
    */
   silentFail?: boolean;
 
@@ -397,7 +398,9 @@ export type TableConfigMigrations = {
    * Defaults to schema_version
    */
   versionTableName?: string;
+} & (LegacyTableConfigMigrations | NumberedTableConfigMigrations);
 
+export type LegacyTableConfigMigrations = {
   /**
    * Current schema version number.
    * Must increase on each schema change.
@@ -409,9 +412,29 @@ export type TableConfigMigrations = {
    * Any data conflicting with the new schema changes should be resolved here.
    */
   onMigrate: OnMigrate;
+  migrations?: never;
+  baseline?: never;
 };
 
-type OnMigrate = (args: {
+export type NumberedTableConfigMigrations = {
+  /** Numbered upgrade files, normally loaded with loadTableConfigMigrations. */
+  migrations: readonly TableConfigMigration[];
+  /** Explicitly adopt an existing database through this version without running those files. */
+  baseline?: number;
+  version?: never;
+  onMigrate?: never;
+};
+
+export type TableConfigMigration = {
+  /** Filename starting with a positive integer and underscore, e.g. 0002_rename_customer.js. */
+  name: string;
+  /** Stable content checksum. Applied files must remain unchanged. */
+  checksum: string;
+  /** Runs before the latest tableConfig; include any intermediate schema changes here. */
+  run: OnMigrate;
+};
+
+export type OnMigrate = (args: {
   db: pgPromise.ITask<{}>;
   oldVersion: number | undefined;
   getConstraints: (
