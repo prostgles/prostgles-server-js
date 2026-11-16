@@ -928,7 +928,7 @@ export const isomorphicQueries = async (
     await test("PostgreSQL text array search", async () => {
       const id = -101;
       await db.items.insert({ id, name: "array search", h: ["xxCat cat!", "", "🐈 café CAT"] });
-      const search = (searchTerm: string, options: unknown = {}) =>
+      const search = (searchTerm: string | string[], options: unknown = {}) =>
         db.items.findOne(
           { id },
           { select: { matches: { $array_search: ["h", searchTerm, options] } } },
@@ -936,7 +936,7 @@ export const isomorphicQueries = async (
       try {
         const result = await search("cat", { contextChars: 2 });
         result?.matches[0]?.offset satisfies number | undefined;
-        // @ts-expect-error search results must retain their type
+        /* @ts-expect-error search results must retain their type */
         result?.matches[0]?.offset satisfies string;
         assert.deepStrictEqual(result, {
           matches: [
@@ -956,6 +956,37 @@ export const isomorphicQueries = async (
           matches: [{ index: 1, offset: 2, match: "Cat", snippet: "xxCat cat!" }],
         });
         assert.deepStrictEqual(await search("missing"), { matches: [] });
+        assert.deepStrictEqual(await search(["cat"]), await search("cat"));
+
+        /* OR terms retain page/offset order and deduplicate occurrences before limiting. */
+        const searchTerms = ["café", "missing", "cat", "CAT", "cat"];
+        assert.deepStrictEqual(await search(searchTerms, { contextChars: 0 }), {
+          matches: [
+            { index: 1, offset: 2, match: "Cat", snippet: "Cat" },
+            { index: 1, offset: 6, match: "cat", snippet: "cat" },
+            { index: 3, offset: 2, match: "café", snippet: "café" },
+            { index: 3, offset: 7, match: "CAT", snippet: "CAT" },
+          ],
+        });
+        assert.deepStrictEqual(
+          await search(searchTerms, { contextChars: 2, limit: 2 }),
+          await search("cat", { contextChars: 2, limit: 2 }),
+        );
+        /* Different-length matches at the same offset remain distinct and sort longest first. */
+        assert.deepStrictEqual(await search(["ca", "cat", "CAT"], { contextChars: 0, limit: 3 }), {
+          matches: [
+            { index: 1, offset: 2, match: "Cat", snippet: "Cat" },
+            { index: 1, offset: 2, match: "Ca", snippet: "Ca" },
+            { index: 1, offset: 6, match: "cat", snippet: "cat" },
+          ],
+        });
+        assert.deepStrictEqual(await search(["CAT", "cat"], { matchCase: true, contextChars: 0 }), {
+          matches: [
+            { index: 1, offset: 6, match: "cat", snippet: "cat" },
+            { index: 3, offset: 7, match: "CAT", snippet: "CAT" },
+          ],
+        });
+        assert.deepStrictEqual(await search(["absent", "missing"]), { matches: [] });
 
         const literalTerm = "['%_.*\\";
         await db.items.update({ id }, { h: [literalTerm + literalTerm, "aaaa"] });
@@ -971,17 +1002,31 @@ export const isomorphicQueries = async (
             { index: 2, offset: 2, match: "aa", snippet: "aa" },
           ],
         });
+        assert.deepStrictEqual(
+          await search(["aa", literalTerm, literalTerm], { contextChars: 0 }),
+          {
+            matches: [
+              { index: 1, offset: 0, match: literalTerm, snippet: literalTerm },
+              { index: 1, offset: literalTerm.length, match: literalTerm, snippet: literalTerm },
+              { index: 2, offset: 0, match: "aa", snippet: "aa" },
+              { index: 2, offset: 2, match: "aa", snippet: "aa" },
+            ],
+          },
+        );
 
         for (const pages of [[], null]) {
           await db.items.update({ id }, { h: pages });
           assert.deepStrictEqual(await search("cat"), { matches: [] });
+          assert.deepStrictEqual(await search(["cat", "dog"]), { matches: [] });
         }
         await sql!("UPDATE items SET h = '[2:4]={NULL,cat,cat}'::text[] WHERE id = -101");
         assert.deepStrictEqual(await search("cat", { limit: 1 }), {
           matches: [{ index: 3, offset: 0, match: "cat", snippet: "cat" }],
         });
 
-        await assert.rejects(() => search(""));
+        for (const searchTerm of ["", [], [""], ["cat", ""]]) {
+          await assert.rejects(() => search(searchTerm));
+        }
         for (const options of [
           { contextChars: -1 },
           { contextChars: 1.5 },
@@ -997,7 +1042,15 @@ export const isomorphicQueries = async (
           await assert.rejects(() => search("cat", options));
         }
         /* Required argument types and surplus positional arguments are checked before querying. */
-        for (const args of [[], ["h"], [null, "cat"], ["h", 42], ["h", "cat", {}, "extra"]]) {
+        for (const args of [
+          [],
+          ["h"],
+          [null, "cat"],
+          ["h", 42],
+          ["h", ["cat", 42]],
+          ["h", ["cat", null]],
+          ["h", "cat", {}, "extra"],
+        ]) {
           await assert.rejects(() =>
             db.items.findOne({ id }, { select: { matches: { $array_search: args } } }),
           );
