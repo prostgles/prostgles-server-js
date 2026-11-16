@@ -345,7 +345,7 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     }
   });
 
-  await test("tableConfig backfills configured defaults before enforcing NOT NULL", async () => {
+  await test("tableConfig applies defaults and NOT NULL after column renames", async () => {
     const database = `table_config_defaults_${process.pid}_${Date.now()}`;
     await parentDb.none(`CREATE DATABASE ${asName(database)}`);
     const pgp = pgPromise();
@@ -366,12 +366,14 @@ export const testTableConfigValidation = async (parentDb: DB) => {
     try {
       await db.none(`
         CREATE TABLE windows (
-          id INTEGER PRIMARY KEY, filter JSONB, existing_default INTEGER DEFAULT 0,
+          id INTEGER PRIMARY KEY, filter_old JSONB, existing_default INTEGER DEFAULT 0,
           changed_default INTEGER DEFAULT 1, enabled BOOLEAN, label TEXT, converted TEXT,
           optional_filter JSONB, no_default TEXT
         );
         INSERT INTO windows VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
         INSERT INTO windows VALUES (2, '[1]', 3, 4, TRUE, 'kept', '5', NULL, NULL);
+        CREATE TABLE schema_version (id NUMERIC PRIMARY KEY, table_config JSONB NOT NULL);
+        INSERT INTO schema_version VALUES (1, '{}'::jsonb);
       `);
       const defaultRow = {
         id: 1,
@@ -388,6 +390,12 @@ export const testTableConfigValidation = async (parentDb: DB) => {
         const prgl = new Prostgles({
           dbConnection: dbConnection as ProstglesInitOptions["dbConnection"],
           tableConfig: { windows: { columns } },
+          tableConfigMigrations: {
+            version: 2,
+            onMigrate: async ({ db }) => {
+              await db.none("ALTER TABLE windows RENAME COLUMN filter_old TO filter");
+            },
+          },
           onReady: () => {},
         });
         instance = await prgl
