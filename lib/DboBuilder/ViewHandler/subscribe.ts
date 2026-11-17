@@ -98,6 +98,7 @@ async function subscribe(
       condition: hasRowPermissions ? "TRUE" : newQuery.whereOpts.condition,
       filter: { ...filter },
       selectParams: { ...selectParams },
+      requestedParams: params,
       subscribeOptions: getValidatedSubscribeOptions(
         { actions, skipFirst, throttle, throttleOpts, skipChangedColumnsCheck },
         table_rules?.select,

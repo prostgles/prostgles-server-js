@@ -175,6 +175,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         if (query.trimStart().startsWith("SELECT") && query.includes('"records"')) rowSelectCount++;
       },
       jobs: { tableName: queueName, definitions },
+      tableConfig: {
+        [queueName]: { columns: { custom_note: "TEXT", output: "JSONB" } },
+      },
       joins: [{ tables: [queueName, table], on: [{ user_id: "owner" }] }],
       auth: {
         getUser: () => undefined,
@@ -1583,7 +1586,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         },
       );
       await t.test(
-        "queue uses tableConfig, table hooks, literal JSON and subscriptions",
+        "queue uses tableConfig custom columns, table hooks, literal JSON and subscriptions",
         async () => {
           const jobs = instance!.db[queueName]!;
           const id = randomUUID();
@@ -1602,14 +1605,25 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 max_attempts: 1,
                 delay_ms: 0,
                 backoff: "fixed",
+                custom_note: "Queued manually",
               },
               { returning: "*" },
             );
             assert.deepEqual(row.params, { $to_timestamp: [123] });
+            assert.equal(row.custom_note, "Queued manually");
             assert(enqueued.has(id), "The queue insert must run normal table hooks");
-            await jobs.update({ id }, { cancel_requested: true });
+            const updated = await jobs.update(
+              { id },
+              { cancel_requested: true, custom_note: null },
+              { returning: "*", multi: false },
+            );
+            assert.equal(updated?.custom_note, null);
             await eventually(() => released.has(id));
             await assert.rejects(jobs.update({ id }, { status: "running" }));
+            await assert.rejects(
+              db.none(`UPDATE ${queue} SET output = '{}'::jsonb WHERE id = $1`, [id]),
+              { code: "23514" },
+            );
             await db.none(`DROP INDEX "${queueName}_pending"`);
             await instance!.update({ jobs: { tableName: queueName, definitions } }, true);
             assert(
@@ -2690,7 +2704,10 @@ type JobTestRow = {
 };
 type JobTestSchema = {
   records: { columns: JobTestRow; insertColumns: Partial<JobTestRow> };
-  [queue: `queue_${string}`]: { columns: JobRecord; insertColumns: JobInsertRecord };
+  [queue: `queue_${string}`]: {
+    columns: JobRecord & { custom_note: string | null };
+    insertColumns: JobInsertRecord & { custom_note?: string | null };
+  };
 };
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

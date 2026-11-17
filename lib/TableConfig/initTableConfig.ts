@@ -44,6 +44,8 @@ export const initTableConfig = async function (this: TableConfigurator, db: DBor
     const now = Date.now();
     console.warn("Running queries: ", q);
     await db.multi(q).catch((err) => {
+      /* Keep the offending key in the schema initialization error. */
+      if (err.code === "23503" && err.detail) err.message += `\n${err.detail}`;
       log({ err, q });
       failedQueries.push({ query: q, error: err });
       return Promise.reject(err);
@@ -238,23 +240,27 @@ export const initTableConfig = async function (this: TableConfigurator, db: DBor
         isNamed: constraintDefs.some((c) => c.name === nc.name),
       }));
 
-      /** Run this first to ensure any dropped cols drop their constraints as well */
-      await runQueries(queries);
-      const currCons = await fetchTableConstraints({
+      let currCons = await fetchTableConstraints({
         db,
         table: tableName,
       });
 
-      /** Drop removed/modified */
+      /* Drop obsolete constraints before changing the types of their columns. */
       currCons.forEach((c) => {
         if (
           !futureCons.some(
             (nc) => nc.definition === c.definition && (!nc.isNamed || nc.name === c.name),
           )
         ) {
-          queries.push(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)};`);
+          queries.unshift(`${ALTER_TABLE_Q} DROP CONSTRAINT ${asName(c.name)};`);
         }
       });
+
+      /* ADD COLUMN can create inline constraints. Read those back before adding more. */
+      if (tableColumnDefinition.newColumnDefs.length) {
+        await runQueries();
+        currCons = await fetchTableConstraints({ db, table: tableName });
+      }
 
       /** Add missing named constraints */
       constraintDefs.forEach((c) => {
@@ -271,6 +277,7 @@ export const initTableConfig = async function (this: TableConfigurator, db: DBor
         .forEach((c) => {
           queries.push(`${ALTER_TABLE_Q} ADD ${c.definition};`);
         });
+      if (tableColumnDefinition.fullQuery) await runQueries();
     }
 
     const indexQueries = await getIndexesQueries(db, tableName, tableConf);

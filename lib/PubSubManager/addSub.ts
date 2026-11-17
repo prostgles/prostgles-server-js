@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SubscriptionChannels } from "prostgles-types";
+import type { SubscribeParams, SubscriptionChannels } from "prostgles-types";
 import type { VoidFunction } from "../SchemaWatch/SchemaWatch";
 import { tout } from "./init/initPubSubManager";
 import type {
@@ -12,7 +12,9 @@ import { parseCondition } from "./PubSubManagerUtils";
 import type { AddTriggerParams } from "./addTrigger";
 
 export type AddSubscriptionParams = SubscriptionParams &
-  Pick<AddTriggerParams, "condition" | "tracked_columns">;
+  Pick<AddTriggerParams, "condition" | "tracked_columns"> & {
+    requestedParams: SubscribeParams;
+  };
 
 type AddSubResult = SubscriptionChannels & {
   sendFirstData: VoidFunction | undefined;
@@ -30,6 +32,7 @@ export async function addSub(
     table_rules,
     filter = {},
     selectParams = {},
+    requestedParams,
     condition = "",
     viewOptions,
     table_info,
@@ -46,11 +49,11 @@ export async function addSub(
     throw "addSub: cannot have socket AND func";
   }
 
-  const serializedParams = `${JSON.stringify(filter)}.${JSON.stringify(selectParams)}`;
+  const serializedParams = `${JSON.stringify(filter)}.${JSON.stringify(requestedParams)}`;
   const channelParams =
-    serializedParams.length > 64
-      ? createHash("sha256").update(serializedParams).digest("hex")
-      : serializedParams;
+    serializedParams.length > 64 ?
+      createHash("sha256").update(serializedParams).digest("hex")
+    : serializedParams;
   const channel_name = `${this.socketChannelPrefix}.${table_name}.${channelParams}.m.sub`;
   const mainTrigger = {
     table_name: table_name,

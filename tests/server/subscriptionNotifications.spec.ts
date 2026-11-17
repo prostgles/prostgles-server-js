@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -10,10 +10,8 @@ import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/ge
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { Server } from "socket.io";
 import type prostglesClient from "../client/node_modules/prostgles-client";
-import {
-  DELIMITER,
-  NOTIF_TYPE,
-} from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
+import type { SubscribeParams } from "prostgles-types";
+import { DELIMITER, NOTIF_TYPE } from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
 
 export const testSubscriptionNotifications = async (db: DB) => {
   await test(
@@ -24,18 +22,14 @@ export const testSubscriptionNotifications = async (db: DB) => {
       const tableName = "subscription_notifications_test.records";
       const retryPayload = `${NOTIF_TYPE.data_trigger_change}${DELIMITER}retry-test`;
       let notificationAttempts = 0;
-      await db.none(
-        `CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.records (id int PRIMARY KEY)`,
-      );
+      await db.none(`CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.records (id int PRIMARY KEY)`);
       const createInstance = () =>
         prostgles<{
           "subscription_notifications_test.records": {
             columns: { id: number };
           };
         }>({
-          dbConnection: getConnectionDetails(
-            db,
-          ) as unknown as ProstglesInitOptions["dbConnection"],
+          dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
           schemaFilter: { [schema]: 1 },
           onReady: () => {},
           onLog: (event) => {
@@ -68,9 +62,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
             "SELECT split_part(current_setting('application_name'), ' ', 2) AS id",
           );
           appIds.push(app.id);
-          await notificationConnection.none("LISTEN $1~", [
-            `prostgles_${app.id}`,
-          ]);
+          await notificationConnection.none("LISTEN $1~", [`prostgles_${app.id}`]);
           await instance.db[tableName].subscribe(
             {},
             { orderBy: { id: 1 }, limit: null },
@@ -90,9 +82,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
           "The notification queue must be unlogged",
         );
         await db.tx(async (slowTransaction) => {
-          await slowTransaction.none(
-            `INSERT INTO ${schema}.records VALUES (1)`,
-          );
+          await slowTransaction.none(`INSERT INTO ${schema}.records VALUES (1)`);
           // This higher queue ID commits and is consumed before the lower one.
           await db.none(`INSERT INTO ${schema}.records VALUES (2)`);
           await waitForBothApps("2");
@@ -133,45 +123,38 @@ export const testSubscriptionNotifications = async (db: DB) => {
               ),
             );
             await waitForBothApps("1,2,3");
-            await waitFor(
-              () => notificationAttempts === 2,
-              "Failed notification was not retried",
-            );
+            await waitFor(() => notificationAttempts === 2, "Failed notification was not retried");
           },
         );
 
-        await context.test(
-          "orphan cleanup does not abort concurrent writes",
-          async () => {
-            const orphanAppId = `subscription-notifications-orphan-${process.pid}`;
-            let concurrentWrite: Promise<unknown> | undefined;
-            try {
-              await db.none(
-                `
+        await context.test("orphan cleanup does not abort concurrent writes", async () => {
+          const orphanAppId = `subscription-notifications-orphan-${process.pid}`;
+          let concurrentWrite: Promise<unknown> | undefined;
+          try {
+            await db.none(
+              `
               INSERT INTO prostgles.apps (id, check_frequency_ms, application_name)
               VALUES ($1, 10000, $1);
               INSERT INTO prostgles.app_triggers (app_id, table_name, condition, condition_hash, columns_info)
               SELECT $1, table_name, condition, condition_hash, columns_info
               FROM prostgles.app_triggers WHERE app_id = $2;
             `,
-                [orphanAppId, appIds[0]],
-              );
-              await db.tx(async (transaction) => {
-                // This write deletes the orphan app; leave that deletion uncommitted.
-                await transaction.none(`INSERT INTO ${tableName} VALUES (4)`);
-                concurrentWrite = db
-                  .none(
-                    `INSERT INTO ${tableName} VALUES (5) /* subscription orphan cleanup */`,
-                  )
-                  .then(
-                    () => undefined,
-                    (error: unknown) => error,
-                  );
-                await waitFor(
-                  () =>
-                    db
-                      .one<{ waiting: boolean }>(
-                        `
+              [orphanAppId, appIds[0]],
+            );
+            await db.tx(async (transaction) => {
+              // This write deletes the orphan app; leave that deletion uncommitted.
+              await transaction.none(`INSERT INTO ${tableName} VALUES (4)`);
+              concurrentWrite = db
+                .none(`INSERT INTO ${tableName} VALUES (5) /* subscription orphan cleanup */`)
+                .then(
+                  () => undefined,
+                  (error: unknown) => error,
+                );
+              await waitFor(
+                () =>
+                  db
+                    .one<{ waiting: boolean }>(
+                      `
                   SELECT EXISTS (
                     SELECT 1 FROM pg_stat_activity
                     WHERE datname = current_database()
@@ -179,45 +162,39 @@ export const testSubscriptionNotifications = async (db: DB) => {
                     AND wait_event_type = 'Lock'
                   ) AS waiting
                 `,
-                      )
-                      .then(({ waiting }) => waiting),
-                  "Concurrent write did not wait for orphan cleanup",
-                );
-              });
-              assert.equal(await concurrentWrite, undefined);
-              await waitForBothApps("1,2,3,4,5");
-              assert.equal(
-                await db.one(
-                  "SELECT count(*)::int AS count FROM prostgles.data_notifications WHERE app_id = $1",
-                  [orphanAppId],
-                  ({ count }: { count: number }) => count,
-                ),
-                0,
-                "Deleted apps must not retain notifications",
+                    )
+                    .then(({ waiting }) => waiting),
+                "Concurrent write did not wait for orphan cleanup",
               );
-            } finally {
-              await concurrentWrite;
-              await db.none(
-                `DELETE FROM prostgles.app_triggers WHERE app_id = $1;
-               DELETE FROM prostgles.apps WHERE id = $1`,
+            });
+            assert.equal(await concurrentWrite, undefined);
+            await waitForBothApps("1,2,3,4,5");
+            assert.equal(
+              await db.one(
+                "SELECT count(*)::int AS count FROM prostgles.data_notifications WHERE app_id = $1",
                 [orphanAppId],
-              );
-            }
-          },
-        );
+                ({ count }: { count: number }) => count,
+              ),
+              0,
+              "Deleted apps must not retain notifications",
+            );
+          } finally {
+            await concurrentWrite;
+            await db.none(
+              `DELETE FROM prostgles.app_triggers WHERE app_id = $1;
+               DELETE FROM prostgles.apps WHERE id = $1`,
+              [orphanAppId],
+            );
+          }
+        });
 
         // More than one poll batch must drain completely, including after a rollback.
         await db.tx(async (transaction) => {
           for (let id = 6; id <= 1006; id++) {
-            await transaction.none(
-              `INSERT INTO ${schema}.records VALUES ($1)`,
-              [id],
-            );
+            await transaction.none(`INSERT INTO ${schema}.records VALUES ($1)`, [id]);
           }
         });
-        await waitForBothApps(
-          Array.from({ length: 1006 }, (_, index) => index + 1).join(","),
-        );
+        await waitForBothApps(Array.from({ length: 1006 }, (_, index) => index + 1).join(","));
         await waitFor(
           () =>
             db
@@ -228,11 +205,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
               .then(({ count }) => count === 0),
           "Subscription notification batches did not drain",
         );
-        assert.equal(
-          notifyCount,
-          0,
-          "Subscriptions must not issue PostgreSQL NOTIFY",
-        );
+        assert.equal(notifyCount, 0, "Subscriptions must not issue PostgreSQL NOTIFY");
       } finally {
         await notificationConnection.done();
         await Promise.all(instances.map((instance) => instance.destroy()));
@@ -251,7 +224,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
   await test(
     "subscription notifications recover subscriptions and syncs after reconnection",
     { timeout: 20_000 },
-    async () => {
+    async (context) => {
       const schema = "subscription_reconnect_test";
       const tableName = "subscription_reconnect_test.records";
       const http = createServer();
@@ -264,9 +237,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
         INSERT INTO ${tableName} VALUES (1, 1);
       `);
       const server = new Prostgles({
-        dbConnection: getConnectionDetails(
-          db,
-        ) as unknown as ProstglesInitOptions["dbConnection"],
+        dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
         schemaFilter: { [schema]: 1 },
         io,
         publish: "*",
@@ -286,11 +257,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
         },
         onReady: () => {},
         onLog: (event) => {
-          if (
-            failRefresh &&
-            event.type === "syncOrSub" &&
-            event.command === "refreshTriggers"
-          ) {
+          if (failRefresh && event.type === "syncOrSub" && event.command === "refreshTriggers") {
             failRefresh = false;
             failedRefreshes++;
             throw new Error("Transient reconnect refresh failure");
@@ -298,11 +265,13 @@ export const testSubscriptionNotifications = async (db: DB) => {
         },
       });
       const instance = await server.init(() => {}, { type: "init" });
-      const connectClient = createRequire(
-        path.resolve("../client/package.json"),
-      )("prostgles-client").default as typeof prostglesClient;
+      const connectClient = createRequire(path.resolve("../client/package.json"))(
+        "prostgles-client",
+      ).default as typeof prostglesClient;
       let client: Awaited<ReturnType<typeof connectClient>> | undefined;
       const received = { subscription: 0, sync: 0 };
+      const lifecycle = new EventEmitter();
+      let unsubscribeChannel: string | undefined;
       try {
         http.listen(0, "127.0.0.1");
         await once(http, "listening");
@@ -310,6 +279,15 @@ export const testSubscriptionNotifications = async (db: DB) => {
         assert(address && typeof address === "object");
         client = await connectClient({
           endpoint: `http://127.0.0.1:${address.port}`,
+          onDebug: (event) => {
+            if (event.type === "subscriptions") {
+              if (event.command === "reAttachAll.start") {
+                const [subscription] = event.subscriptions.values();
+                unsubscribeChannel = subscription?.unsubChannel;
+              }
+              lifecycle.emit(event.command);
+            }
+          },
           socketOptions: {
             path: "/socket.io",
             transports: ["websocket"],
@@ -320,16 +298,137 @@ export const testSubscriptionNotifications = async (db: DB) => {
         /* Short subscription params stay readable; long params use a bounded channel name. */
         const manager = await server.dboBuilder.getPubSubManager();
         const channelPrefix = `${manager.socketChannelPrefix}.${tableName}.`;
-        const shortSubscription = await client.db[tableName]!.subscribe!(
-          {},
-          {},
-          () => {},
-        );
-        assert.equal(
-          manager.subs.at(-1)?.channel_name,
-          `${channelPrefix}{}.{}.m.sub`,
-        );
+        const shortSubscription = await client.db[tableName]!.subscribe!({}, {}, () => {});
+        assert.equal(manager.subs.at(-1)?.channel_name, `${channelPrefix}{}.{}.m.sub`);
         await shortSubscription.unsubscribe();
+        const connectedClient = client;
+        const subscribe = connectedClient.db[tableName]!.subscribe!;
+        await context.test(
+          "subscription options have independent channels and cleanup",
+          async (t) => {
+            const errors = t.mock.method(console, "error");
+            const options: SubscribeParams[] = [
+              {},
+              { throttle: 0 },
+              { throttle: 20 },
+              { skipFirst: true },
+            ];
+            const subscriptions = await Promise.all(
+              options.map(async (params) => {
+                const versions: number[] = [];
+                const handle = await subscribe({}, params, ([row]) => {
+                  versions.push(Number(row?.last_updated));
+                });
+                return { handle, versions, params };
+              }),
+            );
+            assert.equal(manager.subs.length, options.length);
+            assert.equal(
+              new Set(manager.subs.map(({ channel_name }) => channel_name)).size,
+              options.length,
+            );
+            await waitFor(
+              () =>
+                subscriptions.every(
+                  ({ versions, params }) => params.skipFirst || versions.at(-1) === 1,
+                ),
+              "Initial data missing for independent subscriptions",
+            );
+            assert(
+              subscriptions
+                .filter(({ params }) => params.skipFirst)
+                .every(({ versions }) => !versions.length),
+            );
+            const [removed, ...active] = subscriptions;
+            assert(removed);
+            await removed.handle.unsubscribe();
+            await db.none(`UPDATE ${tableName} SET last_updated = 2`);
+            await waitFor(
+              () => active.every(({ versions }) => versions.at(-1) === 2),
+              "Unsubscribing one option set stopped another subscription",
+            );
+            assert.deepEqual(removed.versions, [1]);
+            await Promise.all(active.map(({ handle }) => handle.unsubscribe()));
+            assert.equal(manager.subs.length, 0);
+            assert.equal(errors.mock.callCount(), 0);
+            await db.none(`UPDATE ${tableName} SET last_updated = 1`);
+          },
+        );
+
+        await context.test(
+          "schema refresh, cleanup and reconnect preserve one socket subscription",
+          async (t) => {
+            const errors = t.mock.method(console, "error");
+            const registrations = t.mock.method(manager, "addSub");
+            const removals = t.mock.method(manager, "removeSubscription");
+            const originalListener = t.mock.fn();
+            const original = await subscribe({}, {}, originalListener);
+            await waitFor(
+              () => originalListener.mock.callCount() > 0,
+              "Initial subscription data missing",
+            );
+            const serverSocket = io.sockets.sockets.get(connectedClient.socket.id!);
+            assert(serverSocket);
+            let resumeUnsubscribe: (() => void) | undefined;
+            const removalReceived = new Promise<void>((resolve) => {
+              serverSocket.use(([channel], next) => {
+                if (channel === unsubscribeChannel && !resumeUnsubscribe) {
+                  resumeUnsubscribe = next;
+                  resolve();
+                } else {
+                  next();
+                }
+              });
+            });
+            const refreshFinished = once(lifecycle, "reAttachAll.end");
+            await server.pushSocketSchema(serverSocket);
+            await removalReceived;
+            let replacementVersion = 0;
+            const replacementListener = t.mock.fn<Parameters<typeof subscribe>[2]>(([row]) => {
+              replacementVersion = Number(row?.last_updated);
+            });
+            const replacement = original
+              .unsubscribe()
+              .then(() => subscribe({}, {}, replacementListener));
+            assert(resumeUnsubscribe);
+            resumeUnsubscribe();
+            const [active] = await Promise.all([replacement, refreshFinished]);
+            await waitFor(() => replacementVersion === 1, "Replacement subscription data missing");
+            assert.equal(registrations.mock.callCount(), 2);
+            assert.equal(removals.mock.callCount(), 1);
+            assert.equal(manager.subs.length, 1);
+            const originalDeliveries = originalListener.mock.callCount();
+
+            const disconnected = once(serverSocket, "disconnect");
+            connectedClient.socket.disconnect();
+            await disconnected;
+            replacementVersion = 0;
+            const reconnectFinished = once(lifecycle, "reAttachAll.end");
+            connectedClient.socket.connect();
+            await reconnectFinished;
+            await waitFor(() => replacementVersion === 1, "Reconnected subscription data missing");
+            assert.equal(registrations.mock.callCount(), 3);
+            assert.equal(removals.mock.callCount(), 1);
+            const shared = await subscribe({}, {}, replacementListener);
+            await shared.unsubscribe();
+            await db.none(`UPDATE ${tableName} SET last_updated = 2`);
+            await waitFor(
+              () => replacementVersion === 2,
+              "Shared callback was removed with another handle",
+            );
+            assert.equal(originalListener.mock.callCount(), originalDeliveries);
+            assert.equal(manager.subs.length, 1);
+            const [subscription] = manager.subs;
+            assert(subscription);
+            await active.unsubscribe();
+            assert.equal(removals.mock.callCount(), 2);
+            assert.equal(manager.subs.length, 0);
+            assert.equal(connectedClient.socket.listeners(subscription.channel_name).length, 0);
+            assert.equal(errors.mock.callCount(), 0);
+            await db.none(`UPDATE ${tableName} SET last_updated = 1`);
+          },
+        );
+
         await client.db[tableName]!.subscribe!(
           {},
           {
@@ -344,10 +443,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
         const hashedChannelName = manager.subs.at(-1)?.channel_name;
         assert(hashedChannelName);
         assert(hashedChannelName.startsWith(channelPrefix));
-        assert.match(
-          hashedChannelName.slice(channelPrefix.length),
-          /^[a-f0-9]{64}\.m\.sub$/,
-        );
+        assert.match(hashedChannelName.slice(channelPrefix.length), /^[a-f0-9]{64}\.m\.sub$/);
         await client.db[tableName]!.sync!({}, {}, (rows) => {
           received.sync = Number(rows[0]?.last_updated);
         });
@@ -357,10 +453,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
         );
         const listener = manager.postgresNotifListenManager;
         assert(listener);
-        await waitFor(
-          () => !!listener.connection,
-          "Notification listener did not connect",
-        );
+        await waitFor(() => !!listener.connection, "Notification listener did not connect");
         const { pid } = await listener.connection!.one<{ pid: number }>(
           "SELECT pg_backend_pid() AS pid",
         );
@@ -383,11 +476,7 @@ export const testSubscriptionNotifications = async (db: DB) => {
           "Lost notifications were not recovered after reconnection",
           10_000,
         );
-        assert.equal(
-          failedRefreshes,
-          1,
-          "Recovery must retry a failed refresh",
-        );
+        assert.equal(failedRefreshes, 1, "Recovery must retry a failed refresh");
         assert.equal(
           client.socket.connected,
           true,
