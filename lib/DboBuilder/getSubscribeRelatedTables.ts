@@ -231,10 +231,14 @@ export async function getSubscribeRelatedTables(
     selfTrigger.tracked_columns = firstField ? [firstField, ...otherFields] : undefined;
   }
   if (this.isView) {
-    if (hasComputedJoin || hasRowPermissions) {
-      await pushRelatedTable(this.name, [], undefined, {});
+    const parents = await getAllViewRelatedTables(this.dboBuilder, this.name);
+    if (hasComputedJoin || hasRowPermissions || parents.some((table) => table.is_view)) {
+      /* Only base tables can supply transition rows for a nested view. */
+      for (const parent of parents) {
+        await pushRelatedTable(parent.name, [], undefined, {});
+      }
     } else {
-      const rootViewOptions = await getViewRelatedTables(this, localParams, newQuery);
+      const rootViewOptions = await getViewRelatedTables(this, localParams, newQuery, parents);
       rootViewOptions.relatedTables.push(...viewOptions.relatedTables);
       viewOptions = rootViewOptions;
     }

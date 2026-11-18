@@ -884,11 +884,12 @@ export const testJoins = async (db: DB) => {
 
   await test("computed joins support params, subscriptions, pagination and publish rules", async (context) => {
     // Cover plain views, quoted schema names and views built on other views.
+    const nestedEventView = '"computed_join.views".nested_event_view';
     const viewPairs = [
       { memberView: "member_view", eventView: "event_view" },
       {
         memberView: '"computed_join.views".member_view',
-        eventView: '"computed_join.views".nested_event_view',
+        eventView: nestedEventView,
       },
     ];
     await db.none(`
@@ -904,7 +905,7 @@ export const testJoins = async (db: DB) => {
       CREATE VIEW computed_join_test.event_view AS SELECT * FROM computed_join_test.events;
       CREATE VIEW "computed_join.views".member_view AS SELECT * FROM computed_join_test.members WHERE max_event > 0;
       CREATE VIEW "computed_join.views".event_view AS SELECT * FROM computed_join_test.events;
-      CREATE VIEW "computed_join.views".nested_event_view AS SELECT * FROM "computed_join.views".event_view;
+      CREATE VIEW ${nestedEventView} AS SELECT * FROM "computed_join.views".event_view;
       INSERT INTO computed_join_test.members VALUES (1, 3), (2, 4), (3, 0);
       INSERT INTO computed_join_test.member_links VALUES (1, 1), (2, 2), (3, 3);
       INSERT INTO computed_join_test.labels VALUES (1, 1);
@@ -1730,6 +1731,13 @@ export const testJoins = async (db: DB) => {
             },
           },
         );
+        /* A nested view used directly must track changes to its underlying table. */
+        const nestedEvents = await watch(
+          instance.db[nestedEventView]!,
+          { id: 1 },
+          { select: { label: 1 } },
+        );
+        await nestedEvents([{ label: "first" }]);
         const viewRoots = [];
         const viewTargets = [];
         for (const { memberView, eventView } of viewPairs) {
@@ -1800,6 +1808,7 @@ export const testJoins = async (db: DB) => {
         await notExists([{ id: 3 }]);
         await published([{ history: [{ id: 2, label: "second" }] }]);
         await instance.db.events!.update!({ id: 1 }, { owner: { id: 1 }, label: "renamed" });
+        await nestedEvents([{ label: "renamed" }]);
         await joined([{ id: 1, history: [{ label: "renamed" }] }]);
         await instance.db.events!.update!({ id: 1 }, { label: "first", visible: false });
         await joined([{ id: 1, history: [{ label: "second" }] }]);

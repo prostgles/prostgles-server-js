@@ -3,13 +3,13 @@ import type { LocalParams, TableSchema } from "../DboBuilder";
 import { getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
 import type { NewQuery } from "../QueryBuilder/QueryBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
-import { getAllViewRelatedTables } from "./getAllViewRelatedTables";
 import { getViewRelatedTableJoinCondition } from "./getViewRelatedTableJoinCondition";
 
 export const getViewRelatedTables = async (
   viewHandler: ViewHandler,
   localParams: LocalParams | undefined,
   newQuery: NewQuery,
+  allUsedTables: TableSchema[],
 ) => {
   /** TODO: this needs to be memoized on schema fetch */
   const { name: viewName, dboBuilder } = viewHandler;
@@ -73,8 +73,6 @@ export const getViewRelatedTables = async (
   };
 
   /** Get list of remaining used inner tables (tables whose columns do not appear in fields list but are still used by the view) */
-  const allUsedTables = await getAllViewRelatedTables(dboBuilder, viewName);
-
   /** Remaining tables will have listeners on all records (condition = "TRUE") */
   allUsedTables.forEach((rt) => {
     if (!joinedRelatedTables.find((jt) => jt.tableOID == rt.oid)) {
