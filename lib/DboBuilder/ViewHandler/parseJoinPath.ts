@@ -10,6 +10,7 @@ import { prepareWhere } from "./prepareWhere";
 type parseJoinPathArgs = {
   rawPath: RawJoinPath;
   rootTable: string;
+  ancestorTables?: string[];
   viewHandler: ViewHandler;
   localParams: LocalParams | undefined;
   allowMultiOrJoin?: boolean;
@@ -30,6 +31,7 @@ type ColumnJoinPath = { table: string; on?: Record<string, string>[] };
 export const parseJoinPath = async ({
   rawPath,
   rootTable,
+  ancestorTables = [],
   viewHandler,
   localParams,
   allowMultiOrJoin = false,
@@ -92,8 +94,8 @@ export const parseJoinPath = async ({
     }
   });
 
-  if (result.length > 1) {
-    const blockedTable = [rootTable, ...result.map((path) => path.table)].find(
+  if (result.length > 1 || ancestorTables.length) {
+    const blockedTable = [...ancestorTables, rootTable, ...result.map((path) => path.table)].find(
       (table) =>
         viewHandler.dboBuilder.prostgles.mergedTableConfig.tableConfig?.[table]
           ?.allowMultiHopJoins === false,

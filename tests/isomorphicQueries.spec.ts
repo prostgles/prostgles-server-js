@@ -1023,6 +1023,9 @@ export const isomorphicQueries = async (
         assert.deepStrictEqual(await search("cat", { limit: 1 }), {
           matches: [{ index: 3, offset: 0, match: "cat", snippet: "cat" }],
         });
+        /* A single page subscript cannot address text in a multidimensional array. */
+        await sql!("UPDATE items SET h = ARRAY[['cat', 'cat']] WHERE id = -101");
+        assert.deepStrictEqual(await search("cat"), { matches: [] });
 
         for (const searchTerm of ["", [], [""], ["cat", ""]]) {
           await assert.rejects(() => search(searchTerm));

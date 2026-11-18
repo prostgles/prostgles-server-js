@@ -72,6 +72,7 @@ import { JobManager } from "./Jobs/JobManager";
 
 export class Prostgles {
   readonly jobs = new JobManager(this);
+  readonly maxNestedJoinDepth: number;
   /**
    * Used to manage concurrent prostgles connections to the same database
    */
@@ -151,6 +152,7 @@ export class Prostgles {
     const config: Record<keyof ProstglesInitOptions<void, SessionUser, any>, 1> = {
       transactions: 1,
       joins: 1,
+      maxNestedJoinDepth: 1,
       tsGeneratedTypesDir: 1,
       tsGeneratedTypesFunctionsPath: 1,
       disableRealtime: 1,
@@ -192,6 +194,10 @@ export class Prostgles {
     }
 
     this.opts = { ...this.opts, ...params };
+    this.maxNestedJoinDepth = params.maxNestedJoinDepth ?? 4;
+    if (!Number.isSafeInteger(this.maxNestedJoinDepth) || this.maxNestedJoinDepth < 0) {
+      throw new Error("maxNestedJoinDepth must be a non-negative safe integer");
+    }
 
     this.opts.schemaFilter ??= { public: 1 };
 

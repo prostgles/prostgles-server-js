@@ -7,6 +7,7 @@ import {
   type AnyObject,
   type ClientJoin,
   type JoinPath,
+  type Select,
   type SubscribeParams,
 } from "prostgles-types";
 import prostgles, { defineComputedJoin, type ProstglesInitOptions } from "prostgles-server";
@@ -26,7 +27,7 @@ export const testJoins = async (db: DB) => {
     },
     res: {},
   } as never;
-  await test("inferred join paths preserve reverse routes, ties and disconnected tables", async () => {
+  await test("inferred join paths preserve reverse routes, ties and disconnected tables", async (context) => {
     await db.none(`
       CREATE SCHEMA shortest_join_test;
       CREATE TABLE shortest_join_test.roots (id int PRIMARY KEY, parent_id int REFERENCES shortest_join_test.roots(id));
@@ -101,6 +102,108 @@ export const testJoins = async (db: DB) => {
           [{ id: 1, related: [{ id: 1 }] }],
         );
       }
+      await context.test("nested joins filter, sort and paginate per parent", async () => {
+        await db.none(`
+          INSERT INTO shortest_join_test.roots VALUES (2, NULL), (3, NULL);
+          INSERT INTO shortest_join_test.branches VALUES (2, 1), (3, 2);
+          INSERT INTO shortest_join_test.leaves VALUES (2, 1, NULL), (3, 2, 1), (4, 2, NULL);
+        `);
+        const alternateAlias = "alternate_".repeat(7);
+        const rows = await roots.find(
+          {},
+          {
+            select: {
+              id: 1,
+              branches: {
+                $leftJoin: "branches",
+                orderBy: { "branches.id": -1 },
+                limit: 1,
+                select: {
+                  id: 1,
+                  branches: {
+                    $innerJoin: "leaves",
+                    orderBy: { id: -1 },
+                    offset: 1,
+                    limit: 1,
+                    select: {
+                      id: 1,
+                      [alternateAlias]: { $leftJoin: "alternate", select: { id: 1 } },
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: "id",
+          },
+        );
+        assert.deepEqual(rows, [
+          { id: 1, branches: [{ id: 2, branches: [{ id: 3, [alternateAlias]: [{ id: 1 }] }] }] },
+          { id: 2, branches: [] },
+          { id: 3, branches: [] },
+        ]);
+      });
+      await context.test(
+        "parent ordering includes children outside the returned page",
+        async () => {
+          await db.none(`
+            INSERT INTO shortest_join_test.roots VALUES (10, NULL), (20, NULL);
+            INSERT INTO shortest_join_test.branches VALUES (10, 10), (20, 20), (30, 10);
+          `);
+          const filter = { id: { $in: [10, 20] } };
+          const branches = { $leftJoin: "branches", orderBy: "id", limit: 1 } as const;
+          const findFirst = (select: Select, offset = 0) =>
+            roots.findOne(filter, {
+              select: { id: 1, branches: { ...branches, select, offset } },
+              orderBy: { "branches.id": -1 },
+            });
+          assert.deepEqual(await findFirst({ id: 1 }), { id: 10, branches: [{ id: 10 }] });
+          const nested = { id: 1, leaves: { id: 1 } } as const;
+          assert.deepEqual(await findFirst(nested), { id: 10, branches: [{ id: 10, leaves: [] }] });
+          assert.deepEqual(await findFirst(nested, 2), { id: 10, branches: [] });
+        },
+      );
+      await context.test("a nested join can reuse an unselected sort column name", async () => {
+        assert.deepEqual(
+          await roots.findOne(
+            { id: 1 },
+            {
+              select: {
+                branches: {
+                  $leftJoin: "branches",
+                  orderBy: "id",
+                  limit: 1,
+                  select: { id: { $leftJoin: "leaves", filter: { id: 1 }, select: ["id"] } },
+                },
+              },
+            },
+          ),
+          { branches: [{ id: [{ id: 1 }] }] },
+        );
+      });
+      await context.test("nested select depth is bounded per branch", async () => {
+        const parent = (select: Select) => ({ parent: { $leftJoin: "roots", select } });
+        const fourLevels = parent(parent(parent(parent(["id"]))));
+        assert.deepEqual(
+          await roots.findOne({ id: 1 }, { select: { ...fourLevels, sibling: fourLevels.parent } }),
+          { parent: [], sibling: [] },
+        );
+        await assert.rejects(() => roots.find({}, { select: parent(fourLevels) }), {
+          message: /maxNestedJoinDepth \(4\)/,
+        });
+        const noJoins = await prostgles({ ...instance.options, maxNestedJoinDepth: 0 });
+        try {
+          const table = noJoins.db.roots!;
+          assert.deepEqual(await table.findOne!({ id: 1 }, { select: ["id"] }), { id: 1 });
+          await assert.rejects(() => table.find!({}, { select: parent(["id"]) }), {
+            message: /maxNestedJoinDepth \(0\)/,
+          });
+        } finally {
+          await noJoins.destroy();
+        }
+        assert.throws(() => prostgles({ ...instance.options, maxNestedJoinDepth: -1 }), {
+          message: /maxNestedJoinDepth must be a non-negative safe integer/,
+        });
+      });
     } finally {
       await instance.destroy();
       await db.none("DROP SCHEMA shortest_join_test CASCADE");
@@ -2030,6 +2133,14 @@ export const testJoins = async (db: DB) => {
       const client = await instance.getClientDBHandlers(clientRequest, undefined);
       const clientMembers = client.clientDb.members!;
       const nextHistoryPath = [...selfPath, ...historyPath];
+      const nestedHistory = {
+        $leftJoin: selfPath,
+        select: { history: { $innerJoin: historyPath, select: { id: 1 }, orderBy: "id" } },
+      } as const;
+      assert.deepEqual(
+        await clientMembers.findOne!({ id: 1 }, { select: { next: nestedHistory } }),
+        { next: [{ history: [{ id: 4 }, { id: 5 }] }] },
+      );
       assert.deepEqual(
         await clientMembers.find!(
           {},
@@ -2225,6 +2336,10 @@ export const testJoins = async (db: DB) => {
         },
       });
       const blockedClient = await instance.getClientDBHandlers(clientRequest, undefined);
+      await assert.rejects(
+        () => blockedClient.clientDb.members!.find!({}, { select: { next: nestedHistory } }),
+        { message: /Multi-hop joins are disabled for table: members/ },
+      );
       assert(blockedClient.clientSchema.joins.length);
       assert(blockedClient.clientSchema.joins.every((join) => !join.supportsMultiHop));
       for (const handlers of [instance.db, blockedClient.clientDb]) {

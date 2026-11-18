@@ -1,12 +1,12 @@
 import { isDefined, asName } from "prostgles-types";
 import type { ParsedJoinPath } from "../ViewHandler/parseJoinPath";
-import { getComputedJoinQuery } from "./getComputedJoinQuery";
+import { getLateralJoinQuery } from "./getLateralJoinQuery";
 import type { NewQuery, NewQueryJoin } from "./QueryBuilder";
 import { type SelectItemValidated } from "./QueryBuilder";
 import { ROOT_TABLE_ALIAS, ROOT_TABLE_ROW_NUM_ID, indentLines } from "./getSelectQuery";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import { getJoinOnCondition } from "../ViewHandler/getTableJoinQuery";
-import { prepareOrderByQuery, type PGIdentifier } from "../DboBuilder";
+import { prepareOrderByQuery } from "../DboBuilder";
 import { asNameAlias } from "../../utils/asNameAlias";
 
 type Args = {
@@ -27,6 +27,8 @@ export const getJoinCol = (colName: string) => {
 };
 
 export const JSON_AGG_FIELD_NAME = "prostgles_json_agg_result_field";
+export const getJoinedSelect = ({ joinAlias }: NewQueryJoin) =>
+  `COALESCE(${joinAlias.escaped}.${JSON_AGG_FIELD_NAME}, '[]') AS ${joinAlias.escaped}`;
 /**
  * Used for LIMIT and for sorting
  */
@@ -47,7 +49,6 @@ const getJoinTable = (
 };
 
 export type GetJoinQueryResult = {
-  resultAlias: PGIdentifier;
   firstJoinTableJoinFields: string[];
   isOrJoin: boolean;
   type: "cte";
@@ -69,10 +70,9 @@ export type GetJoinQueryResult = {
 export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoinQueryResult => {
   const paths = q2.joinPath;
 
-  if (q2.joins?.length) {
-    throw new Error("Nested joins not supported yet");
+  if (q2.joins?.length || paths.some((path) => path.computedJoin)) {
+    return getLateralJoinQuery(q1, q2);
   }
-  if (paths.some((path) => path.computedJoin)) return getComputedJoinQuery(q1, q2);
   const targetTableAliasRaw = q2.tableAlias?.raw || q2.table.raw;
   const targetTableAlias = asName(targetTableAliasRaw);
 
@@ -178,7 +178,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
     ];
     return {
       type: "cte",
-      resultAlias: { raw: JSON_AGG_FIELD_NAME, escaped: JSON_AGG_FIELD_NAME },
       joinLines,
       cteLines: [],
       isOrJoin,
@@ -229,7 +228,6 @@ export const getJoinQuery = (viewHandler: ViewHandler, { q1, q2 }: Args): GetJoi
 
   return {
     type: "cte",
-    resultAlias: { raw: JSON_AGG_FIELD_NAME, escaped: JSON_AGG_FIELD_NAME },
     joinLines,
     cteLines,
     isOrJoin,

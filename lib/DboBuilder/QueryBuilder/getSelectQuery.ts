@@ -2,7 +2,7 @@ import { prepareOrderByQuery } from "../DboBuilder";
 import { isDefined, asName } from "prostgles-types";
 import type { NewQuery } from "./QueryBuilder";
 import type { ViewHandler } from "../ViewHandler/ViewHandler";
-import { getJoinQuery } from "./getJoinQuery";
+import { getJoinedSelect, getJoinQuery } from "./getJoinQuery";
 import { getQuerySourceSQL } from "./getQuerySource";
 
 /**
@@ -39,12 +39,7 @@ export function getSelectQuery(
       };
     }) ?? [];
 
-  const selectItems = rootSelect.concat(
-    parsedJoins.map((join) => {
-      const { joinAlias } = join;
-      return `COALESCE(${joinAlias.escaped}.${join.resultAlias.escaped}, '[]') as ${joinAlias.escaped}`;
-    }),
-  );
+  const selectItems = rootSelect.concat(parsedJoins.map(getJoinedSelect));
 
   /** OR joins cannot be easily aggregated to one-many with the root table. Must group by root table id */
   const hasOrJoins = parsedJoins.some((j) => j.isOrJoin);

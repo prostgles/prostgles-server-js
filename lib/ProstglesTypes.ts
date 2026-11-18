@@ -249,6 +249,12 @@ export type ProstglesInitOptions<
   joins?: Joins;
 
   /**
+   * Maximum select join depth per branch. Defaults to 4. Set to 0 to disable joined selects.
+   * Each joined projection counts as one level, including a multi-hop path.
+   */
+  maxNestedJoinDepth?: number;
+
+  /**
    * If defined then the specified schemas are included/excluded from the prostgles schema.
    * By default only current_schema() is included.
    */

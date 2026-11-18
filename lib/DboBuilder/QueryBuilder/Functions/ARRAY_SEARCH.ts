@@ -56,21 +56,22 @@ export const ARRAY_SEARCH = createFunc({
           jsonb_build_object(
             'index', page_index,
             'offset', match_offset,
-            'match', substr(pages[page_index], match_offset + 1, length(search_term)),
-            'snippet', substr(pages[page_index], greatest(1, match_offset + 1 - ${contextChars}),
+            'match', substr(page_text, match_offset + 1, length(search_term)),
+            'snippet', substr(page_text, greatest(1, match_offset + 1 - ${contextChars}),
               least(match_offset, ${contextChars}) + length(search_term) + ${contextChars})
           ) AS result
         FROM (SELECT ${column} AS pages) AS source
-        CROSS JOIN LATERAL generate_subscripts(pages, 1) AS page(page_index)
+        /* Read the page texts sequentially and retain the array's actual subscripts. */
+        CROSS JOIN LATERAL ROWS FROM (unnest(pages), generate_subscripts(pages, 1)) AS page(page_text, page_index)
         CROSS JOIN unnest(${terms}) AS terms(search_term)
         CROSS JOIN LATERAL (
           SELECT (sum(length(part) + length(search_term)) OVER (ORDER BY part_index)
             - length(search_term))::integer AS match_offset,
             lead(part_index) OVER (ORDER BY part_index) AS next_part
-          FROM regexp_split_to_table(pages[page_index], search_term, '${flags}')
+          FROM regexp_split_to_table(page_text, search_term, '${flags}')
             WITH ORDINALITY AS parts(part, part_index)
         ) AS offsets
-        WHERE next_part IS NOT NULL
+        WHERE array_ndims(pages) = 1 AND next_part IS NOT NULL
         ORDER BY page_index, match_offset, match_length DESC
         LIMIT ${limit}
       ) AS matches

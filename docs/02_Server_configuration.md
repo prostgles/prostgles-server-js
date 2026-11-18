@@ -77,6 +77,10 @@
 
   Allows defining custom table relationships that can then be used in filters and data inserts.
   By default FKs are used to infer the joins.
+- **maxNestedJoinDepth** <span style="color: grey">optional</span> <span style="color: green;">number</span>
+
+  Maximum select join depth per branch. Defaults to 4. Set to 0 to disable joined selects.
+  Each joined projection counts as one level, including a multi-hop path.
 - **schemaFilter** <span style="color: grey">optional</span> <span style="color: green;">Record&lt;string, 1&gt; | Record&lt;string, 0&gt; | undefined</span>
 
   If defined then the specified schemas are included/excluded from the prostgles schema.

@@ -26,6 +26,7 @@ export const getNewQuery = async (
   selectParams: SelectParams & { joinExpressionAlias?: PGIdentifier } = {},
   tableRules: ParsedTableRule | undefined,
   localParams: LocalParams | undefined,
+  ancestors: { table: string; alias: string }[] = [],
 ): Promise<NewQuery> => {
   const { columns } = viewHandler;
 
@@ -51,13 +52,19 @@ export const getNewQuery = async (
   const joinQueries: NewQueryJoin[] = [];
 
   const { select: userSelect = "*" } = selectParams;
-  const reservedAliases = new Set([
-    ...viewHandler.column_names,
-    ...(isObject(userSelect) ? Object.keys(userSelect) : []),
-  ]);
   const selectExpressionAlias =
     selectParams.joinExpressionAlias ??
     ({ raw: ROOT_TABLE_ALIAS, escaped: ROOT_TABLE_ALIAS } satisfies PGIdentifier);
+  const joinAncestors = [
+    ...ancestors,
+    { table: viewHandler.name, alias: selectExpressionAlias.raw },
+  ];
+  const ancestorAliases = joinAncestors.map(({ alias }) => alias);
+  const reservedAliases = new Set([
+    ...ancestorAliases,
+    ...viewHandler.column_names,
+    ...(isObject(userSelect) ? Object.keys(userSelect) : []),
+  ]);
 
   const parseExpressionFilter = (filter: AnyObject, errorPrefix: string) => {
     if (!isObject(filter)) {
@@ -126,12 +133,16 @@ export const getNewQuery = async (
   await selectItemBuilder.parseUserSelectWithJoins(
     userSelect,
     async (joinColumnName, parsedJoin) => {
+      const { maxNestedJoinDepth } = viewHandler.dboBuilder.prostgles;
+      if (ancestors.length >= maxNestedJoinDepth) {
+        throw new Error(`Nested select exceeds maxNestedJoinDepth (${maxNestedJoinDepth})`);
+      }
       const j_selectParams: SelectParams = {};
       let j_filter: Filter = {},
         j_isLeftJoin = true;
 
       let sqlAlias = joinColumnName;
-      if (Buffer.byteLength(sqlAlias) > 63) {
+      if (Buffer.byteLength(sqlAlias) > 63 || ancestorAliases.includes(sqlAlias)) {
         let suffix = 0;
         do {
           sqlAlias = `__prostgles_join_${suffix++}`;
@@ -142,6 +153,7 @@ export const getNewQuery = async (
       const j_path = await parseJoinPath({
         rawPath: parsedJoin.type === "simple" ? joinColumnName : parsedJoin.params.path,
         rootTable: viewHandler.name,
+        ancestorTables: ancestors.map(({ table }) => table),
         viewHandler: viewHandler,
         localParams,
         allowMultiOrJoin: true,
@@ -201,6 +213,7 @@ export const getNewQuery = async (
         { ...j_selectParams, joinExpressionAlias },
         joinTableRules,
         localParams,
+        joinAncestors,
       );
       joinQuery.isLeftJoin = j_isLeftJoin;
       joinQueries.push({
