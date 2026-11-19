@@ -150,7 +150,7 @@ export class PublishParser {
           this.prostgles.checkNotDestroyed();
           const parent = createExecutionContext(this.prostgles.getExecution());
           const relatedRecords = getFunctionRelatedRecords(method.input, args);
-          return this.prostgles.runWithExecution(
+          return this.prostgles.runFunctionExecution(
             {
               ...parent,
               user,

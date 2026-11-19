@@ -6,7 +6,6 @@ import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   rejectWithPGClientError,
-  withUserRLS,
 } from "../DboBuilder";
 import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "./TableHandler";
@@ -118,11 +117,7 @@ export async function _delete(
     //   }
     // }
 
-    const queryWithRLS = withUserRLS(
-      localParams,
-      queryWithoutRLS,
-      !!this.getTransaction(localParams),
-    );
+    const queryWithRLS = this.withQueryContext(queryWithoutRLS, localParams);
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,
@@ -153,7 +148,7 @@ export async function _delete(
         );
       }
       if (localParams?.isRemoteRequest) {
-        await transaction.t.none(withUserRLS(localParams, ""));
+        await transaction.t.none(this.withQueryContext("", localParams));
       }
       const result = await runTableHook(this, [filterOpts.filter], () =>
         onInsteadOfDelete({

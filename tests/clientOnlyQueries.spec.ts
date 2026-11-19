@@ -446,7 +446,7 @@ export const clientOnlyQueries = async (
 
             await sql("SELECT 1 -- ${param}", {}, { hasParams: false });
 
-            const arrayMode = await sql("SELECT 1 as a, 2 as a", undefined, {
+            const arrayMode = await sql("SELECT $1::int as a, 2 as a", [1], {
               returnType: "arrayMode",
             });
             assert.equal(arrayMode.rows[0].join("."), "1.2", "sql statement arrayMode failed");

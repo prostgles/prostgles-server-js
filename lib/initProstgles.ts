@@ -333,7 +333,7 @@ export const initProstgles = async function (
         }
         this.restApi?.destroy();
         await this.cleanupContext();
-        this.executionStorage.disable();
+        this.destroyExecutionContext();
         await this.dboBuilder.destroy();
         this.authHandler.destroy();
         await this.tableConfigurator?.destroy();

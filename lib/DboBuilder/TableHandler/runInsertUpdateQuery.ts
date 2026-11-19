@@ -7,7 +7,7 @@ import type { AnyObject, FieldFilter, InsertParams, UpdateParams } from "prostgl
 import { asName, isDefined } from "prostgles-types";
 import type { InsertRule, UpdateRule } from "../../PublishParser/PublishParser";
 import type { LocalParams } from "../DboBuilder";
-import { rejectWithPGClientError, withUserRLS } from "../DboBuilder";
+import { rejectWithPGClientError } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getSelectItemQuery } from "./TableHandler";
 import { executeAfterHooksCheckAndPostValidation } from "./executeAfterHooksCheckAndPostValidation";
@@ -16,7 +16,7 @@ import { MUTATION_METADATA } from "../../TableHooks/mutationMetadata";
 
 type RunInsertUpdateQueryArgs = {
   tableHandler: TableHandler;
-  queryWithoutUserRLS: string;
+  queryWithRLS: string;
   localParams: LocalParams | undefined;
   fields: FieldFilter | undefined;
   returningFields: FieldFilter | undefined;
@@ -43,7 +43,7 @@ type RunInsertUpdateQueryArgs = {
 export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   const {
     tableHandler,
-    queryWithoutUserRLS,
+    queryWithRLS,
     rule,
     localParams,
     fields,
@@ -87,7 +87,6 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
       tableHandler.shouldWrapInTx({ name: "update", rule: conflictUpdateRule }, localParams, [])
         .hasAfterChecks);
   const hasReturning = !!returningSelectItems.length;
-  const userRLS = withUserRLS(localParams, "", !!tableHandler.getTransaction(localParams));
   const RETURNING_ALIAS_PREFIX = "prostgles_returning_";
   if (
     [
@@ -98,9 +97,7 @@ export const runInsertUpdateQuery = async (args: RunInsertUpdateQueryArgs) => {
   )
     throw new Error(`Mutation metadata conflicts with a column on ${name}`);
   const returningSelectKeyRemap = new Map<string, string>();
-  const query = ` 
-    ${userRLS} 
-    ${queryWithoutUserRLS}
+  const query = `${queryWithRLS}
     RETURNING ${[
       `${tableHandler.escapedName}.*`,
       ...(needsCapture ?

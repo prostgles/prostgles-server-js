@@ -4,6 +4,12 @@ import type { TableConfig } from "../TableConfig/TableConfigTypes";
 import type { ResolvedAuditConfig } from "./AuditTypes";
 import { getAuditProtection, getAuditWriterName } from "./getAuditTableConfig";
 import { AUDIT_TABLE_COLUMN_NAMES } from "./AuditTable";
+import {
+  AUDIT_EXECUTION_FIELDS,
+  AUDIT_EXECUTION_SETTING,
+  USER_SESSION_SETTING,
+} from "../DboBuilder/sessionSettings";
+import { QUERY_ID_PREFIX } from "../DboBuilder/dboBuilderUtils";
 
 export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig => {
   const result: TableConfig = {};
@@ -17,6 +23,7 @@ export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig =
     columns.old_row,
     columns.new_row,
     columns.actor,
+    columns.execution_context,
     columns.db_context,
   ].map((columnName) => asName(columnName));
   for (const [name, options] of Object.entries(audit.tables)) {
@@ -31,6 +38,7 @@ export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig =
           forEach: "row",
           query: `DECLARE
             before_row jsonb; after_row jsonb; before_id jsonb; after_id jsonb;
+            execution_setting jsonb := nullif(current_setting(${as.text(AUDIT_EXECUTION_SETTING)}, true), '')::jsonb;
             ids text[] := ARRAY[${ids.map((c) => as.text(c)).join(", ")}]::text[];
             excluded text[] := ARRAY[${excluded.map((c) => as.text(c)).join(", ")}]::text[];
           BEGIN
@@ -47,7 +55,10 @@ export const getAuditTriggerConfig = (audit: ResolvedAuditConfig): TableConfig =
             IF TG_OP = 'UPDATE' AND before_row IS NOT DISTINCT FROM after_row THEN RETURN NULL; END IF;
             INSERT INTO ${asName(audit.tableName)} (${insertColumns.join(", ")})
               VALUES (TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP, before_id, after_id, before_row, after_row,
-                nullif(current_setting('prostgles.user', true), '')::jsonb,
+                nullif(current_setting(${as.text(USER_SESSION_SETTING)}, true), '')::jsonb,
+                CASE WHEN strpos(current_query(), ${as.text(QUERY_ID_PREFIX)} ||
+                  (execution_setting ->> ${as.text(AUDIT_EXECUTION_FIELDS.queryId)}) || chr(10)) > 0
+                THEN execution_setting -> ${as.text(AUDIT_EXECUTION_FIELDS.context)} END,
                 jsonb_build_object(
                   'transaction_id', pg_current_xact_id()::text,
                   'transaction_started_at', transaction_timestamp(),

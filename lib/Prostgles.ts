@@ -253,9 +253,43 @@ export class Prostgles {
 
   context: unknown;
   readonly executionStorage = new AsyncLocalStorage<ExecutionContext | undefined>();
+  private readonly runningExecutions = new Map<string, ExecutionContext>();
   getExecution = () => this.executionStorage.getStore();
+  getRunningExecution = (runId: string, userId: string): ExecutionContext => {
+    this.checkNotDestroyed();
+    if (this.getExecution()) {
+      throw new Error("Cannot use a runId inside an existing execution context");
+    }
+    const execution = this.runningExecutions.get(runId);
+    if (!execution) {
+      throw new Error(`Execution ${JSON.stringify(runId)} is not running`);
+    }
+    if (execution.user?.id !== userId) {
+      throw new Error(`Execution ${JSON.stringify(runId)} was not initiated by this user`);
+    }
+    return execution;
+  };
   runWithExecution = <T>(execution: ExecutionContext | undefined, callback: () => T): T =>
     this.executionStorage.run(execution, callback);
+
+  /** Only a root function or job can be addressed by runId from another request. */
+  runFunctionExecution = async <T>(execution: ExecutionContext, callback: () => T) => {
+    const { runId } = execution;
+    const shouldRegisterExecution = Boolean(execution.user) && this.getExecution()?.runId !== runId;
+    if (!shouldRegisterExecution) {
+      return this.runWithExecution(execution, callback);
+    }
+    this.runningExecutions.set(runId, execution);
+    try {
+      return await this.runWithExecution(execution, callback);
+    } finally {
+      this.runningExecutions.delete(runId);
+    }
+  };
+  destroyExecutionContext = () => {
+    this.runningExecutions.clear();
+    this.executionStorage.disable();
+  };
   private contextCleanups: ContextCleanup[] = [];
 
   cleanupContext = async () => {

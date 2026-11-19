@@ -116,7 +116,7 @@ export const runJob = async (
       },
     };
     controller.signal.throwIfAborted();
-    const result = await prostgles.runWithExecution(
+    const result = await prostgles.runFunctionExecution(
       {
         ...createExecutionContext(undefined),
         user: context.user,

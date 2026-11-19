@@ -41,7 +41,8 @@ export async function getClientSchema(
       publishValidationError = e;
       console.error(`\nProstgles Publish validation failed (after socket connected):\n    ->`, e);
     }
-    const { allowed: rawSQL } = await clientCanRunSqlRequest.bind(this)(clientInfo);
+    const rawSQL =
+      (!scope || !!scope.allowSql) && (await clientCanRunSqlRequest.call(this, clientInfo)).allowed;
 
     const tablesWithSelectRules = new Set(
       fullSchema?.tables.filter((t) => t.publishInfo.select).map((t) => t.name) ?? [],

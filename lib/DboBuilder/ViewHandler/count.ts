@@ -1,11 +1,7 @@
 import type { SelectParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/publishTypesAndUtils";
 import type { Filter, LocalParams } from "../DboBuilder";
-import {
-  getErrorAsObject,
-  getSerializedClientErrorFromPGError,
-  withUserRLS,
-} from "../dboBuilderUtils";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../dboBuilderUtils";
 import type { ViewHandler } from "./ViewHandler";
 import { getReturnTypeQuery } from "./getReturnTypeQuery";
 import type { Param3 } from "./find";
@@ -42,11 +38,7 @@ export async function count(
         ${findQuery}
         ) t 
       `;
-      const queryWithRLS = withUserRLS(
-        localParams,
-        queryWithoutUserRLS,
-        !!this.getTransaction(localParams),
-      );
+      const queryWithRLS = this.withQueryContext(queryWithoutUserRLS, localParams);
 
       const queryToReturn = await getReturnTypeQuery({
         handler: this,

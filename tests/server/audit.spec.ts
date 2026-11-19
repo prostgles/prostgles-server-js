@@ -17,6 +17,7 @@ import {
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { PublishParser } from "prostgles-server/dist/PublishParser/PublishParser";
+import { runJobControl } from "prostgles-server/dist/ExecutionContext";
 import {
   AUDIT_TRIGGER_PREFIX,
   TABLE_CONFIG_TRIGGER_PREFIX,
@@ -199,6 +200,9 @@ export async function testAudit(parentDb: DB) {
             /* @ts-expect-error Diff values must be text or null, not numbers. */
             diff?.changes.value?.[0] satisfies number | undefined;
             if (row) row.table_name satisfies string;
+            row?.execution_context?.runId satisfies string | undefined;
+            /* @ts-expect-error Execution metadata must retain its generated JSONB type. */
+            row?.execution_context?.runId satisfies number;
             // @ts-expect-error Audit history cannot be updated.
             await db.audit_events.update({}, { table_name: "tampered" });
             // @ts-expect-error Empty updates are also forbidden.
@@ -275,6 +279,7 @@ export async function testAudit(parentDb: DB) {
         assert.deepEqual(Object.values(AUDIT_TABLE_COLUMN_NAMES), AUDIT_TABLE_COLUMNS);
         const auditRow: AuditTableRow = (await history())[0];
         assert.equal(auditRow.operation, "INSERT");
+        assert.equal(auditRow.execution_context, null);
         /* Diff pairs preserve before/after direction and stringify changed values without unchanged keys. */
         const diffCases = [
           {
@@ -450,6 +455,44 @@ export async function testAudit(parentDb: DB) {
         await result.sql(
           `INSERT INTO ${maskedTable} VALUES (1, 'mySecret'); DELETE FROM ${maskedTable} WHERE id = 1`,
         );
+        /* Explicit job control persists its identity without copying the target row payload. */
+        const jobTableHandler = prgl.dboBuilder.dboMap.get("audit_test_nopk");
+        assert(jobTableHandler);
+        await result.db.tx(async (dbx, tx) => {
+          const jobs = await Promise.all(
+            ["job one", "job two"].map((key) =>
+              runJobControl(
+                jobTableHandler,
+                { key, secret: "private" },
+                { jobName: key, operation: "rerun" },
+                async () => {
+                  await dbx.audit_test_nopk!.insert!({ key, secret: "private" });
+                  const execution = prgl.getExecution();
+                  assert(execution);
+                  return { key, execution };
+                },
+              ),
+            ),
+          );
+          for (const { key, execution } of jobs) {
+            const row = await tx.one<AuditTableRow>(
+              "SELECT * FROM audit_events WHERE new_id = $1::jsonb",
+              [{ key }],
+            );
+            assert.deepEqual(row.execution_context, {
+              runId: execution.runId,
+              invocations: [
+                {
+                  type: "jobControl",
+                  id: execution.invocations[0]!.id,
+                  tableName: jobTableHandler.name,
+                  jobName: key,
+                  operation: "rerun",
+                },
+              ],
+            });
+          }
+        });
         const storedMaskedHistory = await db.any<AuditTableRow>(
           `SELECT * FROM "audit_events" WHERE table_name = $1 ORDER BY id`,
           [maskedTable],

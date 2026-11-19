@@ -19,7 +19,7 @@ import type {
 import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
 import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
-import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { parseUpdateRules } from "../parseUpdateRules";
 import { COMPUTED_FIELDS } from "../QueryBuilder/Functions/COMPUTED_FIELDS";
@@ -101,7 +101,7 @@ export class TableHandler extends ViewHandler {
     const transaction = this.getTransaction(localParams);
     const hooks = this.getBeforeHooks(command, [row]);
     if (hooks.length && transaction && localParams?.isRemoteRequest) {
-      await transaction.t.none(withUserRLS(localParams, ""));
+      await transaction.t.none(this.withQueryContext("", localParams));
     }
     let newRow = row;
     const initialKeys = Object.keys(row);

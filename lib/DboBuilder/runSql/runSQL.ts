@@ -72,7 +72,7 @@ export async function runSQL(
     });
   }
 
-  const params = hasParams ? args : undefined;
+  const params = hasParams && typeof finalQuery === "string" ? args : undefined;
   let queryResult: pgPromise.IResultExt<AnyObject> | undefined;
 
   if (returnType === "default-with-rollback") {

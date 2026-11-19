@@ -5,7 +5,6 @@ import {
   rejectWithPGClientError,
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
-  withUserRLS,
 } from "../DboBuilder";
 import type { TableHandler } from "./TableHandler";
 import { getReturnTypeQuery, isReturningQuery } from "../ViewHandler/getReturnTypeQuery";
@@ -66,10 +65,7 @@ export async function updateBatch(
         return query;
       }),
     );
-    const queries = [
-      withUserRLS(localParams, "", !!this.getTransaction(localParams)),
-      ...updateQueries,
-    ];
+    const queries = [this.withQueryContext("", localParams), ...updateQueries];
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

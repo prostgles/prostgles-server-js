@@ -10,6 +10,7 @@ import type { ViewHandler } from "./ViewHandler/ViewHandler";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { sqlErrCodeToMsg } from "./sqlErrCodeToMsg";
 import type { TableHandler } from "./TableHandler/TableHandler";
+import { USER_SESSION_SETTING } from "./sessionSettings";
 
 export const getErrorAsObject = (rawError: any) => {
   const serializedError = getSerialisableError(rawError);
@@ -187,21 +188,23 @@ export const withUserRLS = (
   localParams: LocalParams | undefined,
   query: string,
   inTransaction = false,
+  getAuditExecutionQuery?: (queryId: string) => string,
 ) => {
   const user = localParams?.isRemoteRequest?.user;
-  const queryPrefix = `SET LOCAL "prostgles.user" \nTO`;
+  const queryPrefix = `SET LOCAL ${pgp.as.name(USER_SESSION_SETTING)} \nTO`;
   let firstQuery = `${queryPrefix} '';`;
   if (user) {
     firstQuery = pgp.as.format(`${queryPrefix} \${user};`, { user });
   }
-  // Local calls through a transaction's dbx must preserve its request context.
-  // Anonymous remote requests still explicitly clear the user.
+  /* Local transaction calls preserve the user; anonymous remote requests clear it. */
   if (inTransaction && !localParams?.isRemoteRequest) {
     firstQuery = "";
   }
 
   const queryId = crypto.randomUUID();
-  return [QUERY_ID_PREFIX + queryId, firstQuery, query].filter(Boolean).join("\n");
+  return [QUERY_ID_PREFIX + queryId, firstQuery, getAuditExecutionQuery?.(queryId), query]
+    .filter(Boolean)
+    .join("\n");
 };
 
 export const TX_KEY = "tx" as const;

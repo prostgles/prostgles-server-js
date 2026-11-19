@@ -6,7 +6,6 @@ import {
   getErrorAsObject,
   getSerializedClientErrorFromPGError,
   rejectWithPGClientError,
-  withUserRLS,
 } from "../DboBuilder";
 import { getNewQuery } from "../QueryBuilder/getNewQuery";
 import { getSelectQuery } from "../QueryBuilder/getSelectQuery";
@@ -99,11 +98,7 @@ export const find = async function (
       selectParams?.forUpdate,
     );
 
-    const queryWithRLS = withUserRLS(
-      localParams,
-      queryWithoutRLS,
-      !!this.getTransaction(localParams),
-    );
+    const queryWithRLS = this.withQueryContext(queryWithoutRLS, localParams);
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,

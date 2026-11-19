@@ -16,8 +16,9 @@ import type { VoidFunction } from "../../SchemaWatch/SchemaWatch";
 import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 import { escapeTSNames } from "../../utils/utils";
+import { getAuditExecutionContextQuery } from "../../Audit/getAuditExecutionContextQuery";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
-import { getSerializedClientErrorFromPGError } from "../DboBuilder";
+import { getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
 import { getValidatedTableRules } from "../TableRules/getValidatedTableRules";
 import { getColumns } from "../getColumns";
@@ -118,6 +119,12 @@ export class ViewHandler {
   getTransaction = (localParams: LocalParams | undefined) => {
     return localParams?.tx || this.tx;
   };
+
+  withQueryContext(query: string, localParams: LocalParams | undefined) {
+    return withUserRLS(localParams, query, !!this.getTransaction(localParams), (queryId) =>
+      getAuditExecutionContextQuery(this.dboBuilder.prostgles, queryId),
+    );
+  }
 
   abortRemoteQuery = (abortSignalId: string, localParams: LocalParams) => {
     const abortSignalKeys = getAbortSignalKeys(

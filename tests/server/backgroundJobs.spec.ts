@@ -996,9 +996,23 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           }
         },
       );
-      await t.test("queue serializes each row and re-fetches it at run start", async () => {
-        const { row, job } = await insert({ mode: "block" });
-        await eventually(() => blocked.has(job.id));
+      await t.test("queue serializes each row and re-fetches it at run start", async (t) => {
+        const userId = "alice";
+        const alice = await instance!.getClientDBHandlers({ userId }, undefined);
+        const row = await alice.clientDb[table].insert({ mode: "block" }, { returning: "*" });
+        const jobId = row.job_id;
+        assert(jobId);
+        t.after(() => {
+          released.add(jobId);
+        });
+        await eventually(() => blocked.has(jobId));
+        /* Requests outside the job's async context can reuse its running execution. */
+        const running = seen.find((entry) => entry.id === jobId);
+        assert(running);
+        const request = { userId, runId: running.execution.runId };
+        const attributed = await instance!.getClientDBHandlers(request, undefined);
+        await attributed.clientDb[table].update({ id: row.id }, { note: "workflow write" });
+        assert.equal((await instance!.db[table].findOne({ id: row.id }))!.note, "workflow write");
         await instance!.db[table].update({ id: row.id }, { revision: 2 });
         const next = (
           await records("target_row_pkey = ${targetRowPkey:json}", {
@@ -1008,9 +1022,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         await delay(350);
         assert.equal((await instance!.jobs.get(next.id))!.attempts, 0);
         await instance!.db[table].update({ id: row.id }, { revision: 3, mode: null });
-        released.add(job.id);
+        released.add(jobId);
         await status(next.id, "succeeded");
         assert.equal(seen.find((entry) => entry.id === next.id)!.revision, 3);
+        await assert.rejects(instance!.getClientDBHandlers(request, undefined), /is not running/);
+        await assert.rejects(attributed.clientDb[table].findOne({ id: row.id }), /is not running/);
       });
       await t.test("publish controls job reads and functions control job actions", async () => {
         const { job, row: sourceRow } = await insert();

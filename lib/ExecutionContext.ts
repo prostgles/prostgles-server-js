@@ -2,12 +2,11 @@ import { randomUUID } from "node:crypto";
 import { pickKeys, stableStringify } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import type { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
-import type { JobControlOperation } from "./Jobs/JobTypes";
+import type { AuditTableRow } from "./Audit/AuditTable";
 
-export type FunctionInvocation = {
-  type: "function";
-  id: string;
-  functionName: string;
+type AuditInvocation = NonNullable<AuditTableRow["execution_context"]>["invocations"][number];
+
+export type FunctionInvocation = Extract<AuditInvocation, { type: "function" }> & {
   relatedRecords: {
     argName: string;
     tableName: string;
@@ -15,19 +14,11 @@ export type FunctionInvocation = {
   }[];
 };
 
-export type TriggerInvocation = {
-  type: "trigger";
-  id: string;
-  tableName: string;
+export type TriggerInvocation = Extract<AuditInvocation, { type: "trigger" }> & {
   rowParts: Record<string, unknown>[];
 };
 
-export type JobControlInvocation = {
-  type: "jobControl";
-  id: string;
-  jobName: string;
-  operation: JobControlOperation;
-  tableName: string;
+export type JobControlInvocation = Extract<AuditInvocation, { type: "jobControl" }> & {
   rowParts: Record<string, unknown>[];
 };
 
@@ -62,7 +53,8 @@ export const runTableHook = <T>(
           rows.every((row) =>
             invocation.rowParts.some(
               (primaryKey) =>
-                stableStringify(pickKeys(row, Object.keys(primaryKey))) === stableStringify(primaryKey),
+                stableStringify(pickKeys(row, Object.keys(primaryKey))) ===
+                stableStringify(primaryKey),
             ),
           )),
     )

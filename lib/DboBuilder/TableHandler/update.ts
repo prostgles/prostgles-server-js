@@ -1,7 +1,7 @@
 import type { AnyObject, UpdateParams } from "prostgles-types";
 import type { ParsedTableRule } from "../../PublishParser/PublishParser";
 import type { Filter, LocalParams } from "../DboBuilder";
-import { getErrorAsObject, getSerializedClientErrorFromPGError, withUserRLS } from "../DboBuilder";
+import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import { getReturnTypeQuery } from "../ViewHandler/getReturnTypeQuery";
 import { prepareNewData } from "./DataValidator";
 import { getInsertTableRules } from "./insert/getInsertTableRules";
@@ -176,14 +176,13 @@ export async function update(
       })
     ).getQuery();
     query += "\n" + updateFilter.where;
-    const queryWithoutUserRLS = query;
-    query = withUserRLS(localParams, query, !!this.getTransaction(localParams));
+    const queryWithRLS = this.withQueryContext(query, localParams);
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,
       localParams,
-      queryWithoutRLS: queryWithoutUserRLS,
-      queryWithRLS: query,
+      queryWithoutRLS: query,
+      queryWithRLS,
       returnType: params?.returnType,
       newQuery: undefined,
     });
@@ -197,7 +196,7 @@ export async function update(
       fields,
       localParams,
       params,
-      queryWithoutUserRLS,
+      queryWithRLS,
       returningFields,
       rule,
       command: "update",

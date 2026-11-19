@@ -1,4 +1,4 @@
-import { withUserRLS, type LocalParams } from "../DboBuilder";
+import type { LocalParams } from "../DboBuilder";
 import type { AnyObject } from "prostgles-types";
 import { getJSONBObjectSchemaValidationError, omitKeys } from "prostgles-types";
 import type { FileTableConfig } from "../../ProstglesTypes";
@@ -50,10 +50,9 @@ export const lockFileForUpdate = async (
   if (!transaction) throw new Error("File updates require a transaction");
   // Internal locking uses the validated update condition and the request's RLS context.
   const row = await transaction.t.oneOrNone<{}>(
-    withUserRLS(
-      localParams,
+    tableHandler.withQueryContext(
       `SELECT 1 FROM ${tableHandler.escapedName} ${permittedWhere} FOR UPDATE`,
-      true,
+      localParams,
     ),
   );
   return !!row;

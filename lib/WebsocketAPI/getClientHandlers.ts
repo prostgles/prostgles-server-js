@@ -12,6 +12,7 @@ import type { AuthClientRequest } from "../Auth/AuthTypes";
 import { createServerSideRequest } from "../Auth/utils/serverSideRequest";
 import type { DBHandlerServerRestricted } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type { DbTxTableHandlers } from "../DboBuilder/DboBuilderTypes";
+import type { ExecutionContext } from "../ExecutionContext";
 import type { Prostgles } from "../Prostgles";
 import type { PermissionScope } from "../PublishParser/publishTypesAndUtils";
 import { runClientMethod, runClientRequest, runClientSqlRequest } from "../runClientRequest";
@@ -30,6 +31,7 @@ export type ClientHandlers<S = void> = {
   /**
    * Runs permission-checked table operations in a transaction. Requires transactions: true.
    * Caught table request errors also roll back the transaction.
+   * A runId attributes calls made through the supplied clientDb.
    */
   withClientDbTx: <R>(
     callback: (clientDb: DBHandlerServerRestricted<S>) => R | Promise<R>,
@@ -39,10 +41,15 @@ export type ClientHandlers<S = void> = {
 };
 
 export type ClientDBHandlerRequest =
-  | AuthClientRequest
+  | (AuthClientRequest & { runId?: never })
   | {
       /** Trusted server-only identity, resolved through auth.findUser on every operation. */
       userId: string;
+      /**
+       * Attach calls from outside an execution to this user's running root function or job.
+       * When audit is enabled, the handler's permissions must exclude raw SQL.
+       */
+      runId?: string;
       socket?: never;
       httpReq?: never;
       res?: never;
@@ -62,12 +69,15 @@ export const getClientDBHandlers = async <ClientSchema = void>(
     if ("socket" in clientReq || "httpReq" in clientReq || "res" in clientReq) {
       throw new Error("userId cannot be combined with a client request");
     }
+    const { userId, runId } = clientReq;
     return getClientHandlers<ClientSchema>(
       prostgles,
-      createServerSideRequest(prostgles, clientReq.userId),
+      createServerSideRequest(prostgles, userId),
       scope,
+      runId === undefined ? undefined : () => prostgles.getRunningExecution(runId, userId),
     );
   }
+  if ("runId" in clientReq) throw new Error("runId requires a server-side userId");
   return getClientHandlers<ClientSchema>(prostgles, clientReq, scope);
 };
 
@@ -75,17 +85,20 @@ export const getClientHandlers = async <S = void>(
   prostgles: Prostgles,
   clientReq: AuthClientRequest,
   scope: PermissionScope | undefined,
+  getParentExecution?: () => ExecutionContext,
 ): Promise<ClientHandlers<S>> => {
   prostgles.checkNotDestroyed();
+  getParentExecution?.();
   const clientSchema =
     (scope ? undefined : clientReq.socket?.prostgles?.get(prostgles.appId)) ??
     (await getClientSchema.bind(prostgles)(clientReq, scope));
 
-  const sqlHandler: SQLHandler | undefined = ((
-    query: string,
-    params?: unknown,
-    options?: SQLOptions,
-  ) => runClientSqlRequest.bind(prostgles)({ query, params, options }, clientReq)) as SQLHandler;
+  if (getParentExecution && prostgles.opts.audit && clientSchema.rawSQL) {
+    throw new Error(rawSqlWithRunIdError);
+  }
+
+  const runClientOperation = async <T>(callback: () => Promise<T>) =>
+    getParentExecution ? prostgles.runWithExecution(getParentExecution(), callback) : callback();
 
   const getTableHandlers = (
     transactionHandlers?: DbTxTableHandlers,
@@ -101,17 +114,18 @@ export const getClientHandlers = async <S = void>(
               if (transactionHandlers) {
                 prostgles.dboBuilder.getTransactionForHandlers(transactionHandlers);
               }
-              return runClientRequest
-                .bind(prostgles)(
+              return runClientOperation(() =>
+                runClientRequest.call(
+                  prostgles,
                   { command, tableName: table.name, param1, param2, param3 },
                   clientReq,
                   scope,
                   transactionHandlers,
-                )
-                .catch((error: unknown) => {
-                  onRequestError?.(error);
-                  throw error;
-                });
+                ),
+              ).catch((error: unknown) => {
+                onRequestError?.(error);
+                throw error;
+              });
             };
             return [command, method];
           }),
@@ -121,17 +135,21 @@ export const getClientHandlers = async <S = void>(
     );
 
   const clientSql = ((query: string, params?: AnyObject, options?: SQLOptions) => {
+    if (getParentExecution && prostgles.opts.audit) throw new Error(rawSqlWithRunIdError);
     if (scope && !scope.allowSql) {
       throw new Error("SQL is disallowed by PermissionScope");
     }
 
-    return sqlHandler(query, params, options);
+    return runClientOperation(() =>
+      runClientSqlRequest.call(prostgles, { query, params, options }, clientReq),
+    );
   }) as SQLHandler;
 
   const clientDb = getTableHandlers() as unknown as DBHandlerServerRestricted<S>;
 
   const getClientDbForTransaction = (transactionDb: object) => {
     prostgles.checkNotDestroyed();
+    getParentExecution?.();
     const transaction = prostgles.dboBuilder.getTransactionForHandlers(transactionDb);
     const handlers = getTableHandlers(transaction.dbTX, (error) => {
       prostgles.dboBuilder.failTransaction(transaction.t, error);
@@ -156,7 +174,9 @@ export const getClientHandlers = async <S = void>(
         if (scope && !scope.methods?.[name]) {
           throw new Error(`Method ${name} is not allowed by PermissionScope`);
         }
-        return runClientMethod.bind(prostgles)({ name, input }, clientReq);
+        return runClientOperation(() =>
+          runClientMethod.call(prostgles, { name, input }, clientReq),
+        );
       };
       return [name, { name, ...metadata, run: methodHandler }];
     }),
@@ -171,6 +191,9 @@ export const getClientHandlers = async <S = void>(
     getClientDbForTransaction,
   };
 };
+
+const rawSqlWithRunIdError =
+  "A client handler with a runId cannot allow raw SQL when audit is enabled";
 
 const tableMethods = getKeys({
   count: 1,

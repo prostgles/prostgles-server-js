@@ -3,7 +3,7 @@ import { getJSONBSchemaValidationError, getSerialisableError, isObject } from "p
 import type { ParsedTableRule } from "../../../PublishParser/PublishParser";
 import { isArray } from "../../../utils/utils";
 import type { LocalParams } from "../../DboBuilder";
-import { getSerializedClientErrorFromPGError, withUserRLS } from "../../DboBuilder";
+import { getSerializedClientErrorFromPGError } from "../../DboBuilder";
 import { getReturnTypeQuery } from "../../ViewHandler/getReturnTypeQuery";
 import type { TableHandler } from "../TableHandler";
 import { insertTest } from "../insertTest";
@@ -195,7 +195,6 @@ export async function insert(
     }
     const { data } = mediaOrNestedInsert;
 
-    let query = "";
     const commonArgs = {
       fields,
       forcedData,
@@ -207,18 +206,16 @@ export async function insert(
     if (isArray(data) && !data.length) {
       throw "Empty insert. Provide data";
     }
-    ({ query } = await getInsertQuery({
+    const { query: queryWithoutRLS } = await getInsertQuery({
       ...commonArgs,
       rows: isArray(data) ? data : [data],
-    }));
-
-    const queryWithoutUserRLS = query;
-    const queryWithRLS = withUserRLS(localParams, query, !!this.getTransaction(localParams));
+    });
+    const queryWithRLS = this.withQueryContext(queryWithoutRLS, localParams);
 
     const queryToReturn = await getReturnTypeQuery({
       handler: this,
       localParams,
-      queryWithoutRLS: queryWithoutUserRLS,
+      queryWithoutRLS,
       queryWithRLS,
       returnType: insertParams?.returnType,
       newQuery: undefined,
@@ -234,7 +231,7 @@ export async function insert(
     const result = await runInsertUpdateQuery({
       rule,
       localParams,
-      queryWithoutUserRLS,
+      queryWithRLS,
       tableHandler: this,
       returningFields: isConflictUpdate ? conflictReturningFields : returningFields,
       conflictUpdateRule: isConflictUpdate ? tableRules?.update : undefined,

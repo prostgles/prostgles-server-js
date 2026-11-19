@@ -2,6 +2,7 @@ import { tryCatchV2 } from "prostgles-types";
 import { version } from "../../../package.json";
 import type { DboBuilder } from "../../DboBuilder/DboBuilder";
 import { pgp } from "../../DboBuilder/DboBuilderTypes";
+import { USER_SESSION_SETTING } from "../../DboBuilder/sessionSettings";
 import { CREATE_VALIDATE_SCHEMA_FUNCTION_SQL } from "../../JSONBSchemaValidation/validateJSONBSchemaSQL";
 import {
   asValue,
@@ -166,7 +167,7 @@ BEGIN
         DECLARE user_text text;
         DECLARE user_jsonb JSONB = '{}'::JSONB;
         BEGIN
-          user_text := current_setting('prostgles.user', true);
+          user_text := current_setting(${asValue(USER_SESSION_SETTING)}, true);
           IF length(user_text) > 0 THEN
             user_jsonb := user_text::JSONB;
           END IF;
