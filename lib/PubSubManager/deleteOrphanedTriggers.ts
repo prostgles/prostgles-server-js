@@ -1,38 +1,25 @@
 import type { PubSubManager } from "./PubSubManager";
-import { asValue, EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
+import { EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID } from "./PubSubManagerUtils";
 
-export function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {
+export async function deleteOrphanedTriggers(this: PubSubManager, tableNames: string[]) {
   const activeListeners = this.getActiveListeners();
-  const conditions = tableNames.map((tableName) => {
+  /* Disabling triggers locks the table. Commit each deletion before locking another table. */
+  for (const tableName of tableNames) {
     const activeConditions = activeListeners
       .filter((listener) => listener.table_name === tableName)
       .map((listener) => listener.condition);
-    return `(at.table_name = ${asValue(tableName)} ${activeConditions.length ? `AND at.condition NOT IN (${asValue(activeConditions, ":csv")})` : ""})`;
-  });
-
-  // log("deleteOrphanedTriggers", { appId: this.appId, conditions });
-  return this.db
-    .any(
-      `
-        /* Delete removed subscriptions */
+    try {
+      await this.db.none(
+        `
         /* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */
-        DELETE FROM prostgles.app_triggers at
-        WHERE at.app_id = \${appId}
-        AND ( ${conditions.join(" OR ")} )
-        --RETURNING *
+        DELETE FROM prostgles.app_triggers
+        WHERE app_id = $1 AND table_name = $2 AND condition <> ALL($3::text[])
         `,
-      { appId: this.appId },
-    )
-    .then(async (_rows) => {
-      // log("Orphaned triggers deleted", _rows.length);
-      // const wtf = await this.db.any(
-      //   `SELECT * FROM prostgles.app_triggers WHERE app_id = \${appId}`,
-      //   { appId: this.appId }
-      // );
-      // log("Current app_triggers", wtf);
-      return this.refreshTriggers();
-    })
-    .catch((e) => {
-      console.error("Error deleting orphaned triggers", e);
-    });
+        [this.appId, tableName, activeConditions],
+      );
+    } catch (error) {
+      console.error("Error deleting orphaned triggers", tableName, error);
+    }
+  }
+  await this.refreshTriggers().catch((error) => console.error("Error refreshing triggers", error));
 }

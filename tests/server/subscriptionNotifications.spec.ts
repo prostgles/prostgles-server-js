@@ -12,8 +12,44 @@ import { Server } from "socket.io";
 import type prostglesClient from "../client/node_modules/prostgles-client";
 import type { SubscribeParams } from "prostgles-types";
 import { DELIMITER, NOTIF_TYPE } from "prostgles-server/dist/PubSubManager/PubSubManagerUtils";
+import type { DBHandlerServerInternal } from "./serverTypes";
 
-export const testSubscriptionNotifications = async (db: DB) => {
+export const testSubscriptionNotifications = async (db: DB, dbo: DBHandlerServerInternal) => {
+  await test("unsubscribing from two tables lets a writer lock them in reverse order", async () => {
+    const items = await dbo.items!.subscribe({}, {}, () => {});
+    const rec = await dbo.rec!.subscribe({}, {}, () => {});
+    await db.tx(async (writer) => {
+      await writer.none("LOCK TABLE rec IN ROW EXCLUSIVE MODE");
+      await items.unsubscribe();
+      await rec.unsubscribe();
+      await waitFor(
+        () =>
+          writer.one<boolean>(
+            `SELECT EXISTS (
+              SELECT 1 FROM pg_locks WHERE relation = 'rec'::regclass
+              AND mode = 'ShareRowExclusiveLock' AND NOT granted
+            )`,
+            [],
+            ({ exists }) => exists,
+          ),
+        "Subscription cleanup did not wait for the writer on rec",
+      );
+      await writer.none("LOCK TABLE items IN ROW EXCLUSIVE MODE NOWAIT");
+    });
+    await waitFor(
+      () =>
+        db.one<boolean>(
+          `SELECT NOT EXISTS (
+            SELECT 1 FROM prostgles.app_triggers WHERE table_name IN ('items', 'rec')
+            AND app_id = split_part(current_setting('application_name'), ' ', 2)
+          ) AS cleaned`,
+          [],
+          ({ cleaned }) => cleaned,
+        ),
+      "Unsubscribed tables still have trigger registrations",
+    );
+  });
+
   await test(
     "subscription notifications handle rollbacks, out-of-order commits and multiple apps",
     { timeout: 15_000 },

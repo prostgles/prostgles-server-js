@@ -1,7 +1,12 @@
 import { describe, test } from "node:test";
 import { strict as assert } from "node:assert";
 import { getJSONBSchemaValidationErrorAsync, type TableHandler } from "prostgles-types";
-import type { DB, DBHandlerServer, DBHandlerServerInternal, WithUserRLS } from "./server/serverTypes";
+import type {
+  DB,
+  DBHandlerServer,
+  DBHandlerServerInternal,
+  WithUserRLS,
+} from "./server/serverTypes";
 import { testWithUserRLS } from "./server/withUserRLS.spec";
 import { testAudit } from "./server/audit.spec";
 import { testAuditSubscriptionBenchmark } from "./server/auditSubscriptionBenchmark.spec";
@@ -36,7 +41,7 @@ export const serverOnlyQueries = async (
     await testTableHookRecursion(pgDb);
     await testConflictUpdates(pgDb);
     await testNestedInserts(pgDb);
-    await testSubscriptionNotifications(pgDb);
+    await testSubscriptionNotifications(pgDb, db);
     await testBackgroundJobs(pgDb);
     await testJobRetention(pgDb);
     await testFileJobs(pgDb);
