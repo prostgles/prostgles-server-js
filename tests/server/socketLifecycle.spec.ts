@@ -186,6 +186,7 @@ const testSocketSessionCaching = async (db: DB) => {
       let lookups = 0;
       let expires: number | undefined = Date.now() + 30 * 24 * 60 * 60 * 1000;
       let beforeGetUser: (() => Promise<void>) | undefined;
+      let onSocketConnect: ProstglesInitOptions["onSocketConnect"];
       let user = { id: "cached-user", type: "test" };
       const getAuth = (): NonNullable<ProstglesInitOptions["auth"]> => ({
         sidKeyName: "token",
@@ -230,6 +231,7 @@ const testSocketSessionCaching = async (db: DB) => {
           ...options,
           io,
           auth: getAuth(),
+          onSocketConnect: (params) => onSocketConnect?.(params),
           restApi: { expressApp: app, path: "/lifecycle" },
         });
         const client = connect(url);
@@ -325,28 +327,79 @@ const testSocketSessionCaching = async (db: DB) => {
         await new Promise((resolve) => setTimeout(resolve, 1100));
         assert(serverSocket.connected, "Replacing auth cancels the old expiry timer");
 
-        let resumeInitialAuth = () => {};
-        const initialAuthPaused = new Promise<void>((resolve) => {
-          beforeGetUser = () => {
-            resolve();
-            return new Promise<void>((resumeLookup) => {
-              resumeInitialAuth = resumeLookup;
+        /* Auth replacement before/during lookups must not reuse retired handlers or repeat guards. */
+        for (const cacheSession of [true, false]) {
+          for (const { inConnectHook, beforeLookup, denyConnection } of [
+            { inConnectHook: false, beforeLookup: false, denyConnection: false },
+            { inConnectHook: true, beforeLookup: false, denyConnection: false },
+            { inConnectHook: true, beforeLookup: true, denyConnection: false },
+            { inConnectHook: true, beforeLookup: false, denyConnection: true },
+          ]) {
+            let oldLookups = 0;
+            const previousAuth = getAuth();
+            await updateAuth({
+              ...previousAuth,
+              cacheSession,
+              getUser: (...args) => {
+                oldLookups++;
+                return previousAuth.getUser(...args);
+              },
             });
-          };
-        });
-        const reloadingClient = connect(url);
-        clients.push(reloadingClient.socket);
-        void reloadingClient.schema.catch(() => {});
-        await initialAuthPaused;
-        beforeGetUser = undefined;
-        await instance.update({ auth: getAuth() });
-        resumeInitialAuth();
-        assert.equal(
-          (await reloadingClient.schema).auth?.user?.id,
-          "updated-user",
-          "Connecting sockets receive the current schema when auth changes during their lookup",
-        );
-        reloadingClient.socket.close();
+            let resumeInitialAuth = () => {};
+            let pauseInitialAuth = async () => {};
+            const initialAuthPaused = new Promise<void>((resolve) => {
+              pauseInitialAuth = () => {
+                resolve();
+                return new Promise<void>((resumeLookup) => {
+                  resumeInitialAuth = resumeLookup;
+                });
+              };
+            });
+            beforeGetUser = beforeLookup ? undefined : pauseInitialAuth;
+            const connectingUserIds: (string | undefined)[] = [];
+            onSocketConnect = async ({ getUser }) => {
+              if (!inConnectHook) return;
+              if (beforeLookup) await pauseInitialAuth();
+              const results =
+                beforeLookup ? await Promise.all([getUser(), getUser()]) : [await getUser()];
+              connectingUserIds.push(...results.map(({ user }) => user?.id));
+              connectingUserIds.push((await getUser()).user?.id);
+            };
+            const reloadingClient = connect(url);
+            clients.push(reloadingClient.socket);
+            void reloadingClient.schema.catch(() => {});
+            await initialAuthPaused;
+            beforeGetUser = undefined;
+            const oldLookupsBeforeUpdate = oldLookups;
+            const denied = onceSocket(reloadingClient.socket, CHANNELS.CONNECTION);
+            const disconnected = onceSocket(reloadingClient.socket, "disconnect");
+            let replacementGuardCalls = 0;
+            user = { ...user, id: `${user.id}-reloaded` };
+            await updateAuth({
+              ...getAuth(),
+              cacheSession,
+              onUseOrSocketConnected: () => {
+                replacementGuardCalls++;
+                if (denyConnection) return { httpCode: 403, error: "Connection denied" };
+              },
+            });
+            resumeInitialAuth();
+            if (denyConnection) {
+              assert.deepEqual(await denied, { error: "Connection denied" });
+              await disconnected;
+            } else {
+              assert.equal((await reloadingClient.schema).auth?.user?.id, user.id);
+              if (inConnectHook) {
+                assert.deepEqual(connectingUserIds, Array(beforeLookup ? 3 : 2).fill(user.id));
+              }
+              assert.equal(await callMethod(reloadingClient.socket, "version"), 1);
+              reloadingClient.socket.close();
+            }
+            assert.equal(oldLookups, oldLookupsBeforeUpdate, "Retired auth is never called again");
+            assert.equal(replacementGuardCalls, inConnectHook ? 1 : 0);
+          }
+        }
+        onSocketConnect = undefined;
 
         expires = Date.now() + 1000;
         await updateAuth();

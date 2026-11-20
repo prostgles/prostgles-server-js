@@ -1,5 +1,5 @@
 import type { AnyObject, SocketFunctionCall } from "prostgles-types";
-import { CHANNELS, getSerialisableError, isObject } from "prostgles-types";
+import { CHANNELS, getSerialisableError, isObject, tryCatchV2 } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import type { ClientSocketWithCachedData } from "../DboBuilder/DboBuilderTypes";
@@ -20,8 +20,44 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
   this.connectedSockets.push(socket);
 
   try {
-    const getUser = async (): Promise<AuthResultWithSID<SessionUser>> => {
-      const res = await this.authHandler.getSidAndUserFromRequest({ socket });
+    const connectionAuthChecks = new WeakMap<
+      Prostgles["authHandler"],
+      Promise<Prostgles["authHandler"] | undefined>
+    >();
+    const checkConnectionAuth = () => {
+      const { authHandler } = this;
+      const existingCheck = connectionAuthChecks.get(authHandler);
+      if (existingCheck) return existingCheck;
+      const check = (async () => {
+        const errorInfo = await this.opts.auth?.onUseOrSocketConnected?.(
+          authHandler.getValidatedSid({ socket }),
+          getClientRequestIPsInfo({ socket }),
+          { socket },
+        );
+        if (!errorInfo) return authHandler;
+        socket.emit(CHANNELS.CONNECTION, {
+          error: "error" in errorInfo ? errorInfo.error : "New session setup",
+        });
+        socket.disconnect();
+      })();
+      connectionAuthChecks.set(authHandler, check);
+      return check;
+    };
+
+    const getUser = async (
+      authHandler = this.authHandler,
+    ): Promise<AuthResultWithSID<SessionUser>> => {
+      if (this.authHandler !== authHandler) {
+        if (!isDestroyed() && socket.connected && socket.conn.readyState === "open") {
+          connectionAuth = await checkConnectionAuth();
+          if (connectionAuth) return getUser(connectionAuth);
+        }
+        throw new Error("Socket closed during authentication");
+      }
+      const lookup = await tryCatchV2(() => authHandler.getSidAndUserFromRequest({ socket }));
+      if (this.authHandler !== authHandler) return getUser(authHandler);
+      if (lookup.hasError) throw lookup.error;
+      const res = lookup.data;
       if (res === "new-session-redirect") {
         socket.emit(CHANNELS.AUTH_GUARD, {
           shouldReload: true,
@@ -52,7 +88,13 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
         });
       });
 
-      void this.opts.onSocketDisconnect?.({ socket, sid, dbo: dbo as DBHandlerServer, db, getUser });
+      void this.opts.onSocketDisconnect?.({
+        socket,
+        sid,
+        dbo: dbo as DBHandlerServer,
+        db,
+        getUser,
+      });
     });
 
     await this.opts.onLog?.({
@@ -63,32 +105,18 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
     });
 
     if (isDestroyed()) return;
-    const { onUseOrSocketConnected } = this.opts.auth ?? {};
-    const { authHandler } = this;
-    if (onUseOrSocketConnected) {
-      const errorInfo = await onUseOrSocketConnected(
-        authHandler.getValidatedSid({ socket }),
-        getClientRequestIPsInfo({ socket }),
-        { socket },
-      );
-      if (errorInfo) {
-        socket.emit(CHANNELS.CONNECTION, {
-          error: "error" in errorInfo ? errorInfo.error : "New session setup",
-        });
-        socket.disconnect();
-        return;
-      }
-    }
-    if (isDestroyed()) return;
+    let connectionAuth = await checkConnectionAuth();
+    if (!connectionAuth || isDestroyed()) return;
     if (this.opts.onSocketConnect) {
       try {
         await this.opts.onSocketConnect({
           socket,
           dbo: dbo as DBHandlerServer,
           db,
-          getUser,
+          getUser: () => getUser(connectionAuth),
         });
       } catch (error) {
+        if (!socket.connected) return;
         const connectionError =
           error instanceof Error ? error.message
           : typeof error === "string" ? error
@@ -149,6 +177,7 @@ export async function onSocketConnected(this: Prostgles, socket: ClientSocketWit
       },
     );
 
+    this.socketsReadyForSchema.add(socket);
     await this.pushSocketSchema(socket);
   } catch (e) {
     console.trace("setSocketEvents: ", e);

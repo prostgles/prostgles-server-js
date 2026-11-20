@@ -436,6 +436,7 @@ export class Prostgles {
   init = initProstgles.bind(this);
 
   connectedSockets: ClientSocketWithCachedData[] = [];
+  readonly socketsReadyForSchema = new WeakSet<ClientSocketWithCachedData>();
   setupSocketIO() {
     this.checkDb();
 
@@ -449,9 +450,10 @@ export class Prostgles {
 
     /* Already initialised. Only reconnect sockets */
     if (this.connectedSockets.length) {
-      this.connectedSockets.forEach((s) => {
-        s.emit(CHANNELS.SCHEMA_CHANGED);
-        void this.pushSocketSchema(s);
+      this.connectedSockets.forEach((socket) => {
+        if (!this.socketsReadyForSchema.has(socket)) return;
+        socket.emit(CHANNELS.SCHEMA_CHANGED);
+        void this.pushSocketSchema(socket);
       });
       return;
     }
