@@ -2,17 +2,23 @@ import pgPromise from "pg-promise";
 import type { ProstglesInitOptions } from "./ProstglesTypes";
 import type { DB, PGP } from "./initProstgles";
 import type pg from "pg-promise/typescript/pg-subset";
+import type { QueryArrayConfig, QueryConfig, Submittable } from "pg";
+import { isObject } from "prostgles-types";
+
+export type PgQueryInput =
+  string | QueryConfig<unknown[]> | QueryArrayConfig<unknown[]> | Submittable;
 
 type GetDbConnectionArgs = Pick<
   ProstglesInitOptions,
   "DEBUG_MODE" | "onQuery" | "dbConnection" | "onNotice" | "onConnectionError"
->;
+> & { withQueryContext: (query: PgQueryInput) => PgQueryInput };
 export const getDbConnection = function ({
   dbConnection,
   onQuery,
   onConnectionError,
   DEBUG_MODE,
   onNotice,
+  withQueryContext,
 }: GetDbConnectionArgs): { db: DB; pgp: PGP } {
   const onQueryOrError:
     undefined | ((error: any, ctx: pgPromise.IEventContext<pg.IClient>) => void) =
@@ -35,34 +41,51 @@ export const getDbConnection = function ({
       query: (ctx) => onQueryOrError(undefined, ctx),
     }),
     error: (err: Error, ctx) => {
+      /* Trailing query context must not move end-of-input errors beyond the original SQL. */
+      const query: unknown = ctx.query;
+      const queryText: unknown =
+        typeof query === "string" ? query
+        : isObject(query) ? query.text
+        : undefined;
+      if (typeof queryText === "string" && "position" in err && typeof err.position === "string") {
+        const endPosition = [...queryText].length + 1;
+        if (+err.position > endPosition) err.position = String(endPosition);
+      }
       if (ctx.cn) {
         onConnectionError?.(err, ctx);
       }
       onQueryOrError?.(err, ctx);
     },
-    ...((onNotice || DEBUG_MODE) && {
-      connect: function ({ client, useCount }) {
-        const isFresh = !useCount;
-        if (isFresh && !client.listeners("notice").length) {
-          client.on("notice", function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else if (DEBUG_MODE) {
-              console.log("notice: %j", msg?.message);
-            }
-          });
-        }
-        if (isFresh && !client.listeners("error").length) {
-          client.on("error", function (msg) {
-            if (onNotice) {
-              onNotice(msg, msg?.message);
-            } else {
-              console.log("error: %j", msg?.message);
-            }
-          });
-        }
-      },
-    }),
+    connect: ({ client, useCount }) => {
+      const isFresh = !useCount;
+      if (isFresh) {
+        client.query = new Proxy(client.query.bind(client), {
+          apply: (query, queryClient: unknown, args: [PgQueryInput, ...unknown[]]) => {
+            const [queryConfig, ...queryArgs] = args;
+            return Reflect.apply(query, queryClient, [withQueryContext(queryConfig), ...queryArgs]);
+          },
+        });
+      }
+      if (!onNotice && !DEBUG_MODE) return;
+      if (isFresh && !client.listeners("notice").length) {
+        client.on("notice", function (msg) {
+          if (onNotice) {
+            onNotice(msg, msg?.message);
+          } else if (DEBUG_MODE) {
+            console.log("notice: %j", msg?.message);
+          }
+        });
+      }
+      if (isFresh && !client.listeners("error").length) {
+        client.on("error", function (msg) {
+          if (onNotice) {
+            onNotice(msg, msg?.message);
+          } else {
+            console.log("error: %j", msg?.message);
+          }
+        });
+      }
+    },
   });
   // pgp.pg.defaults.max = 70;
 
@@ -83,8 +106,15 @@ export const getDbConnection = function ({
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.TIMESTAMPTZ, (v) => v); // timestamp with time zone
   pgp.pg.types.setTypeParser(pgp.pg.types.builtins.DATE, (v) => v); // date
 
+  const db = pgp(dbConnection);
+  Object.assign(db.$pool, {
+    query: () => {
+      throw new Error("db.$pool.query() is not supported. Use db.query() instead.");
+    },
+  });
+
   return {
-    db: pgp(dbConnection),
+    db,
     pgp,
   };
 };

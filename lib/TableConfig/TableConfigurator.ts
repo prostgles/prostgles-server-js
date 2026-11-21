@@ -139,6 +139,17 @@ export class TableConfigurator {
   initialising = false;
   init = () =>
     this.prostgles.runSchemaQueries(async () => {
+      if (this.prostgles.opts.audit) {
+        const minimumAuditMajor = 14;
+        const { major } = await this.db.one<{ major: number }>(
+          "SELECT current_setting('server_version_num')::int / 10000 AS major",
+        );
+        if (major < minimumAuditMajor) {
+          throw new Error(
+            `Audit requires PostgreSQL ${minimumAuditMajor} or later. Connected to PostgreSQL ${major}.`,
+          );
+        }
+      }
       await runSQLFile(this.prostgles);
       this.prostgles.preparingTableConfig = true;
       try {

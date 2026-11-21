@@ -188,7 +188,6 @@ export const withUserRLS = (
   localParams: LocalParams | undefined,
   query: string,
   inTransaction = false,
-  getAuditExecutionQuery?: (queryId: string) => string,
 ) => {
   const user = localParams?.isRemoteRequest?.user;
   const queryPrefix = `SET LOCAL ${pgp.as.name(USER_SESSION_SETTING)} \nTO`;
@@ -202,9 +201,7 @@ export const withUserRLS = (
   }
 
   const queryId = crypto.randomUUID();
-  return [QUERY_ID_PREFIX + queryId, firstQuery, getAuditExecutionQuery?.(queryId), query]
-    .filter(Boolean)
-    .join("\n");
+  return [QUERY_ID_PREFIX + queryId, firstQuery, query].filter(Boolean).join("\n");
 };
 
 export const TX_KEY = "tx" as const;

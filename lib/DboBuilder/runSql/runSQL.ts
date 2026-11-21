@@ -42,6 +42,11 @@ export async function runSQL(
 
   const db = localParams?.tx?.t || this.db;
   if (returnType === "stream") {
+    if (this.prostgles.opts.audit && this.prostgles.getExecution()) {
+      throw new Error(
+        "SQL streaming is not supported within an execution context when audit is enabled",
+      );
+    }
     if (localParams?.tx) throw "Cannot use stream with localParams transaction";
     if (!socket) throw "stream allowed only with client socket";
     const streamInfo = this.queryStreamer.create({

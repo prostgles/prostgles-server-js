@@ -18,6 +18,7 @@ import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/ge
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { PublishParser } from "prostgles-server/dist/PublishParser/PublishParser";
 import { runJobControl } from "prostgles-server/dist/ExecutionContext";
+import { executeSqlWithRollback } from "prostgles-server/dist/TableConfig/getFutureTableSchema";
 import {
   AUDIT_TRIGGER_PREFIX,
   TABLE_CONFIG_TRIGGER_PREFIX,
@@ -181,6 +182,7 @@ export async function testAudit(parentDb: DB) {
             `Missing audit index for ${column}`,
           );
         }
+        assert(!auditIndexes.some(({ indexdef }) => indexdef.includes("execution_context")));
         checkGeneratedTypes(
           (await prgl.dboBuilder.getTsDefinitions()).tsSchema,
           `
@@ -573,6 +575,51 @@ export async function testAudit(parentDb: DB) {
         const sourceClient = await result.getClientDBHandlers(clientRequest, undefined);
         assert(sourceClient.clientSchema.tableSchema.some(({ name }) => name === auditName));
         const clientAudit = sourceClient.clientDb[auditName]!;
+        /* Time the newest visible page with the source table's inferred row and field rules. */
+        await result.db.tx((dbx, rawTx) =>
+          executeSqlWithRollback(rawTx, async (tx) => {
+            const auditReader = sourceClient.getClientDbForTransaction(dbx)[auditName]!;
+            const eventCount = 10_000;
+            await tx.none(
+              `
+              INSERT INTO audit_test_source (a, b)
+              SELECT id, CASE WHEN id % 2 = 1 THEN 'one' ELSE 'hidden' END
+              FROM generate_series(1, $1) AS id ORDER BY id;
+              ANALYZE audit_events;
+            `,
+              [eventCount],
+            );
+            const expectedSnapshots = Array.from({ length: 20 }, (_, i) => ({
+              a: eventCount - 1 - 2 * i,
+            }));
+            const timeLatestPage = async () => {
+              const durationsMs: number[] = [];
+              for (let sample = 0; sample < 3; sample++) {
+                const started = performance.now();
+                const page = await auditReader.find!(
+                  {},
+                  {
+                    orderBy: [{ key: "created_at", asc: false, nulls: "last" }],
+                    limit: expectedSnapshots.length,
+                  },
+                );
+                durationsMs.push(performance.now() - started);
+                assert.deepEqual(
+                  page.map(({ new_row }) => new_row),
+                  expectedSnapshots,
+                );
+              }
+              return Math.min(...durationsMs);
+            };
+            const latestPageMs = await timeLatestPage();
+            await tx.none("SET LOCAL enable_indexscan = off; SET LOCAL enable_indexonlyscan = off");
+            const fullScanMs = await timeLatestPage();
+            assert(
+              latestPageMs * 4 < fullScanMs,
+              `Inferred audit page took ${latestPageMs.toFixed(2)}ms, expected under ¼ of a full scan (${fullScanMs.toFixed(2)}ms)`,
+            );
+          }),
+        );
         await assert.rejects(() => clientAudit.find!({ invalid_audit_column: 1 }));
         await assert.rejects(() =>
           clientAudit.find!({}, { select: { invalid_audit_column: 1 } as never }),

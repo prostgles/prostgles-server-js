@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
+import type { Pool } from "pg";
+import { as, ParameterizedQuery, PreparedStatement } from "pg-promise";
 import {
   createProstgles,
   defineFunction,
@@ -9,7 +11,7 @@ import {
   type InitResult,
   type ProstglesInitOptions,
 } from "prostgles-server";
-import type { DB, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
+import type { DB, DBorTx, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 
 export const testExecutionContext = async (db: DB) => {
@@ -19,6 +21,7 @@ export const testExecutionContext = async (db: DB) => {
     const events = "events";
     const noKey = "no_key";
     const auditTable = "execution_history";
+    const escapedFunctionName = "raw comment: */\r\n雪😀";
     const readHistory = () =>
       db.any<AuditTableRow>(`SELECT * FROM ${schema}.${auditTable} ORDER BY id`);
     const observed: { phase: string; execution: ExecutionContext }[] = [];
@@ -30,6 +33,7 @@ export const testExecutionContext = async (db: DB) => {
     let readExecution: () => ExecutionContext | undefined = () => undefined;
     let readOtherExecution: () => ExecutionContext | undefined = () => undefined;
     let transaction: DBHandlerServerInternal | undefined;
+    let rawTransaction: DBorTx | undefined;
     let instance: Pick<InitResult, "destroy" | "getClientDBHandlers"> | undefined;
     let other: InitResult | undefined;
     const capture = async (phase: string) => {
@@ -140,11 +144,13 @@ export const testExecutionContext = async (db: DB) => {
             afterEach: [
               {
                 commands: { insert: 1, update: 1, delete: 1 },
-                validate: async ({ onCommit, onRollback, dbx }) => {
+                validate: async ({ onCommit, onRollback, dbx, tx }) => {
                   await capture("each");
                   await dbx[noKey]!.insert({ value: "downstream" });
-                  onCommit(async () => {
+                  await tx.none(`INSERT INTO ${noKey} VALUES ('raw downstream')`);
+                  onCommit(async ({ db }) => {
                     await capture("commit");
+                    await db.none(`INSERT INTO ${noKey} VALUES ('raw onCommit')`);
                   });
                   onRollback(async () => {
                     await capture("rollback");
@@ -192,6 +198,15 @@ export const testExecutionContext = async (db: DB) => {
             userFilter: {},
             functions: {
               readExecution: defineFunction({ run: () => readExecution() }),
+              [escapedFunctionName]: defineFunction({
+                unrestrictedDbAccess: true,
+                run: async (_args, { db }) => {
+                  await db.none(
+                    `INSERT INTO ${noKey} VALUES ('escaped function name'); -- trailing comment`,
+                  );
+                  return readExecution();
+                },
+              }),
               workflow: defineFunction({
                 unrestrictedDbAccess: true,
                 run: async (_args, { dbo, user }) => {
@@ -214,11 +229,72 @@ export const testExecutionContext = async (db: DB) => {
               }),
               child: defineFunction({
                 unrestrictedDbAccess: true,
-                run: async (_args, { dbo, sql, user }) => {
+                run: async (_args, { dbo, db, sql, user }) => {
                   const execution = await capture("child");
                   if (!transaction) {
+                    /* Raw pool queries must fail before bypassing execution attribution. */
+                    const rawPool = db.$pool as typeof db.$pool & Pick<Pool, "query">;
+                    assert.throws(
+                      () => {
+                        void rawPool.query("SELECT 1");
+                      },
+                      { message: "db.$pool.query() is not supported. Use db.query() instead." },
+                    );
+                    await assertAuditErrorPositions(db);
                     await dbo[noKey]!.insert!({ value: `child:${user.id}` });
                     await sql(`INSERT INTO ${noKey} VALUES ($1)`, [`raw child:${user.id}`]);
+                    await db.none(`INSERT INTO ${noKey} VALUES ($1)`, [`raw db child:${user.id}`]);
+                    await db.none(
+                      new ParameterizedQuery({
+                        text: `INSERT INTO ${noKey} VALUES ($1)`,
+                        values: [`parameterized child:${user.id}`],
+                      }),
+                    );
+                    const arrayResult = await sql(
+                      `INSERT INTO ${noKey} VALUES ($1) RETURNING value`,
+                      [`array child:${user.id}`],
+                      { returnType: "arrayMode" },
+                    );
+                    assert.deepEqual(arrayResult.rows, [[`array child:${user.id}`]]);
+                    await dbo.tx(async (_dbx, tx) => {
+                      await tx.none(`INSERT INTO ${noKey} VALUES ($1)`, [
+                        `raw tx child:${user.id}`,
+                      ]);
+                      await assert.rejects(
+                        tx.tx(async (savepoint) => {
+                          await savepoint.none(
+                            `INSERT INTO ${noKey} VALUES ('rolled back raw child')`,
+                          );
+                          throw new Error("raw child rollback");
+                        }),
+                        /raw child rollback/,
+                      );
+                      await tx.none(`INSERT INTO ${noKey} VALUES ($1)`, [
+                        `after savepoint:${user.id}`,
+                      ]);
+                    });
+                    await assert.rejects(
+                      db.none(
+                        new PreparedStatement({
+                          name: "audited-child",
+                          text: `INSERT INTO ${noKey} VALUES ('unsupported prepared child')`,
+                        }),
+                      ),
+                      /Named prepared statements/,
+                    );
+                    await assert.rejects(sql("SELECT 1", undefined, { returnType: "stream" }), {
+                      message: /SQL streaming is not supported/,
+                    });
+                    const connection = await db.connect();
+                    try {
+                      assert.throws(() => {
+                        void connection.client.query({
+                          submit: () => assert.fail("Custom query executed"),
+                        });
+                      }, /custom query objects/);
+                    } finally {
+                      await connection.done();
+                    }
                   }
                   return execution;
                 },
@@ -232,7 +308,10 @@ export const testExecutionContext = async (db: DB) => {
                   fail: "boolean",
                 },
                 unrestrictedDbAccess: true,
-                run: async ({ fail }, { dbo, user, clientReq, getClientDBHandlers, context }) => {
+                run: async (
+                  { fail },
+                  { dbo, db, user, clientReq, getClientDBHandlers, context },
+                ) => {
                   const execution = await context.capture("outer");
                   assert.equal(execution.user, user);
                   assert.equal(execution.clientReq, clientReq);
@@ -257,6 +336,9 @@ export const testExecutionContext = async (db: DB) => {
                     { value: user.id },
                     { returning: "*" },
                   );
+                  await (rawTransaction ?? db).none(`INSERT INTO ${noKey} VALUES ($1)`, [
+                    `raw after hooks:${user.id}`,
+                  ]);
                   if (fail) throw new Error("execution failure");
                   return { execution, row };
                 },
@@ -266,6 +348,12 @@ export const testExecutionContext = async (db: DB) => {
         },
       });
       instance = created;
+      /* Queries outside an execution keep their error positions with audit enabled. */
+      await assert.rejects(created.sql("SELECT missing_column"), {
+        code: "42703",
+        position: "8",
+      });
+      await assert.rejects(created.sql("SELECT 1 +"), { code: "42601", position: "11" });
       const dbo = created.db as unknown as DBHandlerServerInternal;
       const alice = await created.getClientDBHandlers({ userId: "alice" }, undefined);
       const bob = await created.getClientDBHandlers({ userId: "bob" }, undefined);
@@ -340,7 +428,10 @@ export const testExecutionContext = async (db: DB) => {
       await assert.rejects(created.getClientDBHandlers(request, undefined), /is not running/);
       await assert.rejects(proxy.clientDb[noKey]!.insert!({ value: "expired" }), /is not running/);
       await assert.rejects(proxy.clientMethods.readExecution!.run(), /is not running/);
-      await assert.rejects(proxy.withClientDbTx(() => undefined), /is not running/);
+      await assert.rejects(
+        proxy.withClientDbTx(() => undefined),
+        /is not running/,
+      );
       const input = {
         rows: [{ tenant: 1, id: 2, slug: "first" }, { tenant: 1, id: 3 }, { slug: "first" }],
         slug: "second",
@@ -387,11 +478,26 @@ export const testExecutionContext = async (db: DB) => {
             { type: "function", id: child.invocations[1]!.id, functionName: "child" },
           ],
         });
-        assert.equal(
-          (await readHistory()).find(
-            ({ new_row }) => new_row?.value === `raw child:${execution.user?.id}`,
+        /* Raw writes keep the child ancestry across connections, query modes and savepoints. */
+        for (const prefix of [
+          "raw child",
+          "raw db child",
+          "parameterized child",
+          "array child",
+          "raw tx child",
+          "after savepoint",
+        ]) {
+          assert.deepEqual(
+            runHistory.find(({ new_row }) => new_row?.value === `${prefix}:${execution.user?.id}`)
+              ?.execution_context,
+            runHistory[0]!.execution_context,
+          );
+        }
+        assert.deepEqual(
+          runHistory.find(
+            ({ new_row }) => new_row?.value === `raw after hooks:${execution.user?.id}`,
           )?.execution_context,
-          null,
+          { runId: execution.runId, invocations: [outerInvocation] },
         );
         assert.deepEqual(getFunctionInvocation(execution.invocations[0]).relatedRecords, [
           { argName: "rows", tableName: records, rowPart: { tenant: 1, id: 2, slug: "first" } },
@@ -422,13 +528,22 @@ export const testExecutionContext = async (db: DB) => {
           );
         }
         assert.equal(hooks[1]!.execution, hooks[3]!.execution);
-        assert.deepEqual(runHistory.at(-1)!.execution_context, {
-          runId: execution.runId,
-          invocations: [
-            outerInvocation,
-            { type: "trigger", id: hooks[1]!.execution.invocations.at(-1)!.id, tableName: events },
-          ],
-        });
+        for (const value of ["downstream", "raw downstream", "raw onCommit"]) {
+          assert.deepEqual(
+            runHistory.find(({ new_row }) => new_row?.value === value)?.execution_context,
+            {
+              runId: execution.runId,
+              invocations: [
+                outerInvocation,
+                {
+                  type: "trigger",
+                  id: hooks[1]!.execution.invocations.at(-1)!.id,
+                  tableName: events,
+                },
+              ],
+            },
+          );
+        }
         const nested = observed.find(
           (item) =>
             item.phase === "noKey" &&
@@ -448,29 +563,34 @@ export const testExecutionContext = async (db: DB) => {
       observed.length = 0;
       await dbo.tx!(async (tx, rawTx) => {
         transaction = tx;
+        rawTransaction = rawTx;
+        await rawTx.none(`INSERT INTO ${noKey} VALUES ('raw before invocation in transaction')`);
         await alice.clientMethods.outer!.run(input);
         assert.equal(readExecution(), undefined);
         assert(!observed.some(({ phase }) => phase === "afterCommit"));
-        /* Raw SQL must not inherit the completed invocation's transaction-local audit context. */
+        /* Raw SQL must not inherit the completed invocation's audit context. */
         await rawTx.none(`INSERT INTO ${noKey} (value) VALUES ($1)`, [
           "raw outside invocation in transaction",
         ]);
         await tx[noKey]!.insert({ value: "outside invocation in transaction" });
       });
       transaction = undefined;
+      rawTransaction = undefined;
       const deferred = observed.find(({ phase }) => phase === "afterCommit")!.execution;
       assert.equal(getFunctionInvocation(deferred.invocations[0]).functionName, "outer");
       assert.equal(deferred.user!.id, "alice");
 
       observed.length = 0;
       await assert.rejects(
-        dbo.tx!(async (tx) => {
+        dbo.tx!(async (tx, rawTx) => {
           transaction = tx;
+          rawTransaction = rawTx;
           await alice.clientMethods.outer!.run({ ...input, fail: true });
         }),
         /execution failure/,
       );
       transaction = undefined;
+      rawTransaction = undefined;
       assert(!observed.some(({ phase }) => phase === "afterCommit" || phase === "commit"));
       const rolledBack = observed.find(({ phase }) => phase === "rollback")!.execution;
       assert(
@@ -497,9 +617,21 @@ export const testExecutionContext = async (db: DB) => {
         { id: results[0]!.row.id, value: "updated" },
       ]);
       await created.db[noKey]!.insert!({ value: "no key" });
+      await dbo.tx!(async (_tx, rawTx) => {
+        await rawTx.none(
+          new PreparedStatement({
+            name: "outside-execution",
+            text: `INSERT INTO ${noKey} VALUES ('named outside execution')`,
+          }),
+        );
+      });
       const history = await readHistory();
       assert.equal(history.at(-1)!.execution_context, null);
+      assert(!history.some(({ new_row }) => new_row?.value === "rolled back raw child"));
+      assert(!history.some(({ new_row }) => new_row?.value === "unsupported prepared child"));
       for (const value of [
+        "raw before invocation in transaction",
+        "named outside execution",
         "outside invocation in transaction",
         "raw outside invocation in transaction",
       ]) {
@@ -515,12 +647,63 @@ export const testExecutionContext = async (db: DB) => {
       await created.db[noKey]!.delete!(deleteFilter);
       assert.equal(observed.at(-1)!.phase, "insteadOfDelete");
       assert.equal(readExecution(), undefined);
+      /* Audit metadata must preserve the query prefix used to cancel a blocked query. */
+      const tableLocked = createDeferred<void>();
+      const releaseTable = db.tx(async (tx) => {
+        await tx.none(`LOCK TABLE ${schema}.${noKey} IN ACCESS EXCLUSIVE MODE`);
+        tableLocked.resolve();
+        await tx.any("SELECT pg_sleep(1)");
+      });
+      await tableLocked.promise;
+      try {
+        await assert.rejects(
+          created.db[noKey]!.find!({}, { abortSignal: AbortSignal.timeout(100) }),
+          { message: /Query cancelled by abortSignal/ },
+        );
+      } finally {
+        await releaseTable;
+      }
+      /* JSON metadata preserves arbitrary function names and follows trailing SQL comments. */
+      const escapedExecution = (await alice.clientMethods[
+        escapedFunctionName
+      ]!.run()) as ExecutionContext;
+      assert.deepEqual((await readHistory()).at(-1)!.execution_context, {
+        runId: escapedExecution.runId,
+        invocations: [
+          {
+            type: "function",
+            id: escapedExecution.invocations[0]!.id,
+            functionName: escapedFunctionName,
+          },
+        ],
+      });
+      const { unattributed } = await db.one<{ unattributed: boolean }>(
+        `SELECT execution_context IS NULL AS unattributed FROM ${schema}.${auditTable} WHERE new_row->>'value' = 'named outside execution'`,
+      );
+      assert.equal(unattributed, true);
     } finally {
       await instance?.destroy();
       await other?.destroy();
       await db.none(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     }
   });
+};
+
+/* Audit comments preserve token and end-of-input error positions across query modes. */
+const assertAuditErrorPositions = async (db: DB) => {
+  for (const { text, position } of [
+    { text: "SELECT missing_column, $1::text", position: "8" },
+    { text: "SELECT '雪😀', $1::text +", position: undefined },
+  ]) {
+    const values = ["value"];
+    const formattedQuery = as.format(text, values);
+    await assert.rejects(db.any(formattedQuery), {
+      position: position ?? String([...formattedQuery].length + 1),
+    });
+    await assert.rejects(db.any(new ParameterizedQuery({ text, values })), {
+      position: position ?? String([...text].length + 1),
+    });
+  }
 };
 
 const getFunctionInvocation = (invocation: ExecutionContext["invocations"][number] | undefined) => {

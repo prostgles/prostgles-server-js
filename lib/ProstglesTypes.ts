@@ -363,7 +363,7 @@ export type ProstglesInitOptions<
    * made to the database schema through SQL queries
    */
   tableConfig?: TableConfig;
-  /** Audit committed row changes after bootstrap, before application callbacks run. */
+  /** Audit committed row changes after bootstrap, before application callbacks run. Requires PostgreSQL 14 or later. */
   audit?: SchemaConfigAudit<S>;
 
   /**

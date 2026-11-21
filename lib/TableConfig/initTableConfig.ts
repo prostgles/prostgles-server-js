@@ -14,6 +14,7 @@ import type { DBorTx } from "../Prostgles";
 import { getTableColumns } from "./getColumnSQLDefinitionQuery";
 import type { TableConfigurator } from "./TableConfigurator";
 import { getTableCheckBranches, getTableCheckConstraint } from "./getTableCheck";
+import { CREATE_UUID_OR_NULL_SQL } from "../Audit/getAuditJobIdSQL";
 
 export const initTableConfig = async function (this: TableConfigurator, db: DBorTx = this.db) {
   this.initialising = true;
@@ -280,6 +281,9 @@ export const initTableConfig = async function (this: TableConfigurator, db: DBor
       if (tableColumnDefinition.fullQuery) await runQueries();
     }
 
+    if (this.prostgles.opts.jobs && this.prostgles.opts.audit?.tableName === tableName) {
+      await db.none(`/* ${EXCLUDE_QUERY_FROM_SCHEMA_WATCH_ID} */ ${CREATE_UUID_OR_NULL_SQL}`);
+    }
     const indexQueries = await getIndexesQueries(db, tableName, tableConf);
     queries.push(...indexQueries);
   }

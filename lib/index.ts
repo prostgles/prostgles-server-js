@@ -109,6 +109,7 @@ export default prostgles;
 export type { FileTableInsertRow, FileTableRow } from "./StorageClient/getFileTableConfig";
 export { defineJoin };
 export { defineComputedJoin } from "./DboBuilder/joins/defineComputedJoin";
+export { AUDIT_JOB_JOIN_NAME } from "./Audit/getAuditJoins";
 export {
   AUDIT_TABLE_COLUMN_DEFINITIONS,
   AUDIT_TABLE_COLUMN_NAMES,

@@ -1,4 +1,5 @@
 import type { ExecutionContext } from "./ExecutionContext";
+import { withAuditQueryContext } from "./Audit/withAuditQueryContext";
 import { deferDbQueries } from "./deferDbQueries";
 import type pgPromise from "pg-promise";
 import type pg from "pg-promise/typescript/pg-subset";
@@ -186,6 +187,7 @@ export const initProstgles = async function (
 
     /* 1. Connect to db */
     const { db, pgp } = getDbConnection({
+      withQueryContext: (query) => withAuditQueryContext(this, query),
       onQuery: this.opts.onQuery,
       onConnectionError: this.opts.onConnectionError,
       DEBUG_MODE: this.opts.DEBUG_MODE,

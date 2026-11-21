@@ -5,11 +5,11 @@ import pgPromise from "pg-promise";
 import {
   isObject,
   ROW_ACTIONS_COLUMN,
-  type AnyObject,
   type JobValue,
   type JSONBObjectTypeIfDefined,
 } from "prostgles-types";
 import prostgles, {
+  AUDIT_JOB_JOIN_NAME,
   createJobDefiner,
   createJobControlFunctionDefiner,
   defineFunction,
@@ -167,6 +167,15 @@ export const testBackgroundJobs = async (parentDb: DB) => {
     };
     const definitions: JobsConfig<JobTestSchema> = controlDefinitions;
     const defineJobControl = createJobControlFunctionDefiner<JobTestSchema>()(controlDefinitions);
+    const users = {
+      isLookupTable: {
+        values: { alice: { type: "member" }, bob: { type: "member" }, admin: { type: "admin" } },
+      },
+    };
+    const auth = {
+      getUser: () => undefined,
+      findUser: (filter, dbo) => dbo.users!.findOne!(filter, { select: { id: 1, type: 1 } }),
+    } satisfies NonNullable<ProstglesInitOptions["auth"]>;
     const options: ProstglesInitOptions<JobTestSchema> = {
       dbConnection: getConnectionDetails(db) as unknown as ProstglesInitOptions["dbConnection"],
       transactions: true,
@@ -176,23 +185,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       },
       jobs: { tableName: queueName, definitions },
       tableConfig: {
+        users,
         [queueName]: { columns: { custom_note: "TEXT", output: "JSONB" } },
       },
       joins: [{ tables: [queueName, table], on: [{ user_id: "owner" }] }],
-      auth: {
-        getUser: () => undefined,
-        findUser: (filter) => {
-          const filters: AnyObject[] = "$and" in filter ? filter.$and! : [filter];
-          const id = filters[0]?.id;
-          return (
-              typeof id === "string" &&
-                id !== "deleted" &&
-                filters.every((userFilter) => userFilter.id === id)
-            ) ?
-              { id, type: id === "admin" ? "admin" : "member" }
-            : undefined;
-        },
-      },
+      auth,
       functions: {
         members: {
           userFilter: { id: "alice" },
@@ -335,7 +332,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
       return { row, job: job! };
     };
     try {
-      await t.test("validates jobs after onMount and again on refresh", async () => {
+      await t.test("validates jobs after onMount and again on refresh", async (t) => {
         const validationDatabase = `${database}_validation`;
         await parentDb.none(`CREATE DATABASE ${validationDatabase}`);
         let contextsCreated = 0;
@@ -348,7 +345,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               jobIdColumn: "job_id",
               when: { id: { $gt: 0 } },
             },
-            run: async () => {},
+            run: async ({ dbo, run }) => {
+              await dbo.job_validation_setup!.insert!({ job_id: run.id });
+            },
           }),
         };
         const prgl = new Prostgles({
@@ -357,8 +356,20 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             database: validationDatabase,
           } as unknown as ProstglesInitOptions["dbConnection"],
           onReady: () => {},
-          audit: { tableName: "job_validation_audit", tables: { job_validation_setup: 1 } },
+          audit: {
+            tableName: "job_validation_audit",
+            tables: { job_validation_setup: 1, job_validation_queue: 1 },
+          },
+          auth,
+          publish: ({ user }) => ({
+            job_validation_target: { select: "*", insert: "*" },
+            job_validation_setup: { select: "*" },
+            job_validation_queue: {
+              select: { fields: "*", forcedFilter: { user_id: user?.id } },
+            },
+          }),
           tableConfig: {
+            users,
             job_validation_setup: {
               columns: { id: "serial PRIMARY KEY", job_id: "UUID" },
               constraints: {
@@ -395,6 +406,85 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         try {
           result = await prgl.init(() => {}, { type: "init" });
           assert.equal(contextsCreated, 1);
+          const initialized = result;
+          await t.test(
+            "audit links job executions in both directions and applies job visibility",
+            async () => {
+              const alice = await initialized.getClientDBHandlers({ userId: "alice" }, undefined);
+              const { job_id: jobId } = await alice.clientDb.job_validation_target!.insert!(
+                { id: 1 },
+                { returning: "*" },
+              );
+              assert(typeof jobId === "string");
+              await eventually(
+                async () => (await initialized.jobs.get(jobId))?.status === "succeeded",
+              );
+              const audit = prgl.resolvedAuditConfig;
+              assert(audit);
+              const jobSelect = {
+                job: {
+                  $leftJoin: [{ table: prgl.jobs.tableName, on: AUDIT_JOB_JOIN_NAME }],
+                  select: { id: 1 as const },
+                },
+              };
+              const bob = await initialized.getClientDBHandlers({ userId: "bob" }, undefined);
+              const sourceFilter = { table_name: "job_validation_setup" };
+              const aliceHistory = alice.clientDb[audit.tableName]!;
+              assert.deepEqual(await aliceHistory.find!(sourceFilter, { select: jobSelect }), [
+                { job: [{ id: jobId }] },
+              ]);
+              assert.deepEqual(
+                await bob.clientDb[audit.tableName]!.find!(sourceFilter, { select: jobSelect }),
+                [{ job: [] }],
+              );
+              const reverseJoin = (on: string) => ({
+                $leftJoin: [{ table: audit.tableName, on }],
+                select: { table_name: 1 as const },
+                limit: 1,
+              });
+              const joined = await alice.clientDb.job_validation_queue!.findOne!(
+                { id: jobId },
+                {
+                  select: {
+                    execution: reverseJoin(AUDIT_JOB_JOIN_NAME),
+                    changes: reverseJoin("default"),
+                  },
+                },
+              );
+              assert.deepEqual(joined, {
+                execution: [sourceFilter],
+                changes: [{ table_name: prgl.jobs.tableName }],
+              });
+              for (const { id, invocationId, expectedJobs } of [
+                { id: -1, invocationId: "legacy-id", expectedJobs: [] },
+                { id: -2, invocationId: jobId.replaceAll("-", ""), expectedJobs: [{ id: jobId }] },
+              ]) {
+                await prgl.runWithExecution(
+                  {
+                    runId: randomUUID(),
+                    user: undefined,
+                    clientReq: undefined,
+                    invocations: [
+                      {
+                        type: "function",
+                        id: invocationId,
+                        functionName: "process",
+                        relatedRecords: [],
+                      },
+                    ],
+                  },
+                  () => initialized.db.job_validation_setup!.insert!({ id }),
+                );
+                assert.deepEqual(
+                  await aliceHistory.findOne!(
+                    { ...sourceFilter, new_id: { id } },
+                    { select: jobSelect },
+                  ),
+                  { job: expectedJobs },
+                );
+              }
+            },
+          );
           await prgl.refreshDBO();
           assert.equal(contextsCreated, 2);
           const definition = prgl.opts.jobs!.definitions.process!;

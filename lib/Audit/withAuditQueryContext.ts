@@ -1,12 +1,19 @@
-import { as } from "pg-promise";
 import { pickKeys } from "prostgles-types";
 import type { Prostgles } from "../Prostgles";
 import type { AuditTableRow } from "./AuditTable";
-import { AUDIT_EXECUTION_FIELDS, AUDIT_EXECUTION_SETTING } from "../DboBuilder/sessionSettings";
+import type { PgQueryInput } from "../getDbConnection";
 
-export const getAuditExecutionContextQuery = (prostgles: Prostgles, queryId: string): string => {
-  if (!prostgles.opts.audit) return "";
+export const withAuditQueryContext = (prostgles: Prostgles, query: PgQueryInput): PgQueryInput => {
+  if (!prostgles.opts.audit) return query;
   const execution = prostgles.getExecution();
+  if (typeof query !== "string" && ("submit" in query || query.name)) {
+    if (execution) {
+      throw new Error(
+        "Named prepared statements and custom query objects are not supported within an execution context when audit is enabled",
+      );
+    }
+    return query;
+  }
   const context: AuditTableRow["execution_context"] =
     execution ?
       {
@@ -22,12 +29,8 @@ export const getAuditExecutionContextQuery = (prostgles: Prostgles, queryId: str
         }),
       }
     : null;
-  const auditExecutionSetting =
-    context ?
-      JSON.stringify({
-        [AUDIT_EXECUTION_FIELDS.queryId]: queryId,
-        [AUDIT_EXECUTION_FIELDS.context]: context,
-      })
-    : "";
-  return `SET LOCAL ${as.name(AUDIT_EXECUTION_SETTING)} TO ${as.text(auditExecutionSetting)};`;
+  const comment = `\n${AUDIT_EXECUTION_PREFIX}${JSON.stringify(context)}`;
+  return typeof query === "string" ? query + comment : { ...query, text: query.text + comment };
 };
+
+export const AUDIT_EXECUTION_PREFIX = "-- prostgles execution context: ";

@@ -479,6 +479,6 @@ const withMigrationDatabase = async (
     await run({ db, start });
   } finally {
     await db.$pool.end();
-    await parentDb.none(`DROP DATABASE ${asName(database)} WITH (FORCE)`);
+    await parentDb.none(`DROP DATABASE ${asName(database)}`);
   }
 };

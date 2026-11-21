@@ -2,8 +2,9 @@ import { md5 } from "prostgles-types/dist/md5";
 import type { Prostgles } from "../Prostgles";
 import type { TableConfig, TableDefinition } from "../TableConfig/TableConfigTypes";
 
-import { AUDIT_TABLE_COLUMN_DEFINITIONS } from "./AuditTable";
+import { AUDIT_TABLE_COLUMN_DEFINITIONS, AUDIT_TABLE_COLUMN_NAMES } from "./AuditTable";
 import { getAuditJoins } from "./getAuditJoins";
+import { getAuditJobIdSQL } from "./getAuditJobIdSQL";
 import {
   AUDIT_HISTORY_PROTECTION_PREFIX,
   AUDIT_TRUNCATE_PROTECTION_PREFIX,
@@ -23,6 +24,9 @@ export const getAuditTableConfig = (
   if (tableConfig?.[tableName]) {
     throw new Error("The audit table cannot also be defined in tableConfig");
   }
+  const { created_at, execution_context } = AUDIT_TABLE_COLUMN_NAMES;
+  const newestFirst = `${created_at} DESC NULLS LAST`;
+  const tableHash = md5(tableName);
   return {
     [tableName]: {
       getJoins: (tables) => getAuditJoins(prgl, tables),
@@ -30,11 +34,17 @@ export const getAuditTableConfig = (
       publishRestrictions: { insert: false, update: false, delete: false },
       columns: AUDIT_TABLE_COLUMN_DEFINITIONS,
       indexes: {
-        [`prostgles_audit_source_${md5(tableName)}`]: { columns: "schema_name, table_name, id" },
-        [`prostgles_audit_old_id_${md5(tableName)}`]: {
+        [`prostgles_audit_time_${tableHash}`]: { columns: newestFirst },
+        ...(prgl.opts.jobs && {
+          [`prostgles_audit_job_time_${tableHash}`]: {
+            columns: `${getAuditJobIdSQL(execution_context)}, ${newestFirst}`,
+          },
+        }),
+        [`prostgles_audit_source_${tableHash}`]: { columns: "schema_name, table_name, id" },
+        [`prostgles_audit_old_id_${tableHash}`]: {
           columns: "schema_name, table_name, old_id",
         },
-        [`prostgles_audit_new_id_${md5(tableName)}`]: {
+        [`prostgles_audit_new_id_${tableHash}`]: {
           columns: "schema_name, table_name, new_id",
         },
       },
