@@ -393,6 +393,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 control: createJobControlFunctionDefiner()(validationJobs)({
                   jobName: "process",
                   operation: "startOrRetry",
+                  run: async ({ dbx }) => {
+                    await dbx.job_validation_setup!.insert!({});
+                  },
                 }),
               },
             },
@@ -455,13 +458,21 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 execution: [sourceFilter],
                 changes: [{ table_name: prgl.jobs.tableName }],
               });
-              for (const { id, invocationId, expectedJobs } of [
-                { id: -1, invocationId: "legacy-id", expectedJobs: [] },
-                { id: -2, invocationId: jobId.replaceAll("-", ""), expectedJobs: [{ id: jobId }] },
+              /* Only explicit job IDs identify workers; invocation IDs are not job references. */
+              for (const { id, contextJobId, invocationId, expectedJobs } of [
+                { id: -1, contextJobId: undefined, invocationId: jobId, expectedJobs: [] },
+                { id: -2, contextJobId: "invalid-id", invocationId: jobId, expectedJobs: [] },
+                {
+                  id: -3,
+                  contextJobId: jobId.replaceAll("-", ""),
+                  invocationId: randomUUID(),
+                  expectedJobs: [{ id: jobId }],
+                },
               ]) {
                 await prgl.runWithExecution(
                   {
                     runId: randomUUID(),
+                    jobId: contextJobId,
                     user: undefined,
                     clientReq: undefined,
                     invocations: [
@@ -483,6 +494,22 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                   { job: expectedJobs },
                 );
               }
+              /* Preparation and worker writes both link to the job returned by the control. */
+              await initialized.sql("INSERT INTO job_validation_target (id) VALUES (2)");
+              const controlled = (await alice.clientMethods.control!.run({ row: { id: 2 } })) as {
+                jobId: string;
+              };
+              await eventually(
+                async () => (await initialized.jobs.get(controlled.jobId))?.status === "succeeded",
+              );
+              const controlledWrites = await aliceHistory.find!(
+                { ...sourceFilter, "execution_context->>jobId": controlled.jobId },
+                { select: jobSelect },
+              );
+              assert.deepEqual(controlledWrites, [
+                { job: [{ id: controlled.jobId }] },
+                { job: [{ id: controlled.jobId }] },
+              ]);
             },
           );
           await prgl.refreshDBO();
@@ -1360,6 +1387,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await assert.rejects(preparationJobs.get(started.jobId), /active transaction/);
           assert.equal(controlCallbacks.length, 1);
           const execution = controlCallbacks[0]!;
+          assert.equal(execution.jobId, started.jobId);
           assert.deepEqual(
             execution.invocations.map(({ type }) => type),
             ["function", "jobControl"],
@@ -1373,6 +1401,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(controlHooks.length, 2);
           for (const hookExecution of controlHooks) {
             assert.equal(hookExecution.runId, execution.runId);
+            assert.equal(hookExecution.jobId, started.jobId);
             assert.equal(hookExecution.user?.id, "alice");
             assert.deepEqual(hookExecution.invocations.slice(0, -1), execution.invocations);
             assert.equal(hookExecution.invocations.at(-1)!.type, "trigger");
@@ -1428,6 +1457,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal((await instance!.jobs.get(started.jobId))!.cancel_requested, false);
           const mutationsBeforeCancel = rowMutationCount;
           await cancel(row.id);
+          assert.equal(controlCallbacks.at(-1)!.jobId, started.jobId);
           assert.equal(
             rowMutationCount,
             mutationsBeforeCancel,
@@ -1435,6 +1465,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           );
           await status(started.jobId, "cancelled");
           const retried = await control(row.id);
+          assert.equal(controlCallbacks.at(-1)!.jobId, retried.jobId);
           assert.notEqual(retried.jobId, started.jobId);
           assert.equal((await status(retried.jobId, "running")).reason, "rerun");
           released.add(retried.jobId);
@@ -1442,6 +1473,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await assert.rejects(control(row.id), /not allowed/);
           await assert.rejects(cancel(row.id), /not allowed/);
           const rerun = await control(row.id, "rerun");
+          assert.equal(controlCallbacks.at(-1)!.jobId, rerun.jobId);
           released.add(rerun.jobId);
           await status(rerun.jobId, "succeeded");
           assert.equal(
@@ -2362,6 +2394,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           const defineManualControl = createJobControlFunctionDefiner<JobTestSchema>()({ manual });
           const functions = options.functions!.members!.functions;
           let manualControlJobs: Jobs | undefined;
+          let manualControlJobId: string | undefined;
           functions.startManualJob = defineManualControl({
             jobName: "manual",
             operations: ["startOrRetry", "rerun", "cancel"],
@@ -2370,6 +2403,13 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               assert(["startOrRetry", "rerun", "cancel"].includes(operation));
               assert.equal(job?.job_name ?? "manual", "manual");
               manualControlJobs = jobs;
+              manualControlJobId = getExecution().jobId;
+              if (operation === "startOrRetry" && params.size === 98) {
+                /* The outer control must reject and roll back a conflicting nested start. */
+                assert(manualControlJobId);
+                assert.equal(await jobs.get(manualControlJobId), undefined);
+                assert.notEqual((await jobs.start("manual", params)).jobId, manualControlJobId);
+              }
               if (params.size === -1) {
                 await dbx.records.insert({
                   enabled: false,
@@ -2378,6 +2418,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 throw new Error("Manual preparation rejected");
               }
             },
+          });
+          functions.startManualWithoutPreparation = defineManualControl({
+            jobName: "manual",
+            operation: "startOrRetry",
           });
           functions.rerunManualJob = defineManualControl({
             jobName: "manual",
@@ -2531,8 +2575,25 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             await status(retried.jobId, "succeeded");
             const inheritedParams = await rerunManual({ jobId: retried.jobId });
             assert.equal((await status(inheritedParams.jobId, "succeeded")).params!.size, 60);
+            manual.onConflict = "skip";
+            const countBeforeNestedStart = (await records()).length;
+            await assert.rejects(
+              startManual({ params: { size: 98 } }),
+              /Cannot skip an active job/,
+            );
+            assert.equal((await records()).length, countBeforeNestedStart);
             const running = await startManual({ params: { size: 99 } });
+            assert.equal(manualControlJobId, running.jobId);
             await status(running.jobId, "running");
+            await assert.rejects(startManual(), /Cannot skip an active job/);
+            assert.deepEqual(
+              await alice.clientMethods.startManualWithoutPreparation!.run({}),
+              running,
+            );
+            assert.deepEqual(
+              await instance!.jobs.start("manual", {}, { userId: "alice" }),
+              running,
+            );
             await assert.rejects(
               alice.clientMethods.startManualJob!.run({
                 operation: "cancel",
@@ -2546,6 +2607,8 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               jobId: running.jobId,
             });
             await status(running.jobId, "cancelled");
+            assert.equal(manualControlJobId, running.jobId);
+            delete manual.onConflict;
             const resumed = await startManual({
               jobId: running.jobId,
               params: { size: 70 },
@@ -2577,6 +2640,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           } finally {
             delete definitions.manual;
             delete functions.startManualJob;
+            delete functions.startManualWithoutPreparation;
             delete functions.rerunManualJob;
             delete functions.cancelManualJob;
             await instance!.update(

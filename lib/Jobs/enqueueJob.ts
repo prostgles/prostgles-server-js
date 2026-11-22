@@ -13,6 +13,7 @@ export const enqueueJob = async (
   name: string,
   targetRowPkey: JobRecord["target_row_pkey"],
   options: {
+    jobId?: string;
     userId?: string;
     params?: Record<string, unknown>;
     reason?: "trigger" | "rerun";
@@ -40,11 +41,13 @@ export const enqueueJob = async (
         })),
       };
   if (rowTable && options.reason === "rerun") {
-    // Match row-trigger lock ordering: the target row before the job advisory lock.
+    /* Match row-trigger lock ordering: the target row before the job advisory lock. */
     await rowTable.find(targetRowFilter, { select: "", limit: null, forUpdate: true });
   }
   const setJobId = async (jobId: string) => {
-    if (!rowTable || jobIdColumn === undefined) return { jobId, targetRow: undefined };
+    if (!rowTable || jobIdColumn === undefined) {
+      return { jobId, targetRow: undefined };
+    }
     const targetRow = await rowTable.update(
       targetRowFilter,
       { [jobIdColumn]: jobId },
@@ -52,7 +55,7 @@ export const enqueueJob = async (
     );
     return { jobId, targetRow: targetRow || undefined };
   };
-  // Serialize conflicts for this row without serializing writes to unrelated rows.
+  /* Serialize conflicts for this row without serializing writes to unrelated rows. */
   await transaction.t.one("SELECT pg_advisory_xact_lock(hashtextextended(${advisoryLockKey}, 0))", {
     advisoryLockKey: stableStringify([tableSQL, name, table, targetRowPkey]),
   });
@@ -73,6 +76,9 @@ export const enqueueJob = async (
     { orderBy: { created_at: 1 } },
   );
   if (active && definition.onConflict === "skip") {
+    if (options.jobId && definition.trigger.type !== "manual") {
+      throw new Error("Cannot skip an active job when a job ID is supplied");
+    }
     return setJobId(active.id);
   }
   if (active && definition.onConflict === "replace") {
@@ -91,7 +97,7 @@ export const enqueueJob = async (
       { jobName: name, targetTable: table, targetRowPkey },
     );
   }
-  const jobId = randomUUID();
+  const jobId = options.jobId ?? randomUUID();
   await jobs.insert({
     id: jobId,
     job_name: name,

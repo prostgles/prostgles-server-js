@@ -3,8 +3,10 @@ import { pickKeys, stableStringify } from "prostgles-types";
 import type { AuthClientRequest, SessionUser } from "./Auth/AuthTypes";
 import type { ViewHandler } from "./DboBuilder/ViewHandler/ViewHandler";
 import type { AuditTableRow } from "./Audit/AuditTable";
+import type { Prostgles } from "./Prostgles";
 
-type AuditInvocation = NonNullable<AuditTableRow["execution_context"]>["invocations"][number];
+type AuditExecutionContext = NonNullable<AuditTableRow["execution_context"]>;
+type AuditInvocation = AuditExecutionContext["invocations"][number];
 
 export type FunctionInvocation = Extract<AuditInvocation, { type: "function" }> & {
   relatedRecords: {
@@ -25,13 +27,26 @@ export type JobControlInvocation = Extract<AuditInvocation, { type: "jobControl"
 type Invocation = FunctionInvocation | TriggerInvocation | JobControlInvocation;
 
 /** Correlation metadata only; database authorization still uses the explicit caller. */
-export type ExecutionContext = {
-  runId: string;
+export type ExecutionContext = Omit<AuditExecutionContext, "invocations"> & {
   user: undefined | SessionUser["user"];
   clientReq: undefined | AuthClientRequest;
   /** Invocation ancestry, oldest first. Parallel branches have separate lists. */
   invocations: Invocation[];
 };
+
+export const withPreparedJob = <T>(
+  prostgles: Prostgles,
+  jobId: string,
+  prepare: () => Promise<void>,
+  operation: () => Promise<T>,
+) =>
+  prostgles.runWithExecution(
+    { ...createExecutionContext(prostgles.getExecution()), jobId },
+    async () => {
+      await prepare();
+      return operation();
+    },
+  );
 
 /** Record the row parts available to the hook, including rows without primary keys. */
 export const runTableHook = <T>(

@@ -18,6 +18,7 @@ export const withAuditQueryContext = (prostgles: Prostgles, query: PgQueryInput)
     execution ?
       {
         runId: execution.runId,
+        jobId: execution.jobId,
         invocations: execution.invocations.map((invocation) => {
           if (invocation.type === "function") {
             return pickKeys(invocation, ["type", "id", "functionName"]);

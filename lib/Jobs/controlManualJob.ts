@@ -1,4 +1,6 @@
 import type { DBTableHandlersFromSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
+import { randomUUID } from "node:crypto";
+import { withPreparedJob } from "../ExecutionContext";
 import type { Prostgles } from "../Prostgles";
 import { enqueueJob } from "./enqueueJob";
 import { getJobDefinition } from "./getJobDefinition";
@@ -12,7 +14,7 @@ export const controlManualJob = async <S>(
   name: string,
   options: ManualJobControlOptions<S>,
 ) => {
-  const { jobId, operation } = options;
+  const { jobId, operation, run } = options;
   const transactionJobs = prostgles.jobs.api.withTransaction(transaction.dbx);
   let job: JobRecord | undefined;
   if (jobId !== undefined) {
@@ -39,26 +41,33 @@ export const controlManualJob = async <S>(
         ...job?.params,
         ...options.params,
       });
-  await options.run?.({
-    job,
-    params,
-    dbx: transaction.dbx as unknown as DBTableHandlersFromSchema<S>,
-  });
-  if (operation === "cancel") {
-    if (!job) throw new Error("Job ID is required");
-    await transactionJobs.cancel(job.id);
-    return { jobId: job.id };
-  }
-  const { jobId: startedJobId } = await enqueueJob(
-    prostgles,
-    transaction,
-    name,
-    {},
-    {
-      userId: prostgles.getExecution()?.user?.id,
-      reason: job ? "rerun" : "trigger",
+  const prepare = async () =>
+    run?.({
+      job,
       params,
-    },
-  );
-  return { jobId: startedJobId };
+      dbx: transaction.dbx as unknown as DBTableHandlersFromSchema<S>,
+    });
+  const controlledJobId = operation === "cancel" && job ? job.id : randomUUID();
+  return withPreparedJob(prostgles, controlledJobId, prepare, async () => {
+    if (operation === "cancel") {
+      await transactionJobs.cancel(controlledJobId);
+      return { jobId: controlledJobId };
+    }
+    const { jobId: enqueuedJobId } = await enqueueJob(
+      prostgles,
+      transaction,
+      name,
+      {},
+      {
+        jobId: controlledJobId,
+        userId: prostgles.getExecution()?.user?.id,
+        reason: job ? "rerun" : "trigger",
+        params,
+      },
+    );
+    if (run && enqueuedJobId !== controlledJobId) {
+      throw new Error("Cannot skip an active job after running job preparation");
+    }
+    return { jobId: enqueuedJobId };
+  });
 };

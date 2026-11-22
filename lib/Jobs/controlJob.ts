@@ -1,6 +1,7 @@
 import { pickKeys, stableStringify, type AnyObject } from "prostgles-types";
+import { randomUUID } from "node:crypto";
 import type { DBTableHandlersFromSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
-import { runJobControl } from "../ExecutionContext";
+import { runJobControl, withPreparedJob } from "../ExecutionContext";
 import type { Prostgles } from "../Prostgles";
 import type { AuthClientRequest } from "../Auth/AuthTypes";
 import { runClientRequest } from "../runClientRequest";
@@ -109,25 +110,34 @@ export const controlJob = async <S, Row extends AnyObject>(
       if (!job && options.operation !== "startOrRetry") {
         throw new Error("Job has not started");
       }
-      await options.run?.(row as Row, dbx);
-      if (!(await rowTable.findOne({ $and: [targetRowPkey, { [jobIdColumn]: previousJobId }] }))) {
-        throw new Error("Job control must preserve the target row and job link");
-      }
-      if (options.operation === "cancel") {
-        if (!job) throw new Error("Job has not started");
-        await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(job.id);
-        return { jobId: job.id };
-      }
-      if (!job && !(await matchesJobTriggerCondition(rowTable, targetRowPkey, trigger.when))) {
-        throw new Error("Job row does not satisfy its trigger condition");
-      }
-      const { jobId, targetRow } = await enqueueJob(prostgles, transaction, name, targetRowPkey, {
-        userId: prostgles.getExecution()?.user?.id,
-        reason: job ? "rerun" : "trigger",
-        params: job?.params,
+      const prepare = async () => {
+        await options.run?.(row as Row, dbx);
+        if (
+          !(await rowTable.findOne({
+            $and: [targetRowPkey, { [jobIdColumn]: previousJobId }],
+          }))
+        ) {
+          throw new Error("Job control must preserve the target row and job link");
+        }
+        if (!job && !(await matchesJobTriggerCondition(rowTable, targetRowPkey, trigger.when))) {
+          throw new Error("Job row does not satisfy its trigger condition");
+        }
+      };
+      const jobId = options.operation === "cancel" && job ? job.id : randomUUID();
+      return withPreparedJob(prostgles, jobId, prepare, async () => {
+        if (options.operation === "cancel") {
+          await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(jobId);
+          return { jobId };
+        }
+        const { targetRow } = await enqueueJob(prostgles, transaction, name, targetRowPkey, {
+          jobId,
+          userId: prostgles.getExecution()?.user?.id,
+          reason: job ? "rerun" : "trigger",
+          params: job?.params,
+        });
+        if (!targetRow) throw new Error("Job row is unavailable");
+        return { jobId };
       });
-      if (!targetRow) throw new Error("Job row is unavailable");
-      return { jobId };
     },
   );
 };
