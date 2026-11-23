@@ -1,10 +1,11 @@
 import pgPromise from "pg-promise";
 import type { ColumnInfo, PG_COLUMN_UDT_DATA_TYPE } from "prostgles-types";
-import { asName, includes, isObject, TextFilter_FullTextSearchFilterKeys } from "prostgles-types";
+import { includes, isObject } from "prostgles-types";
 import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
 import { ARRAY_SEARCH } from "./ARRAY_SEARCH";
+import { TS_HEADLINE } from "./TS_HEADLINE";
 import { TS_RANK_CD } from "./TS_RANK_CD";
 import { JSONB_DIFF } from "./JSONB_DIFF";
 import { createFunc } from "./createFunc";
@@ -222,54 +223,6 @@ const JSON_Funcs: FunctionSpec[] = [
       }) satisfies FunctionSpec,
   ),
 ];
-
-const FTS_Funcs: FunctionSpec[] =
-  /* Full text search 
-    https://www.postgresql.org/docs/current/textsearch-dictionaries.html#TEXTSEARCH-SIMPLE-DICTIONARY
-  */
-  [
-    "simple", //  • convert the input token to lower case • exclude stop words
-    // "synonym", // replace word with a synonym
-    "english",
-    // "english_stem",
-    // "english_hunspell",
-    "",
-  ].map((type) => ({
-    name: "$ts_headline" + (type ? "_" + type : ""),
-    description: ` :[column_name <string>, search_term: <string | { to_tsquery: string } > ] -> sha512 hash of the of column content`,
-    type: "function" as const,
-    singleColArg: true,
-    numArgs: 2,
-    getFields: ([column]) => [column],
-    getQuery: ({ args }) => {
-      const col = asName(args[0]);
-      let qVal = args[1],
-        qType = "to_tsquery";
-      const _type = type ? asValue(type) + "," : "";
-
-      const searchTypes = TextFilter_FullTextSearchFilterKeys;
-
-      /* { to_tsquery: 'search term' } */
-      if (isObject(qVal)) {
-        const keys = Object.keys(qVal);
-        const [searchType] = keys;
-        if (searchType === undefined) throw "Bad arg";
-        if (keys.length !== 1 || !searchTypes.includes(searchType as any))
-          throw "Expecting a an object with a single key named one of: " + searchTypes.join(", ");
-        qType = searchType;
-        qVal = asValue(qVal[qType]);
-
-        /* 'search term' */
-      } else if (typeof qVal === "string") {
-        qVal = pgp.as.format(qType + "($1)", [qVal]);
-      } else throw "Bad second arg. Exepcting search string or { to_tsquery: 'search string' }";
-
-      const res = `ts_headline(${_type} ${col}::text, ${qVal}, 'ShortWord=1 ' )`;
-      // console.log(res)
-
-      return res;
-    },
-  }));
 
 let PostGIS_Funcs: FunctionSpec[] = (
   [
@@ -527,7 +480,7 @@ PostGIS_Funcs = PostGIS_Funcs.concat(
 export const FUNCTIONS: FunctionSpec[] = [
   ...HASHING_FUNCTIONS,
 
-  ...FTS_Funcs,
+  TS_HEADLINE,
   TS_RANK_CD,
 
   ...JSON_Funcs,

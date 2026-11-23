@@ -182,15 +182,12 @@ export const getFilterItemCondition = ({
 
         /* FTSQuery */
       } else if (
-        ["@@"].includes(filterOperand) &&
+        filterOperand === "@@" &&
         includes(TextFilter_FullTextSearchFilterKeys, funcName)
       ) {
-        let lq = `to_tsvector(${leftQ}::text)`;
-        if (selItem.columnPGDataType === "tsvector") lq = leftQ;
-
-        const res = `${lq} ${operand} ` + `${funcName}${parseRightVal(funcArgs, "csv")}`;
-
-        return res;
+        const searchVector =
+          selItem.column_udt_type === "tsvector" ? leftQ : `to_tsvector(${leftQ}::text)`;
+        return `${searchVector} ${operand} ${funcName}${parseRightVal(funcArgs, "csv")}`;
       } else {
         throw new Error("Unrecognised filter operand: " + filterOperand + " ");
       }

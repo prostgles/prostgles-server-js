@@ -1134,7 +1134,19 @@ export const isomorphicQueries = async (
           ),
           [{ id: -102, rank: bestRank }],
         );
-        assert.deepEqual(await search('"acoustic fence"'), result);
+        const phrase = `"${searchTerm}"`;
+        assert.deepEqual(await search(phrase), result);
+        /* Phrase filtering must preserve stored word positions even when tsv is omitted. */
+        for (const select of [rankedSelect, { ...rankedSelect, tsv: 1 }] as const) {
+          const matches = await db.various.find(
+            { id: { $in: ids }, tsv: { "@@": { websearch_to_tsquery: ["english", phrase] } } },
+            { select, orderBy },
+          );
+          assert.deepEqual(
+            matches.map(({ id }) => id),
+            [-102, -103],
+          );
+        }
         assert.deepEqual(await search(searchTerm, { queryType: "plainto_tsquery" }), result);
         assert.deepEqual(await search(searchTerm, { queryType: "phraseto_tsquery" }), result);
         assert.deepEqual(await search("acoust & fence", { queryType: "to_tsquery" }), result);
@@ -1215,6 +1227,66 @@ export const isomorphicQueries = async (
       }
     });
 
+    await test("Full-text headlines return matching passages using the selected language and parser", async () => {
+      const id = -107;
+      const filler = "ailleurs ".repeat(30);
+      const document = `${filler}cheval rapide ${filler}rivière ${filler}`.trim();
+      const searchText = '"chevaux rapides" OR rivières';
+      const options = {
+        lang: "pg_catalog.french",
+        minWords: 1,
+        maxWords: 3,
+        startSel: "«",
+        stopSel: "»",
+        fragmentDelimiter: ' | "p", ',
+      };
+      await sql!("INSERT INTO various (id, name) VALUES ($1, $2)", [id, document]);
+      try {
+        const result = await db.various.findOne(
+          { id },
+          {
+            select: {
+              single: {
+                $ts_headline: ["name", searchText, { ...options, maxFragments: 1 }],
+              },
+              multiple: {
+                $ts_headline: ["name", searchText, { ...options, maxFragments: 2 }],
+              },
+              prefix: {
+                $ts_headline: [
+                  "name",
+                  "chev:*",
+                  { ...options, queryType: "to_tsquery", maxFragments: 1 },
+                ],
+              },
+            },
+          },
+        );
+        assert.ok(result?.single && result.multiple);
+        assert.ok(result.prefix?.includes("«cheval»"));
+        assert.ok(result.single.includes("«cheval» «rapide»"));
+        assert.ok(!result.single.includes("rivière"));
+        const [firstPassage, secondPassage] = result.multiple.split(options.fragmentDelimiter);
+        assert.equal(firstPassage, result.single);
+        assert.ok(secondPassage?.includes("«rivière»"));
+        assert.ok(result.multiple.length < document.length);
+
+        for (const args of [
+          ["name", {}],
+          ["name", searchText, { queryType: "lower" }],
+          ["name", searchText, { lang: 1 }],
+          ["name", searchText, { maxFragments: "two" }],
+          ["missing_column", searchText],
+        ]) {
+          await assert.rejects(() =>
+            db.various.findOne({ id }, { select: { passage: { $ts_headline: args } } }),
+          );
+        }
+      } finally {
+        await db.various.delete({ id });
+      }
+    });
+
     /**
      * TODO -> ADD ALL FILTER TYPES
      */
@@ -1228,7 +1300,7 @@ export const isomorphicQueries = async (
         { "name.@@.to_tsquery": ["abc81"] },
         {
           select: {
-            h: { $ts_headline_simple: ["name", { plainto_tsquery: "abc81" }] },
+            h: { $ts_headline: ["name", "abc81", { lang: "simple" }] },
             hh: { $ts_headline: ["name", "abc81"] },
             added: "$year" as "$max",
             addedY: { $date: ["added"] },
@@ -1241,7 +1313,7 @@ export const isomorphicQueries = async (
         {
           //@ts-expect-error
           select: {
-            h: { $ts_headline_simple: ["name", { plainto_tsquery: "abc81" }] },
+            h: { $ts_headline: ["name", "abc81", { lang: "simple" }] },
             hh: { $ts_headline: ["name", "abc81"] },
             added: "$year" as "$max",
             addedY: { $date: ["added"] },
