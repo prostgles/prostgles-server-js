@@ -1,9 +1,9 @@
 import type { JoinPath, RawJoinPath } from "prostgles-types";
 import { reverseJoinOn } from "prostgles-types";
 import type { ViewHandler } from "./ViewHandler";
-import type { JoinInfo, LocalParams } from "../DboBuilder";
+import type { LocalParams } from "../DboBuilder";
 import type { ParsedComputedJoin } from "../joins/computedJoins";
-import { resolveComputedJoin } from "../joins/computedJoins";
+import { parseComputedJoin } from "../joins/computedJoins";
 import { getQuerySourceSQL, type QuerySource } from "../QueryBuilder/getQuerySource";
 import { prepareWhere } from "./prepareWhere";
 
@@ -13,7 +13,7 @@ type parseJoinPathArgs = {
   ancestorTables?: string[];
   viewHandler: ViewHandler;
   localParams: LocalParams | undefined;
-  allowMultiOrJoin?: boolean;
+  allowMultiOrJoin?: boolean | "explicit";
   addShortestJoinIfMissing?: boolean;
 };
 export type ParsedJoinPath = {
@@ -23,76 +23,41 @@ export type ParsedJoinPath = {
   /** The target uses its own query source; intermediate sources are resolved here. */
   source: QuerySource | undefined;
 };
-type ColumnJoinPath = { table: string; on?: Record<string, string>[] };
 
 /**
  * Return a valid join path
  */
-export const parseJoinPath = async ({
+export const resolveJoinPath = ({
   rawPath,
   rootTable,
   ancestorTables = [],
   viewHandler,
-  localParams,
   allowMultiOrJoin = false,
   addShortestJoinIfMissing,
-}: parseJoinPathArgs): Promise<ParsedJoinPath[]> => {
+}: Omit<parseJoinPathArgs, "localParams">): ParsedJoinPath[] => {
   const result: ParsedJoinPath[] = [];
-  let cleanPath = typeof rawPath === "string" ? [{ table: rawPath }] : rawPath;
-  if (addShortestJoinIfMissing && cleanPath[0] !== "**") {
-    cleanPath = ["**", ...cleanPath];
-  }
-  cleanPath.forEach((item, i) => {
-    const prevTable = result.at(-1)?.table ?? rootTable;
-    if (!prevTable) throw `prevTable missing`;
-
-    const pushJoinPath = (targetPath: JoinPath) => {
-      const computedJoin = resolveComputedJoin(viewHandler, prevTable, targetPath);
-      if (computedJoin) {
-        result.push({ table: targetPath.table, on: [], computedJoin, source: undefined });
-        return;
-      }
-      const getShortestJoin = i === 1 && cleanPath[0] === "**";
-      const joinInfo = getJoins(
-        viewHandler,
-        prevTable,
-        [
-          {
-            table: targetPath.table,
-            on: typeof targetPath.on === "string" ? undefined : targetPath.on,
-          },
-        ],
-        {
-          allowMultiOrJoin,
-          getShortestJoin,
-        },
-      );
-
-      joinInfo.paths.forEach((path) => {
-        /** Check if join tables are valid */
-        if (!viewHandler.dboBuilder.dboMap.get(path.table)) {
-          throw {
-            stack: ["prepareExistCondition()"],
-            message: `Invalid or disallowed table in join path: ${path.table}`,
-          };
-        }
-        result.push({
-          table: path.table,
-          on: path.on.map((constraint) => Object.fromEntries(constraint)),
-          source: undefined,
-        });
-      });
-    };
-
-    /** Shortest join */
-    if (item === "**") {
-    } else if (typeof item === "string") {
-      const table = item;
-      pushJoinPath({ table });
-    } else {
-      pushJoinPath(item);
+  const appendJoin = (step: JoinPath, allowShortestPath: boolean) => {
+    const source = result.at(-1)?.table ?? rootTable;
+    const directJoin = getDirectJoin(viewHandler, source, step, allowMultiOrJoin);
+    if (directJoin) {
+      result.push(directJoin);
+      return;
     }
-  });
+    const shortest =
+      allowShortestPath &&
+      viewHandler.joinPaths.find(({ t1, t2 }) => t1 === source && t2 === step.table);
+    if (!shortest) throw new Error(`Joining ${source} to ${step.table} is disallowed or missing`);
+    for (const table of shortest.path.slice(1)) {
+      appendJoin(table === step.table ? step : { table }, false);
+    }
+  };
+  const steps = typeof rawPath === "string" ? [rawPath] : rawPath;
+  for (const [index, step] of steps.entries()) {
+    if (step === "**") continue;
+    const allowShortestPath =
+      (index === 0 && !!addShortestJoinIfMissing) || (index === 1 && steps[0] === "**");
+    appendJoin(typeof step === "string" ? { table: step } : step, allowShortestPath);
+  }
 
   if (result.length > 1 || ancestorTables.length) {
     const blockedTable = [...ancestorTables, rootTable, ...result.map((path) => path.table)].find(
@@ -109,6 +74,12 @@ export const parseJoinPath = async ({
     throw `Missing join on condition for: ${missingPath.table}`;
   }
 
+  return result;
+};
+
+export const parseJoinPath = async (args: parseJoinPathArgs): Promise<ParsedJoinPath[]> => {
+  const { viewHandler, localParams } = args;
+  const result = resolveJoinPath(args);
   for (const part of result.slice(0, -1)) {
     const table = viewHandler.dboBuilder.dboMap.get(part.table);
     if (!table) throw new Error(`Join table not found: ${part.table}`);
@@ -154,98 +125,62 @@ export const getJoinPathColumns = (path: ParsedJoinPath | undefined) => ({
     : (path?.on.flatMap((columnPair) => Object.values(columnPair)) ?? []),
 });
 
-type Opts = {
-  allowMultiOrJoin?: boolean;
-  getShortestJoin?: boolean;
-};
-
-/**
- * Returns all tables and fields required to join from source table to target table
- * Respecting the path.on condition
- */
-const getJoins = (
+const getDirectJoin = (
   viewHandler: ViewHandler,
   source: string,
-  path: ColumnJoinPath[],
-  { allowMultiOrJoin = true, getShortestJoin }: Opts = {},
-): JoinInfo => {
-  const [lastItem] = path;
-  if (!lastItem) {
-    throw `Empty path`;
+  step: JoinPath,
+  allowMultiOrJoin: boolean | "explicit",
+): ParsedJoinPath | undefined => {
+  const { table, on } = step;
+  const joins = getJoinsBetween(viewHandler, source, table);
+  const candidates =
+    on === undefined ? joins : (
+      joins.filter((join) => ("$joinName" in join ? join.$joinName === on : Array.isArray(on)))
+    );
+  const [join] = candidates;
+  if (candidates.length > 1) {
+    throw new Error(`Multiple joins between ${source} and ${table}. Specify on in joinPath.`);
   }
-  if (getShortestJoin && path.length !== 1) {
-    throw `getShortestJoin requires exactly 1 path item`;
+  if (join && "$joinName" in join) {
+    return {
+      table,
+      on: [],
+      computedJoin: parseComputedJoin(join, source, step),
+      source: undefined,
+    };
   }
-  const target = lastItem.table;
-
-  /* Find the join path between tables */
-  const actualPath =
-    getShortestJoin ?
-      viewHandler.joinPaths
-        .find((j) => {
-          return j.t1 === source && j.t2 === target;
-        })
-        ?.path.map((table) => ({ table, on: undefined }))
-        .slice(1)
-    : (
-      viewHandler.joinPaths.find((j) => {
-        return j.path.join() === [{ table: source }, ...path].map((p) => p.table).join();
-      })
-    ) ?
-      path
-    : undefined;
-
-  const lastPath = actualPath?.at(-1);
-  if (getShortestJoin && lastPath && lastItem.on?.length) {
-    lastPath.on = lastItem.on;
+  if (typeof on === "string") {
+    throw new Error(`Unknown computed join: ${source} -> ${table} (${on})`);
+  }
+  if (step.params !== undefined) throw new Error("Join params require a computed join");
+  if (step.reversed !== undefined) throw new Error("Join reversed requires a computed self-join");
+  if (!join) return;
+  if (!viewHandler.dboBuilder.dboMap.has(table)) {
+    throw new Error(`Invalid or disallowed table in join path: ${table}`);
   }
 
-  if (!actualPath) {
-    throw `Joining ${source} <-...-> ${target} disallowed or missing`;
+  const possible = join.tables[0] === source ? join.on : reverseJoinOn(join.on);
+  const constraints = getValidOn(on, possible);
+  if (constraints.length > 1 && (!allowMultiOrJoin || (allowMultiOrJoin === "explicit" && !on))) {
+    throw new Error(
+      `Table ${source} can join to ${table} through multiple constraints. Specify on in joinPath.`,
+    );
   }
-
-  /* Make the join chain info */
-  const paths: JoinInfo["paths"] = [];
-  actualPath.forEach((tablePath, i, arr) => {
-    const prevTable = arr[i - 1];
-    if (i && !prevTable) throw new Error("Previous join table is missing");
-    const t1 = prevTable ? prevTable.table : source;
-
-    /* Get join options */
-    const join = viewHandler.joins.find(({ tables: [left, right] }) => {
-      return (
-        (left === t1 && right === tablePath.table) || (right === t1 && left === tablePath.table)
-      );
-    });
-    if (!join) {
-      throw `Joining ${t1} <-> ${tablePath.table} disallowed or missing`;
-    }
-    const isLtr = join.tables[0] === t1;
-    const joinOn = isLtr ? join.on : reverseJoinOn(join.on);
-
-    const on = getValidOn(tablePath.on, joinOn);
-    paths.push({
-      source,
-      target,
-      table: tablePath.table,
-      on,
-    });
-  });
-  const expectOne = false;
-
-  const isMultiOrJoin = paths.find((p) => p.on.length > 1);
-  if (!allowMultiOrJoin && isMultiOrJoin) {
-    throw `Table ${JSON.stringify(source)} can join to ${JSON.stringify(target)} through multiple constraints. Must chose one of ${JSON.stringify(isMultiOrJoin.on)}`;
-  }
-  return {
-    paths,
-    expectOne,
-  };
+  return { table, on: constraints.map((constraint) => ({ ...constraint })), source: undefined };
 };
 
-const getValidOn = (requested: ColumnJoinPath["on"], possible: ParsedJoinPath["on"]) => {
+export const getJoinsBetween = (viewHandler: ViewHandler, source: string, target: string) =>
+  [...viewHandler.joins, ...viewHandler.dboBuilder.computedJoins].filter(
+    ({ tables: [left, right] }) =>
+      (left === source && right === target) || (right === source && left === target),
+  );
+
+const getValidOn = (
+  requested: ParsedJoinPath["on"] | undefined,
+  possible: ParsedJoinPath["on"],
+) => {
   if (!requested) {
-    return possible.map((v) => Object.entries(v));
+    return possible;
   }
   if (!requested.length) {
     throw `Invalid requested "tablePath.on". Cannot be empty`;
@@ -260,7 +195,7 @@ const getValidOn = (requested: ColumnJoinPath["on"], possible: ParsedJoinPath["o
     throw `Invalid path specified for join: ${JSON.stringify(requested)}. Allowed paths: ${JSON.stringify(possible)}`;
   }
 
-  return requested.map((v) => Object.entries(v));
+  return requested;
 };
 
 const conditionsMatch = (c1: Record<string, string>, c2: Record<string, string>) => {

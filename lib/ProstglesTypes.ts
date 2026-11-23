@@ -4,6 +4,7 @@ import type {
   FileColumnConfig,
   JSONB,
   MaybePromise,
+  RawJoinPath,
 } from "prostgles-types";
 import type {
   AuthConfig,
@@ -89,6 +90,15 @@ export type FileTableConfig = {
   };
 
   /**
+   * Tables containing derived file content. Only select access is inherited.
+   * A name requires one unambiguous direct join to the file or revision table.
+   * Explicit paths run from the derived table to the file or revision table.
+   * Specify on for each hop with multiple join constraints.
+   * Source content permissions are required; explicit publish rules can only narrow access.
+   */
+  derivedTables?: (string | { tableName: string; joinPath: RawJoinPath })[];
+
+  /**
    * Specifying referencedTables with referenceColumns allows restricting the
    * allowed file types that can be inserted and referenced in the specified tables.
    */
@@ -108,6 +118,7 @@ export type FileTableConfig = {
 };
 
 export type ComputedJoin = {
+  /** Set joinPath.on to this name when another join connects the same table pair. */
   $joinName: string;
   /** Object schema for request params. Undeclared parameters are rejected. */
   $params?: JSONB.ObjectType["type"];

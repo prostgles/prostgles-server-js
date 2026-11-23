@@ -14,8 +14,8 @@ import type {
   UnrestrictedFunctionContext,
 } from "./defineServerFunction";
 import { getFileTableRules } from "./getFileTableRules";
-import { getFileVersionTableRules } from "./getFileVersionTableRules";
-import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
+import { getFileDerivedTableRules } from "./getFileDerivedTableRules";
+import { getFileDerivedTables, type FileDerivedTable } from "./getFileDerivedTables";
 import { getPublishedObjectFromResult } from "./getPublishedObjectFromResult";
 import { getSchemaFromPublish } from "./getSchemaFromPublish";
 import { getParsedPublishTable } from "./getParsedPublishTable";
@@ -43,6 +43,7 @@ export class PublishParser {
   dbo: DBHandlerServerInternal;
   /** Schema generation must use the same metadata snapshot as these handlers. */
   readonly tablesOrViews: TableSchema[];
+  readonly fileDerivedTables: FileDerivedTable[];
   db: DB;
   prostgles: Prostgles;
 
@@ -59,6 +60,7 @@ export class PublishParser {
     this.dbo = dbo;
     this.db = db;
     this.tablesOrViews = prostgles.dboBuilder.tablesOrViews ?? [];
+    this.fileDerivedTables = getFileDerivedTables(prostgles);
     this.parsedPublish = getParsedPublish(publish, this.tablesOrViews, dbo);
   }
 
@@ -336,9 +338,10 @@ export class PublishParser {
     }
     const audit = this.prostgles.resolvedAuditConfig;
     const isAuditTable = audit?.tableName === tableName;
+    const derivedTable = this.fileDerivedTables.find((table) => table.tableName === tableName);
     const resolvedPublishObject =
       overriddenPublish ??
-      (isAuditTable && clientReq ?
+      ((isAuditTable || derivedTable || tableHandler.is_media) && clientReq ?
         await this.getPublishObjectForUser(clientReq, clientInfo)
       : undefined);
     const publishRulesExcludingInferredTables = await this.getParsedPublishTable({
@@ -349,7 +352,6 @@ export class PublishParser {
       isInferred: false,
     });
     let tableRules = publishRulesExcludingInferredTables;
-    const fileConfig = this.prostgles.opts.fileTable;
     if (audit && isAuditTable) {
       tableRules = await getAuditTableRules.bind(this)(
         audit,
@@ -359,14 +361,14 @@ export class PublishParser {
         scope,
         resolvedPublishObject,
       );
-    } else if (isFileVersionTable(fileConfig, tableName)) {
-      tableRules = await getFileVersionTableRules.bind(this)(
-        fileConfig,
+    } else if (derivedTable) {
+      tableRules = await getFileDerivedTableRules.bind(this)(
+        derivedTable,
         publishRulesExcludingInferredTables,
         clientReq,
         clientInfo,
         scope,
-        overriddenPublish,
+        resolvedPublishObject,
       );
     } else if (tableHandler.is_media) {
       const { rules: fileTableRules } = await getFileTableRules.bind(this)(
@@ -375,7 +377,7 @@ export class PublishParser {
         clientReq,
         clientInfo,
         scope,
-        overriddenPublish,
+        resolvedPublishObject,
       );
       tableRules = fileTableRules;
     }

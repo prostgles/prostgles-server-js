@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { FileTableConfig } from "../ProstglesTypes";
 import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { PublishParser } from "./PublishParser";
-import { getFileVersionTableRules } from "./getFileVersionTableRules";
+import { getFileDerivedTableRules } from "./getFileDerivedTableRules";
 
 void test("file version rules inherit fields and restrictive select options", async () => {
   const fileColumns = ["id", "updated", "metadata"];
@@ -27,9 +26,14 @@ void test("file version rules inherit fields and restrictive select options", as
     }),
   } as unknown as PublishParser;
 
-  const rules = await getFileVersionTableRules.call(
+  const rules = await getFileDerivedTableRules.call(
     parser,
-    { tableName: "files", versioning: {} } as FileTableConfig,
+    {
+      tableName: "files_versions",
+      sourceTableName: "files",
+      joinPath: [{ table: "files", on: [{ file_id: "id" }] }],
+      isVersion: true,
+    },
     {
       select: {
         fields: "*",

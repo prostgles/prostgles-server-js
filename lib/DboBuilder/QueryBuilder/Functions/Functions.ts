@@ -5,6 +5,7 @@ import { asNameAlias } from "../../../utils/asNameAlias";
 import { HASHING_FUNCTIONS } from "./HASHING_FUNCTIONS";
 import { TEXT_FUNCTIONS } from "./TEXT_FUNCTIONS";
 import { ARRAY_SEARCH } from "./ARRAY_SEARCH";
+import { TS_RANK_CD } from "./TS_RANK_CD";
 import { JSONB_DIFF } from "./JSONB_DIFF";
 import { createFunc } from "./createFunc";
 import { asFunction, getAggregateQuery } from "./utils";
@@ -527,6 +528,7 @@ export const FUNCTIONS: FunctionSpec[] = [
   ...HASHING_FUNCTIONS,
 
   ...FTS_Funcs,
+  TS_RANK_CD,
 
   ...JSON_Funcs,
 

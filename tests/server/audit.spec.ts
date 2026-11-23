@@ -215,7 +215,7 @@ export async function testAudit(parentDb: DB) {
             // Generated types must retain the selected audit column type through a computed join.
             const joined = await db.audit_test_source.find({}, {
               select: { a: 1, history: {
-                $leftJoin: [{ table: "audit_events", on: "default" }],
+                $leftJoin: [{ table: "audit_events" }],
                 select: { operation: 1 },
               } },
             });
@@ -784,15 +784,15 @@ export async function testAudit(parentDb: DB) {
         );
         await source.insert!({ a: 3, b: "one" });
         // Audit joins advertise and enforce the multi-hop restriction in both directions.
-        const historyPath = [{ table: auditName, on: "default" }];
+        const historyPath = [auditName];
         const auditJoins = sourceClient.clientSchema.joins.filter((join) =>
           join.tables.includes(auditName),
         );
         assert(auditJoins.length);
         assert(auditJoins.every((join) => !join.supportsMultiHop));
         for (const [handler, path] of [
-          [clientSource, [...historyPath, { table: "audit_test_source", on: "default" }]],
-          [clientAudit, [{ table: "audit_test_source", on: "default" }, ...historyPath]],
+          [clientSource, [...historyPath, "audit_test_source"]],
+          [clientAudit, ["audit_test_source", ...historyPath]],
         ] as const) {
           await assert.rejects(
             () =>
@@ -841,7 +841,7 @@ export async function testAudit(parentDb: DB) {
         // Reverse audit joins must also work in filters, CASE expressions and filtered aggregates.
         const matchingSource = {
           $existsJoined: {
-            path: [{ table: "audit_test_source", on: "default" }],
+            path: ["audit_test_source"],
             filter: { a: 3 },
           },
         };

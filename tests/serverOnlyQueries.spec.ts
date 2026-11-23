@@ -29,6 +29,7 @@ import { testConflictUpdates } from "./server/conflictUpdates.spec";
 import { testNestedInserts } from "./server/nestedInserts.spec";
 import { testSubscriptionNotifications } from "./server/subscriptionNotifications.spec";
 import type { DBGeneratedSchema } from "./DBGeneratedSchema";
+import { testQueryCancellation } from "./server/queryCancellation.spec";
 
 export const serverOnlyQueries = async (
   db: DBHandlerServerInternal,
@@ -36,6 +37,7 @@ export const serverOnlyQueries = async (
   withUserRLS: typeof WithUserRLS,
 ) => {
   await describe("Server Only Queries", async () => {
+    await testQueryCancellation(db, pgDb);
     await testTableConfigValidation(pgDb);
     await testExecutionContext(pgDb);
     await testTableHookRecursion(pgDb);

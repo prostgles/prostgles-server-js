@@ -5,7 +5,6 @@ import { parseFieldFilter } from "../DboBuilder/ViewHandler/parseFieldFilter";
 import type { PublishParser } from "./PublishParser";
 import type { ParsedPublishTable, PublishObject, UpdateRule } from "./publishTypesAndUtils";
 import type { LocalParams } from "../DboBuilder/DboBuilder";
-import { isFileVersionTable } from "../StorageClient/fileVersionUtils";
 import { getSelectRules, hasSelectRules, mergeSelectRules } from "./mergeSelectRules";
 import { withExistsTableRules } from "../DboBuilder/ViewHandler/getExistsCondition";
 
@@ -35,7 +34,7 @@ export async function getFileTableRules(
       (t) =>
         !t.is_view &&
         t.name !== fileTableName &&
-        !isFileVersionTable(this.prostgles.opts.fileTable, t.name),
+        !this.fileDerivedTables.some((table) => table.tableName === t.name),
     )
     .map((t) => {
       const refCols = t.columns.filter((c) =>

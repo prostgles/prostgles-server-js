@@ -1,7 +1,6 @@
 import { asName, getJSONBObjectSchemaValidationError, isDefined, isObject } from "prostgles-types";
 import type { ColumnJoin, ComputedJoin, Join } from "../../ProstglesTypes";
 import type { DboBuilder } from "../DboBuilder";
-import type { ViewHandler } from "../ViewHandler/ViewHandler";
 import type { JoinPath } from "prostgles-types";
 import { sortedArraysMatch } from "../../utils/utils";
 import { asValue } from "../../PubSubManager/PubSubManagerUtils";
@@ -66,38 +65,11 @@ export const prepareComputedJoins = (dboBuilder: DboBuilder, joins: Join[]): Col
   });
 };
 
-export const resolveComputedJoin = (
-  viewHandler: ViewHandler,
+export const parseComputedJoin = (
+  definition: ComputedJoinDefinition,
   source: string,
   path: JoinPath,
-): ParsedComputedJoin | undefined => {
-  if (Array.isArray(path.on)) {
-    if (path.params !== undefined) throw new Error("Join params require a computed join");
-    if (path.reversed !== undefined) throw new Error("Join reversed requires a computed self-join");
-    return;
-  }
-  const candidates = viewHandler.dboBuilder.computedJoins.filter((join) =>
-    sortedArraysMatch(join.tables, [source, path.table]),
-  );
-  if (
-    path.on === undefined &&
-    (!candidates.length ||
-      viewHandler.joins.some((join) => sortedArraysMatch(join.tables, [source, path.table])))
-  ) {
-    if (path.params !== undefined) throw new Error("Join params require a computed join");
-    if (path.reversed !== undefined) throw new Error("Join reversed requires a computed self-join");
-    return;
-  }
-  const definition =
-    path.on !== undefined ?
-      candidates.find((join) => join.$joinName === path.on)
-    : (candidates.find((join) => join.$joinName === "default") ??
-      (candidates.length === 1 ? candidates[0] : undefined));
-  if (!definition) {
-    throw new Error(
-      `Unknown or ambiguous computed join: ${source} -> ${path.table} (${path.on ?? "default"})`,
-    );
-  }
+): ParsedComputedJoin => {
   if (
     path.reversed !== undefined &&
     (source !== path.table || typeof path.reversed !== "boolean")

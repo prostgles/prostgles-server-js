@@ -322,7 +322,15 @@ export type ExistsFilterConfig = {
    */
   targetTableFilter: Filter;
   targetTableColumns: string[];
+  /**
+   * Subscriptions watch these tables unconditionally because changes to permissions or
+   * nested EXISTS matches can affect the result even when the outer join rows stay the same.
+   */
   rowPermissionTables?: string[];
+  /**
+   * The target, any intermediate join tables, and rowPermissionTables.
+   * Enclosing EXISTS filters and permission rules inherit these dependencies.
+   */
   dependencyTables?: string[];
 } & (
   | {

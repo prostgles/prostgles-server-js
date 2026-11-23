@@ -21,8 +21,12 @@ export async function count(
   try {
     const result = await this.find(
       filter,
-      { select: selectParamsWithoutLimit.select ?? "", limit: 0 },
-      undefined,
+      {
+        select: selectParamsWithoutLimit.select ?? "",
+        limit: 0,
+        abortSignal: selectParams?.abortSignal,
+      },
+      param3,
       table_rules,
       localParams,
     ).then(async (_allowed) => {

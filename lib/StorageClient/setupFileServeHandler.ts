@@ -1,12 +1,13 @@
 import type e from "express";
 import * as fs from "fs";
 import { join } from "path";
+import { pickKeys } from "prostgles-types";
 import { HTTP_FAIL_CODES, removeExpressRoute } from "../Auth/AuthHandler";
 import type { DB } from "../initProstgles";
 import type { Prostgles } from "../Prostgles";
 import type { FileTableConfig } from "../ProstglesTypes";
 import { runClientRequest } from "../runClientRequest";
-import type { FileVersionTableRow } from "./fileTableDefinitions";
+import { FILE_CONTENT_SELECT, FILE_LOOKUP_FIELDS } from "./fileTableDefinitions";
 import { getFileVersionTableName } from "./fileVersionUtils";
 import { getFileStorageKey } from "./getFileStorageKey";
 import type { FileTableRow } from "./getFileTableConfig";
@@ -55,22 +56,16 @@ export const setupFileServeHandler = (
         throw "File version requested but versioning is not enabled";
       }
 
-      const select = {
-        id: 1,
-        storage_key: 1,
-        signed_url: 1,
-        signed_url_expires: 1,
-        content_type: 1,
-      } satisfies
-        Partial<Record<keyof FileTableRow, 1>> | Partial<Record<keyof FileVersionTableRow, 1>>;
-
       const file = (await runClientRequest.bind(prg)(
         {
           command: "findOne",
           tableName: version === undefined ? fileTableName : getFileVersionTableName(config),
-          param1: version === undefined ? { id } : { file_id: id, version },
+          param1: pickKeys(
+            { id, file_id: id, version },
+            version === undefined ? FILE_LOOKUP_FIELDS.file : FILE_LOOKUP_FIELDS.revision,
+          ),
           param2: {
-            select,
+            select: FILE_CONTENT_SELECT,
           },
           param3: undefined,
         },
@@ -79,7 +74,7 @@ export const setupFileServeHandler = (
           httpReq: req,
         },
         undefined,
-      )) as Pick<FileTableRow, keyof typeof select> | undefined;
+      )) as Pick<FileTableRow, keyof typeof FILE_CONTENT_SELECT> | undefined;
 
       if (!file) {
         res

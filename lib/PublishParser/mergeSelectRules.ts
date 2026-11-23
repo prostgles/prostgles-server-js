@@ -13,6 +13,7 @@ type MergedSelectRule = SelectRule & {
 export const mergeSelectRules = (
   table: ViewHandler,
   rules: SelectRule[],
+  requiredFields: string[] = [],
 ): SelectRule | undefined => {
   if (!rules.length) return;
   const parsedRules = rules.map((rule) => {
@@ -73,12 +74,21 @@ export const mergeSelectRules = (
         grants.every((grant) => grant.fields.includes(column)) ||
         grants.some((grant) => !grant.condition && grant.fields.includes(column)),
     );
+    const getFieldGrantCondition = (field: string) =>
+      orConditions(grants.filter((grant) => grant.fields.includes(field)));
     const columns = table.column_names.map(
       (column) =>
-        `CASE WHEN ${orConditions(grants.filter((grant) => grant.fields.includes(column)))} THEN ${asName(column)} END AS ${asName(column)}`,
+        `CASE WHEN ${getFieldGrantCondition(column)} THEN ${asName(column)} END AS ${asName(column)}`,
     );
+    /* Derived content needs every required field granted on the same source row. */
+    const rowConditions = new Set([
+      orConditions(grants),
+      ...requiredFields.map(getFieldGrantCondition),
+    ]);
+    const rowCondition = Array.from(rowConditions, (condition) => `(${condition})`).join(" AND ");
     const getExpression = (condition = "", suffix = "") =>
-      `(SELECT ${columns.join(", ")} FROM ${table.escapedName} WHERE (${orConditions(grants)})${condition ? ` AND (${condition})` : ""}${suffix} OFFSET 0)`;
+      `(SELECT ${columns.join(", ")} FROM ${table.escapedName} WHERE ${rowCondition}${condition ? ` AND (${condition})` : ""}${suffix} OFFSET 0)`;
+
     const rowPermissionTables = [
       ...new Set([
         table.name,
@@ -94,7 +104,7 @@ export const mergeSelectRules = (
       rowPermissionTables,
       getOptimizedExpression: (query) => {
         const { condition, suffix } = getSelectRulePushdown(table, query, params, (field) => ({
-          condition: orConditions(grants.filter((grant) => grant.fields.includes(field))),
+          condition: getFieldGrantCondition(field),
           alwaysVisible: grants.every((grant) => grant.fields.includes(field)),
         }));
         return getExpression(condition, suffix);

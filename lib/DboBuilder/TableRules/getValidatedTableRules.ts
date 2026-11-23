@@ -66,19 +66,11 @@ export function getValidatedTableRules(
     if (tableRules.select) {
       if (!tableRules.select.fields) return throwFieldsErr("select");
 
-      let maxLimit: number | null = null;
-      if (
-        !localParams?.bypassLimit &&
-        tableRules.select.maxLimit !== undefined &&
-        tableRules.select.maxLimit !== maxLimit
-      ) {
-        const ml = tableRules.select.maxLimit;
-        if (!Number.isInteger(ml) || ml < 0)
-          throw (
-            ` Invalid publish.${this.name}.select.maxLimit -> expecting   a positive integer OR null    but got ` +
-            ml
-          );
-        maxLimit = ml;
+      const maxLimit = tableRules.select.maxLimit ?? null;
+      if (maxLimit !== null && (!Number.isInteger(maxLimit) || maxLimit < 1)) {
+        throw new Error(
+          `publish.${this.name}.select.maxLimit must be a positive integer or null, got ${maxLimit}`,
+        );
       }
 
       const fields = this.parseFieldFilter(tableRules.select.fields);
@@ -91,7 +83,7 @@ export function getValidatedTableRules(
           : fields,
         forcedFilter: { ...tableRules.select.forcedFilter },
         filterFields: this.parseFieldFilter(tableRules.select.filterFields),
-        maxLimit,
+        maxLimit: localParams?.bypassLimit ? null : maxLimit,
         syncConfig: this.dboBuilder.prostgles.tableConfigurator?.getTableSyncConfig(this.name),
       };
     }

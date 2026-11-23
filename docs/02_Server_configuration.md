@@ -158,7 +158,7 @@
   made to the database schema through SQL queries
 - **audit** <span style="color: grey">optional</span> <span style="color: green;">SchemaConfigAudit</span>
 
-  Audit committed row changes after bootstrap, before application callbacks run.
+  Audit committed row changes after bootstrap, before application callbacks run. Requires PostgreSQL 14 or later.
 - **tableConfigMigrations** <span style="color: grey">optional</span> <span style="color: green;">TableConfigMigrations</span>
 
   Migration logic used when the new tableConfig version is higher than the one in the database.

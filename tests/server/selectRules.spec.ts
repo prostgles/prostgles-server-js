@@ -801,6 +801,7 @@ export const testSelectRules = async (db: DB) => {
         });
         const client = await instance.getClientDBHandlers(clientRequest, undefined);
         await assert.rejects(() => client.clientDb.members!.find!({}, { limit: 2 }));
+        assert.deepEqual(await client.clientDb.members!.find!({}, { limit: 0 }), []);
         assert.deepEqual(await client.clientDb.members!.find!({}, { limit: 1, orderBy: "id" }), [
           { id: 1, username: "own" },
         ]);
@@ -842,6 +843,7 @@ export const testSelectRules = async (db: DB) => {
         }
         for (const invalidSelect of [
           [{ fields: ["missing"] }],
+          [{ fields: ["id"], maxLimit: 0 }],
           [{ fields: ["id"], maxLimit: -1 }],
           [{ fields: ["id"], filterFields: ["email"] }],
         ]) {

@@ -15,6 +15,7 @@ import {
   type AnyObject,
   type CaseSelect,
   type ComplexFilter,
+  type OrderBy,
   type SQLHandler,
 } from "prostgles-types";
 import type { DBHandlerServer } from "./server/serverTypes";
@@ -1066,6 +1067,151 @@ export const isomorphicQueries = async (
         );
       } finally {
         await db.items.delete({ id });
+      }
+    });
+
+    await test("PostgreSQL full-text ranking uses stored vectors with filtering, ordering and limits", async () => {
+      const ids = [-102, -103, -104, -105, -106];
+      const searchTerm = "acoustic fence";
+      const rank = { $ts_rank_cd: ["tsv", searchTerm] };
+      const rankedSelect = { id: 1, rank } as const;
+      const orderBy = { rank: -1, id: -1 } satisfies OrderBy<typeof rankedSelect>;
+      const search = (query = searchTerm, options: unknown = {}) =>
+        db.various.findOne(
+          { id: -102 },
+          { select: { rank: { $ts_rank_cd: ["tsv", query, options] } } },
+        );
+      await sql!(
+        `INSERT INTO various (id, name, tsv)
+         SELECT id, 'Unrelated title', to_tsvector('english', page_text)
+         FROM (VALUES
+           (-102, 'Acoustic fences prevent noise.'),
+           (-103, 'ACOUSTIC FENCES prevent noise.'),
+           (-104, 'acoustic barrier with a fence'),
+           (-105, 'transport survey 2.4m'),
+           (-106, NULL)
+         ) AS pages(id, page_text)`,
+      );
+      try {
+        const result = await search();
+        assert(result && typeof result.rank === "number");
+        const bestRank = result.rank;
+        assert(bestRank > 0);
+        assert.deepEqual(await db.various.findOne({ id: -102 }, { select: { rank } }), result);
+        const rankedRows = await db.various.find(
+          {
+            id: { $in: ids },
+            tsv: { "@@": { websearch_to_tsquery: ["english", searchTerm] } },
+          },
+          {
+            select: rankedSelect,
+            orderBy,
+            limit: 3,
+          },
+        );
+        const distantRow = await db.various.findOne({ id: -104 }, { select: { rank } });
+        assert(distantRow?.rank && distantRow.rank < bestRank);
+        assert.deepEqual(rankedRows, [
+          { id: -102, rank: bestRank },
+          { id: -103, rank: bestRank },
+          { id: -104, rank: distantRow.rank },
+        ]);
+        assert.equal(
+          await db.various.count({
+            id: { $in: ids },
+            $filter: [rank, ">", (bestRank + distantRow.rank) / 2],
+          }),
+          2,
+        );
+        assert.deepEqual(
+          await db.various.find(
+            { id: { $in: ids }, tsv: { "@@": { websearch_to_tsquery: ["english", searchTerm] } } },
+            {
+              select: rankedSelect,
+              orderBy,
+              limit: 1,
+            },
+          ),
+          [{ id: -102, rank: bestRank }],
+        );
+        assert.deepEqual(await search('"acoustic fence"'), result);
+        assert.deepEqual(await search(searchTerm, { queryType: "plainto_tsquery" }), result);
+        assert.deepEqual(await search(searchTerm, { queryType: "phraseto_tsquery" }), result);
+        assert.deepEqual(await search("acoust & fence", { queryType: "to_tsquery" }), result);
+        assert.deepEqual(await search(searchTerm, { config: "simple" }), { rank: 0 });
+        const normalized = await search(searchTerm, { normalization: 32 });
+        assert(normalized && typeof normalized.rank === "number");
+        assert(Math.abs(normalized.rank - bestRank / (bestRank + 1)) < 1e-7);
+        assert.deepEqual(await db.various.findOne({ id: -106 }, { select: { rank } }), {
+          rank: null,
+        });
+        assert.deepEqual(await db.various.findOne({ id: -105 }, { select: { rank } }), {
+          rank: 0,
+        });
+        assert.deepEqual(
+          await db.various.findOne(
+            { id: -105 },
+            { select: { rank: { $ts_rank_cd: ["tsv", '"acoustic fence" OR 2.4m'] } } },
+          ),
+          { rank: bestRank },
+        );
+        /* PostgreSQL ranking does not replace @@, particularly for negated terms. */
+        const excludedQuery = "acoustic -fence";
+        assert.deepEqual(await search(excludedQuery), result);
+        assert.equal(
+          await db.various.count({
+            id: { $in: ids },
+            tsv: { "@@": { websearch_to_tsquery: ["english", excludedQuery] } },
+          }),
+          0,
+        );
+        for (const query of ["missing", "the and", "unfindable'); SELECT 1; --"]) {
+          assert.deepEqual(await search(query), { rank: 0 });
+        }
+        for (const args of [
+          [],
+          ["tsv"],
+          [null, searchTerm],
+          ["tsv", 42],
+          ["tsv", [searchTerm]],
+          ["tsv", ""],
+          ["tsv", "   "],
+          ["name", searchTerm],
+          ["h", searchTerm],
+          ["tsv", searchTerm, {}, "extra"],
+          ...[
+            { normalization: -1 },
+            { normalization: 1.5 },
+            { normalization: 64 },
+            { queryType: "lower" },
+            { config: 42 },
+            { config: "english'); SELECT 1; --" },
+            { unknownOption: true },
+            null,
+            [],
+          ].map((options) => ["tsv", searchTerm, options]),
+        ]) {
+          await assert.rejects(() =>
+            db.various.findOne({ id: -102 }, { select: { rank: { $ts_rank_cd: args } } }),
+          );
+        }
+        await assert.rejects(
+          () =>
+            db.various.findOne(
+              { id: -102 },
+              { select: { rank: { $ts_rank_cd: ["missing_column", searchTerm] } } },
+            ),
+          (error: unknown) => isObject(error) && String(error.message).includes("disallowed"),
+        );
+        if (!isServer) {
+          await assert.rejects(
+            () =>
+              db.items4.findOne({}, { select: { rank: { $ts_rank_cd: ["name", searchTerm] } } }),
+            (error: unknown) => isObject(error) && String(error.message).includes("disallowed"),
+          );
+        }
+      } finally {
+        await db.various.delete({ id: { $in: ids } });
       }
     });
 

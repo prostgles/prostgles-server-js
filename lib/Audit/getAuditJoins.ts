@@ -7,6 +7,7 @@ import { AUDIT_TABLE_COLUMN_NAMES } from "./AuditTable";
 import { getAuditJobIdSQL } from "./getAuditJobIdSQL";
 
 export const AUDIT_JOB_JOIN_NAME = "executed_by_job";
+export const AUDIT_ROW_JOIN_NAME = "audited_row";
 
 export const getAuditJoins = (prostgles: Prostgles, tables: TableSchema[]): Join[] => {
   const audit = parseAuditConfig(prostgles, tables);
@@ -19,7 +20,7 @@ export const getAuditJoins = (prostgles: Prostgles, tables: TableSchema[]): Join
       tables: [audit.tableName, tableName],
       on: [
         {
-          $joinName: "default",
+          $joinName: AUDIT_ROW_JOIN_NAME,
           $sql: ({ left, right }) => {
             const rowPkeyJsonb = `jsonb_build_object(${idColumns
               .flatMap((column) => [as.text(column), right(column)])

@@ -4,6 +4,7 @@ import type { DB } from "../../initProstgles";
 export const getAdminClient = async (db: DB, onDbDropped?: () => void) => {
   const adminClient = new pg.Pool({
     ...getConnectionDetails(db),
+    max: 1,
     application_name: "prostgles-admin-client",
     keepAlive: true,
   });

@@ -10,6 +10,7 @@ import {
 } from "prostgles-types";
 import prostgles, {
   AUDIT_JOB_JOIN_NAME,
+  AUDIT_ROW_JOIN_NAME,
   createJobDefiner,
   createJobControlFunctionDefiner,
   defineFunction,
@@ -450,7 +451,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 {
                   select: {
                     execution: reverseJoin(AUDIT_JOB_JOIN_NAME),
-                    changes: reverseJoin("default"),
+                    changes: reverseJoin(AUDIT_ROW_JOIN_NAME),
                   },
                 },
               );

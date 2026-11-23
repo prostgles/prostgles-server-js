@@ -136,9 +136,7 @@ export class ViewHandler {
         `No active query found with abortSignalId ${abortSignalId}. Ensure that the query was initiated with the correct abortSignalId.`,
       );
     }
-    this.abortRequests.add(abortSignalKeys.abortSignalKey);
     abortableQuery.abort();
-    this.abortRequests.delete(abortSignalKeys.abortSignalKey);
   };
 
   activeQueries = new Map<
@@ -151,7 +149,6 @@ export class ViewHandler {
       socketId: string | undefined;
     }
   >();
-  abortRequests = new Set<string>();
 
   _log = ({
     command,

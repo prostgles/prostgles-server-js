@@ -58,7 +58,6 @@ export const find = async function (
     if (tableRules) {
       if (!tableRules.select) throw "select rules missing for " + this.name;
       const fields = tableRules.select.fields;
-      const maxLimit = tableRules.select.maxLimit;
 
       if (
         <any>tableRules.select !== "*" &&
@@ -69,11 +68,6 @@ export const find = async function (
       }
       if (!fields) {
         throw ` invalid ${this.name}.select rule -> fields (required) setting missing.\nExpecting any of: "*" | { col_name: false } | { col1: true, col2: true }`;
-      }
-      if (maxLimit && !Number.isInteger(maxLimit)) {
-        throw (
-          ` invalid publish.${this.name}.select.maxLimit -> expecting integer but got ` + maxLimit
-        );
       }
     }
 

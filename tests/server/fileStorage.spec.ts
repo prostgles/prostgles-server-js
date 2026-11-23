@@ -15,8 +15,10 @@ import { setupFileServeHandler } from "prostgles-server/dist/StorageClient/setup
 import { getFileStorageKey } from "prostgles-server/dist/StorageClient/getFileStorageKey";
 import { deleteUnreferencedFile } from "prostgles-server/dist/StorageClient/deleteUnreferencedFile";
 import type { PublishObject } from "prostgles-server/dist/PublishParser/PublishParser";
+import { testFileDerivedTables } from "./fileDerivedTables.spec";
 
 export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
+  await testFileDerivedTables(db);
   await test("Managed storage permission and transaction safety", async (t) => {
     const files = dbo.files as TableHandler;
     const config = files.dboBuilder.prostgles.opts.fileTable!;

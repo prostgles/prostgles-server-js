@@ -986,6 +986,8 @@ export const testJoins = async (db: DB) => {
   });
 
   await test("computed joins support params, subscriptions, pagination and publish rules", async (context) => {
+    /* A user-defined join named "default" must still be selected explicitly when ambiguous. */
+    const eventOwnerJoin = "default";
     // Cover plain views, quoted schema names and views built on other views.
     const nestedEventView = '"computed_join.views".nested_event_view';
     const viewPairs = [
@@ -1082,7 +1084,7 @@ export const testJoins = async (db: DB) => {
           override: true,
           on: [
             {
-              $joinName: "default",
+              $joinName: "negative_label",
               $sql: ({ left, right }) =>
                 `${left("id")} = ${right("member_id")} AND ${right("id")} < 0`,
             },
@@ -1097,7 +1099,7 @@ export const testJoins = async (db: DB) => {
             tables,
             on: [
               {
-                $joinName: "default",
+                $joinName: "by_owner",
                 $sql: ({ left, right }) => `${left("id")}::text = ${right("owner")} ->> 'id'`,
               },
             ],
@@ -1116,7 +1118,7 @@ export const testJoins = async (db: DB) => {
                 tables: ["events", "members"],
                 on: [
                   {
-                    $joinName: "default",
+                    $joinName: eventOwnerJoin,
                     $sql: ({ left, right }) =>
                       `${left("table_name")} = 'members' AND ${left("owner")} ->> 'id' = ${right("id")}::text`,
                   },
@@ -1130,7 +1132,10 @@ export const testJoins = async (db: DB) => {
     });
     try {
       const members = instance.db.members!;
-      const historyPath = [{ table: "events", on: "default" }];
+      const historyPath = [{ table: "events", on: eventOwnerJoin }];
+      await assert.rejects(() => members.find!({}, { select: { events: "*" } }), {
+        message: /Multiple joins.*Specify on/,
+      });
       const withinPath = [{ table: "events", on: "within", params: { distance: -1 } }];
       const selfPath = [{ table: "members", on: "next_member", params: { step: 1 } }];
       const reversedSelfPath = reverseParsedPath(selfPath, "members");
@@ -1407,7 +1412,7 @@ export const testJoins = async (db: DB) => {
             {
               select: {
                 history: {
-                  $leftJoin: [{ table: "events", on: "default", params: { distance: 1 } }],
+                  $leftJoin: [{ table: "events", on: eventOwnerJoin, params: { distance: 1 } }],
                   select: "*",
                 },
               },
@@ -1447,7 +1452,7 @@ export const testJoins = async (db: DB) => {
         }),
         [],
       );
-      // A default computed override must replace the inferred foreign-key condition.
+      /* The sole computed join overrides the inferred foreign key. */
       assert.deepEqual(
         await members.find!(
           { id: 1 },
@@ -1600,7 +1605,7 @@ export const testJoins = async (db: DB) => {
         ),
         { history: [{ label: "private" }] },
       );
-      // Existence filters must support both the default join and a named reverse join.
+      /* Existence filters support named joins in both directions. */
       assert.deepEqual(
         await members.find!(
           {
@@ -1628,7 +1633,7 @@ export const testJoins = async (db: DB) => {
               select: { events: { $leftJoin: [{ table: "events", on: "missing" }], select: "*" } },
             },
           ),
-        { message: /Unknown or ambiguous computed join/ },
+        { message: /Unknown computed join/ },
       );
       await assert.rejects(() => instance.db.events!.find!({}, { select: { labels: "*" } }));
 
@@ -2178,17 +2183,17 @@ export const testJoins = async (db: DB) => {
       // Expose serializable join names and param schemas only for published tables.
       assert.deepEqual(client.clientSchema.joins.map((join) => join.on).sort(), [
         "before",
-        "default",
+        eventOwnerJoin,
         "masked_bound",
         "next_member",
         "within",
       ]);
       const withinJoin = client.clientSchema.joins.find((join) => join.on === "within")!;
       assert.deepEqual(
-        client.clientSchema.joins.find((join) => join.on === "default"),
+        client.clientSchema.joins.find((join) => join.on === eventOwnerJoin),
         {
           tables: ["events", "members"],
-          on: "default",
+          on: eventOwnerJoin,
           supportsMultiHop: true,
         } satisfies ClientJoin,
       );
@@ -2298,8 +2303,8 @@ export const testJoins = async (db: DB) => {
       const aliasedClient = await instance.getClientDBHandlers(clientRequest, undefined);
       for (const [rootTable, path, expectedId] of [
         ["members", nextHistoryPath, 4],
-        ["events", [{ table: "members", on: "default" }, ...selfPath], 2],
-        ["members", [...historyPath, { table: "members", on: "default" }], 1],
+        ["events", [{ table: "members", on: eventOwnerJoin }, ...selfPath], 2],
+        ["members", [...historyPath, { table: "members", on: eventOwnerJoin }], 1],
       ] as const) {
         assert.deepEqual(
           await aliasedClient.clientDb[rootTable]!.find!(
@@ -2347,7 +2352,7 @@ export const testJoins = async (db: DB) => {
           { table: "members", path: nextHistoryPath },
           {
             table: "events",
-            path: [{ table: "members", on: "default" }, { table: "member_links" }],
+            path: [{ table: "members", on: eventOwnerJoin }, { table: "member_links" }],
           },
           { table: "member_links", path: [{ table: "members" }, ...selfPath] },
           { table: "members", path: [{ table: "member_links" }, { table: "members" }] },
@@ -2417,7 +2422,7 @@ export const testJoins = async (db: DB) => {
         clientMembers.find!(
           {},
           {
-            select: { events: "*" },
+            select: { history: { $leftJoin: historyPath, select: "*" } },
           },
         ),
       );

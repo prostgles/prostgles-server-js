@@ -229,9 +229,7 @@ export type SelectRule<Cols extends AnyObject = AnyObject, S extends DBSchema | 
    */
   orderByFields?: FieldFilter<Cols>;
 
-  /**
-   * The maximum number of rows a user can get in a select query. null by default. Unless a null or higher limit is specified 100 rows will be returned by the default
-   */
+  /** Maximum rows allowed per select query. Must be a positive integer. Null or omitted means no published cap. */
   maxLimit?: number | null;
 
   /**

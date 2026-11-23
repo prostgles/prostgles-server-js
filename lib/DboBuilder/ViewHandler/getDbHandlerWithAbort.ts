@@ -1,24 +1,22 @@
 import type { DB } from "../../initProstgles";
 import { QUERY_ID_PREFIX, type LocalParams } from "../DboBuilder";
 import type { ViewHandler } from "./ViewHandler";
-import type pgPromise from "pg-promise";
 import { getServerSideUserId } from "../../Auth/utils/serverSideRequest";
 import type { Prostgles } from "../../Prostgles";
-import { isObject } from "prostgles-types";
+import { fromEntries, isObject } from "prostgles-types";
 
 type Params = { abortSignal: AbortSignal | undefined; abortSignalId: string | undefined };
+const METHODS = ["any", "one", "many", "manyOrNone", "none", "oneOrNone"] as const;
+type QueryHandler = Pick<DB, (typeof METHODS)[number]>;
+const QUERY_CANCELLED_CODE = "57014";
 
 export const getDbHandlerWithAbort = (
   viewHandler: ViewHandler,
   localParams: LocalParams | undefined,
   params: Params,
-): Pick<DB | pgPromise.ITask<{}>, "any" | "one" | "many" | "manyOrNone" | "none" | "oneOrNone"> => {
+): QueryHandler => {
   if (params.abortSignal && params.abortSignalId) {
     throw new Error("Cannot provide both abortSignal and abortSignalId");
-  }
-
-  if (params.abortSignal?.aborted) {
-    throw new Error("Query aborted before execution");
   }
 
   if (params.abortSignal !== undefined && !(params.abortSignal instanceof AbortSignal)) {
@@ -29,7 +27,7 @@ export const getDbHandlerWithAbort = (
   const defaultTimeoutMs = clientReq ? 7_000 : 120_000;
   const abortSignal = params.abortSignal ?? AbortSignal.timeout(defaultTimeoutMs);
   const { prostgles } = viewHandler.dboBuilder;
-  const handler = viewHandler.getTransaction(localParams)?.t ?? viewHandler.db;
+  const transaction = viewHandler.getTransaction(localParams)?.t;
   const { adminClient } = prostgles;
   if (!adminClient) {
     throw new Error(
@@ -45,93 +43,100 @@ export const getDbHandlerWithAbort = (
     );
   }
 
-  const withAbortQuery = <Args extends unknown[], R extends Promise<any>>(
-    func: (query: string, ...args: Args) => R,
-  ) => {
-    return (query: string, ...args: Args) => {
+  const withAbortQuery = (method: keyof QueryHandler) => {
+    return async (query: string, ...args: unknown[]) => {
+      if (abortSignal.aborted) throw new Error("Query aborted before execution");
       const queryIdPrefix = query.split("\n", 1)[0];
 
-      const queryHasIdPrefix = queryIdPrefix?.startsWith(QUERY_ID_PREFIX);
-      if (!queryIdPrefix || !queryHasIdPrefix) {
+      if (!queryIdPrefix?.startsWith(QUERY_ID_PREFIX)) {
         throw new Error(
           "Query does not have a prostgles query id prefix. Ensure that the query is generated using prostgles methods that include the query id.",
         );
       }
 
-      let abortErrorMessage: string | undefined;
+      const start = Date.now();
+      const logAbort = (error: unknown) =>
+        viewHandler._log({
+          data: { query, abortSignalId: signalKeys.abortSignalId },
+          command: "abort",
+          localParams,
+          duration: Date.now() - start,
+          error,
+        });
+      let abortError: Error | undefined;
+      let rejectCheckout: ((error: Error) => void) | undefined;
       const abort = () => {
+        if (abortError) return;
         const abortReason: unknown = abortSignal.reason;
         const reasonMessage =
           abortReason instanceof Error ? abortReason.message
           : typeof abortReason === "string" ? abortReason
           : "";
-        abortErrorMessage ??=
+        const message =
           !abortSignal.aborted ? "Query cancelled by client abort request"
           : params.abortSignal ?
             `Query cancelled by abortSignal${reasonMessage ? `: ${reasonMessage}` : ""}`
           : `Query cancelled because the default ${clientReq ? "client" : "server"} query timeout of ${defaultTimeoutMs}ms was exceeded`;
-        void viewHandler._log({
-          data: { query, abortSignalId: signalKeys.abortSignalId },
-          command: "abort",
-          localParams,
-          duration:
-            Date.now() - (viewHandler.activeQueries.get(abortSignalKey)?.start ?? Date.now()),
-          error: new Error(abortErrorMessage),
-        });
-        /** Only terminate if there is exactly one matching query with a query id prefix */
-
-        viewHandler.abortRequests.delete(abortSignalKey);
+        abortError = Object.assign(new Error(message), { code: QUERY_CANCELLED_CODE });
+        void logAbort(abortError);
+        if (rejectCheckout) {
+          rejectCheckout(abortError);
+          return;
+        }
         void adminClient
           .query(
-            `
-            SELECT pg_cancel_backend(pid), * 
-            FROM pg_stat_activity 
-            WHERE query LIKE $1 AND pid <> pg_backend_pid()
-            `,
-            [`${queryIdPrefix}%`],
+            `SELECT pg_cancel_backend((
+               SELECT pid FROM pg_stat_activity
+               WHERE datname = current_database()
+               AND backend_type = 'client backend'
+               AND state = 'active'
+               AND starts_with(query, $1)
+             ))`,
+            [queryIdPrefix + "\n"],
           )
-          .catch((_err) => {
-            // ignore error
-          });
+          .catch((error: unknown) =>
+            logAbort(new Error("Failed to cancel query", { cause: error })),
+          );
       };
-
-      if (viewHandler.abortRequests.has(abortSignalKey)) {
-        viewHandler.abortRequests.delete(abortSignalKey);
-        throw new Error("Abort already requested");
-      }
 
       const sid = prostgles.authHandler.getSIDNoError(clientReq);
       viewHandler.activeQueries.set(abortSignalKey, {
         query,
-        start: Date.now(),
+        start,
         sid,
         abort,
         socketId: localParams?.clientReq?.socket?.id,
       });
       abortSignal.addEventListener("abort", abort);
-      return func(query, ...args)
-        .catch((error: unknown) => {
-          if (abortErrorMessage && isObject(error) && error.code === "57014") {
-            error.message = abortErrorMessage;
-          }
-          throw error;
-        })
-        .finally(() => {
-          abortSignal.removeEventListener("abort", abort);
-          viewHandler.activeQueries.delete(abortSignalKey);
-          viewHandler.abortRequests.delete(abortSignalKey);
+      try {
+        if (transaction) {
+          return await transaction[method](query, ...args);
+        }
+        const cancelledDuringCheckout = new Promise<never>((_, reject) => {
+          rejectCheckout = reject;
         });
+        const result = viewHandler.db.task((connection) => {
+          rejectCheckout = undefined;
+          /* A cancelled checkout still drains through the pool. Skip its SQL. */
+          if (abortError) {
+            return Promise.reject(abortError);
+          }
+          return connection[method](query, ...args);
+        });
+        return await Promise.race([result, cancelledDuringCheckout]);
+      } catch (error) {
+        if (abortError && isObject(error) && error.code === QUERY_CANCELLED_CODE) {
+          error.message = abortError.message;
+        }
+        throw error;
+      } finally {
+        abortSignal.removeEventListener("abort", abort);
+        viewHandler.activeQueries.delete(abortSignalKey);
+      }
     };
   };
 
-  return {
-    manyOrNone: withAbortQuery(handler.manyOrNone.bind(handler)),
-    one: withAbortQuery(handler.one.bind(handler)),
-    oneOrNone: withAbortQuery(handler.oneOrNone.bind(handler)),
-    any: withAbortQuery(handler.any.bind(handler)),
-    none: withAbortQuery(handler.none.bind(handler)),
-    many: withAbortQuery(handler.many.bind(handler)),
-  };
+  return fromEntries(METHODS.map((method) => [method, withAbortQuery(method)]));
 };
 
 export const getAbortSignalKeys = (

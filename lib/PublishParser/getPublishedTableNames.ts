@@ -1,7 +1,6 @@
 import { isObject } from "prostgles-types";
 import type { PublishParser } from "./PublishParser";
 import { type PublishObject } from "./PublishParser";
-import { getFileVersionTableName, isFileVersionTable } from "../StorageClient/fileVersionUtils";
 import { TX_KEY } from "../DboBuilder/dboBuilderUtils";
 
 export const getPublishedTableNames = (
@@ -15,6 +14,7 @@ export const getPublishedTableNames = (
     );
   }
   const tableNames = Object.keys(publishObject);
+  const { fileDerivedTables } = publishParserInstance;
 
   /**
    * Add file table to the list of published tables if it's referenced by other published tables.
@@ -28,7 +28,7 @@ export const getPublishedTableNames = (
   ) {
     const isReferenced = publishParserInstance.prostgles.dboBuilder.tablesOrViews?.some(
       (t) =>
-        !isFileVersionTable(publishParserInstance.prostgles.opts.fileTable, t.name) &&
+        !fileDerivedTables.some((table) => table.tableName === t.name) &&
         t.columns.some((c) => c.references?.some((r) => r.ftable === fileTableName)),
     );
     if (isReferenced) {
@@ -36,11 +36,9 @@ export const getPublishedTableNames = (
     }
   }
 
-  const fileConfig = publishParserInstance.prostgles.opts.fileTable;
-  if (fileConfig?.versioning && tableNames.includes(fileConfig.tableName)) {
-    const versionTableName = getFileVersionTableName(fileConfig);
-    if (!tableNames.includes(versionTableName)) {
-      tableNames.unshift(versionTableName);
+  if (fileTableName && tableNames.includes(fileTableName)) {
+    for (const { tableName } of fileDerivedTables) {
+      if (!tableNames.includes(tableName)) tableNames.unshift(tableName);
     }
   }
 

@@ -465,6 +465,15 @@ export const testSubscriptionNotifications = async (db: DB, dbo: DBHandlerServer
           },
         );
 
+        /* Let the poller finish earlier writes before registering the recovery listeners. */
+        await waitFor(
+          async () =>
+            !(await db.oneOrNone(
+              "SELECT 1 FROM prostgles.data_notifications WHERE app_id = $1 LIMIT 1",
+              [server.appId],
+            )),
+          "Previous subscription notifications did not drain",
+        );
         await client.db[tableName]!.subscribe!(
           {},
           {
@@ -540,7 +549,7 @@ export const testSubscriptionNotifications = async (db: DB, dbo: DBHandlerServer
   );
 };
 
-const waitFor = async (
+export const waitFor = async (
   condition: () => boolean | Promise<boolean>,
   message: string,
   timeout = 3000,

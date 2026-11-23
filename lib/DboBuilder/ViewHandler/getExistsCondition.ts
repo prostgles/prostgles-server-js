@@ -68,15 +68,18 @@ export async function getExistsCondition(
   const { source: targetSource, where: finalWhere } = whereOpts;
   eConfig.targetTableColumns = whereOpts.columnsUsed;
   eConfig.rowPermissionTables = [
-    ...(targetSource.rowPermissionTables ?? []),
-    ...(eConfig.isJoined ?
-      eConfig.parsedPath.flatMap((part) => part.source?.rowPermissionTables ?? [])
-    : []),
+    ...new Set([
+      ...(targetSource.rowPermissionTables ?? []),
+      ...(eConfig.isJoined ?
+        eConfig.parsedPath.flatMap((part) => part.source?.rowPermissionTables ?? [])
+      : []),
+      /* Nested filters can change while every row on the outer join path stays the same. */
+      ...whereOpts.exists.flatMap((filter) => filter.dependencyTables ?? []),
+    ]),
   ];
   eConfig.dependencyTables = [
     ...(eConfig.isJoined ? eConfig.parsedPath.map(({ table }) => table) : [targetTable]),
     ...eConfig.rowPermissionTables,
-    ...whereOpts.exists.flatMap((filter) => filter.dependencyTables ?? []),
   ];
 
   let innerQuery = [
