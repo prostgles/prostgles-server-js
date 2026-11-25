@@ -36,12 +36,12 @@ export type ExecutionContext = Omit<AuditExecutionContext, "invocations"> & {
 
 export const withPreparedJob = <T>(
   prostgles: Prostgles,
-  jobId: string,
+  job: { id: string; name: string },
   prepare: () => Promise<void>,
   operation: () => Promise<T>,
 ) =>
   prostgles.runWithExecution(
-    { ...createExecutionContext(prostgles.getExecution()), jobId },
+    { ...createExecutionContext(prostgles.getExecution()), job },
     async () => {
       await prepare();
       return operation();

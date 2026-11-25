@@ -124,7 +124,7 @@ export const controlJob = async <S, Row extends AnyObject>(
         }
       };
       const jobId = options.operation === "cancel" && job ? job.id : randomUUID();
-      return withPreparedJob(prostgles, jobId, prepare, async () => {
+      return withPreparedJob(prostgles, { id: jobId, name }, prepare, async () => {
         if (options.operation === "cancel") {
           await prostgles.jobs.api.withTransaction(transaction.dbx).cancel(jobId);
           return { jobId };

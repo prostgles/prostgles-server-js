@@ -1,10 +1,10 @@
 import type { AuditTableRow } from "./AuditTable";
 
 const UUID_OR_NULL = "prostgles.uuid_or_null";
-const jobIdKey = "jobId" satisfies keyof NonNullable<AuditTableRow["execution_context"]>;
+const jobKey = "job" satisfies keyof NonNullable<AuditTableRow["execution_context"]>;
 
 export const getAuditJobIdSQL = (executionContext: string) =>
-  `${UUID_OR_NULL}(${executionContext}->>'${jobIdKey}')`;
+  `${UUID_OR_NULL}(${executionContext}->'${jobKey}'->>'id')`;
 
 export const CREATE_UUID_OR_NULL_SQL = `
   CREATE OR REPLACE FUNCTION ${UUID_OR_NULL}(value text) RETURNS pg_catalog.uuid

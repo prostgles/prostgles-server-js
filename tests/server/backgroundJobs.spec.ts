@@ -473,7 +473,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 await prgl.runWithExecution(
                   {
                     runId: randomUUID(),
-                    jobId: contextJobId,
+                    job: contextJobId ? { id: contextJobId, name: "process" } : undefined,
                     user: undefined,
                     clientReq: undefined,
                     invocations: [
@@ -497,19 +497,20 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               }
               /* Preparation and worker writes both link to the job returned by the control. */
               await initialized.sql("INSERT INTO job_validation_target (id) VALUES (2)");
-              const controlled = (await alice.clientMethods.control!.run({ row: { id: 2 } })) as {
+              const controlledId = (await alice.clientMethods.control!.run({ row: { id: 2 } })) as {
                 jobId: string;
               };
+              const controlled = { id: controlledId.jobId, name: "process" };
               await eventually(
-                async () => (await initialized.jobs.get(controlled.jobId))?.status === "succeeded",
+                async () => (await initialized.jobs.get(controlled.id))?.status === "succeeded",
               );
               const controlledWrites = await aliceHistory.find!(
-                { ...sourceFilter, "execution_context->>jobId": controlled.jobId },
+                { ...sourceFilter, "execution_context->job": controlled },
                 { select: jobSelect },
               );
               assert.deepEqual(controlledWrites, [
-                { job: [{ id: controlled.jobId }] },
-                { job: [{ id: controlled.jobId }] },
+                { job: [{ id: controlled.id }] },
+                { job: [{ id: controlled.id }] },
               ]);
             },
           );
@@ -972,6 +973,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 relatedRecords: [{ argName: "row", tableName: table, rowPart: { id: row.id } }],
               },
             ]);
+            assert.deepEqual(execution.job, { id, name: "process" });
           }
           await assert.rejects(instance!.jobs.rerun(job.id, { size: "wrong" }));
           await assert.rejects(instance!.jobs.rerun(job.id, { unknown: 1 }));
@@ -1388,7 +1390,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await assert.rejects(preparationJobs.get(started.jobId), /active transaction/);
           assert.equal(controlCallbacks.length, 1);
           const execution = controlCallbacks[0]!;
-          assert.equal(execution.jobId, started.jobId);
+          assert.equal(execution.job?.id, started.jobId);
           assert.deepEqual(
             execution.invocations.map(({ type }) => type),
             ["function", "jobControl"],
@@ -1402,7 +1404,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal(controlHooks.length, 2);
           for (const hookExecution of controlHooks) {
             assert.equal(hookExecution.runId, execution.runId);
-            assert.equal(hookExecution.jobId, started.jobId);
+            assert.equal(hookExecution.job?.id, started.jobId);
             assert.equal(hookExecution.user?.id, "alice");
             assert.deepEqual(hookExecution.invocations.slice(0, -1), execution.invocations);
             assert.equal(hookExecution.invocations.at(-1)!.type, "trigger");
@@ -1458,7 +1460,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           assert.equal((await instance!.jobs.get(started.jobId))!.cancel_requested, false);
           const mutationsBeforeCancel = rowMutationCount;
           await cancel(row.id);
-          assert.equal(controlCallbacks.at(-1)!.jobId, started.jobId);
+          assert.equal(controlCallbacks.at(-1)!.job?.id, started.jobId);
           assert.equal(
             rowMutationCount,
             mutationsBeforeCancel,
@@ -1466,7 +1468,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           );
           await status(started.jobId, "cancelled");
           const retried = await control(row.id);
-          assert.equal(controlCallbacks.at(-1)!.jobId, retried.jobId);
+          assert.equal(controlCallbacks.at(-1)!.job?.id, retried.jobId);
           assert.notEqual(retried.jobId, started.jobId);
           assert.equal((await status(retried.jobId, "running")).reason, "rerun");
           released.add(retried.jobId);
@@ -1474,7 +1476,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           await assert.rejects(control(row.id), /not allowed/);
           await assert.rejects(cancel(row.id), /not allowed/);
           const rerun = await control(row.id, "rerun");
-          assert.equal(controlCallbacks.at(-1)!.jobId, rerun.jobId);
+          assert.equal(controlCallbacks.at(-1)!.job?.id, rerun.jobId);
           released.add(rerun.jobId);
           await status(rerun.jobId, "succeeded");
           assert.equal(
@@ -2404,7 +2406,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               assert(["startOrRetry", "rerun", "cancel"].includes(operation));
               assert.equal(job?.job_name ?? "manual", "manual");
               manualControlJobs = jobs;
-              manualControlJobId = getExecution().jobId;
+              manualControlJobId = getExecution().job?.id;
               if (operation === "startOrRetry" && params.size === 98) {
                 /* The outer control must reject and roll back a conflicting nested start. */
                 assert(manualControlJobId);

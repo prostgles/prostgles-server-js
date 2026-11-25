@@ -48,7 +48,7 @@ export const controlManualJob = async <S>(
       dbx: transaction.dbx as unknown as DBTableHandlersFromSchema<S>,
     });
   const controlledJobId = operation === "cancel" && job ? job.id : randomUUID();
-  return withPreparedJob(prostgles, controlledJobId, prepare, async () => {
+  return withPreparedJob(prostgles, { id: controlledJobId, name }, prepare, async () => {
     if (operation === "cancel") {
       await transactionJobs.cancel(controlledJobId);
       return { jobId: controlledJobId };

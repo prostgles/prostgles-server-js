@@ -119,7 +119,10 @@ export const runJob = async (
     const result = await prostgles.runFunctionExecution(
       {
         ...createExecutionContext(undefined),
-        jobId: job.id,
+        job: {
+          id: job.id,
+          name: job.job_name,
+        },
         user: context.user,
         invocations: [
           {
