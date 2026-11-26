@@ -40,9 +40,9 @@ export class DataValidator {
     this.tableHandler = tableHandler;
   }
 
-  parse = async (args: ParseDataArgs) => {
+  parse = (args: ParseDataArgs) => {
     const { command } = args;
-    const { rowFieldData, validatedRows } = await getValidatedRowFieldData(args, this.tableHandler);
+    const { rowFieldData, validatedRows } = getValidatedRowFieldData(args, this.tableHandler);
     const parsedRowFieldData = getParsedRowFieldData(rowFieldData, args);
     if (command === "update") {
       if (rowFieldData.some((rowParts) => rowParts.length === 0)) {
@@ -205,56 +205,54 @@ export const prepareNewData = ({
  *  - update is not empty
  *  - no duplicate column names ( could update with $func and plain value for same column )
  */
-const getValidatedRowFieldData = async (
+const getValidatedRowFieldData = (
   { allowedCols, rows, command }: ParseDataArgs,
   tableHandler: TableHandler,
 ) => {
   if (!allowedCols.length && command === "update") {
     throw "allowedColumns cannot be empty";
   }
-  const validatedData = await Promise.all(
-    rows.map((nonValidatedRow) => {
-      const row = pickKeys(nonValidatedRow, allowedCols);
+  const validatedData = rows.map((nonValidatedRow) => {
+    const row = pickKeys(nonValidatedRow, allowedCols);
 
-      const getColumn = (fieldName: string) => {
-        if (!allowedCols.includes(fieldName)) {
-          throw `Unexpected/Disallowed column name: ${fieldName}`;
-        }
-        const column = tableHandler.columns.find((c) => c.name === fieldName);
-        if (!column) {
-          throw `Invalid column: ${fieldName}`;
-        }
-        return column;
-      };
+    const getColumn = (fieldName: string) => {
+      if (!allowedCols.includes(fieldName)) {
+        throw `Unexpected/Disallowed column name: ${fieldName}`;
+      }
+      const column = tableHandler.columns.find((c) => c.name === fieldName);
+      if (!column) {
+        throw `Invalid column: ${fieldName}`;
+      }
+      return column;
+    };
 
-      const rowPartValues = Object.entries(row).map(([fieldName, fieldValue]) => {
-        const column = getColumn(fieldName);
-        if (tableHandler.allowColumnFunctions && isObject(fieldValue)) {
-          const [firstKey, ...remainingKeys] = Object.keys(fieldValue);
-          const func =
-            firstKey && !remainingKeys.length ?
-              conversionFunctions.some((f) => `$${f.name}` === firstKey)
-            : undefined;
-          if (func) {
-            const { funcName, args } = parseFunctionObject(fieldValue);
-            return {
-              type: "function",
-              column,
-              funcName,
-              args,
-            } satisfies RowFieldData;
-          }
+    const rowPartValues = Object.entries(row).map(([fieldName, fieldValue]) => {
+      const column = getColumn(fieldName);
+      if (tableHandler.allowColumnFunctions && isObject(fieldValue)) {
+        const [firstKey, ...remainingKeys] = Object.keys(fieldValue);
+        const func =
+          firstKey && !remainingKeys.length ?
+            conversionFunctions.some((f) => `$${f.name}` === firstKey)
+          : undefined;
+        if (func) {
+          const { funcName, args } = parseFunctionObject(fieldValue);
+          return {
+            type: "function",
+            column,
+            funcName,
+            args,
+          } satisfies RowFieldData;
         }
-        return {
-          type: "plain",
-          column: getColumn(fieldName),
-          fieldValue,
-        } satisfies RowFieldData;
-      });
+      }
+      return {
+        type: "plain",
+        column,
+        fieldValue,
+      } satisfies RowFieldData;
+    });
 
-      return { row, rowFieldData: rowPartValues };
-    }),
-  );
+    return { row, rowFieldData: rowPartValues };
+  });
 
   return {
     validatedRows: validatedData.map((data) => data.row),

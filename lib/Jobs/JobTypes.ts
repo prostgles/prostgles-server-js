@@ -31,10 +31,10 @@ export type ParamsSchema = Record<
   string,
   JSONBColumnDef & ({ optional: true } | { default: unknown })
 >;
-type ParamType<P extends JSONBColumnDef> =
-  P extends { jsonbSchema: infer J extends JSONB.JSONBSchema } ? JSONB.GetSchemaType<J>
-  : P extends { jsonbSchemaType: infer J extends JSONB.ObjectType["type"] } ? JSONB.GetObjectType<J>
-  : never;
+export type JobParamSchema<P extends JSONBColumnDef> =
+  P extends { jsonbSchema: infer Field extends JSONB.JSONBSchema } ? Field
+  : { type: NonNullable<P["jsonbSchemaType"]> };
+type ParamType<P extends JSONBColumnDef> = JSONB.GetSchemaType<JobParamSchema<P>>;
 export type ParamsOutput<P extends ParamsSchema> = {
   -readonly [K in keyof P as P[K] extends { default: unknown } ? K : never]: ParamType<P[K]>;
 } & {
@@ -147,6 +147,7 @@ export const jobControlStatuses: Record<JobControlOperation, readonly JobStatus[
   rerun: ["succeeded"],
   cancel: ["pending", "running"],
 };
+
 export type JobControlOptions<S = void, Row extends AnyObject = AnyObject> = {
   row: AnyObject;
   operation: JobControlOperation;

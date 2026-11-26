@@ -151,6 +151,18 @@ export const testSchemaTypes = async (db: DBHandlerServerInternal, pgDb: DB) => 
 
       const initial = await instance.getTSSchema();
       assert(initial.tsSchema.includes('"cachedResult": () => Promise<number>;'));
+      await assert.rejects(
+        instance.update({
+          functions: {
+            public: {
+              userFilter: {},
+              /* @ts-expect-error JavaScript callers can supply an empty input union. */
+              functions: { invalid: { input: [], run: () => 1 } },
+            },
+          },
+        }),
+        /invalid.*at least one input variant/,
+      );
       assert.equal((await instance.getTSSchema()).tsSchema, initial.tsSchema);
       await Promise.all([instance.getTSSchema(), instance.getTSSchema()]);
       assert.equal(analysis.mock.callCount(), 1, "repeated requests must reuse analysis");

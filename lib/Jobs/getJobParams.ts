@@ -1,6 +1,6 @@
 import { getJSONBSchemaValidationErrorAsync, type JSONB, type TableHandler } from "prostgles-types";
 import type { Prostgles } from "../Prostgles";
-import type { JobValue, ParamsSchema } from "./JobTypes";
+import type { JobParamSchema, JobValue, ParamsSchema } from "./JobTypes";
 import { assertJobValue } from "./jobUtils";
 
 export const getJobParams = async (
@@ -21,7 +21,7 @@ export const getJobParams = async (
     const value: unknown =
       input[key] === undefined && hasDefault && "default" in field ? field.default : input[key];
     if (value === undefined && !hasDefault) continue;
-    const jsonSchema = field.jsonbSchema ?? { type: field.jsonbSchemaType };
+    const jsonSchema = getJobParamSchema(field);
     const validation = await getJSONBSchemaValidationErrorAsync(
       jsonSchema as JSONB.FieldType,
       value,
@@ -33,4 +33,9 @@ export const getJobParams = async (
     result[key] = value;
   }
   return result;
+};
+
+export const getJobParamSchema = <P extends ParamsSchema[string]>(field: P) => {
+  const schema = (field.jsonbSchema ?? { type: field.jsonbSchemaType }) satisfies JSONB.JSONBSchema;
+  return schema as JobParamSchema<P>;
 };

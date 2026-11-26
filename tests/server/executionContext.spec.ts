@@ -13,6 +13,7 @@ import {
 } from "prostgles-server";
 import type { DB, DBorTx, DBHandlerServerInternal } from "prostgles-server/dist/Prostgles";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 
 export const testExecutionContext = async (db: DB) => {
   await test("execution context follows functions, hooks and deferred transaction callbacks", async () => {
@@ -198,6 +199,34 @@ export const testExecutionContext = async (db: DB) => {
             userFilter: {},
             functions: {
               readExecution: defineFunction({ run: () => readExecution() }),
+              readLookup: defineFunction({
+                input: [
+                  { lookup: { type: "ValueLookup", table: "pg_class", column: "relname" } },
+                  { lookup: { type: "ValueLookup", table: records, column: "slug" } },
+                  { lookup: { type: "ValueLookup", table: noKey, column: "value" } },
+                  { lookup: "string" },
+                  { row: { type: "RowLookup", table: records } },
+                  { row: { type: "RowLookup", table: noKey } },
+                  {
+                    tenantRow: {
+                      type: "RowLookup",
+                      table: records,
+                      filter: {
+                        tenant: {
+                          $prostglesContext: { objectName: "user", objectPropertyName: "tenant" },
+                        },
+                      },
+                    },
+                  },
+                  { id: "number" },
+                ],
+                run: (args) => {
+                  /* @ts-expect-error A call must match one complete variant. */
+                  const mixed: typeof args = { lookup: "keyless", id: 1 };
+                  void mixed;
+                  return readExecution();
+                },
+              }),
               [escapedFunctionName]: defineFunction({
                 unrestrictedDbAccess: true,
                 run: async (_args, { db }) => {
@@ -357,6 +386,38 @@ export const testExecutionContext = async (db: DB) => {
       const dbo = created.db as unknown as DBHandlerServerInternal;
       const alice = await created.getClientDBHandlers({ userId: "alice" }, undefined);
       const bob = await created.getClientDBHandlers({ userId: "bob" }, undefined);
+      /* The no_key lookup matches before the plain string, so the invocation includes its row reference. */
+      const lookupExecution = (await alice.clientMethods.readLookup!.run({
+        lookup: "keyless",
+      })) as ExecutionContext;
+      assert.deepEqual(getFunctionInvocation(lookupExecution.invocations[0]).relatedRecords, [
+        { argName: "lookup", tableName: noKey, rowPart: { value: "keyless" } },
+      ]);
+      /* The records lookup rejects this column, so the invocation references only the no_key row. */
+      const row = { value: "keyless" };
+      const rowExecution = (await alice.clientMethods.readLookup!.run({ row })) as ExecutionContext;
+      assert.deepEqual(getFunctionInvocation(rowExecution.invocations[0]).relatedRecords, [
+        { argName: "row", tableName: noKey, rowPart: row },
+      ]);
+      await assert.rejects(alice.clientMethods.readLookup!.run({ row: { value: "missing" } }));
+      await assert.rejects(alice.clientMethods.readLookup!.run({ lookup: "keyless", id: 1 }));
+      /* A missing user.tenant only prevents the tenant-scoped variant from matching. */
+      await assert.doesNotReject(alice.clientMethods.readLookup!.run({ id: 2 }));
+      await assert.rejects(
+        alice.clientMethods.readLookup!.run({ tenantRow: { id: 2 } }),
+        /Context property "tenant" not found/,
+      );
+      checkGeneratedTypes(
+        (await created.getTSSchema()).tsSchema,
+        `
+        declare const read: GeneratedFunctionSchema["readLookup"];
+        read({ id: 1 });
+        read({ lookup: "keyless" });
+        const mixed = { id: 1, lookup: "keyless" };
+        /* @ts-expect-error Mixing keys from different input variants is invalid. */
+        read(mixed);
+      `,
+      );
       /* The proxy commits its writes independently of the workflow's transaction. */
       const workflow = alice.clientMethods.workflow!.run();
       const parent = await Promise.race([

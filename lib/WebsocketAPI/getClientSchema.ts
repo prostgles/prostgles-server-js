@@ -90,7 +90,9 @@ export async function getClientSchema(
             return {
               name,
               ...omitKeys(method, ["run", "jobControl"]),
-              ...(method.jobControl && { jobControl: getJobControlBinding(this, method) }),
+              ...(method.jobControl && {
+                jobControl: getJobControlBinding(this.opts.jobs, method),
+              }),
             };
           })
           .sort((a, b) => {

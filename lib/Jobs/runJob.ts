@@ -58,7 +58,7 @@ export const runJob = async (
   let output: JobValue = null;
   try {
     controller.signal.throwIfAborted();
-    const { definition } = getJobDefinition(prostgles, job.job_name);
+    const definition = getJobDefinition(prostgles.opts.jobs, job.job_name);
     if (definition.timeoutMs) {
       timeout = setTimeout(
         () => controller.abort(new Error("Job timed out")),

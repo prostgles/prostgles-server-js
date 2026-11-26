@@ -150,13 +150,13 @@ export async function parseUpdateRules(
             tableHandler: this,
             columnsAddedFromBeforeHooks: [],
           });
-          const updateQ = (
-            await this.dataValidator.parse({
+          const updateQ = this.dataValidator
+            .parse({
               command: "update",
               rows: [data],
               allowedCols,
             })
-          ).getQuery();
+            .getQuery();
           const query = updateQ + " WHERE FALSE ";
           await this.db.any("EXPLAIN " + query);
         } catch (e: any) {

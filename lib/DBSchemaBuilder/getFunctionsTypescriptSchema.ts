@@ -1,4 +1,4 @@
-import { getJSONBTSTypes, type JSONB } from "prostgles-types";
+import { getFunctionInputSchema, getJSONBTSTypes, type FunctionInput } from "prostgles-types";
 import type { TableSchema } from "../DboBuilder/DboBuilder";
 import type { ProstglesInitOptions } from "../ProstglesTypes";
 import { getServerFunctionReturnTypes } from "./getServerFunctionReturnTypes";
@@ -12,7 +12,7 @@ export const getFunctionsTypescriptSchema = (
   resolvedFunctions: Map<
     string,
     {
-      input?: Record<string, JSONB.FieldType>;
+      input?: FunctionInput;
       description?: string;
     }
   >,
@@ -25,7 +25,9 @@ export const getFunctionsTypescriptSchema = (
     ([name, functionDefinition]) => {
       const input = functionDefinition.input;
       const argumentTypes =
-        !input ? "" : `args: ${getJSONBTSTypes(tablesOrViews, { type: input })}`;
+        input ?
+          `args: ${getJSONBTSTypes(tablesOrViews, getFunctionInputSchema(input), { strictUnions: true })}`
+        : "";
 
       const removeSemicolon = (v: string) =>
         v.trim().endsWith(";") ? v.trim().slice(0, -1) : v.trim();

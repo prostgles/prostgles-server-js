@@ -10,7 +10,6 @@ import { PubSubManager } from "../PubSubManager/PubSubManager";
 import { getCreatePubSubManagerError } from "../PubSubManager/getCreatePubSubManagerError";
 import type { PublishParser } from "../PublishParser/PublishParser";
 import type { OnCommitCallback } from "../PublishParser/publishTypesAndUtils";
-import type { ServerFunctionDefinition } from "../PublishParser/defineServerFunction";
 import { getQueryErrorPositionInfo } from "../TableConfig/runSQLFile";
 import type { Graph } from "./joins/shortestPath";
 import type {
@@ -36,6 +35,7 @@ import { cacheDBTypes, runSQL } from "./runSql/runSQL";
 import { getDetailedFieldInfo, type getDbTypes } from "./runSql/runSqlUtils";
 import { getTablesForSchemaPostgresSQL } from "./schema/getTablesForSchemaPostgresSQL";
 import { getPublishSchemas } from "../PublishParser/getPublishSchemas";
+import { validateServerFunctions } from "../PublishParser/validateServerFunctions";
 
 export * from "./DboBuilderTypes";
 export * from "./dboBuilderUtils";
@@ -341,23 +341,7 @@ export class DboBuilder {
       ) => this.getTX(cb);
     }
 
-    const { functions } = this.prostgles.opts;
-    const resolvedFunctions = new Map<string, ServerFunctionDefinition>();
-    if (functions) {
-      for (const group of Object.values(functions)) {
-        for (const [name, definition] of Object.entries(group.functions)) {
-          if (typeof definition.run !== "function") {
-            throw new Error(`Function ${JSON.stringify(name)} must define run`);
-          }
-          if (resolvedFunctions.has(name)) {
-            throw new Error(
-              `Function ${JSON.stringify(name)} is already defined. Function names must be unique across all groups`,
-            );
-          }
-          resolvedFunctions.set(name, definition);
-        }
-      }
-    }
+    validateServerFunctions(this.prostgles.opts.functions);
 
     this.tableTsDefinitions = getDBGeneratedSchema({
       config: this.prostgles.mergedTableConfig.tableConfig,

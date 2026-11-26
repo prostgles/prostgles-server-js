@@ -21,7 +21,7 @@ export const enqueueJob = async (
     occurrence?: Date;
   } = {},
 ) => {
-  const { definition } = getJobDefinition(prostgles, name);
+  const definition = getJobDefinition(prostgles.opts.jobs, name);
   if (definition.runAs === "user" && !options.userId) {
     throw new Error(`User job ${name} requires a user`);
   }

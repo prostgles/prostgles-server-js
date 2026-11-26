@@ -55,7 +55,7 @@ export const getConflictUpdateQuery = async ({
     throw new Error("No non conflict columns to update for onConflict=DoUpdate");
   }
   const forcedColumns = new Set(Object.keys(forcedData ?? {}).map(asName));
-  const { getAssignments } = await table.dataValidator.parse({
+  const { getAssignments } = table.dataValidator.parse({
     command: "update",
     rows: [Object.assign({}, ...prepared.map(({ data }) => data))],
     allowedCols: columns,

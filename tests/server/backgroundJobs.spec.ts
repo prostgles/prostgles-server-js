@@ -1,9 +1,11 @@
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
+import { checkGeneratedTypes } from "./checkGeneratedTypes";
 import { test } from "node:test";
 import pgPromise from "pg-promise";
 import {
   isObject,
+  isFunctionInputUnion,
   ROW_ACTIONS_COLUMN,
   type JobValue,
   type JSONBObjectTypeIfDefined,
@@ -28,7 +30,10 @@ import prostgles, {
 } from "prostgles-server";
 import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import type { JobInsertRecord } from "prostgles-server/dist/Jobs/JobTypes";
-import type { PublishFullyTyped } from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
+import type {
+  DBHandlerServer,
+  PublishFullyTyped,
+} from "prostgles-server/dist/DBSchemaBuilder/DBSchemaBuilder";
 import { getConnectionDetails } from "prostgles-server/dist/DboBuilder/runSql/getAdminClient";
 import { parseCronSchedule } from "prostgles-server/dist/Jobs/cronSchedule";
 import type { TableHandler } from "prostgles-server/dist/DboBuilder/TableHandler/TableHandler";
@@ -197,7 +202,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           functions: {
             controlRecord: defineJobControl({
               jobName: "process",
-              operations: ["startOrRetry", "rerun", "cancel"],
+              operation: ["startOrRetry", "rerun", "cancel"],
               run: async ({ operation, row, user, dbx, jobs }) => {
                 preparationJobs = jobs;
                 controlCallbacks.push(getExecution());
@@ -218,7 +223,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             }),
             retryRecord: defineJobControl({
               jobName: "process",
-              operations: ["startOrRetry"],
+              operation: ["startOrRetry"],
             }),
             rerunJob: defineFunction({
               input: {
@@ -411,6 +416,29 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           result = await prgl.init(() => {}, { type: "init" });
           assert.equal(contextsCreated, 1);
           const initialized = result;
+          /* Rejected updates must leave the published control usable by the next client. */
+          const liveFunctions = prgl.opts.functions!;
+          const members = liveFunctions.members!;
+          const publishedControl = members.functions.control!;
+          await assert.rejects(
+            initialized.update({
+              functions: {
+                members: {
+                  ...members,
+                  functions: {
+                    control: {
+                      input: publishedControl.input,
+                      run: publishedControl.run,
+                      jobControl: { ...publishedControl.jobControl!, operation: ["startOrRetry"] },
+                    },
+                  },
+                },
+              },
+            }),
+            /Job control input must match/,
+          );
+          await assert.rejects(initialized.update({ jobs: undefined }), /Unknown job: process/);
+          assert.equal(prgl.opts.functions, liveFunctions);
           await t.test(
             "audit links job executions in both directions and applies job visibility",
             async () => {
@@ -523,11 +551,19 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           }
           delete definition.retry;
           assert.equal(contextsCreated, 2);
-          const control = prgl.opts.functions!.members!.functions.control!.jobControl!;
+          const control = publishedControl.jobControl!;
           control.jobName = "missing";
           await assert.rejects(prgl.refreshDBO(), /Unknown job: missing/);
           control.jobName = "process";
-          const input = prgl.opts.functions!.members!.functions.control!.input!;
+          const input = publishedControl.input!;
+          /* @ts-expect-error Untyped configurations must also reject empty input unions. */
+          publishedControl.input = [];
+          await assert.rejects(prgl.refreshDBO(), /control.*at least one input variant/);
+          publishedControl.input = input;
+          assert(!isFunctionInputUnion(input));
+          input.operation = { enum: ["startOrRetry"] };
+          await assert.rejects(prgl.refreshDBO(), /Job control input must match/);
+          delete input.operation;
           input.row = { type: "RowLookup", table: "missing" };
           await assert.rejects(
             prgl.refreshDBO(),
@@ -647,11 +683,12 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             row satisfies undefined;
             params.size satisfies number;
             job satisfies JobRecord | undefined;
-            dbx.records satisfies DBOFullyTyped<JobSchema>["records"];
+            dbx.records satisfies DBHandlerServer<JobSchema>["records"];
             /* @ts-expect-error Unknown manual control parameter. */
             void params.missing;
           },
         });
+        manualControl.jobControl.operation satisfies "startOrRetry";
         const manualInput: JSONBObjectTypeIfDefined<typeof manualControl.input> = {};
         const providedParams: JSONBObjectTypeIfDefined<typeof manualControl.input> = {
           params: { size: 2 },
@@ -665,11 +702,11 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const missingJobId: JSONBObjectTypeIfDefined<typeof rerunControl.input> = {};
         const combinedControl = defineControl({
           jobName: "process",
-          operations: ["startOrRetry", "cancel"],
+          operation: ["startOrRetry", "cancel"],
           run: ({ operation, row, dbx }) => {
             operation satisfies "startOrRetry" | "cancel";
             row.revision satisfies number;
-            dbx.records satisfies DBOFullyTyped<JobSchema>["records"];
+            dbx.records satisfies DBHandlerServer<JobSchema>["records"];
           },
         });
         const combinedInput: JSONBObjectTypeIfDefined<typeof combinedControl.input> = {
@@ -683,7 +720,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         };
         const combinedManual = defineControl({
           jobName: "manual",
-          operations: ["startOrRetry", "rerun", "cancel"],
+          operation: ["startOrRetry", "rerun", "cancel"],
           run: ({ operation, params }) => {
             operation satisfies JobControlOperation;
             params.size satisfies number;
@@ -701,10 +738,10 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         const manualCancel: JSONBObjectTypeIfDefined<typeof combinedManual.input> = {
           operation: "cancel",
         };
+        /* @ts-expect-error Cancellation has no parameter overrides. */
         const invalidCancelParams: JSONBObjectTypeIfDefined<typeof combinedManual.input> = {
           operation: "cancel",
           jobId: "id",
-          /* @ts-expect-error Cancellation has no parameter overrides. */
           params: { size: 2 },
         };
         void [
@@ -1268,23 +1305,27 @@ export const testBackgroundJobs = async (parentDb: DB) => {
         "job controls validate and prepare in one callback, start, retry, rerun and cancel atomically",
         async () => {
           const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
-          for (const [name, rowArg, operation, allowedStatuses] of [
+          for (const [name, triggerRowArgName, operation, allowedStatuses] of [
             ["rerunRecord", "row", "rerun", ["succeeded"]],
             ["cancelRecord", "row", "cancel", ["pending", "running"]],
           ] as const) {
             const method = alice.clientSchema.methods.find((method) => method.name === name)!;
-            assert.equal(method.jobControl?.operation, operation);
-            assert.equal(alice.clientMethods[name]!.jobControl?.operation, operation);
+            assert.deepEqual(alice.clientMethods[name]!.jobControl, method.jobControl);
             assert.deepEqual(method.input, { row: { type: "RowLookup", table } });
             assert.deepEqual(method.jobControl, {
               jobName: "process",
-              rowArg,
-              operation,
-              allowedStatuses,
-              tableName: queueName,
-              columnName: "job_id",
+              triggerRowArgName,
+              operations: { [operation]: allowedStatuses },
+              jobsTableName: queueName,
+              rowJobIdColumn: "job_id",
             });
           }
+          const retryMethod = alice.clientMethods.retryRecord!;
+          assert(retryMethod.input && !isFunctionInputUnion(retryMethod.input));
+          assert.deepEqual(retryMethod.input.operation, { enum: ["startOrRetry"] });
+          assert.deepEqual(retryMethod.jobControl?.operations, {
+            startOrRetry: ["failed", "cancelled"],
+          });
           const combinedMethod = alice.clientSchema.methods.find(
             ({ name }) => name === "controlRecord",
           )!;
@@ -1294,9 +1335,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           });
           assert.deepEqual(combinedMethod.jobControl, {
             jobName: "process",
-            rowArg: "row",
-            tableName: queueName,
-            columnName: "job_id",
+            triggerRowArgName: "row",
+            jobsTableName: queueName,
+            rowJobIdColumn: "job_id",
             operations: {
               startOrRetry: ["failed", "cancelled"],
               rerun: ["succeeded"],
@@ -1361,8 +1402,9 @@ export const testBackgroundJobs = async (parentDb: DB) => {
               }),
             );
           }
+          await assert.rejects(retryMethod.run({ row: { id: row.id } }));
           await assert.rejects(
-            alice.clientMethods.retryRecord!.run({
+            retryMethod.run({
               row: { id: row.id },
               operation: "cancel",
             }),
@@ -2400,7 +2442,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
           let manualControlJobId: string | undefined;
           functions.startManualJob = defineManualControl({
             jobName: "manual",
-            operations: ["startOrRetry", "rerun", "cancel"],
+            operation: ["startOrRetry", "rerun", "cancel"],
             run: async ({ operation, row, params, job, dbx, jobs }) => {
               assert.equal(row, undefined);
               assert(["startOrRetry", "rerun", "cancel"].includes(operation));
@@ -2483,6 +2525,45 @@ export const testBackgroundJobs = async (parentDb: DB) => {
             const alice = await instance!.getClientDBHandlers({ userId: "alice" }, undefined);
             const bob = await instance!.getClientDBHandlers({ userId: "bob" }, undefined);
             assert.equal(bob.clientMethods.startManualJob, undefined);
+            const combinedInput = alice.clientMethods.startManualJob!.input;
+            assert(combinedInput && isFunctionInputUnion(combinedInput));
+            assert.deepEqual(combinedInput, [
+              {
+                operation: { enum: ["startOrRetry"] },
+                ...alice.clientMethods.startManualWithoutPreparation!.input,
+              },
+              { operation: { enum: ["rerun"] }, ...alice.clientMethods.rerunManualJob!.input },
+              { operation: { enum: ["cancel"] }, ...alice.clientMethods.cancelManualJob!.input },
+            ]);
+            checkGeneratedTypes(
+              (await instance!.getTSSchema()).tsSchema,
+              `
+              declare const control: GeneratedFunctionSchema["startManualJob"];
+              control({ operation: "startOrRetry", params: { size: 2 } });
+              control({ operation: "rerun", jobId: "id" });
+              control({ operation: "cancel", jobId: "id" });
+              /* @ts-expect-error Reruns require an existing job. */
+              control({ operation: "rerun" });
+              /* @ts-expect-error Cancellations cannot override parameters. */
+              control({ operation: "cancel", jobId: "id", params: { size: 2 } });
+            `,
+            );
+            assert.deepEqual(alice.clientMethods.startManualJob!.jobControl, {
+              jobName: "manual",
+              manualJobIdArgName: "jobId",
+              jobsTableName: queueName,
+              operations: {
+                startOrRetry: ["failed", "cancelled"],
+                rerun: ["succeeded"],
+                cancel: ["pending", "running"],
+              },
+            });
+            assert.deepEqual(alice.clientMethods.cancelManualJob!.jobControl, {
+              jobName: "manual",
+              manualJobIdArgName: "jobId",
+              jobsTableName: queueName,
+              operations: { cancel: ["pending", "running"] },
+            });
             const startManual = (input: { jobId?: string; params?: { size: number } } = {}) =>
               alice.clientMethods.startManualJob!.run({
                 ...input,
@@ -2603,7 +2684,7 @@ export const testBackgroundJobs = async (parentDb: DB) => {
                 jobId: running.jobId,
                 params: { size: 1 },
               }),
-              /does not accept params/,
+              /extra properties: params/,
             );
             await alice.clientMethods.startManualJob!.run({
               operation: "cancel",

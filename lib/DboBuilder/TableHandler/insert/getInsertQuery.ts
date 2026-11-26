@@ -47,7 +47,7 @@ export const getInsertQuery = async ({
   });
 
   const allowedCols = Array.from(new Set(preparedData.flatMap((d) => d.allowedCols)));
-  const { getQuery, validatedRows } = await tableHandler.dataValidator.parse({
+  const { getQuery, validatedRows } = tableHandler.dataValidator.parse({
     command: "insert",
     rows: preparedData.map((d) => d.data),
     allowedCols,

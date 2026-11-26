@@ -1,6 +1,8 @@
-import { getKeys, includes, isDefined, isEmpty, isEqual } from "prostgles-types";
+import { getKeys, includes, isEqual, pickKeys } from "prostgles-types";
+import { validateJobControlBindings } from "./Jobs/getJobControlBinding";
 import type { OnReadyCallbackBasic, UpdatableOptions } from "./initProstgles";
 import type { Prostgles } from "./Prostgles";
+import { validateServerFunctions } from "./PublishParser/validateServerFunctions";
 
 export const updateConfiguration = async (
   prgl: Prostgles,
@@ -9,29 +11,30 @@ export const updateConfiguration = async (
   force?: true,
 ) => {
   prgl.checkNotDestroyed();
-  if ("jobs" in newOpts && (force || !isEqual(prgl.opts.jobs, newOpts.jobs))) {
-    await prgl.jobs.stop();
-  }
-  const optionsThatChanged = getKeys(newOpts)
-    .map((k) => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      if (force || !isEqual(prgl.opts[k], newOpts[k])) {
-        //@ts-ignore
-        prgl.opts[k] = newOpts[k];
-        return k;
-      }
-      return;
-    })
-    .filter(isDefined);
+  const optionsThatChanged = getKeys(newOpts).filter(
+    /* eslint-disable-next-line @typescript-eslint/unbound-method -- callbacks are compared by reference */
+    (key) => force || !isEqual(prgl.opts[key], newOpts[key]),
+  );
   if (!optionsThatChanged.length) {
     await prgl.schemaReady;
     console.warn("No options changed");
     return;
   }
 
-  if (includes(optionsThatChanged, "functions")) {
+  const changedOptions = pickKeys(newOpts, optionsThatChanged, false);
+  if ("functions" in changedOptions) {
+    validateServerFunctions(changedOptions.functions);
+  }
+  if ("functions" in changedOptions || "jobs" in changedOptions) {
+    validateJobControlBindings({ ...prgl.opts, ...changedOptions });
+  }
+  if ("functions" in changedOptions) {
     prgl.dboBuilder.functionTsDefinitions = undefined;
   }
+  if ("jobs" in changedOptions) {
+    await prgl.jobs.stop();
+  }
+  Object.assign(prgl.opts, changedOptions);
 
   // Clear old sockets before either update path initializes the replacement IO.
   if (includes(optionsThatChanged, "io")) {
@@ -70,8 +73,6 @@ export const updateConfiguration = async (
   ) {
     await prgl.writeDBSchema();
   }
-
-  if (isEmpty(newOpts)) return;
 
   /**
    * Some of these changes require clients to reconnect

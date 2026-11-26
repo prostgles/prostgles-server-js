@@ -1,45 +1,43 @@
-import type { JobControlOperation } from "./JobTypes";
+import { isArray } from "../utils/utils";
+import type { JobControlFunctionMetadata, JobControlOperation } from "./JobTypes";
 import { jobControlStatuses } from "./JobTypes";
 
-export type JobControlOperations = JobControlOperation | readonly JobControlOperation[];
-
-export type JobControlSelection =
-  | { operation: JobControlOperation; operations?: never }
-  | { operations: readonly JobControlOperation[]; operation?: never };
+export type JobControlOperations = JobControlFunctionMetadata["operation"];
 
 export type SelectedJobControlOperation<Selection extends JobControlOperations> =
   Selection extends readonly JobControlOperation[] ? Selection[number] : Selection;
 
-export type JobControlOperationInput<Selection extends JobControlOperations> =
+type JobControlOperationInput<Selection extends JobControlOperations> =
   Selection extends readonly JobControlOperation[] ? { operation: { enum: Selection } } : {};
 
 export const getJobControlOperationInput = <Selection extends JobControlOperations>(
   selection: Selection,
-): JobControlOperationInput<Selection> => {
-  const control = getJobControlSelection(selection);
-  const operations = control.operations ?? [control.operation];
+) =>
+  (typeof selection === "string" ?
+    {}
+  : { operation: { enum: selection } }) as JobControlOperationInput<Selection>;
+
+export const getAllowedJobControlOperations = (
+  selection: JobControlOperations,
+): readonly JobControlOperation[] => {
+  const operations = isArray(selection) ? selection : [selection];
   if (
     !operations.length ||
     operations.some((operation) => !Object.hasOwn(jobControlStatuses, operation))
   ) {
     throw new Error("Job control requires valid operations");
   }
-  return (
-    typeof selection === "string" ?
-      {}
-    : { operation: { enum: [...operations] } }) as JobControlOperationInput<Selection>;
+  return operations;
 };
 
-export const getJobControlSelection = (selection: JobControlOperations): JobControlSelection =>
-  typeof selection === "string" ? { operation: selection } : { operations: [...selection] };
-
-export const getJobControlOperation = (
-  selection: JobControlOperations,
+export const getJobControlOperation = <Selection extends JobControlOperations>(
+  selection: Selection,
   input: { operation?: JobControlOperation },
-): JobControlOperation => {
-  if (typeof selection === "string") return selection;
-  if (!input.operation || !selection.includes(input.operation)) {
-    throw new Error(`Job control operation is not allowed: ${input.operation}`);
+): SelectedJobControlOperation<Selection> => {
+  const operations: JobControlOperations = selection;
+  const operation = typeof operations === "string" ? operations : input.operation;
+  if (!operation || (typeof operations !== "string" && !operations.includes(operation))) {
+    throw new Error(`Job control operation is not allowed: ${operation}`);
   }
-  return input.operation;
+  return operation as SelectedJobControlOperation<Selection>;
 };

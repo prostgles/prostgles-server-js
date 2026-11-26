@@ -6,8 +6,8 @@ import { jobError } from "./jobUtils";
 import { getJobTableHandler } from "./getJobTableHandler";
 import { claimJob } from "./claimJob";
 import { enqueueSchedules } from "./enqueueSchedules";
-import { validateJobDefinitions } from "./getJobDefinition";
-import { getJobControlBinding } from "./getJobControlBinding";
+import { getJobTableName, validateJobDefinitions } from "./getJobDefinition";
+import { validateJobControlBindings } from "./getJobControlBinding";
 import { getJobRetention, type JobRetentionPolicy } from "./getJobRetention";
 import { pruneJobs } from "./pruneJobs";
 
@@ -16,7 +16,7 @@ export class JobManager {
     this.api = createJobsAPI(prostgles, undefined);
   }
   get tableName() {
-    return this.prostgles.opts.jobs?.tableName ?? "prostgles_jobs";
+    return getJobTableName(this.prostgles.opts.jobs);
   }
   get tableSQL() {
     const table = this.prostgles.dboBuilder.dboMap.get(this.tableName);
@@ -35,10 +35,7 @@ export class JobManager {
 
   validate = async () => {
     await validateJobDefinitions(this.prostgles, this.prostgles.dboBuilder.tables);
-    for (const group of Object.values(this.prostgles.opts.functions ?? {})) {
-      for (const method of Object.values(group.functions))
-        getJobControlBinding(this.prostgles, method);
-    }
+    validateJobControlBindings(this.prostgles.opts);
     this.retention = await getJobRetention(this.prostgles);
     this.nextRetentionCleanup = 0;
   };

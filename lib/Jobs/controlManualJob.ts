@@ -33,7 +33,7 @@ export const controlManualJob = async <S>(
   } else if (operation !== "startOrRetry") {
     throw new Error("Job ID is required");
   }
-  const { definition } = getJobDefinition(prostgles, name);
+  const definition = getJobDefinition(prostgles.opts.jobs, name);
   const params =
     operation === "cancel" ?
       (job?.params ?? {})

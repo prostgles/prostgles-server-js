@@ -1,9 +1,9 @@
 import type { FunctionInvocation } from "../ExecutionContext";
-import type { ServerFunctionDefinition } from "./defineServerFunction";
+import type { JSONB } from "prostgles-types";
 
 /** Capture top-level RowLookup/ValueLookup inputs without querying the database. */
 export const getFunctionRelatedRecords = (
-  input: ServerFunctionDefinition["input"],
+  input: JSONB.ObjectType["type"] | undefined,
   args: Record<string, unknown> | undefined,
 ): FunctionInvocation["relatedRecords"] => {
   const records: FunctionInvocation["relatedRecords"] = [];

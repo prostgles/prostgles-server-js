@@ -2,7 +2,7 @@ import type {
   AnyObject,
   DBSchema,
   FullFilter,
-  JSONB,
+  FunctionInput,
   JSONBObjectTypeIfDefined,
   MaybePromise,
   SQLHandler,
@@ -55,7 +55,7 @@ export type ServerFunctionContext =
   | UnrestrictedFunctionContext<void, SessionUser, unknown>;
 
 export type ServerFunctionDefinition = {
-  input?: Record<string, JSONB.FieldType>;
+  input?: FunctionInput;
   description?: string;
   unrestrictedDbAccess?: true;
   jobControl?: JobControlFunctionMetadata;
@@ -67,18 +67,14 @@ export type ServerFunctionContextMarker<S, SUser extends SessionUser, Context = 
   [serverFunctionContext]?: [S, SUser, [Context] extends [undefined] ? never : Context];
 };
 
-type DefineFunctionArgs<
-  TInput extends Record<string, JSONB.FieldType> | undefined,
-  Context,
-  Return,
-> = {
+type DefineFunctionArgs<TInput extends FunctionInput | undefined, Context, Return> = {
   input?: TInput;
   description?: string;
   run: (args: JSONBObjectTypeIfDefined<TInput>, context: Context) => MaybePromise<Return>;
 };
 
 export function defineFunction<
-  TInput extends Record<string, JSONB.FieldType> | undefined = undefined,
+  const TInput extends FunctionInput | undefined = undefined,
   S = void,
   SUser extends SessionUser = SessionUser,
   Return = unknown,
@@ -90,7 +86,7 @@ export function defineFunction<
 ): typeof args & ServerFunctionContextMarker<S, SUser, Context>;
 
 export function defineFunction<
-  TInput extends Record<string, JSONB.FieldType> | undefined = undefined,
+  const TInput extends FunctionInput | undefined = undefined,
   S = void,
   SUser extends SessionUser = SessionUser,
   Return = unknown,

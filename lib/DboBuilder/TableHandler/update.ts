@@ -168,13 +168,13 @@ export async function update(
       }
     }
 
-    let query = (
-      await this.dataValidator.parse({
+    let query = this.dataValidator
+      .parse({
         command: "update",
         rows: [nData],
         allowedCols,
       })
-    ).getQuery();
+      .getQuery();
     query += "\n" + updateFilter.where;
     const queryWithRLS = this.withQueryContext(query, localParams);
 

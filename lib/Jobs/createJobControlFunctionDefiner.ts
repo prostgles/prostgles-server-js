@@ -11,42 +11,41 @@ import {
   type ManualJobControlFunctionContext,
 } from "./createManualJobControlFunction";
 import {
+  getAllowedJobControlOperations,
   getJobControlOperation,
   getJobControlOperationInput,
-  getJobControlSelection,
   type JobControlOperations,
-  type JobControlSelection,
   type SelectedJobControlOperation,
 } from "./jobControlFunctionUtils";
 
 /**
  * Row controls accept { row }; manual controls accept { jobId, params }.
- * With operations, callers also provide operation and the shared callback receives it.
+ * An operation array requires callers to choose an operation, even for a single entry.
  * Omit jobId only for a new manual startOrRetry. Existing rows/runs must be readable by the caller.
  */
 export const createJobControlFunctionDefiner =
   <S = void, Context = undefined, SUser extends SessionUser = SessionUser>() =>
   <Definitions extends JobsConfig<S, Context>>(jobs: Definitions) =>
-  <Name extends ControllableJobName<Definitions>, const Selection extends JobControlOperations>(
-    definition: JobControlSelection & {
-      jobName: Name;
-      operation?: Selection & JobControlOperation;
-      operations?: Selection & readonly JobControlOperation[];
-      description?: string;
-      /** Validate and prepare in the control transaction. Throw to roll back everything. */
-      run?: (
-        context: (Definitions[Name] extends { trigger: { type: "manual" } } ?
-          ManualJobControlFunctionContext<S, SUser, Context, JobParams<Definitions, Name>>
-        : JobControlFunctionContext<S, SUser, Context, JobRow<Definitions, Name>>) & {
-          operation: SelectedJobControlOperation<Selection>;
-        },
-      ) => MaybePromise<void>;
-    },
-  ) => {
-    const { jobName, description, run } = definition;
-    const selection = (definition.operations ?? definition.operation) as Selection;
+  <
+    Name extends ControllableJobName<Definitions>,
+    const Selection extends JobControlOperations,
+  >(definition: {
+    jobName: Name;
+    operation: Selection;
+    description?: string;
+    /** Validate and prepare in the control transaction. Throw to roll back everything. */
+    run?: (
+      context: (Definitions[Name] extends { trigger: { type: "manual" } } ?
+        ManualJobControlFunctionContext<S, SUser, Context, JobParams<Definitions, Name>>
+      : JobControlFunctionContext<S, SUser, Context, JobRow<Definitions, Name>>) & {
+        operation: SelectedJobControlOperation<Selection>;
+      },
+    ) => MaybePromise<void>;
+  }) => {
+    const { jobName, operation: selection, description, run } = definition;
     const job = jobs[jobName];
     if (!job) throw new Error(`Unknown job: ${jobName}`);
+    getAllowedJobControlOperations(selection);
     const { trigger } = job;
     type ManualFunction = typeof createManualJobControlFunction<
       S,
@@ -126,14 +125,14 @@ const createRowJobControlFunction = <
   const functionDefinition = {
     input: {
       row: { type: "RowLookup" as const, table },
-      ...getJobControlOperationInput<Selection>(selection),
+      ...getJobControlOperationInput(selection),
     },
     description,
     unrestrictedDbAccess: true as const,
     jobControl: {
       jobName,
-      rowArg: "row" as const,
-      ...getJobControlSelection(selection),
+      triggerRowArgName: "row" as const,
+      operation: selection,
     },
     run: (
       input: { row: AnyObject; operation?: JobControlOperation },
@@ -149,7 +148,7 @@ const createRowJobControlFunction = <
             run({
               ...context,
               row,
-              operation: operation as SelectedJobControlOperation<Selection>,
+              operation,
               dbx,
               jobs: context.jobs.withTransaction(dbx),
             })),

@@ -28,7 +28,7 @@ export const controlJob = async <S, Row extends AnyObject>(
   name: string,
   options: JobControlOptions<S, Row> | ManualJobControlOptions<S>,
 ) => {
-  const { definition } = getJobDefinition(prostgles, name);
+  const definition = getJobDefinition(prostgles.opts.jobs, name);
   const { trigger } = definition;
   if (trigger.type === "manual") {
     if ("row" in options) throw new Error(`Manual job ${name} does not accept a row`);

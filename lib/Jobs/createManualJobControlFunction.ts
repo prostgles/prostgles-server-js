@@ -1,10 +1,12 @@
-import type { JSONB, MaybePromise } from "prostgles-types";
+import type { MaybePromise } from "prostgles-types";
 import type { SessionUser } from "../Auth/AuthTypes";
 import type { DBTableHandlersFromSchema } from "../DBSchemaBuilder/DBSchemaBuilder";
 import type {
   ServerFunctionContextMarker,
+  ServerFunctionDefinition,
   UnrestrictedFunctionContext,
 } from "../PublishParser/defineServerFunction";
+import { getManualJobControlInput } from "./getManualJobControlInput";
 import type {
   JobControlOperation,
   JobRecord,
@@ -15,7 +17,6 @@ import type {
 } from "./JobTypes";
 import {
   getJobControlOperation,
-  getJobControlOperationInput,
   type JobControlOperations,
   type SelectedJobControlOperation,
 } from "./jobControlFunctionUtils";
@@ -45,36 +46,12 @@ export const createManualJobControlFunction = <
       ) => MaybePromise<void>)
     | undefined;
 }) => {
-  const input: Record<string, JSONB.FieldType> = {
-    ...getJobControlOperationInput<Selection>(selection),
-    jobId: {
-      type: "string",
-      optional:
-        typeof selection === "string" ?
-          selection === "startOrRetry"
-        : selection.includes("startOrRetry"),
-    },
-    ...((typeof selection === "string" ?
-      selection !== "cancel"
-    : selection.some((operation) => operation !== "cancel")) && {
-      params: {
-        type: Object.fromEntries(
-          Object.entries(params ?? {}).map(([key, field]) => [
-            key,
-            {
-              ...(field.jsonbSchema ?? { type: field.jsonbSchemaType }),
-              optional: true,
-            } as JSONB.FieldType,
-          ]),
-        ),
-        optional: true,
-      },
-    }),
-  };
+  const input = getManualJobControlInput<Schema, Selection>(params, selection);
   const functionDefinition = {
-    input: input as SelectedManualControlInput<Schema, Selection>,
+    input,
     description,
     unrestrictedDbAccess: true as const,
+    jobControl: { jobName, manualJobIdArgName: "jobId" as const, operation: selection },
     run: (
       input: {
         jobId?: string;
@@ -84,16 +61,13 @@ export const createManualJobControlFunction = <
       context: UnrestrictedFunctionContext<S, SUser, Context>,
     ) => {
       const operation = getJobControlOperation(selection, input);
-      if (operation === "cancel" && "params" in input) {
-        throw new Error("Cancelling a job does not accept params");
-      }
       const prepare: ManualJobControlOptions<S>["run"] =
         run &&
         (({ job, params, dbx }) =>
           run({
             ...context,
             row: undefined,
-            operation: operation as SelectedJobControlOperation<Selection>,
+            operation,
             job,
             params: params as unknown as ParamsOutput<Schema>,
             dbx,
@@ -105,8 +79,8 @@ export const createManualJobControlFunction = <
         run: prepare,
       });
     },
-  };
-  return functionDefinition as typeof functionDefinition &
+  } as const;
+  return functionDefinition satisfies ServerFunctionDefinition as typeof functionDefinition &
     ServerFunctionContextMarker<S, SUser, Context>;
 };
 
@@ -119,31 +93,3 @@ export type ManualJobControlFunctionContext<S, SUser extends SessionUser, Contex
   params: Params;
   dbx: DBTableHandlersFromSchema<S>;
 };
-
-type ManualControlInput<Schema extends ParamsSchema, Operation extends JobControlOperation> = {
-  jobId: { type: "string"; optional: Operation extends "startOrRetry" ? true : false };
-} & (Operation extends "cancel" ? {}
-: {
-    params: {
-      optional: true;
-      type: {
-        [Key in keyof Schema]: Omit<
-          Schema[Key] extends { jsonbSchema: infer Field } ? Field
-          : { type: Schema[Key]["jsonbSchemaType"] },
-          "optional"
-        > & { optional: true };
-      };
-    };
-  });
-
-type SelectedManualControlInput<
-  Schema extends ParamsSchema,
-  Selection extends JobControlOperations,
-> =
-  Selection extends readonly JobControlOperation[] ?
-    {
-      [Operation in Selection[number]]: ManualControlInput<Schema, Operation> & {
-        operation: { enum: readonly [Operation] };
-      };
-    }[Selection[number]]
-  : ManualControlInput<Schema, Extract<Selection, JobControlOperation>>;

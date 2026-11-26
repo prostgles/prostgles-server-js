@@ -1,4 +1,4 @@
-import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS } from "prostgles-types";
+import { getObjectEntries, includes, SQL_COMMAND_TABLE_METHODS, type JSONB } from "prostgles-types";
 import { getClientRequestIPsInfo } from "../Auth/AuthHandler";
 import type { AuthClientRequest, AuthResultWithSID, SessionUser } from "../Auth/AuthTypes";
 import { getAuditTableRules } from "../Audit/getAuditTableRules";
@@ -105,7 +105,7 @@ export class PublishParser {
     if (!userId || typeof userId !== "string") {
       throw "User ID is missing or invalid";
     }
-    const allowedFunctionsMap = new Map<string, ServerFunctionDefinition>();
+    const allowedFunctionsMap = new Map<string, PublishedFunction>();
 
     for (const group of Object.values(functionGroups)) {
       const matchingUser = await findUser(
@@ -122,7 +122,7 @@ export class PublishParser {
           throw `Duplicate function name detected: ${name}. Function names must be unique across all groups.`;
         }
 
-        const runWithContext = async (args: Record<string, unknown> | undefined) => {
+        const runWithContext: PublishedFunction["run"] = async (args, inputFields) => {
           this.prostgles.checkNotDestroyed();
           const ctx = await (async () => {
             if (method.unrestrictedDbAccess) {
@@ -151,7 +151,7 @@ export class PublishParser {
 
           this.prostgles.checkNotDestroyed();
           const parent = createExecutionContext(this.prostgles.getExecution());
-          const relatedRecords = getFunctionRelatedRecords(method.input, args);
+          const relatedRecords = getFunctionRelatedRecords(inputFields, args);
           return this.prostgles.runFunctionExecution(
             {
               ...parent,
@@ -434,3 +434,10 @@ function applyParamsIfFunc<T>(
   //@ts-ignore
   return maybeFunc;
 }
+
+type PublishedFunction = Omit<ServerFunctionDefinition, "run"> & {
+  run: (
+    args: Record<string, unknown> | undefined,
+    validatedFields: JSONB.ObjectType["type"] | undefined,
+  ) => Promise<unknown>;
+};

@@ -4,16 +4,14 @@ import type { TableSchema } from "../DboBuilder/DboBuilderTypes";
 import { parseCronSchedule } from "./cronSchedule";
 import { getJobParams } from "./getJobParams";
 
-export const getJobDefinition = (prostgles: Prostgles, name: string) => {
-  const definition = prostgles.opts.jobs?.definitions[name] as RuntimeJobDefinition | undefined;
+export const getJobDefinition = (jobs: Prostgles["opts"]["jobs"], name: string) => {
+  const definition = jobs?.definitions[name] as RuntimeJobDefinition | undefined;
   if (!definition) throw new Error(`Unknown job: ${name}`);
-  const { trigger } = definition;
-  const table =
-    trigger.type === "row" ?
-      prostgles.dboBuilder.tablesOrViews?.find((t) => t.name === trigger.table)
-    : undefined;
-  return { definition, table };
+  return definition;
 };
+
+export const getJobTableName = (jobs: Prostgles["opts"]["jobs"]) =>
+  jobs?.tableName ?? "prostgles_jobs";
 
 export const validateJobDefinitions = async (prostgles: Prostgles, tables: TableSchema[]) => {
   for (const [name, job] of Object.entries(prostgles.opts.jobs?.definitions ?? {})) {

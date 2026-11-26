@@ -16,7 +16,7 @@ export const startJob = async (
     userId: string | undefined;
   },
 ) => {
-  const { trigger } = getJobDefinition(prostgles, name).definition;
+  const { trigger } = getJobDefinition(prostgles.opts.jobs, name);
   const enqueue = async (targetRowPkey: JobRecord["target_row_pkey"]) => {
     const { jobId } = await enqueueJob(prostgles, transaction, name, targetRowPkey, options);
     return { jobId };

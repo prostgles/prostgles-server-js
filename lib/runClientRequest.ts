@@ -2,8 +2,8 @@ import type { SQLRequest, TableHandler } from "prostgles-types";
 import {
   ABORTABLE_METHODS,
   getJSONBObjectSchemaValidationError,
-  getJSONBSchemaValidationErrorAsync,
   getKeys,
+  getValidatedFunctionInputFields,
   type AnyObject,
 } from "prostgles-types";
 import type { AuthClientRequest } from "./Auth/AuthTypes";
@@ -290,22 +290,16 @@ export const runClientMethod = async function (
     if (!this.publishParser) throw new Error("Publish parser is not initialized");
     const publishParams = await this.publishParser.getPublishParams(clientReq, undefined);
     const { clientDb } = await this.getClientDBHandlers(clientReq, undefined);
-    const expectedArgsError = await getJSONBSchemaValidationErrorAsync(
-      { type: replaceContextPlaceholders(inputSchema, publishParams, "runtime") },
+    const fields = await getValidatedFunctionInputFields(
+      inputSchema,
       input,
       new Map(Object.entries(clientDb)),
+      (fields) => replaceContextPlaceholders(fields, publishParams, "runtime"),
     );
-
-    if (expectedArgsError.error !== undefined) {
-      const { error } = expectedArgsError;
-      const message = error.startsWith(" ") ? "input" + error : error;
-      throw message;
-    }
+    this.checkNotDestroyed();
+    return functionDefinition.run(input, fields);
   }
 
-  /** Allowed functions are wrapped with their request context by PublishParser. */
   this.checkNotDestroyed();
-  const res = await functionDefinition.run(input as never, undefined);
-
-  return res;
+  return functionDefinition.run(undefined, undefined);
 };
