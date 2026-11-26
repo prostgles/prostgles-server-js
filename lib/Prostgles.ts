@@ -122,7 +122,12 @@ export class Prostgles {
   schemaReady: Promise<void> = Promise.resolve();
 
   runSchemaQueries = (queries: () => Promise<void>) => {
-    this.schemaReady = this.schemaReady.catch(() => {}).then(queries);
+    this.schemaReady = this.schemaReady
+      .catch(() => {})
+      .then(() => {
+        this.invalidateMergedTableConfig();
+        return queries();
+      });
     void this.schemaReady.catch(() => {});
     return this.schemaReady;
   };
@@ -140,8 +145,12 @@ export class Prostgles {
     return parseAuditConfig(this);
   }
 
+  private cachedMergedTableConfig: ReturnType<typeof getMergedTableConfig> | undefined;
   get mergedTableConfig() {
-    return getMergedTableConfig(this);
+    return (this.cachedMergedTableConfig ??= getMergedTableConfig(this));
+  }
+  invalidateMergedTableConfig() {
+    this.cachedMergedTableConfig = undefined;
   }
 
   isMedia(tableName: string) {

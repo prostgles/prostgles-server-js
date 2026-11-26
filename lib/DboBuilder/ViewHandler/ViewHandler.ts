@@ -52,7 +52,9 @@ export class ViewHandler {
   joinGraph?: Graph;
   joinPaths: JoinPaths;
   dboBuilder: DboBuilder;
-  config: TableDefinition<any> | undefined;
+  get config(): TableDefinition<any> | undefined {
+    return this.dboBuilder.prostgles.mergedTableConfig.tableConfig?.[this.name];
+  }
   hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
 
   tx?: {
@@ -70,7 +72,6 @@ export class ViewHandler {
   is_media = false;
   constructor({
     db,
-    config,
     dboBuilder,
     tableOrViewInfo,
     tx,
@@ -80,12 +81,10 @@ export class ViewHandler {
     db: DB;
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
-    config: TableDefinition<any> | undefined;
     hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths: JoinPaths;
   }) {
-    this.config = config;
     this.hooks = hooks;
     this.db = db;
     this.tx = tx;

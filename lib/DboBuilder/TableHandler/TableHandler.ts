@@ -17,7 +17,6 @@ import type {
   UpdateRule,
 } from "../../PublishParser/PublishParser";
 import { getSyncBatchOptions } from "../../PubSubManager/SyncReplication/getSyncBatchOptions";
-import type { TableDefinition } from "../../TableConfig/TableConfigTypes";
 import type { DboBuilder, Filter, LocalParams, TableHandlers } from "../DboBuilder";
 import { getErrorAsObject, getSerializedClientErrorFromPGError } from "../DboBuilder";
 import type { TableSchema } from "../DboBuilderTypes";
@@ -34,7 +33,6 @@ import { update } from "./update";
 import { updateBatch } from "./updateBatch";
 import { upsert } from "./upsert";
 import { isApplicableHook } from "./isApplicableHook";
-import type { TableConfigurator } from "../../TableConfig/TableConfigurator";
 import type { TableHooksDefinition } from "../../TableHooks/TableHooks";
 import type { TransactionCallbacks } from "../../PublishParser/publishTypesAndUtils";
 import { prepareWhere } from "../ViewHandler/prepareWhere";
@@ -46,7 +44,6 @@ export type ValidatedParams = {
   allowedFields?: FieldFilter;
   tableRules?: ParsedTableRule;
   removeDisallowedFields: boolean;
-  tableConfigurator: TableConfigurator | undefined;
   tableHandler: TableHandler;
   columnsAddedFromBeforeHooks: string[];
 };
@@ -56,7 +53,6 @@ export class TableHandler extends ViewHandler {
   readonly allowColumnFunctions: boolean;
   constructor({
     db,
-    config,
     hooks,
     dboBuilder,
     tableOrViewInfo,
@@ -66,12 +62,11 @@ export class TableHandler extends ViewHandler {
     db: DB;
     tableOrViewInfo: TableSchema;
     dboBuilder: DboBuilder;
-    config: TableDefinition<any> | undefined;
     hooks: TableHooksDefinition<AnyObject, TableHandlers, any> | undefined;
     tx?: { t: pgPromise.ITask<{}>; dbTX: TableHandlers };
     joinPaths: JoinPaths;
   }) {
-    super({ db, tableOrViewInfo, dboBuilder, config, hooks, tx, joinPaths });
+    super({ db, tableOrViewInfo, dboBuilder, hooks, tx, joinPaths });
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.remove = this.delete;

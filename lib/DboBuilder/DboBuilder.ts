@@ -301,7 +301,7 @@ export class DboBuilder {
     this.constraints = await getConstraints(schemaDb, this.prostgles.opts.schemaFilter);
     this.prepareShortestJoinPaths();
 
-    const { tableConfig, tableHooks } = this.prostgles.mergedTableConfig;
+    const { tableHooks } = this.prostgles.mergedTableConfig;
     this.dboMap = new Map();
     this.dbo = {};
     this.tablesOrViews.map((tov) => {
@@ -320,7 +320,6 @@ export class DboBuilder {
         tableOrViewInfo: tov,
         dboBuilder: this,
         tx: undefined,
-        config: tableConfig?.[tov.name],
         hooks: tableHooks?.[tov.name],
         joinPaths: this.shortestJoinPaths,
       });
@@ -459,14 +458,13 @@ export class DboBuilder {
         this.onRollbackCallbacksByTransaction.set(t, onRollbackCallbacks);
 
         const dbTX: DbTxTableHandlers = {};
-        const { tableConfig, tableHooks } = this.prostgles.mergedTableConfig;
+        const { tableHooks } = this.prostgles.mergedTableConfig;
         this.tablesOrViews?.map((tov) => {
           dbTX[tov.name] = new TableHandler({
             db: this.db,
             tableOrViewInfo: tov,
             dboBuilder: this,
             tx: { t, dbTX },
-            config: tableConfig?.[tov.name],
             hooks: tableHooks?.[tov.name],
             joinPaths: this.shortestJoinPaths,
           });

@@ -19,6 +19,7 @@ import { Prostgles, type DB } from "prostgles-server/dist/Prostgles";
 import { PublishParser } from "prostgles-server/dist/PublishParser/PublishParser";
 import { runJobControl } from "prostgles-server/dist/ExecutionContext";
 import { executeSqlWithRollback } from "prostgles-server/dist/TableConfig/getFutureTableSchema";
+import { getMergedTableConfig } from "prostgles-server/dist/TableConfig/getMergedTableConfig";
 import {
   AUDIT_TRIGGER_PREFIX,
   TABLE_CONFIG_TRIGGER_PREFIX,
@@ -230,13 +231,13 @@ export async function testAudit(parentDb: DB) {
           throw new Error("tableConfig is not defined");
         }
         prgl.opts.tableConfig.audit_events = {};
-        assert.throws(() => prgl.mergedTableConfig, /cannot also be defined/);
+        assert.throws(() => getMergedTableConfig(prgl), /cannot also be defined/);
         delete prgl.opts.tableConfig.audit_events;
         const sourceConfig = prgl.opts.tableConfig.audit_test_source as TableDefinition;
         for (const prefix of [AUDIT_TRIGGER_PREFIX, TABLE_CONFIG_TRIGGER_PREFIX]) {
           const name = prefix + "user_trigger";
           sourceConfig.triggers![name] = sourceConfig.triggers!.audit_test_custom!;
-          assert.throws(() => prgl.mergedTableConfig, /prefix reserved for prostgles/);
+          assert.throws(() => getMergedTableConfig(prgl), /prefix reserved for prostgles/);
           delete sourceConfig.triggers![name];
         }
         await result.sql(`CREATE OR REPLACE FUNCTION audit_test_manual() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END;';

@@ -35,6 +35,7 @@ export const updateConfiguration = async (
     await prgl.jobs.stop();
   }
   Object.assign(prgl.opts, changedOptions);
+  prgl.invalidateMergedTableConfig();
 
   // Clear old sockets before either update path initializes the replacement IO.
   if (includes(optionsThatChanged, "io")) {

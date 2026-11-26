@@ -565,7 +565,7 @@ export const testConflictUpdates = async (db: DB) => {
       await db.none(`DROP SCHEMA ${schema} CASCADE`);
     }
   });
-  await test("conflict updates normalize forcedData like ordinary updates", async () => {
+  await test("retained handlers apply updated column rules to writes", async () => {
     const schema = `conflict_normalized_${randomUUID().replaceAll("-", "")}`;
     let instance: InitResult | undefined;
     await db.none(`CREATE SCHEMA ${schema}`);
@@ -580,17 +580,34 @@ export const testConflictUpdates = async (db: DB) => {
           records: {
             columns: {
               id: "INTEGER PRIMARY KEY",
-              value: { isText: true, trimmed: true, lowerCased: true },
+              value: { isText: true },
             },
           },
         },
         onReady: () => {},
       });
       const handler = instance.db.records as TableHandler;
+      const { prostgles: server } = handler.dboBuilder;
+      const initialConfig = server.mergedTableConfig;
       await handler.insert([
         { id: 1, value: "old" },
         { id: 2, value: "old" },
       ]);
+      assert.strictEqual(server.mergedTableConfig, initialConfig);
+      await instance.update({
+        tableConfig: {
+          records: {
+            columns: {
+              id: { sqlDefinition: "INTEGER PRIMARY KEY", info: { max: 2 } },
+              value: { isText: true, trimmed: true, lowerCased: true },
+            },
+          },
+        },
+      });
+      assert.notStrictEqual(server.mergedTableConfig, initialConfig);
+      await assert.rejects(handler.insertMany([{ id: 3, value: "invalid" }]), {
+        message: "id must be less than 2",
+      });
       const rules = {
         insert: { fields: "*" as const, returningFields: "*" as const },
         update: {

@@ -123,18 +123,6 @@ export class TableConfigurator {
     return result;
   };
 
-  checkColVal = (params: { col: string; table: string; value?: number | string }): void => {
-    const conf = this.getColInfo(params);
-    if (conf) {
-      const { value } = params;
-      const { min, max } = conf;
-      if (min !== undefined && value !== undefined && value < min)
-        throw `${params.col} must be greater than ${min}`;
-      if (max !== undefined && value !== undefined && value > max)
-        throw `${params.col} must be less than ${max}`;
-    }
-  };
-
   prevInitQueryHistory?: string[];
   initialising = false;
   init = () =>

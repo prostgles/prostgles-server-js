@@ -145,21 +145,17 @@ const getValidatedRow = ({
   return finalRow;
 };
 
-/**
- * Add synced_field value if missing
- * prepareFieldValues(): Apply forcedData, remove disallowed columns, validate against allowed columns
- * tableConfigurator?.checkColVal(): Validate column min/max/isText/lowerCased/trimmed values
- */
+/** Apply forced data and validate values using the table handler's schema configuration. */
 export const prepareNewData = ({
   row,
   forcedData,
   allowedFields,
   removeDisallowedFields = false,
-  tableConfigurator,
   tableHandler,
   columnsAddedFromBeforeHooks,
 }: ValidatedParams) => {
-  const synced_field = tableHandler.config?.syncConfig?.synced_field;
+  const tableConfig = tableHandler.config;
+  const synced_field = tableConfig?.syncConfig?.synced_field;
 
   /* Update synced_field if sync is on and missing */
   if (synced_field && !row[synced_field]) {
@@ -175,15 +171,20 @@ export const prepareNewData = ({
     columnsAddedFromBeforeHooks,
   });
   const dataKeys = getKeys(data);
+  const columnConfigs = tableConfig?.columns;
 
   dataKeys.forEach((col) => {
-    tableConfigurator?.checkColVal({
-      table: tableHandler.name,
-      col,
-      value: data[col],
-    });
-    const colConfig = tableConfigurator?.getColumnConfig(tableHandler.name, col);
-    if (colConfig && isObject(colConfig) && "isText" in colConfig && data[col]) {
+    const colConfig = columnConfigs?.[col];
+    if (!isObject(colConfig)) return;
+    const { min, max } = colConfig.info ?? {};
+    const value = data[col];
+    if (min !== undefined && value !== undefined && value < min) {
+      throw `${col} must be greater than ${min}`;
+    }
+    if (max !== undefined && value !== undefined && value > max) {
+      throw `${col} must be less than ${max}`;
+    }
+    if ("isText" in colConfig && value) {
       if (colConfig.lowerCased) {
         data[col] = data[col].toString().toLowerCase();
       }

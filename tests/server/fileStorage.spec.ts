@@ -63,6 +63,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
         })[]
       >;
     const hooks = files.dboBuilder.prostgles.opts.tableHooks!.files!;
+    const syncHooks = files.dboBuilder.prostgles.tableConfigurator!.sync;
     const originalHooks = hooks.afterEach;
     hooks.afterEach = [
       ...(originalHooks ?? []),
@@ -73,6 +74,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
         },
       },
     ];
+    await syncHooks();
     let original = await files.insert(fileData("original"), { returning: "*" });
     try {
       const getFileRules = async (publish: PublishObject) => {
@@ -712,6 +714,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
           },
         ];
         try {
+          await syncHooks();
           for (const outcome of ["commit", "rollback", "failure"]) {
             events.length = 0;
             let id: string | undefined;
@@ -734,6 +737,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
           }
         } finally {
           hooks.beforeEach = beforeHooks;
+          await syncHooks();
         }
       });
 
@@ -914,6 +918,7 @@ export const testFileStorage = async (dbo: DBHandlerServerInternal, db: DB) => {
       storage.upload = upload;
       storage.delete = remove;
       hooks.afterEach = originalHooks;
+      await syncHooks();
       await db.none("DROP TABLE IF EXISTS storage_file_ref");
       await files.delete({ id: original.id });
     }

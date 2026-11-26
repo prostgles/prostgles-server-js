@@ -92,7 +92,6 @@ export async function update(
       allowedFields: fields,
       tableRules,
       removeDisallowedFields,
-      tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
       tableHandler: this,
       columnsAddedFromBeforeHooks: beforeResult.columnsAdded,
     });

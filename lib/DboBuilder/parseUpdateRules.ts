@@ -146,7 +146,6 @@ export async function parseUpdateRules(
             allowedFields: "*",
             tableRules,
             removeDisallowedFields: false,
-            tableConfigurator: this.dboBuilder.prostgles.tableConfigurator,
             tableHandler: this,
             columnsAddedFromBeforeHooks: [],
           });

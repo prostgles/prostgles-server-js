@@ -45,7 +45,6 @@ export const getConflictUpdateQuery = async ({
       allowedFields: fields,
       tableRules,
       removeDisallowedFields,
-      tableConfigurator: table.dboBuilder.prostgles.tableConfigurator,
       tableHandler: table,
       columnsAddedFromBeforeHooks,
     }),

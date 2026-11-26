@@ -40,7 +40,6 @@ export const getInsertQuery = async ({
       allowedFields: fields,
       tableRules,
       removeDisallowedFields,
-      tableConfigurator: tableHandler.dboBuilder.prostgles.tableConfigurator,
       tableHandler,
       columnsAddedFromBeforeHooks,
     });
