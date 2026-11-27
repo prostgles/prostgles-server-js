@@ -813,6 +813,27 @@ export const isomorphicQueries = async (
       assert.deepStrictEqual(resVl, ["a", "a", "b"]);
     });
 
+    await test("JSONB object projection preserves fields beyond 50 key/value pairs", async () => {
+      const id = -101;
+      await db.items.insert({ id, name: "wide projection" });
+      try {
+        const columns = [...Array<string>(50).fill("id"), "name", "h"];
+        const row = await db.items.findOne(
+          { id },
+          {
+            select: { projected: { $jsonb_build_object: columns } },
+          },
+        );
+        assert.deepEqual(row?.projected, {
+          id,
+          name: "wide projection",
+          h: null,
+        });
+      } finally {
+        await db.items.delete({ id });
+      }
+    });
+
     await test("PostgreSQL array element", async () => {
       const id = -100;
       await db.items.insert({ id, name: "array element", h: ["a1", "a2"] });

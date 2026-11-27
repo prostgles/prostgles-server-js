@@ -790,7 +790,19 @@ export const FUNCTIONS: FunctionSpec[] = [
     singleColArg: false,
     getFields: (args) => args,
     getQuery: ({ args, tableAliasRaw: tableAlias }) => {
-      return `jsonb_build_object(${args.flatMap((arg) => [asValue(arg), asNameAlias(arg, tableAlias)]).join(", ")})`;
+      /* PostgreSQL accepts 100 function arguments, two per key/value pair. */
+      const columnsPerObject = 50;
+      const objects: string[] = [];
+      for (let offset = 0; offset < args.length; offset += columnsPerObject) {
+        const pairs = args
+          .slice(offset, offset + columnsPerObject)
+          .map(
+            (column) =>
+              `${asValue(column)}, ${asNameAlias(column, tableAlias)}`,
+          );
+        objects.push(`jsonb_build_object(${pairs.join(", ")})`);
+      }
+      return `(${objects.join(" || ")})`;
     },
   }),
 
